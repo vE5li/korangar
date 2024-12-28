@@ -250,6 +250,10 @@ impl Prepare for InterfaceRectangleDrawer {
             return;
         }
 
+        let Some(font_map_texture) = instructions.font_map_texture else {
+            return;
+        };
+
         self.instance_data.clear();
 
         if self.bindless_support {
@@ -381,8 +385,8 @@ impl Prepare for InterfaceRectangleDrawer {
                 &self.bind_group_layout,
                 &self.instance_data_buffer,
                 &texture_views,
-                instructions.font_map_texture.get_texture_view(),
-            )
+                font_map_texture.get_texture_view(),
+            );
         } else {
             for instruction in instructions.interface.iter() {
                 match instruction {
@@ -481,8 +485,8 @@ impl Prepare for InterfaceRectangleDrawer {
                 device,
                 &self.bind_group_layout,
                 &self.instance_data_buffer,
-                instructions.font_map_texture.get_texture_view(),
-            )
+                font_map_texture.get_texture_view(),
+            );
         }
     }
 

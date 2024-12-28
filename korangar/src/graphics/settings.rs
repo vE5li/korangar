@@ -161,7 +161,7 @@ impl Display for ScreenSpaceAntiAliasing {
 }
 
 #[cfg(feature = "debug")]
-#[derive(Copy, Clone, new)]
+#[derive(Copy, Clone, Default, new)]
 pub struct RenderSettings {
     #[new(value = "true")]
     pub show_frames_per_second: bool,

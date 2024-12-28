@@ -60,7 +60,7 @@ impl PacketCallback for NoPacketCallback {}
 
 pub type HandlerFunction<Output, Meta> = Box<dyn Fn(&mut ByteReader<Meta>) -> ConversionResult<Output>>;
 
-/// A struct to help with reading packets from from a [`ByteReader`] and
+/// A struct to help with reading packets from a [`ByteReader`] and
 /// converting them to some common event type.
 ///
 /// It allows passing a packet callback to monitor incoming packets.

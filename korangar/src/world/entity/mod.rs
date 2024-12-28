@@ -2,7 +2,7 @@ use std::string::String;
 use std::sync::Arc;
 
 use arrayvec::ArrayVec;
-use cgmath::{EuclideanSpace, Point3, Vector2, VectorSpace};
+use cgmath::{EuclideanSpace, Point3, Vector2, VectorSpace, Zero};
 use derive_new::new;
 use korangar_audio::{AudioEngine, SoundEffectKey};
 use korangar_interface::elements::PrototypeElement;
@@ -347,17 +347,14 @@ impl Common {
         action_loader: &mut ActionLoader,
         animation_loader: &mut AnimationLoader,
         script_loader: &ScriptLoader,
-        map: &Map,
-        path_finder: &mut PathFinder,
-        entity_data: EntityData,
+        entity_data: &EntityData,
+        grid_position: Vector2<usize>,
+        position: Point3<f32>,
         client_tick: ClientTick,
     ) -> Self {
         let entity_id = entity_data.entity_id;
         let job_id = entity_data.job as usize;
         let head = entity_data.head as usize;
-        let grid_position = entity_data.position;
-        let grid_position = Vector2::new(grid_position.x, grid_position.y);
-        let position = map.get_world_position(grid_position);
         let head_direction = entity_data.head_direction;
         let direction = entity_data.position.direction;
 
@@ -376,7 +373,7 @@ impl Common {
         let details = ResourceState::Unavailable;
         let animation_state = AnimationState::new(entity_type, client_tick);
 
-        let mut common = Self {
+        Self {
             grid_position,
             position,
             entity_id,
@@ -393,15 +390,7 @@ impl Common {
             details,
             animation_state,
             sound_state: SoundState::default(),
-        };
-
-        if let Some(destination) = entity_data.destination {
-            let position_from = Vector2::new(entity_data.position.x, entity_data.position.y);
-            let position_to = Vector2::new(destination.x, destination.y);
-            common.move_from_to(map, path_finder, position_from, position_to, client_tick);
         }
-
-        common
     }
 
     pub fn reload_sprite(
@@ -799,16 +788,16 @@ pub struct Player {
 }
 
 impl Player {
+    /// This function creates the player entity free-floating in the
+    /// "void". When a new map is loaded on map change, the server sends
+    /// the correct position we need to position the player to.
     pub fn new(
         sprite_loader: &mut SpriteLoader,
         action_loader: &mut ActionLoader,
         animation_loader: &mut AnimationLoader,
         script_loader: &ScriptLoader,
-        map: &Map,
-        path_finder: &mut PathFinder,
         account_id: AccountId,
         character_information: CharacterInformation,
-        player_position: WorldPosition,
         client_tick: ClientTick,
     ) -> Self {
         let hair_id = character_information.head as usize;
@@ -816,14 +805,19 @@ impl Player {
         let activity_points = 0;
         let maximum_spell_points = character_information.maximum_spell_points as usize;
         let maximum_activity_points = 0;
+
+        let entity_data = EntityData::from_character(account_id, character_information, WorldPosition::origin());
+        let grid_position = Vector2::zero();
+        let position = Point3::origin();
+
         let common = Common::new(
             sprite_loader,
             action_loader,
             animation_loader,
             script_loader,
-            map,
-            path_finder,
-            EntityData::from_character(account_id, character_information, player_position),
+            &entity_data,
+            grid_position,
+            position,
             client_tick,
         );
 
@@ -962,16 +956,25 @@ impl Npc {
         entity_data: EntityData,
         client_tick: ClientTick,
     ) -> Self {
-        let common = Common::new(
+        let grid_position = Vector2::new(entity_data.position.x, entity_data.position.y);
+        let position = map.get_world_position(grid_position);
+
+        let mut common = Common::new(
             sprite_loader,
             action_loader,
             animation_loader,
             script_loader,
-            map,
-            path_finder,
-            entity_data,
+            &entity_data,
+            grid_position,
+            position,
             client_tick,
         );
+
+        if let Some(destination) = entity_data.destination {
+            let position_from = Vector2::new(entity_data.position.x, entity_data.position.y);
+            let position_to = Vector2::new(destination.x, destination.y);
+            common.move_from_to(map, path_finder, position_from, position_to, client_tick);
+        }
 
         Self { common }
     }

@@ -114,7 +114,9 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
 
 impl Prepare for PostProcessingBufferDrawer {
     fn prepare(&mut self, device: &Device, instructions: &RenderInstruction) {
-        self.bind_group = Self::create_bind_group(device, &self.bind_group_layout, instructions.font_map_texture);
+        if let Some(font_map_texture) = instructions.font_map_texture {
+            self.bind_group = Self::create_bind_group(device, &self.bind_group_layout, font_map_texture);
+        }
     }
 
     fn upload(&mut self, _device: &Device, _staging_belt: &mut StagingBelt, _command_encoder: &mut CommandEncoder) {

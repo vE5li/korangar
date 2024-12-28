@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use cgmath::{Matrix4, Point3, Vector2, Vector3, Vector4};
+use cgmath::{Matrix4, Point3, SquareMatrix, Vector2, Vector3, Vector4, Zero};
 use korangar_util::Rectangle;
 use ragnarok_packets::EntityId;
 use wgpu::BlendFactor;
@@ -40,8 +40,8 @@ pub struct RenderInstruction<'a> {
     pub point_shadow_entities: &'a [EntityInstruction],
     pub effects: &'a [EffectInstruction],
     pub water: Option<WaterInstruction<'a>>,
-    pub map_picker_tile_vertex_buffer: &'a Buffer<TileVertex>,
-    pub font_map_texture: &'a Texture,
+    pub map_picker_tile_vertex_buffer: Option<&'a Buffer<TileVertex>>,
+    pub font_map_texture: Option<&'a Texture>,
     #[cfg(feature = "debug")]
     pub render_settings: RenderSettings,
     #[cfg(feature = "debug")]
@@ -54,6 +54,47 @@ pub struct RenderInstruction<'a> {
     pub marker: &'a [MarkerInstruction],
 }
 
+impl Default for RenderInstruction<'static> {
+    fn default() -> Self {
+        Self {
+            clear_interface: true,
+            show_interface: false,
+            picker_position: ScreenPosition::default(),
+            uniforms: Uniforms::default(),
+            indicator: None,
+            interface: &[],
+            bottom_layer_rectangles: &[],
+            middle_layer_rectangles: &[],
+            top_layer_rectangles: &[],
+            directional_light_with_shadow: DirectionalShadowCasterInstruction::default(),
+            point_light_shadow_caster: &[],
+            point_light: &[],
+            model_batches: &[],
+            models: &mut [],
+            entities: &mut [],
+            directional_model_batches: &[],
+            directional_shadow_models: &[],
+            directional_shadow_entities: &[],
+            point_shadow_models: &[],
+            point_shadow_entities: &[],
+            effects: &[],
+            water: None,
+            map_picker_tile_vertex_buffer: None,
+            font_map_texture: None,
+            #[cfg(feature = "debug")]
+            render_settings: RenderSettings::default(),
+            #[cfg(feature = "debug")]
+            aabb: &[],
+            #[cfg(feature = "debug")]
+            circles: &[],
+            #[cfg(feature = "debug")]
+            rectangles: &[],
+            #[cfg(feature = "debug")]
+            marker: &[],
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Uniforms {
     pub view_matrix: Matrix4<f32>,
@@ -64,6 +105,21 @@ pub struct Uniforms {
     pub ambient_light_color: Color,
     pub enhanced_lighting: bool,
     pub shadow_quality: ShadowQuality,
+}
+
+impl Default for Uniforms {
+    fn default() -> Self {
+        Self {
+            view_matrix: Matrix4::identity(),
+            projection_matrix: Matrix4::identity(),
+            camera_position: Vector4::zero(),
+            animation_timer: 0.0,
+            day_timer: 0.0,
+            ambient_light_color: Color::default(),
+            enhanced_lighting: false,
+            shadow_quality: ShadowQuality::Soft,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -84,6 +140,17 @@ pub struct DirectionalShadowCasterInstruction {
     pub view_matrix: Matrix4<f32>,
     pub direction: Vector3<f32>,
     pub color: Color,
+}
+
+impl Default for DirectionalShadowCasterInstruction {
+    fn default() -> Self {
+        Self {
+            view_projection_matrix: Matrix4::identity(),
+            view_matrix: Matrix4::identity(),
+            direction: Vector3::zero(),
+            color: Color::default(),
+        }
+    }
 }
 
 /// Right now point shadows can't cast shadows of models that are not part of

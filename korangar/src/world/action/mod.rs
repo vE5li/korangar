@@ -5,7 +5,9 @@ use derive_new::new;
 use korangar_audio::SoundEffectKey;
 use korangar_interface::elements::{ElementCell, PrototypeElement};
 use korangar_util::container::Cacheable;
-use ragnarok_formats::action::{Action, ActionsData};
+use ragnarok_formats::action::Action;
+#[cfg(feature = "debug")]
+use ragnarok_formats::action::ActionsData;
 use ragnarok_packets::ClientTick;
 
 use crate::graphics::Color;

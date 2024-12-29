@@ -1094,8 +1094,8 @@ impl Client {
                     self.point_light_manager.clear();
                     let _ = self.networking_system.map_loaded();
                 }
-                NetworkEvent::UpdateClientTick(client_tick) => {
-                    self.game_timer.set_client_tick(client_tick);
+                NetworkEvent::UpdateClientTick { client_tick, received_at } => {
+                    self.game_timer.set_client_tick(client_tick, received_at);
                 }
                 NetworkEvent::ChatMessage { text, color } => {
                     self.chat_messages.push(ChatMessage { text, color });

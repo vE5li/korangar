@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use ragnarok_packets::*;
 
 use crate::hotkey::HotkeyState;
@@ -82,7 +84,10 @@ pub enum NetworkEvent {
     /// Update the client side [`tick
     /// counter`](crate::system::GameTimer::base_client_tick) to keep server and
     /// client synchronized.
-    UpdateClientTick(ClientTick),
+    UpdateClientTick {
+        client_tick: ClientTick,
+        received_at: Instant,
+    },
     /// New chat message for the client.
     ChatMessage {
         text: String,

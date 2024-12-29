@@ -8,7 +8,7 @@ mod server;
 use std::cell::RefCell;
 use std::net::{IpAddr, SocketAddr};
 use std::rc::Rc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use event::{
     CharacterServerDisconnectedEvent, DisconnectedEvent, LoginServerDisconnectedEvent, MapServerDisconnectedEvent, NetworkEventList,
@@ -946,7 +946,10 @@ where
             index: packet.index,
             amount: packet.amount,
         })?;
-        packet_handler.register(|packet: ServerTickPacket| NetworkEvent::UpdateClientTick(packet.client_tick))?;
+        packet_handler.register(|packet: ServerTickPacket| NetworkEvent::UpdateClientTick {
+            client_tick: packet.client_tick,
+            received_at: Instant::now(),
+        })?;
         packet_handler.register(|packet: RequestPlayerDetailsSuccessPacket| {
             NetworkEvent::UpdateEntityDetails(EntityId(packet.character_id.0), packet.name)
         })?;
@@ -997,7 +1000,10 @@ where
         })?;
         packet_handler.register_noop::<Packet8302>()?;
         packet_handler.register_noop::<Packet0b18>()?;
-        packet_handler.register(|packet: MapServerLoginSuccessPacket| NetworkEvent::UpdateClientTick(packet.client_tick))?;
+        packet_handler.register(|packet: MapServerLoginSuccessPacket| NetworkEvent::UpdateClientTick {
+            client_tick: packet.client_tick,
+            received_at: Instant::now(),
+        })?;
         packet_handler.register(|packet: RestartResponsePacket| match packet.result {
             RestartResponseStatus::Ok => NetworkEvent::LoggedOut,
             RestartResponseStatus::Nothing => NetworkEvent::ChatMessage {

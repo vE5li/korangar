@@ -800,7 +800,14 @@ impl<F: FileLoader> EngineContext<F> {
             }
         };
 
-        let data = data.output_destination(&self.background_music_track).loop_region(..);
+        // Workaround: It seems kira drops the music as soon as it finishes, even though
+        // we defined the loop region to be the full region of the music. We shave off
+        // 50 ms of the music, so that the music never finishes, and we properly loop
+        // the music again.
+        let duration = data.duration().as_secs_f64() - 0.05;
+        let data = data.loop_region(..duration);
+        let data = data.output_destination(&self.background_music_track);
+
         let handle = match self.manager.play(data) {
             Ok(handle) => handle,
             Err(_error) => {

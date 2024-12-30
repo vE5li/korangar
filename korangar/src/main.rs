@@ -931,6 +931,9 @@ impl Client {
                     let saved_login_data = self.saved_login_data.as_ref().unwrap();
                     self.networking_system.disconnect_from_character_server();
                     self.networking_system.connect_to_map_server(saved_login_data, login_data);
+                    // Ask for the client tick right away, so that the player isn't de-synced when
+                    // they spawn on the map.
+                    let _ = self.networking_system.request_client_tick();
 
                     let character_information = self
                         .saved_characters

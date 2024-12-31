@@ -117,10 +117,7 @@ impl PrototypeWindow<InterfaceSettings> for ProfilerWindow {
             PickList::default()
                 .with_options(vec![
                     ("Main thread", crate::threads::Enum::Main),
-                    ("Picker thread", crate::threads::Enum::Picker),
-                    ("Shadow thread", crate::threads::Enum::Shadow),
-                    ("Point shadow thread", crate::threads::Enum::PointShadow),
-                    ("Deferred thread", crate::threads::Enum::Deferred),
+                    ("Loader thread", crate::threads::Enum::Loader),
                 ])
                 .with_selected(self.visible_thread.clone())
                 .with_width(dimension_bound!(150))

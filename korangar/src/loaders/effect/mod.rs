@@ -70,7 +70,7 @@ impl EffectLoader {
                             .into_iter()
                             .map(|name| {
                                 let path = format!("effect\\{}{}", prefix, name.name);
-                                texture_loader.get(&path, ImageType::Color).unwrap()
+                                texture_loader.get_or_load(&path, ImageType::Color).unwrap()
                             })
                             .collect(),
                         {
@@ -156,7 +156,7 @@ impl EffectLoader {
         Ok(effect)
     }
 
-    pub fn get(&self, path: &str, texture_loader: &TextureLoader) -> Result<Arc<Effect>, LoadError> {
+    pub fn get_or_load(&self, path: &str, texture_loader: &TextureLoader) -> Result<Arc<Effect>, LoadError> {
         let mut lock = self.cache.lock().unwrap();
         match lock.get(path) {
             Some(effect) => Ok(effect.clone()),

@@ -48,7 +48,7 @@ impl ActionLoader {
                     print_debug!("Replacing with fallback");
                 }
 
-                return self.get(FALLBACK_ACTIONS_FILE);
+                return self.get_or_load(FALLBACK_ACTIONS_FILE);
             }
         };
         let mut byte_reader: ByteReader<Option<InternalVersion>> = ByteReader::with_default_metadata(&bytes);
@@ -62,7 +62,7 @@ impl ActionLoader {
                     print_debug!("Replacing with fallback");
                 }
 
-                return self.get(FALLBACK_ACTIONS_FILE);
+                return self.get_or_load(FALLBACK_ACTIONS_FILE);
             }
         };
 
@@ -107,7 +107,7 @@ impl ActionLoader {
         Ok(sprite)
     }
 
-    pub fn get(&self, path: &str) -> Result<Arc<Actions>, LoadError> {
+    pub fn get_or_load(&self, path: &str) -> Result<Arc<Actions>, LoadError> {
         let mut lock = self.cache.lock().unwrap();
         match lock.get(path) {
             Some(sprite) => Ok(sprite.clone()),

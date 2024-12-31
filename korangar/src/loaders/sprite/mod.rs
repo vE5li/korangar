@@ -69,7 +69,7 @@ impl SpriteLoader {
                     print_debug!("Replacing with fallback");
                 }
 
-                return self.get(FALLBACK_SPRITE_FILE);
+                return self.get_or_load(FALLBACK_SPRITE_FILE);
             }
         };
         let mut byte_reader: ByteReader<Option<InternalVersion>> = ByteReader::with_default_metadata(&bytes);
@@ -83,7 +83,7 @@ impl SpriteLoader {
                     print_debug!("Replacing with fallback");
                 }
 
-                return self.get(FALLBACK_SPRITE_FILE);
+                return self.get_or_load(FALLBACK_SPRITE_FILE);
             }
         };
 
@@ -191,7 +191,7 @@ impl SpriteLoader {
         Ok(sprite)
     }
 
-    pub fn get(&self, path: &str) -> Result<Arc<Sprite>, LoadError> {
+    pub fn get_or_load(&self, path: &str) -> Result<Arc<Sprite>, LoadError> {
         let mut lock = self.cache.lock().unwrap();
         match lock.get(path) {
             Some(sprite) => Ok(sprite.clone()),

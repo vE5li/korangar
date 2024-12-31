@@ -22,7 +22,7 @@ use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 use crate::interface::theme::GameTheme;
 use crate::interface::windows::WindowCache;
-use crate::loaders::{ActionLoader, AnimationLoader, GameFileLoader, ScriptLoader, SpriteLoader};
+use crate::loaders::{GameFileLoader, ScriptLoader};
 use crate::renderer::GameInterfaceRenderer;
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
@@ -135,7 +135,7 @@ pub struct Common {
     #[hidden_element]
     pub entity_type: EntityType,
     pub active_movement: Option<Movement>,
-    pub animation_data: Arc<AnimationData>,
+    pub animation_data: Option<Arc<AnimationData>>,
     pub grid_position: Vector2<usize>,
     pub position: Point3<f32>,
     #[hidden_element]
@@ -342,19 +342,9 @@ fn get_entity_part_files(
 }
 
 impl Common {
-    pub fn new(
-        sprite_loader: &SpriteLoader,
-        action_loader: &ActionLoader,
-        animation_loader: &AnimationLoader,
-        script_loader: &ScriptLoader,
-        entity_data: &EntityData,
-        grid_position: Vector2<usize>,
-        position: Point3<f32>,
-        client_tick: ClientTick,
-    ) -> Self {
+    pub fn new(entity_data: &EntityData, grid_position: Vector2<usize>, position: Point3<f32>, client_tick: ClientTick) -> Self {
         let entity_id = entity_data.entity_id;
         let job_id = entity_data.job as usize;
-        let head = entity_data.head as usize;
         let head_direction = entity_data.head_direction;
         let direction = entity_data.position.direction;
 
@@ -366,10 +356,6 @@ impl Common {
         let active_movement = None;
         let entity_type = job_id.into();
 
-        let entity_part_files = get_entity_part_files(script_loader, entity_type, job_id, sex, Some(head));
-        let animation_data = animation_loader
-            .get(sprite_loader, action_loader, entity_type, &entity_part_files)
-            .unwrap();
         let details = ResourceState::Unavailable;
         let animation_state = AnimationState::new(entity_type, client_tick);
 
@@ -386,41 +372,34 @@ impl Common {
             movement_speed,
             health_points,
             maximum_health_points,
-            animation_data,
+            animation_data: None,
             details,
             animation_state,
             sound_state: SoundState::default(),
         }
     }
 
-    pub fn reload_sprite(
-        &mut self,
-        sprite_loader: &SpriteLoader,
-        action_loader: &ActionLoader,
-        script_loader: &ScriptLoader,
-        animation_loader: &AnimationLoader,
-    ) {
-        let entity_part_files = get_entity_part_files(script_loader, self.entity_type, self.job_id, self.sex, None);
-        self.animation_data = animation_loader
-            .get(sprite_loader, action_loader, self.entity_type, &entity_part_files)
-            .unwrap();
+    pub fn get_entity_part_files(&self, script_loader: &ScriptLoader) -> Vec<String> {
+        get_entity_part_files(script_loader, self.entity_type, self.job_id, self.sex, None)
     }
 
     pub fn update(&mut self, audio_engine: &AudioEngine<GameFileLoader>, map: &Map, camera: &dyn Camera, client_tick: ClientTick) {
         self.update_movement(map, client_tick);
         self.animation_state.update(client_tick);
 
-        let frame = self.animation_data.get_frame(&self.animation_state, camera, self.direction);
-        match frame.event {
-            Some(ActionEvent::Sound { key }) => {
-                self.sound_state.update(audio_engine, self.position, key, client_tick);
+        if let Some(animation_data) = self.animation_data.as_ref() {
+            let frame = animation_data.get_frame(&self.animation_state, camera, self.direction);
+            match frame.event {
+                Some(ActionEvent::Sound { key }) => {
+                    self.sound_state.update(audio_engine, self.position, key, client_tick);
+                }
+                Some(ActionEvent::Attack) => {
+                    // TODO: NHA What do we need to do at this event? Other
+                    //       clients are playing the attackers weapon attack
+                    //       sound using this event.
+                }
+                None | Some(ActionEvent::Unknown) => { /* Nothing to do */ }
             }
-            Some(ActionEvent::Attack) => {
-                // TODO: NHA What do we need to do at this event? Other clients
-                //       are playing the attackers weapon attack sound using
-                //       this event.
-            }
-            None | Some(ActionEvent::Unknown) => { /* Nothing to do */ }
         }
     }
 
@@ -741,28 +720,32 @@ impl Common {
     }
 
     pub fn render(&self, instructions: &mut Vec<EntityInstruction>, camera: &dyn Camera, add_to_picker: bool) {
-        self.animation_data.render(
-            instructions,
-            camera,
-            add_to_picker,
-            self.entity_id,
-            self.position,
-            &self.animation_state,
-            self.direction,
-        );
+        if let Some(animation_data) = self.animation_data.as_ref() {
+            animation_data.render(
+                instructions,
+                camera,
+                add_to_picker,
+                self.entity_id,
+                self.position,
+                &self.animation_state,
+                self.direction,
+            );
+        }
     }
 
     #[cfg(feature = "debug")]
     pub fn render_debug(&self, instructions: &mut Vec<DebugRectangleInstruction>, camera: &dyn Camera) {
-        self.animation_data.render_debug(
-            instructions,
-            camera,
-            self.position,
-            &self.animation_state,
-            self.direction,
-            Color::rgb_u8(255, 0, 0),
-            Color::rgb_u8(0, 255, 0),
-        );
+        if let Some(animation_data) = self.animation_data.as_ref() {
+            animation_data.render_debug(
+                instructions,
+                camera,
+                self.position,
+                &self.animation_state,
+                self.direction,
+                Color::rgb_u8(255, 0, 0),
+                Color::rgb_u8(0, 255, 0),
+            );
+        }
     }
 
     #[cfg(feature = "debug")]
@@ -791,15 +774,7 @@ impl Player {
     /// This function creates the player entity free-floating in the
     /// "void". When a new map is loaded on map change, the server sends
     /// the correct position we need to position the player to.
-    pub fn new(
-        sprite_loader: &SpriteLoader,
-        action_loader: &ActionLoader,
-        animation_loader: &AnimationLoader,
-        script_loader: &ScriptLoader,
-        account_id: AccountId,
-        character_information: CharacterInformation,
-        client_tick: ClientTick,
-    ) -> Self {
+    pub fn new(account_id: AccountId, character_information: &CharacterInformation, client_tick: ClientTick) -> Self {
         let hair_id = character_information.head as usize;
         let spell_points = character_information.spell_points as usize;
         let activity_points = 0;
@@ -810,16 +785,7 @@ impl Player {
         let grid_position = Vector2::zero();
         let position = Point3::origin();
 
-        let common = Common::new(
-            sprite_loader,
-            action_loader,
-            animation_loader,
-            script_loader,
-            &entity_data,
-            grid_position,
-            position,
-            client_tick,
-        );
+        let common = Common::new(&entity_data, grid_position, position, client_tick);
 
         Self {
             common,
@@ -915,28 +881,9 @@ impl Player {
         );
     }
 
-    pub fn reload_sprite(
-        &mut self,
-        sprite_loader: &SpriteLoader,
-        action_loader: &ActionLoader,
-        script_loader: &ScriptLoader,
-        animation_loader: &AnimationLoader,
-    ) {
-        let entity_part_files = get_entity_part_files(
-            script_loader,
-            self.get_common_mut().entity_type,
-            self.get_common_mut().job_id,
-            self.get_common_mut().sex,
-            Some(self.hair_id),
-        );
-        self.get_common_mut().animation_data = animation_loader
-            .get(
-                sprite_loader,
-                action_loader,
-                self.get_common_mut().entity_type,
-                &entity_part_files,
-            )
-            .unwrap();
+    pub fn get_entity_part_files(&self, script_loader: &ScriptLoader) -> Vec<String> {
+        let common = self.get_common();
+        get_entity_part_files(script_loader, common.entity_type, common.job_id, common.sex, Some(self.hair_id))
     }
 }
 
@@ -946,28 +893,11 @@ pub struct Npc {
 }
 
 impl Npc {
-    pub fn new(
-        sprite_loader: &SpriteLoader,
-        action_loader: &ActionLoader,
-        animation_loader: &AnimationLoader,
-        script_loader: &ScriptLoader,
-        map: &Map,
-        entity_data: EntityData,
-        client_tick: ClientTick,
-    ) -> Self {
+    pub fn new(map: &Map, entity_data: EntityData, client_tick: ClientTick) -> Self {
         let grid_position = Vector2::new(entity_data.position.x, entity_data.position.y);
         let position = map.get_world_position(grid_position);
 
-        let mut common = Common::new(
-            sprite_loader,
-            action_loader,
-            animation_loader,
-            script_loader,
-            &entity_data,
-            grid_position,
-            position,
-            client_tick,
-        );
+        let mut common = Common::new(&entity_data, grid_position, position, client_tick);
 
         if let Some(destination) = entity_data.destination {
             let mut path_finder = PathFinder::default();
@@ -1070,18 +1000,14 @@ impl Entity {
         }
     }
 
-    pub fn reload_sprite(
-        &mut self,
-        sprite_loader: &SpriteLoader,
-        action_loader: &ActionLoader,
-        animation_loader: &AnimationLoader,
-        script_loader: &ScriptLoader,
-    ) {
+    pub fn set_animation_data(&mut self, animation_data: Arc<AnimationData>) {
+        self.get_common_mut().animation_data = Some(animation_data)
+    }
+
+    pub fn get_entity_part_files(&self, script_loader: &ScriptLoader) -> Vec<String> {
         match self {
-            Self::Player(player) => player.reload_sprite(sprite_loader, action_loader, script_loader, animation_loader),
-            Self::Npc(npc) => npc
-                .get_common_mut()
-                .reload_sprite(sprite_loader, action_loader, script_loader, animation_loader),
+            Self::Player(player) => player.get_entity_part_files(script_loader),
+            Self::Npc(npc) => npc.get_common().get_entity_part_files(script_loader),
         }
     }
 

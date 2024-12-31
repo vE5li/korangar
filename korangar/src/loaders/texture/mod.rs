@@ -345,7 +345,7 @@ impl TextureLoader {
         Ok(image_buffer)
     }
 
-    pub fn get(&self, path: &str, image_type: ImageType) -> Result<Arc<Texture>, LoadError> {
+    pub fn get_or_load(&self, path: &str, image_type: ImageType) -> Result<Arc<Texture>, LoadError> {
         let mut lock = self.cache.lock().unwrap();
         match lock.get(&(path.into(), image_type)) {
             Some(texture) => Ok(texture.clone()),

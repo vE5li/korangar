@@ -15,7 +15,7 @@ pub struct EntityData {
 }
 
 impl EntityData {
-    pub fn from_character(account_id: AccountId, character_information: CharacterInformation, position: WorldPosition) -> Self {
+    pub fn from_character(account_id: AccountId, character_information: &CharacterInformation, position: WorldPosition) -> Self {
         Self {
             entity_id: EntityId(account_id.0),
             movement_speed: character_information.movement_speed as u16,

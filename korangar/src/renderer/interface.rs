@@ -33,10 +33,10 @@ impl InterfaceRenderer {
     ) -> Self {
         let instructions = RefCell::new(Vec::default());
 
-        let filled_box_texture = texture_loader.get("filled_box.png", ImageType::Sdf).unwrap();
-        let unfilled_box_texture = texture_loader.get("unfilled_box.png", ImageType::Sdf).unwrap();
-        let expanded_arrow_texture = texture_loader.get("expanded_arrow.png", ImageType::Sdf).unwrap();
-        let collapsed_arrow_texture = texture_loader.get("collapsed_arrow.png", ImageType::Sdf).unwrap();
+        let filled_box_texture = texture_loader.get_or_load("filled_box.png", ImageType::Sdf).unwrap();
+        let unfilled_box_texture = texture_loader.get_or_load("unfilled_box.png", ImageType::Sdf).unwrap();
+        let expanded_arrow_texture = texture_loader.get_or_load("expanded_arrow.png", ImageType::Sdf).unwrap();
+        let collapsed_arrow_texture = texture_loader.get_or_load("collapsed_arrow.png", ImageType::Sdf).unwrap();
 
         let interface_size = if high_quality_interface { window_size * 2.0 } else { window_size };
 

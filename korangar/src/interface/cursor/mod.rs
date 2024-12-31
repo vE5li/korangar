@@ -46,8 +46,8 @@ pub struct MouseCursor {
 
 impl MouseCursor {
     pub fn new(sprite_loader: &SpriteLoader, action_loader: &ActionLoader) -> Self {
-        let sprite = sprite_loader.get("cursors.spr").unwrap();
-        let actions = action_loader.get("cursors.act").unwrap();
+        let sprite = sprite_loader.get_or_load("cursors.spr").unwrap();
+        let actions = action_loader.get_or_load("cursors.act").unwrap();
         let animation_state = SpriteAnimationState::new(ClientTick(0));
         let shown = true;
 

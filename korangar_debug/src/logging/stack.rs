@@ -1,4 +1,4 @@
-use std::sync::{LazyLock, Mutex};
+use std::cell::RefCell;
 
 struct StackItem {
     pub message_count: usize,
@@ -11,46 +11,29 @@ impl StackItem {
     }
 }
 
-static STACK: LazyLock<Mutex<Vec<StackItem>>> = LazyLock::new(|| Mutex::new(Vec::new()));
+#[thread_local]
+static STACK: RefCell<Vec<StackItem>> = RefCell::new(Vec::new());
 
 pub fn stack_size() -> usize {
-    match STACK.try_lock() {
-        Ok(ref mut mutex) => mutex.len(),
-        Err(..) => panic!(),
-    }
+    STACK.borrow().len()
 }
 
 pub fn message_offset() -> usize {
-    match STACK.try_lock() {
-        Ok(ref mut mutex) => mutex.iter().map(|item| item.size).sum(),
-        Err(..) => panic!(),
-    }
+    STACK.borrow().iter().map(|item| item.size).sum()
 }
 
 pub fn increment_stack(size: usize) {
-    match STACK.try_lock() {
-        Ok(ref mut mutex) => mutex.push(StackItem::new(0, size)),
-        Err(..) => panic!(),
-    }
+    STACK.borrow_mut().push(StackItem::new(0, size))
 }
 
 pub fn decrement_stack() {
-    match STACK.try_lock() {
-        Ok(ref mut mutex) => mutex.pop(),
-        Err(..) => panic!(),
-    };
+    STACK.borrow_mut().pop();
 }
 
 pub fn increment_message_count() {
-    match STACK.try_lock() {
-        Ok(ref mut mutex) => mutex.last_mut().unwrap().message_count += 1,
-        Err(..) => panic!(),
-    }
+    STACK.borrow_mut().last_mut().unwrap().message_count += 1;
 }
 
 pub fn get_message_count() -> usize {
-    match STACK.try_lock() {
-        Ok(ref mut mutex) => mutex.last_mut().unwrap().message_count,
-        Err(..) => panic!(),
-    }
+    STACK.borrow_mut().last_mut().unwrap().message_count
 }

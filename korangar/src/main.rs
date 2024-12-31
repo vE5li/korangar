@@ -126,10 +126,7 @@ static ICON_DATA: &[u8] = include_bytes!("../archive/data/icon.png");
 #[cfg(feature = "debug")]
 korangar_debug::create_profiler_threads!(threads, {
     Main,
-    Picker,
-    Shadow,
-    PointShadow,
-    Deferred,
+    Loader,
 });
 
 fn main() {
@@ -163,15 +160,16 @@ struct Client {
     #[cfg(not(feature = "debug"))]
     networking_system: NetworkingSystem<NoPacketCallback>,
 
-    model_loader: Arc<ModelLoader>,
-    texture_loader: Arc<TextureLoader>,
+    action_loader: Arc<ActionLoader>,
+    animation_loader: Arc<AnimationLoader>,
+    async_loader: Arc<AsyncLoader>,
+    effect_loader: Arc<EffectLoader>,
     font_loader: Rc<RefCell<FontLoader>>,
     map_loader: Arc<MapLoader>,
+    model_loader: Arc<ModelLoader>,
+    script_loader: Rc<ScriptLoader>,
     sprite_loader: Arc<SpriteLoader>,
-    script_loader: Arc<ScriptLoader>,
-    action_loader: Arc<ActionLoader>,
-    effect_loader: Arc<EffectLoader>,
-    animation_loader: Arc<AnimationLoader>,
+    texture_loader: Arc<TextureLoader>,
 
     interface_renderer: InterfaceRenderer,
     bottom_interface_renderer: GameInterfaceRenderer,
@@ -269,12 +267,12 @@ struct Client {
     #[cfg(feature = "debug")]
     tile_texture: Arc<Texture>,
     #[cfg(feature = "debug")]
-    tile_texture_mapping: Vec<AtlasAllocation>,
+    tile_texture_mapping: Arc<Vec<AtlasAllocation>>,
 
     chat_messages: PlainTrackedState<Vec<ChatMessage>>,
     main_menu_click_sound_effect: SoundEffectKey,
 
-    map: Option<Map>,
+    map: Option<Box<Map>>,
 }
 
 impl Client {
@@ -390,7 +388,7 @@ impl Client {
             let effect_loader = Arc::new(EffectLoader::new(game_file_loader.clone()));
             let animation_loader = Arc::new(AnimationLoader::new());
 
-            let script_loader = Arc::new(ScriptLoader::new(&game_file_loader).unwrap_or_else(|_| {
+            let script_loader = Rc::new(ScriptLoader::new(&game_file_loader).unwrap_or_else(|_| {
                 // The scrip loader not being created correctly means that the lua files were
                 // not valid. It's possible that the archive was copied from a
                 // different machine with a different architecture, so the one thing
@@ -407,6 +405,15 @@ impl Client {
 
                 ScriptLoader::new(&game_file_loader).unwrap()
             }));
+
+            let async_loader = Arc::new(AsyncLoader::new(
+                action_loader.clone(),
+                animation_loader.clone(),
+                map_loader.clone(),
+                model_loader.clone(),
+                sprite_loader.clone(),
+                texture_loader.clone(),
+            ));
 
             let interface_renderer = InterfaceRenderer::new(
                 INITIAL_SCREEN_SIZE,
@@ -545,6 +552,8 @@ impl Client {
                 "tile_5.png",
                 "tile_6.png",
             ]);
+            #[cfg(feature = "debug")]
+            let tile_texture_mapping = Arc::new(tile_texture_mapping);
 
             let welcome_string = format!(
                 "Welcome to ^ff8800Korangar^000000 version ^ff8800{}^000000!",
@@ -584,15 +593,16 @@ impl Client {
             #[cfg(feature = "debug")]
             packet_history_callback,
             networking_system,
-            model_loader,
-            texture_loader,
+            action_loader,
+            animation_loader,
+            async_loader,
+            effect_loader,
             font_loader,
             map_loader,
-            sprite_loader,
+            model_loader,
             script_loader,
-            action_loader,
-            effect_loader,
-            animation_loader,
+            sprite_loader,
+            texture_loader,
             interface_renderer,
             bottom_interface_renderer,
             middle_interface_renderer,
@@ -950,17 +960,23 @@ impl Client {
 
                     self.saved_player_name = character_information.name.clone();
 
-                    let player = Player::new(
-                        &self.sprite_loader,
-                        &self.action_loader,
-                        &self.animation_loader,
-                        &self.script_loader,
-                        saved_login_data.account_id,
-                        character_information,
-                        client_tick,
-                    );
+                    let mut player = Entity::Player(Player::new(saved_login_data.account_id, &character_information, client_tick));
 
-                    self.entities.push(Entity::Player(player));
+                    let entity_id = player.get_entity_id();
+                    let entity_type = player.get_entity_type();
+                    let entity_part_files = player.get_entity_part_files(&self.script_loader);
+
+                    match self.animation_loader.get(&entity_part_files) {
+                        Some(animation_data) => {
+                            player.set_animation_data(animation_data);
+                        }
+                        None => {
+                            self.async_loader
+                                .request_animation_data_load(entity_id, entity_type, entity_part_files);
+                        }
+                    }
+
+                    self.entities.push(player);
 
                     // TODO: This will do one unnecessary restore_focus. Check if
                     //       that will be problematic.
@@ -1001,25 +1017,30 @@ impl Client {
                         &ErrorWindow::new("Failed to switch character slots".to_owned()),
                     );
                 }
-                NetworkEvent::AddEntity(entity_appeared_data) => {
+                NetworkEvent::AddEntity(entity_data) => {
                     if let Some(map) = self.map.as_ref() {
+                        let mut npc = Entity::Npc(Npc::new(map, entity_data, client_tick));
+
+                        let entity_id = npc.get_entity_id();
+                        let entity_type = npc.get_entity_type();
+                        let entity_part_files = npc.get_entity_part_files(&self.script_loader);
+
                         // Sometimes (like after a job change) the server will tell the client
                         // that a new entity appeared, even though it was already on screen. So
                         // to prevent the entity existing twice, we remove the old one.
-                        self.entities
-                            .retain(|entity| entity.get_entity_id() != entity_appeared_data.entity_id);
+                        self.entities.retain(|entity| entity.get_entity_id() != entity_id);
 
-                        let npc = Npc::new(
-                            &self.sprite_loader,
-                            &self.action_loader,
-                            &self.animation_loader,
-                            &self.script_loader,
-                            map,
-                            entity_appeared_data,
-                            client_tick,
-                        );
+                        match self.animation_loader.get(&entity_part_files) {
+                            Some(animation_data) => {
+                                npc.set_animation_data(animation_data);
+                            }
+                            None => {
+                                self.async_loader
+                                    .request_animation_data_load(entity_id, entity_type, entity_part_files);
+                            }
+                        }
 
-                        self.entities.push(Entity::Npc(npc));
+                        self.entities.push(npc);
                     }
                 }
                 NetworkEvent::RemoveEntity { entity_id, reason } => {
@@ -1075,31 +1096,12 @@ impl Client {
                     // Only the player must stay alive between map changes.
                     self.entities.truncate(1);
 
-                    // TODO: NHA Support async map loading.
-                    let new_map = self
-                        .map_loader
-                        .load(
-                            map_name,
-                            &self.model_loader,
-                            self.texture_loader.clone(),
-                            #[cfg(feature = "debug")]
-                            &self.tile_texture_mapping,
-                        )
-                        .unwrap();
-
-                    let map = self.map.insert(new_map);
-
-                    map.set_ambient_sound_sources(&self.audio_engine);
-                    self.audio_engine.play_background_music_track(map.background_music_track_name());
-
-                    let player_position = Vector2::new(player_position.x as usize, player_position.y as usize);
-                    self.entities[0].set_position(map, player_position, client_tick);
-                    self.player_camera.set_focus_point(self.entities[0].get_position());
-
-                    self.particle_holder.clear();
-                    self.effect_holder.clear();
-                    self.point_light_manager.clear();
-                    let _ = self.networking_system.map_loaded();
+                    self.async_loader.request_map_load(
+                        map_name,
+                        player_position,
+                        #[cfg(feature = "debug")]
+                        self.tile_texture_mapping.clone(),
+                    );
                 }
                 NetworkEvent::UpdateClientTick { client_tick, received_at } => {
                     self.game_timer.set_client_tick(client_tick, received_at);
@@ -1199,11 +1201,11 @@ impl Client {
                     // request a full list of items and the hotbar.
 
                     entity.set_job(job_id as usize);
-                    entity.reload_sprite(
-                        &self.sprite_loader,
-                        &self.action_loader,
-                        &self.animation_loader,
-                        &self.script_loader,
+
+                    self.async_loader.request_animation_data_load(
+                        entity.get_entity_id(),
+                        entity.get_entity_type(),
+                        entity.get_entity_part_files(&self.script_loader),
                     );
                 }
                 NetworkEvent::ChangeHair { account_id, hair_id } => {
@@ -1214,11 +1216,11 @@ impl Client {
                         .unwrap();
 
                     entity.set_hair(hair_id as usize);
-                    entity.reload_sprite(
-                        &self.sprite_loader,
-                        &self.action_loader,
-                        &self.animation_loader,
-                        &self.script_loader,
+
+                    self.async_loader.request_animation_data_load(
+                        entity.get_entity_id(),
+                        entity.get_entity_type(),
+                        entity.get_entity_part_files(&self.script_loader),
                     );
                 }
                 NetworkEvent::LoggedOut => {
@@ -1236,7 +1238,7 @@ impl Client {
                     self.friend_list.push((friend, LinkedElement::new()));
                 }
                 NetworkEvent::VisualEffect(path, entity_id) => {
-                    let effect = self.effect_loader.get(path, &self.texture_loader).unwrap();
+                    let effect = self.effect_loader.get_or_load(path, &self.texture_loader).unwrap();
                     let frame_timer = effect.new_frame_timer();
 
                     self.effect_holder.add_effect(Box::new(EffectWithLight::new(
@@ -1263,7 +1265,7 @@ impl Client {
                         UnitId::Firewall => {
                             let position = Vector2::new(position.x as usize, position.y as usize);
                             let position = map.get_world_position(position);
-                            let effect = self.effect_loader.get("firewall.str", &self.texture_loader).unwrap();
+                            let effect = self.effect_loader.get_or_load("firewall.str", &self.texture_loader).unwrap();
                             let frame_timer = effect.new_frame_timer();
 
                             self.effect_holder.add_unit(
@@ -1284,7 +1286,7 @@ impl Client {
                         UnitId::Pneuma => {
                             let position = Vector2::new(position.x as usize, position.y as usize);
                             let position = map.get_world_position(position);
-                            let effect = self.effect_loader.get("pneuma1.str", &self.texture_loader).unwrap();
+                            let effect = self.effect_loader.get_or_load("pneuma1.str", &self.texture_loader).unwrap();
                             let frame_timer = effect.new_frame_timer();
 
                             self.effect_holder.add_unit(
@@ -1833,6 +1835,39 @@ impl Client {
 
         #[cfg(feature = "debug")]
         user_event_measurement.stop();
+
+        #[cfg(feature = "debug")]
+        let loads_measurement = Profiler::start_measurement("complete async loads");
+
+        for completed in self.async_loader.take_completed() {
+            match completed {
+                (LoaderId::AnimationData(entity_id), LoadableResource::AnimationData(animation_data)) => {
+                    if let Some(entity) = self.entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id) {
+                        entity.set_animation_data(animation_data);
+                    }
+                }
+                (LoaderId::Map(..), LoadableResource::Map { map, player_position }) => {
+                    let map = self.map.insert(map);
+
+                    map.set_ambient_sound_sources(&self.audio_engine);
+                    self.audio_engine.play_background_music_track(map.background_music_track_name());
+
+                    let player_position = Vector2::new(player_position.x as usize, player_position.y as usize);
+                    self.entities[0].set_position(map, player_position, client_tick);
+                    self.player_camera.set_focus_point(self.entities[0].get_position());
+
+                    self.particle_holder.clear();
+                    self.effect_holder.clear();
+                    self.point_light_manager.clear();
+                    self.interface.schedule_render();
+                    let _ = self.networking_system.map_loaded();
+                }
+                _ => {}
+            }
+        }
+
+        #[cfg(feature = "debug")]
+        loads_measurement.stop();
 
         // Main map update and render loop
         if let Some(map) = self.map.as_ref() {

@@ -21,7 +21,7 @@ korangar_interface = { workspace = true, features = ["serde", "cgmath"] }
 korangar_networking = { workspace = true, features = ["debug"] }
 korangar_util = { workspace = true, features = ["interface"] }
 lunify = { workspace = true }
-mlua = { workspace = true, features = ["lua51", "send", "vendored"] }
+mlua = { workspace = true, features = ["lua51", "vendored"] }
 num = { workspace = true }
 option-ext = { workspace = true }
 pollster = { workspace = true }

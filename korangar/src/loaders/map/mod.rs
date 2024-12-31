@@ -61,7 +61,7 @@ impl MapLoader {
         model_loader: &ModelLoader,
         texture_loader: Arc<TextureLoader>,
         #[cfg(feature = "debug")] tile_texture_mapping: &[AtlasAllocation],
-    ) -> Result<Map, LoadError> {
+    ) -> Result<Box<Map>, LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load map from {}", &resource_file));
 
@@ -121,7 +121,11 @@ impl MapLoader {
                     let water_paths = get_water_texture_paths(water_type);
                     water_paths
                         .iter()
-                        .map(|path| texture_loader.get(path, ImageType::Color).expect("Can't load water texture"))
+                        .map(|path| {
+                            texture_loader
+                                .get_or_load(path, ImageType::Color)
+                                .expect("Can't load water texture")
+                        })
                         .collect()
                 });
 
@@ -232,7 +236,7 @@ impl MapLoader {
         #[cfg(feature = "debug")]
         timer.stop();
 
-        Ok(map)
+        Ok(Box::new(map))
     }
 
     fn generate_vertex_buffer_and_atlas_texture(

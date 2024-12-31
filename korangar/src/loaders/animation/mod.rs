@@ -40,8 +40,8 @@ impl AnimationLoader {
         let animation_pairs: Vec<AnimationPair> = entity_part_files
             .iter()
             .map(|file_path| AnimationPair {
-                sprites: sprite_loader.get(&format!("{file_path}.spr")).unwrap(),
-                actions: action_loader.get(&format!("{file_path}.act")).unwrap(),
+                sprites: sprite_loader.get_or_load(&format!("{file_path}.spr")).unwrap(),
+                actions: action_loader.get_or_load(&format!("{file_path}.act")).unwrap(),
             })
             .collect();
 
@@ -310,22 +310,9 @@ impl AnimationLoader {
         Ok(animation_data)
     }
 
-    pub fn get(
-        &self,
-        sprite_loader: &SpriteLoader,
-        action_loader: &ActionLoader,
-        entity_type: EntityType,
-        entity_part_files: &[String],
-    ) -> Result<Arc<AnimationData>, LoadError> {
+    pub fn get(&self, entity_part_files: &[String]) -> Option<Arc<AnimationData>> {
         let mut lock = self.cache.lock().unwrap();
-        match lock.get(entity_part_files) {
-            Some(animation_data) => Ok(animation_data.clone()),
-            None => {
-                // We need to drop to avoid a deadlock here.
-                drop(lock);
-                self.load(sprite_loader, action_loader, entity_type, entity_part_files)
-            }
-        }
+        lock.get(entity_part_files).cloned()
     }
 }
 

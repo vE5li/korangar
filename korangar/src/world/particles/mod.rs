@@ -107,7 +107,7 @@ impl QuestIcon {
             + Vector3::new(0.0, 25.0, 0.0); // TODO: get height of the entity as offset
         let effect_id = quest_effect.effect as usize;
         let texture = texture_loader
-            .get(
+            .get_or_load(
                 &format!("À¯ÀúÀÎÅÍÆäÀÌ½º\\minimap\\quest_{}_{}.bmp", effect_id, 1), /* 1 - 3 */
                 ImageType::Color,
             )

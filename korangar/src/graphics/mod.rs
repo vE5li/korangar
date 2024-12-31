@@ -377,7 +377,7 @@ impl GlobalContext {
             RgbaImage::from_raw(1, 1, vec![255, 255, 255, 255]).unwrap().as_raw(),
             false,
         ));
-        let walk_indicator_texture = texture_loader.get("grid.tga", ImageType::Color).unwrap();
+        let walk_indicator_texture = texture_loader.get_or_load("grid.tga", ImageType::Color).unwrap();
         let forward_textures = Self::create_forward_textures(device, forward_size, msaa);
         let picker_textures = Self::create_picker_textures(device, screen_size);
         let directional_shadow_map_texture = Self::create_directional_shadow_texture(device, directional_shadow_size);

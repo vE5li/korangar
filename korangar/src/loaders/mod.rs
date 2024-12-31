@@ -2,6 +2,7 @@ mod action;
 mod animation;
 mod archive;
 
+mod r#async;
 mod effect;
 pub mod error;
 mod font;
@@ -20,6 +21,7 @@ pub use self::font::{FontLoader, FontSize, GlyphInstruction, Scaling, TextLayout
 pub use self::gamefile::*;
 pub use self::map::{MapLoader, MAP_TILE_SIZE};
 pub use self::model::*;
+pub use self::r#async::*;
 pub use self::script::{ResourceMetadata, ScriptLoader};
 pub use self::server::{load_client_info, ClientInfo, ServiceId};
 pub use self::sprite::*;

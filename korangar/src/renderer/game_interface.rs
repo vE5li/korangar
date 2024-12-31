@@ -103,17 +103,17 @@ impl GameInterfaceRenderer {
         let instructions = RefCell::new(Vec::new());
 
         #[cfg(feature = "debug")]
-        let object_marker_texture = texture_loader.get("marker_object.png", ImageType::Sdf).unwrap();
+        let object_marker_texture = texture_loader.get_or_load("marker_object.png", ImageType::Sdf).unwrap();
         #[cfg(feature = "debug")]
-        let light_source_marker_texture = texture_loader.get("marker_light.png", ImageType::Sdf).unwrap();
+        let light_source_marker_texture = texture_loader.get_or_load("marker_light.png", ImageType::Sdf).unwrap();
         #[cfg(feature = "debug")]
-        let sound_source_marker_texture = texture_loader.get("marker_sound.png", ImageType::Sdf).unwrap();
+        let sound_source_marker_texture = texture_loader.get_or_load("marker_sound.png", ImageType::Sdf).unwrap();
         #[cfg(feature = "debug")]
-        let effect_source_marker_texture = texture_loader.get("marker_effect.png", ImageType::Sdf).unwrap();
+        let effect_source_marker_texture = texture_loader.get_or_load("marker_effect.png", ImageType::Sdf).unwrap();
         #[cfg(feature = "debug")]
-        let entity_marker_texture = texture_loader.get("marker_entity.png", ImageType::Sdf).unwrap();
+        let entity_marker_texture = texture_loader.get_or_load("marker_entity.png", ImageType::Sdf).unwrap();
         #[cfg(feature = "debug")]
-        let shadow_marker_texture = texture_loader.get("marker_shadow.png", ImageType::Sdf).unwrap();
+        let shadow_marker_texture = texture_loader.get_or_load("marker_shadow.png", ImageType::Sdf).unwrap();
 
         Self {
             instructions,

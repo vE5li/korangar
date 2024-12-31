@@ -84,7 +84,7 @@ impl TimeSynchronization {
 
 pub struct NetworkingSystem<Callback> {
     command_sender: UnboundedSender<ServerConnectCommand>,
-    time_context: Arc<Mutex<TimeSynchronization>>,
+    time_synchronization: Arc<Mutex<TimeSynchronization>>,
     login_server_connection: ServerConnection,
     character_server_connection: ServerConnection,
     map_server_connection: ServerConnection,
@@ -93,8 +93,8 @@ pub struct NetworkingSystem<Callback> {
 
 impl NetworkingSystem<NoPacketCallback> {
     pub fn spawn() -> (Self, NetworkEventBuffer) {
-        let (command_sender, time_context) = Self::spawn_networking_thread(NoPacketCallback);
-        Self::inner_new(command_sender, time_context, NoPacketCallback)
+        let (command_sender, time_synchronization) = Self::spawn_networking_thread(NoPacketCallback);
+        Self::inner_new(command_sender, time_synchronization, NoPacketCallback)
     }
 }
 
@@ -104,12 +104,12 @@ where
 {
     fn inner_new(
         command_sender: UnboundedSender<ServerConnectCommand>,
-        time_context: Arc<Mutex<TimeSynchronization>>,
+        time_synchronization: Arc<Mutex<TimeSynchronization>>,
         packet_callback: Callback,
     ) -> (Self, NetworkEventBuffer) {
         let networking_system = Self {
             command_sender,
-            time_context,
+            time_synchronization,
             login_server_connection: ServerConnection::Disconnected,
             character_server_connection: ServerConnection::Disconnected,
             map_server_connection: ServerConnection::Disconnected,
@@ -121,14 +121,14 @@ where
     }
 
     pub fn spawn_with_callback(packet_callback: Callback) -> (Self, NetworkEventBuffer) {
-        let (command_sender, time_context) = Self::spawn_networking_thread(packet_callback.clone());
-        Self::inner_new(command_sender, time_context, packet_callback)
+        let (command_sender, time_synchronization) = Self::spawn_networking_thread(packet_callback.clone());
+        Self::inner_new(command_sender, time_synchronization, packet_callback)
     }
 
     fn spawn_networking_thread(packet_callback: Callback) -> (UnboundedSender<ServerConnectCommand>, Arc<Mutex<TimeSynchronization>>) {
         let (command_sender, mut command_receiver) = tokio::sync::mpsc::unbounded_channel::<ServerConnectCommand>();
-        let time_context = Arc::new(Mutex::new(TimeSynchronization::new()));
-        let thread_time_context = Arc::clone(&time_context);
+        let time_synchronization = Arc::new(Mutex::new(TimeSynchronization::new()));
+        let thread_time_synchronization = Arc::clone(&time_synchronization);
 
         std::thread::spawn(move || {
             let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
@@ -162,7 +162,7 @@ where
                                 |_| LoginServerKeepalivePacket::new(),
                                 Duration::from_secs(58),
                                 false,
-                                thread_time_context.clone(),
+                                thread_time_synchronization.clone(),
                             ));
 
                             login_server_task_handle = Some(handle);
@@ -186,7 +186,7 @@ where
                                 |_| CharacterServerKeepalivePacket::new(),
                                 Duration::from_secs(10),
                                 true,
-                                thread_time_context.clone(),
+                                thread_time_synchronization.clone(),
                             ));
 
                             character_server_task_handle = Some(handle);
@@ -207,16 +207,16 @@ where
                                 action_receiver,
                                 event_sender,
                                 packet_handler,
-                                |time_context| match time_context.lock() {
-                                    Ok(mut context) => {
-                                        let client_tick = context.request_client_tick();
+                                |time_synchronization| match time_synchronization.lock() {
+                                    Ok(mut time_synchronization) => {
+                                        let client_tick = time_synchronization.request_client_tick();
                                         RequestServerTickPacket::new(ClientTick(client_tick))
                                     }
                                     Err(_) => RequestServerTickPacket::new(ClientTick(100)),
                                 },
                                 Duration::from_secs(10),
                                 false,
-                                thread_time_context.clone(),
+                                thread_time_synchronization.clone(),
                             ));
 
                             map_server_task_handle = Some(handle);
@@ -226,7 +226,7 @@ where
             });
         });
 
-        (command_sender, time_context)
+        (command_sender, time_synchronization)
     }
 
     fn handle_connection<Event>(connection: &mut ServerConnection, event_buffer: &mut NetworkEventBuffer)
@@ -282,7 +282,7 @@ where
         // Since our packet handler has no way of working with this, we need to add some special
         // logic.
         mut read_account_id: bool,
-        time_context: Arc<Mutex<TimeSynchronization>>,
+        time_synchronization: Arc<Mutex<TimeSynchronization>>,
     ) -> Result<(), NetworkTaskError>
     where
         PingPacket: Packet + ClientPacket,
@@ -360,8 +360,8 @@ where
                     }
 
                     for event in events.drain(..) {
-                        if let NetworkEvent::UpdateClientTick {client_tick,received_at} = &event && let Ok(mut context) = time_context.lock() {
-                            context.estimated_client_tick(client_tick.0, *received_at);
+                        if let NetworkEvent::UpdateClientTick {client_tick,received_at} = &event && let Ok(mut time_synchronization) = time_synchronization.lock() {
+                            time_synchronization.estimated_client_tick(client_tick.0, *received_at);
                         }
 
                         event_sender.send(event).map_err(|_| NetworkTaskError::ConnectionClosed)?;
@@ -369,7 +369,7 @@ where
                 }
                 // Send a keep-alive packet to the server.
                 _ = interval.tick() => {
-                    let packet_bytes = ping_factory(&time_context).packet_to_bytes().unwrap();
+                    let packet_bytes = ping_factory(&time_synchronization).packet_to_bytes().unwrap();
                     stream.write_all(&packet_bytes).await.map_err(|_| NetworkTaskError::ConnectionClosed)?;
                 }
             }
@@ -1155,7 +1155,11 @@ where
     }
 
     pub fn request_client_tick(&mut self) -> Result<(), NotConnectedError> {
-        let client_tick = self.time_context.lock().map(|context| context.client_tick as u32).unwrap_or(100);
+        let client_tick = self
+            .time_synchronization
+            .lock()
+            .map(|time_synchronization| time_synchronization.client_tick as u32)
+            .unwrap_or(100);
         self.send_map_server_packet(&RequestServerTickPacket::new(ClientTick(client_tick)))
     }
 

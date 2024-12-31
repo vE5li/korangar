@@ -56,9 +56,9 @@ pub struct MapLoader {
 
 impl MapLoader {
     pub fn load(
-        &mut self,
+        &self,
         resource_file: String,
-        model_loader: &mut ModelLoader,
+        model_loader: &ModelLoader,
         texture_loader: Arc<TextureLoader>,
         #[cfg(feature = "debug")] tile_texture_mapping: &[AtlasAllocation],
     ) -> Result<Map, LoadError> {
@@ -236,7 +236,7 @@ impl MapLoader {
     }
 
     fn generate_vertex_buffer_and_atlas_texture(
-        &mut self,
+        &self,
         resource_file: &str,
         mut texture_atlas_factory: TextureAtlasFactory,
         mut deferred_vertex_generation: Vec<DeferredVertexGeneration>,

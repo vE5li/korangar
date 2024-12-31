@@ -343,9 +343,9 @@ fn get_entity_part_files(
 
 impl Common {
     pub fn new(
-        sprite_loader: &mut SpriteLoader,
-        action_loader: &mut ActionLoader,
-        animation_loader: &mut AnimationLoader,
+        sprite_loader: &SpriteLoader,
+        action_loader: &ActionLoader,
+        animation_loader: &AnimationLoader,
         script_loader: &ScriptLoader,
         entity_data: &EntityData,
         grid_position: Vector2<usize>,
@@ -395,10 +395,10 @@ impl Common {
 
     pub fn reload_sprite(
         &mut self,
-        sprite_loader: &mut SpriteLoader,
-        action_loader: &mut ActionLoader,
+        sprite_loader: &SpriteLoader,
+        action_loader: &ActionLoader,
         script_loader: &ScriptLoader,
-        animation_loader: &mut AnimationLoader,
+        animation_loader: &AnimationLoader,
     ) {
         let entity_part_files = get_entity_part_files(script_loader, self.entity_type, self.job_id, self.sex, None);
         self.animation_data = animation_loader
@@ -792,9 +792,9 @@ impl Player {
     /// "void". When a new map is loaded on map change, the server sends
     /// the correct position we need to position the player to.
     pub fn new(
-        sprite_loader: &mut SpriteLoader,
-        action_loader: &mut ActionLoader,
-        animation_loader: &mut AnimationLoader,
+        sprite_loader: &SpriteLoader,
+        action_loader: &ActionLoader,
+        animation_loader: &AnimationLoader,
         script_loader: &ScriptLoader,
         account_id: AccountId,
         character_information: CharacterInformation,
@@ -917,10 +917,10 @@ impl Player {
 
     pub fn reload_sprite(
         &mut self,
-        sprite_loader: &mut SpriteLoader,
-        action_loader: &mut ActionLoader,
+        sprite_loader: &SpriteLoader,
+        action_loader: &ActionLoader,
         script_loader: &ScriptLoader,
-        animation_loader: &mut AnimationLoader,
+        animation_loader: &AnimationLoader,
     ) {
         let entity_part_files = get_entity_part_files(
             script_loader,
@@ -947,12 +947,11 @@ pub struct Npc {
 
 impl Npc {
     pub fn new(
-        sprite_loader: &mut SpriteLoader,
-        action_loader: &mut ActionLoader,
-        animation_loader: &mut AnimationLoader,
+        sprite_loader: &SpriteLoader,
+        action_loader: &ActionLoader,
+        animation_loader: &AnimationLoader,
         script_loader: &ScriptLoader,
         map: &Map,
-        path_finder: &mut PathFinder,
         entity_data: EntityData,
         client_tick: ClientTick,
     ) -> Self {
@@ -971,9 +970,10 @@ impl Npc {
         );
 
         if let Some(destination) = entity_data.destination {
+            let mut path_finder = PathFinder::default();
             let position_from = Vector2::new(entity_data.position.x, entity_data.position.y);
             let position_to = Vector2::new(destination.x, destination.y);
-            common.move_from_to(map, path_finder, position_from, position_to, client_tick);
+            common.move_from_to(map, &mut path_finder, position_from, position_to, client_tick);
         }
 
         Self { common }
@@ -1072,9 +1072,9 @@ impl Entity {
 
     pub fn reload_sprite(
         &mut self,
-        sprite_loader: &mut SpriteLoader,
-        action_loader: &mut ActionLoader,
-        animation_loader: &mut AnimationLoader,
+        sprite_loader: &SpriteLoader,
+        action_loader: &ActionLoader,
+        animation_loader: &AnimationLoader,
         script_loader: &ScriptLoader,
     ) {
         match self {

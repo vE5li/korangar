@@ -346,8 +346,8 @@ impl TextureLoader {
     }
 
     pub fn get(&self, path: &str, image_type: ImageType) -> Result<Arc<Texture>, LoadError> {
-        let mut lock = self.cache.lock();
-        match lock.as_mut().unwrap().get(&(path.into(), image_type)) {
+        let mut lock = self.cache.lock().unwrap();
+        match lock.get(&(path.into(), image_type)) {
             Some(texture) => Ok(texture.clone()),
             None => {
                 // We need to drop to avoid a deadlock here.

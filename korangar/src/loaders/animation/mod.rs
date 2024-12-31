@@ -1,6 +1,6 @@
 use std::cmp::{max, min};
 use std::num::{NonZeroU32, NonZeroUsize};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 #[cfg(feature = "debug")]
 use cgmath::SquareMatrix;
@@ -17,23 +17,23 @@ const MAX_CACHE_COUNT: u32 = 256;
 const MAX_CACHE_SIZE: usize = 64 * 1024 * 1024;
 
 pub struct AnimationLoader {
-    cache: SimpleCache<Vec<String>, Arc<AnimationData>>,
+    cache: Mutex<SimpleCache<Vec<String>, Arc<AnimationData>>>,
 }
 
 impl AnimationLoader {
     pub fn new() -> Self {
         Self {
-            cache: SimpleCache::new(
+            cache: Mutex::new(SimpleCache::new(
                 NonZeroU32::new(MAX_CACHE_COUNT).unwrap(),
                 NonZeroUsize::new(MAX_CACHE_SIZE).unwrap(),
-            ),
+            )),
         }
     }
 
     pub fn load(
-        &mut self,
-        sprite_loader: &mut SpriteLoader,
-        action_loader: &mut ActionLoader,
+        &self,
+        sprite_loader: &SpriteLoader,
+        action_loader: &ActionLoader,
         entity_type: EntityType,
         entity_part_files: &[String],
     ) -> Result<Arc<AnimationData>, LoadError> {
@@ -301,21 +301,30 @@ impl AnimationLoader {
             entity_type,
         });
 
-        self.cache.insert(entity_part_files.to_vec(), animation_data.clone()).unwrap();
+        self.cache
+            .lock()
+            .unwrap()
+            .insert(entity_part_files.to_vec(), animation_data.clone())
+            .unwrap();
 
         Ok(animation_data)
     }
 
     pub fn get(
-        &mut self,
-        sprite_loader: &mut SpriteLoader,
-        action_loader: &mut ActionLoader,
+        &self,
+        sprite_loader: &SpriteLoader,
+        action_loader: &ActionLoader,
         entity_type: EntityType,
         entity_part_files: &[String],
     ) -> Result<Arc<AnimationData>, LoadError> {
-        match self.cache.get(entity_part_files) {
+        let mut lock = self.cache.lock().unwrap();
+        match lock.get(entity_part_files) {
             Some(animation_data) => Ok(animation_data.clone()),
-            None => self.load(sprite_loader, action_loader, entity_type, entity_part_files),
+            None => {
+                // We need to drop to avoid a deadlock here.
+                drop(lock);
+                self.load(sprite_loader, action_loader, entity_type, entity_part_files)
+            }
         }
     }
 }

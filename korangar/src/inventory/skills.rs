@@ -25,8 +25,8 @@ pub struct SkillTree {
 impl SkillTree {
     pub fn fill(
         &mut self,
-        sprite_loader: &mut SpriteLoader,
-        action_loader: &mut ActionLoader,
+        sprite_loader: &SpriteLoader,
+        action_loader: &ActionLoader,
         skill_data: Vec<SkillInformation>,
         client_tick: ClientTick,
     ) {

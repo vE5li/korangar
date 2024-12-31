@@ -350,7 +350,7 @@ impl ModelLoader {
     }
 
     pub fn load(
-        &mut self,
+        &self,
         texture_atlas_factory: &mut TextureAtlasFactory,
         vertex_offset: &mut usize,
         model_file: &str,

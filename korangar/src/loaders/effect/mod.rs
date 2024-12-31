@@ -1,5 +1,5 @@
 use std::num::{NonZeroU32, NonZeroUsize};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use cgmath::Deg;
 #[cfg(feature = "debug")]
@@ -22,21 +22,21 @@ const MAX_CACHE_SIZE: usize = 64 * 1024 * 1024;
 
 pub struct EffectLoader {
     game_file_loader: Arc<GameFileLoader>,
-    cache: SimpleCache<String, Arc<Effect>>,
+    cache: Mutex<SimpleCache<String, Arc<Effect>>>,
 }
 
 impl EffectLoader {
     pub fn new(game_file_loader: Arc<GameFileLoader>) -> Self {
         Self {
             game_file_loader,
-            cache: SimpleCache::new(
+            cache: Mutex::new(SimpleCache::new(
                 NonZeroU32::new(MAX_CACHE_COUNT).unwrap(),
                 NonZeroUsize::new(MAX_CACHE_SIZE).unwrap(),
-            ),
+            )),
         }
     }
 
-    fn load(&mut self, path: &str, texture_loader: &TextureLoader) -> Result<Arc<Effect>, LoadError> {
+    fn load(&self, path: &str, texture_loader: &TextureLoader) -> Result<Arc<Effect>, LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load effect from {}", path.magenta()));
 
@@ -148,7 +148,7 @@ impl EffectLoader {
                 .collect(),
         ));
 
-        self.cache.insert(path.to_string(), effect.clone()).unwrap();
+        self.cache.lock().unwrap().insert(path.to_string(), effect.clone()).unwrap();
 
         #[cfg(feature = "debug")]
         timer.stop();
@@ -156,10 +156,15 @@ impl EffectLoader {
         Ok(effect)
     }
 
-    pub fn get(&mut self, path: &str, texture_loader: &TextureLoader) -> Result<Arc<Effect>, LoadError> {
-        match self.cache.get(path) {
+    pub fn get(&self, path: &str, texture_loader: &TextureLoader) -> Result<Arc<Effect>, LoadError> {
+        let mut lock = self.cache.lock().unwrap();
+        match lock.get(path) {
             Some(effect) => Ok(effect.clone()),
-            None => self.load(path, texture_loader),
+            None => {
+                // We need to drop to avoid a deadlock here.
+                drop(lock);
+                self.load(path, texture_loader)
+            }
         }
     }
 }

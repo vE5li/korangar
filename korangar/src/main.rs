@@ -163,15 +163,15 @@ struct Client {
     #[cfg(not(feature = "debug"))]
     networking_system: NetworkingSystem<NoPacketCallback>,
 
-    model_loader: ModelLoader,
+    model_loader: Arc<ModelLoader>,
     texture_loader: Arc<TextureLoader>,
     font_loader: Rc<RefCell<FontLoader>>,
-    map_loader: MapLoader,
-    sprite_loader: SpriteLoader,
-    script_loader: ScriptLoader,
-    action_loader: ActionLoader,
-    effect_loader: EffectLoader,
-    animation_loader: AnimationLoader,
+    map_loader: Arc<MapLoader>,
+    sprite_loader: Arc<SpriteLoader>,
+    script_loader: Arc<ScriptLoader>,
+    action_loader: Arc<ActionLoader>,
+    effect_loader: Arc<EffectLoader>,
+    animation_loader: Arc<AnimationLoader>,
 
     interface_renderer: InterfaceRenderer,
     bottom_interface_renderer: GameInterfaceRenderer,
@@ -376,16 +376,21 @@ impl Client {
         time_phase!("create resource managers", {
             std::fs::create_dir_all("client/themes").unwrap();
 
-            let mut model_loader = ModelLoader::new(game_file_loader.clone());
+            let model_loader = Arc::new(ModelLoader::new(game_file_loader.clone()));
             let texture_loader = Arc::new(TextureLoader::new(device.clone(), queue.clone(), game_file_loader.clone()));
             let font_loader = Rc::new(RefCell::new(FontLoader::new(&game_file_loader, &texture_loader)));
-            let mut map_loader = MapLoader::new(device.clone(), queue.clone(), game_file_loader.clone(), audio_engine.clone());
-            let mut sprite_loader = SpriteLoader::new(device.clone(), queue.clone(), game_file_loader.clone());
-            let mut action_loader = ActionLoader::new(game_file_loader.clone(), audio_engine.clone());
-            let effect_loader = EffectLoader::new(game_file_loader.clone());
-            let animation_loader = AnimationLoader::new();
+            let map_loader = Arc::new(MapLoader::new(
+                device.clone(),
+                queue.clone(),
+                game_file_loader.clone(),
+                audio_engine.clone(),
+            ));
+            let sprite_loader = Arc::new(SpriteLoader::new(device.clone(), queue.clone(), game_file_loader.clone()));
+            let action_loader = Arc::new(ActionLoader::new(game_file_loader.clone(), audio_engine.clone()));
+            let effect_loader = Arc::new(EffectLoader::new(game_file_loader.clone()));
+            let animation_loader = Arc::new(AnimationLoader::new());
 
-            let script_loader = ScriptLoader::new(&game_file_loader).unwrap_or_else(|_| {
+            let script_loader = Arc::new(ScriptLoader::new(&game_file_loader).unwrap_or_else(|_| {
                 // The scrip loader not being created correctly means that the lua files were
                 // not valid. It's possible that the archive was copied from a
                 // different machine with a different architecture, so the one thing
@@ -401,7 +406,7 @@ impl Client {
                 game_file_loader.load_patched_lua_files();
 
                 ScriptLoader::new(&game_file_loader).unwrap()
-            });
+            }));
 
             let interface_renderer = InterfaceRenderer::new(
                 INITIAL_SCREEN_SIZE,
@@ -457,7 +462,7 @@ impl Client {
             let application = InterfaceSettings::load_or_default();
             let mut interface = Interface::new(INITIAL_SCREEN_SIZE);
             let mut focus_state = FocusState::default();
-            let mouse_cursor = MouseCursor::new(&mut sprite_loader, &mut action_loader);
+            let mouse_cursor = MouseCursor::new(&sprite_loader, &action_loader);
             let dialog_system = DialogSystem::default();
             let show_interface = true;
         });
@@ -557,7 +562,7 @@ impl Client {
             let map = map_loader
                 .load(
                     DEFAULT_MAP.to_string(),
-                    &mut model_loader,
+                    &model_loader,
                     texture_loader.clone(),
                     #[cfg(feature = "debug")]
                     &tile_texture_mapping,
@@ -857,7 +862,7 @@ impl Client {
                         .map_loader
                         .load(
                             DEFAULT_MAP.to_string(),
-                            &mut self.model_loader,
+                            &self.model_loader,
                             self.texture_loader.clone(),
                             #[cfg(feature = "debug")]
                             &self.tile_texture_mapping,
@@ -946,9 +951,9 @@ impl Client {
                     self.saved_player_name = character_information.name.clone();
 
                     let player = Player::new(
-                        &mut self.sprite_loader,
-                        &mut self.action_loader,
-                        &mut self.animation_loader,
+                        &self.sprite_loader,
+                        &self.action_loader,
+                        &self.animation_loader,
                         &self.script_loader,
                         saved_login_data.account_id,
                         character_information,
@@ -1005,12 +1010,11 @@ impl Client {
                             .retain(|entity| entity.get_entity_id() != entity_appeared_data.entity_id);
 
                         let npc = Npc::new(
-                            &mut self.sprite_loader,
-                            &mut self.action_loader,
-                            &mut self.animation_loader,
+                            &self.sprite_loader,
+                            &self.action_loader,
+                            &self.animation_loader,
                             &self.script_loader,
                             map,
-                            &mut self.path_finder,
                             entity_appeared_data,
                             client_tick,
                         );
@@ -1076,7 +1080,7 @@ impl Client {
                         .map_loader
                         .load(
                             map_name,
-                            &mut self.model_loader,
+                            &self.model_loader,
                             self.texture_loader.clone(),
                             #[cfg(feature = "debug")]
                             &self.tile_texture_mapping,
@@ -1178,7 +1182,7 @@ impl Client {
                 }
                 NetworkEvent::SkillTree(skill_information) => {
                     self.player_skill_tree
-                        .fill(&mut self.sprite_loader, &mut self.action_loader, skill_information, client_tick);
+                        .fill(&self.sprite_loader, &self.action_loader, skill_information, client_tick);
                 }
                 NetworkEvent::UpdateEquippedPosition { index, equipped_position } => {
                     self.player_inventory.update_equipped_position(index, equipped_position);
@@ -1196,9 +1200,9 @@ impl Client {
 
                     entity.set_job(job_id as usize);
                     entity.reload_sprite(
-                        &mut self.sprite_loader,
-                        &mut self.action_loader,
-                        &mut self.animation_loader,
+                        &self.sprite_loader,
+                        &self.action_loader,
+                        &self.animation_loader,
                         &self.script_loader,
                     );
                 }
@@ -1211,9 +1215,9 @@ impl Client {
 
                     entity.set_hair(hair_id as usize);
                     entity.reload_sprite(
-                        &mut self.sprite_loader,
-                        &mut self.action_loader,
-                        &mut self.animation_loader,
+                        &self.sprite_loader,
+                        &self.action_loader,
+                        &self.animation_loader,
                         &self.script_loader,
                     );
                 }

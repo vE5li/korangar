@@ -1,5 +1,5 @@
 use std::num::{NonZeroU32, NonZeroUsize};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use korangar_audio::AudioEngine;
 #[cfg(feature = "debug")]
@@ -20,7 +20,7 @@ const MAX_CACHE_SIZE: usize = 64 * 1024 * 1024;
 pub struct ActionLoader {
     game_file_loader: Arc<GameFileLoader>,
     audio_engine: Arc<AudioEngine<GameFileLoader>>,
-    cache: SimpleCache<String, Arc<Actions>>,
+    cache: Mutex<SimpleCache<String, Arc<Actions>>>,
 }
 
 impl ActionLoader {
@@ -28,14 +28,14 @@ impl ActionLoader {
         Self {
             game_file_loader,
             audio_engine,
-            cache: SimpleCache::new(
+            cache: Mutex::new(SimpleCache::new(
                 NonZeroU32::new(MAX_CACHE_COUNT).unwrap(),
                 NonZeroUsize::new(MAX_CACHE_SIZE).unwrap(),
-            ),
+            )),
         }
     }
 
-    fn load(&mut self, path: &str) -> Result<Arc<Actions>, LoadError> {
+    fn load(&self, path: &str) -> Result<Arc<Actions>, LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load actions from {}", path.magenta()));
 
@@ -99,7 +99,7 @@ impl ActionLoader {
             actions_data: saved_actions_data,
         });
 
-        self.cache.insert(path.to_string(), sprite.clone()).unwrap();
+        self.cache.lock().unwrap().insert(path.to_string(), sprite.clone()).unwrap();
 
         #[cfg(feature = "debug")]
         timer.stop();
@@ -107,10 +107,15 @@ impl ActionLoader {
         Ok(sprite)
     }
 
-    pub fn get(&mut self, path: &str) -> Result<Arc<Actions>, LoadError> {
-        match self.cache.get(path) {
+    pub fn get(&self, path: &str) -> Result<Arc<Actions>, LoadError> {
+        let mut lock = self.cache.lock().unwrap();
+        match lock.get(path) {
             Some(sprite) => Ok(sprite.clone()),
-            None => self.load(path),
+            None => {
+                // We need to drop to avoid a deadlock here.
+                drop(lock);
+                self.load(path)
+            }
         }
     }
 }

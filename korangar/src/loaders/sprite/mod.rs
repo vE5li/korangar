@@ -1,5 +1,5 @@
 use std::num::{NonZeroU32, NonZeroUsize};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use image::RgbaImage;
 #[cfg(feature = "debug")]
@@ -40,7 +40,7 @@ pub struct SpriteLoader {
     device: Arc<Device>,
     queue: Arc<Queue>,
     game_file_loader: Arc<GameFileLoader>,
-    cache: SimpleCache<String, Arc<Sprite>>,
+    cache: Mutex<SimpleCache<String, Arc<Sprite>>>,
 }
 
 impl SpriteLoader {
@@ -49,14 +49,14 @@ impl SpriteLoader {
             device,
             queue,
             game_file_loader,
-            cache: SimpleCache::new(
+            cache: Mutex::new(SimpleCache::new(
                 NonZeroU32::new(MAX_CACHE_COUNT).unwrap(),
                 NonZeroUsize::new(MAX_CACHE_SIZE).unwrap(),
-            ),
+            )),
         }
     }
 
-    fn load(&mut self, path: &str) -> Result<Arc<Sprite>, LoadError> {
+    fn load(&self, path: &str) -> Result<Arc<Sprite>, LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load sprite from {}", path.magenta()));
 
@@ -183,7 +183,7 @@ impl SpriteLoader {
             #[cfg(feature = "debug")]
             sprite_data: cloned_sprite_data,
         });
-        let _ = self.cache.insert(path.to_string(), sprite.clone());
+        let _ = self.cache.lock().unwrap().insert(path.to_string(), sprite.clone());
 
         #[cfg(feature = "debug")]
         timer.stop();
@@ -191,10 +191,15 @@ impl SpriteLoader {
         Ok(sprite)
     }
 
-    pub fn get(&mut self, path: &str) -> Result<Arc<Sprite>, LoadError> {
-        match self.cache.get(path) {
+    pub fn get(&self, path: &str) -> Result<Arc<Sprite>, LoadError> {
+        let mut lock = self.cache.lock().unwrap();
+        match lock.get(path) {
             Some(sprite) => Ok(sprite.clone()),
-            None => self.load(path),
+            None => {
+                // We need to drop to avoid a deadlock here.
+                drop(lock);
+                self.load(path)
+            }
         }
     }
 }

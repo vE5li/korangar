@@ -8,11 +8,11 @@ use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 use std::sync::Mutex;
 
+use flate2::bufread::ZlibDecoder;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, Timer};
 use ragnarok_bytes::{ByteReader, FixedByteSize, FromBytes};
 use ragnarok_formats::archive::{AssetTable, FileTableRow, Header};
-use yazi::{decompress, Format};
 
 pub use self::builder::NativeArchiveBuilder;
 use crate::loaders::archive::native::mixcrypt::decrypt_file;
@@ -44,11 +44,14 @@ impl Archive for NativeArchive {
         let mut file_table_buffer = vec![0; AssetTable::size_in_bytes()];
 
         file.read_exact(&mut file_table_buffer).unwrap();
-        let file_table = AssetTable::from_bytes(&mut ByteReader::without_metadata(&file_table_buffer)).unwrap();
+        let file_table = AssetTable::from_bytes(&mut ByteReader::without_metadata(&file_table_buffer)).expect("can't read file table");
 
         let mut compressed_file_table_buffer = vec![0u8; file_table.compressed_size as usize];
         file.read_exact(&mut compressed_file_table_buffer).unwrap();
-        let (decompressed, _checksum) = decompress(&compressed_file_table_buffer, Format::Zlib).unwrap();
+
+        let mut decoder = ZlibDecoder::new(compressed_file_table_buffer.as_slice());
+        let mut decompressed = Vec::with_capacity(file_table.uncompressed_size as usize);
+        decoder.read_to_end(&mut decompressed).expect("can't decompress file table");
 
         let file_count = file_header.get_file_count();
 
@@ -66,7 +69,7 @@ impl Archive for NativeArchive {
         timer.stop();
 
         // TODO: only take 64..? bytes so that loaded game archives can be extended
-        // aswell
+        //       as well.
         Self {
             file_table: assets,
             file_handle: Mutex::new(file),
@@ -86,15 +89,16 @@ impl Archive for NativeArchive {
                 file_handle.seek(SeekFrom::Start(position)).unwrap();
                 file_handle
                     .read_exact(&mut compressed_file_buffer)
-                    .expect("Can't read archive content");
+                    .expect("can't read archive content");
             }
 
             decrypt_file(file_information, &mut compressed_file_buffer);
 
-            let (uncompressed_file_buffer, _checksum) =
-                decompress(&compressed_file_buffer, Format::Zlib).expect("Can't decompress archive content");
+            let mut decoder = ZlibDecoder::new(compressed_file_buffer.as_slice());
+            let mut decompressed = Vec::with_capacity(file_information.uncompressed_size as usize);
+            decoder.read_to_end(&mut decompressed).expect("can't decompress archive content");
 
-            uncompressed_file_buffer
+            decompressed
         })
     }
 

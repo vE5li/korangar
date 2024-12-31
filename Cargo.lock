@@ -840,6 +840,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c936bfdafb507ebbf50b8074c54fa31c5be9a1e7e5f467dd659697041407d07c"
 dependencies = [
  "crc32fast",
+ "libz-rs-sys",
  "miniz_oxide",
 ]
 
@@ -1625,7 +1626,6 @@ dependencies = [
  "wgpu",
  "winit",
  "xml-rs",
- "yazi",
 ]
 
 [[package]]
@@ -1732,6 +1732,15 @@ dependencies = [
  "bitflags 2.6.0",
  "libc",
  "redox_syscall 0.5.8",
+]
+
+[[package]]
+name = "libz-rs-sys"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a90e19106f1b2c93f1fa6cdeec2e56facbf2e403559c1e1c0ddcc6d46e979cdf"
+dependencies = [
+ "zlib-rs",
 ]
 
 [[package]]
@@ -4756,12 +4765,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ea8b391c9a790b496184c29f7f93b9ed5b16abb306c05415b68bcc16e4d06432"
 
 [[package]]
-name = "yazi"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7773623574268945095a9008f1583f7feac95bf1c4c406de5c98d02e0c0eb98"
-
-[[package]]
 name = "yoke"
 version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4854,6 +4857,12 @@ dependencies = [
  "quote",
  "syn",
 ]
+
+[[package]]
+name = "zlib-rs"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aada01553a9312bad4b9569035a1f12b05e5ec9770a1a4b323757356928944f8"
 
 [[package]]
 name = "zune-core"

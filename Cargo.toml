@@ -14,7 +14,7 @@ cpal = "0.15"
 derive-new = "0.7"
 etherparse = "0.16"
 fast-srgb8 = "1"
-flate2 = "1"
+flate2 = { version = "1", default-features = false }
 glidesort = "0.1"
 hashbrown = "0.15"
 image = { version = "0.25", default-features = false }
@@ -50,7 +50,6 @@ walkdir = "2.5"
 wgpu = "23.0"
 winit = "0.30"
 xml-rs = "0.8"
-yazi = "0.2"
 
 [profile.dev.build-override]
 opt-level = 3

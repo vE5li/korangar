@@ -1,12 +1,15 @@
-//! Implements an writable instance of a GRF File
+//! Implements a writable instance of a GRF File
 //! This way, we can provide a temporal storage to files before the final write
-//! occurs while keeping it outside of the
+//! occurs while keeping it outside the
 //! [`NativeArchive`](super::NativeArchive) implementation
+
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
+use flate2::bufread::ZlibEncoder;
+use flate2::Compression;
 use ragnarok_bytes::ToBytes;
 use ragnarok_formats::archive::{AssetTable, FileTableRow, Header};
-use yazi::{compress, CompressionLevel, Format};
 
 use super::FileTable;
 use crate::loaders::archive::Writable;
@@ -29,7 +32,9 @@ impl NativeArchiveBuilder {
 
 impl Writable for NativeArchiveBuilder {
     fn add_file(&mut self, path: &str, asset: Vec<u8>) {
-        let compressed = compress(&asset, Format::Zlib, CompressionLevel::Default).unwrap();
+        let mut encoder = ZlibEncoder::new(asset.as_slice(), Compression::default());
+        let mut compressed = Vec::default();
+        encoder.read_to_end(&mut compressed).expect("can't compress asset");
 
         let compressed_size = compressed.len() as u32;
         let compressed_size_aligned = compressed_size;
@@ -66,14 +71,17 @@ impl Writable for NativeArchiveBuilder {
             file_table_data.extend(file_information.to_bytes().unwrap());
         }
 
-        let compressed_file_information_data = compress(&file_table_data, Format::Zlib, CompressionLevel::Default).unwrap();
+        let mut encoder = ZlibEncoder::new(file_table_data.as_slice(), Compression::default());
+        let mut compressed = Vec::default();
+        encoder.read_to_end(&mut compressed).expect("can't compress file information");
+
         let file_table = AssetTable {
-            compressed_size: compressed_file_information_data.len() as u32,
+            compressed_size: compressed.len() as u32,
             uncompressed_size: file_table_data.len() as u32,
         };
 
         bytes.extend(file_table.to_bytes().unwrap());
-        bytes.extend(compressed_file_information_data);
+        bytes.extend(compressed);
 
         std::fs::write(&self.os_file_path, bytes).expect("unable to write file");
     }

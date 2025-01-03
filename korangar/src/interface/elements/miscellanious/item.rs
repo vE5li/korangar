@@ -12,8 +12,9 @@ use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
 use crate::interface::resource::{ItemSource, Move, PartialMove};
 use crate::interface::theme::InterfaceTheme;
-use crate::loaders::{FontSize, ResourceMetadata, Scaling};
+use crate::loaders::{FontSize, Scaling};
 use crate::renderer::{InterfaceRenderer, SpriteRenderer};
+use crate::world::ResourceMetadata;
 
 #[derive(new)]
 pub struct ItemBox {
@@ -100,9 +101,11 @@ impl Element<InterfaceSettings> for ItemBox {
 
         renderer.render_background(CornerRadius::uniform(5.0), background_color);
 
-        if let Some(item) = &self.item {
+        if let Some(item) = &self.item
+            && let Some(texture) = item.metadata.texture.as_ref()
+        {
             renderer.renderer.render_sprite(
-                item.metadata.texture.clone(),
+                texture.clone(),
                 renderer.position,
                 ScreenSize::uniform(30.0).scaled(Scaling::new(application.get_scaling_factor())),
                 renderer.clip,

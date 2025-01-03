@@ -12,8 +12,8 @@ use crate::interface::application::InterfaceSettings;
 use crate::interface::elements::{ShopEntry, ShopEntryOperation};
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::interface::theme::InterfaceTheme;
-use crate::loaders::ResourceMetadata;
 use crate::renderer::InterfaceRenderer;
+use crate::world::ResourceMetadata;
 
 pub struct BuyContainer {
     items: PlainRemote<Vec<ShopItem<ResourceMetadata>>>,

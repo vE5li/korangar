@@ -12,8 +12,8 @@ use crate::interface::elements::ItemBox;
 use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
 use crate::interface::resource::{ItemSource, Move, PartialMove};
 use crate::interface::theme::InterfaceTheme;
-use crate::loaders::ResourceMetadata;
 use crate::renderer::InterfaceRenderer;
+use crate::world::ResourceMetadata;
 
 pub struct InventoryContainer {
     items: PlainRemote<Vec<InventoryItem<ResourceMetadata>>>,

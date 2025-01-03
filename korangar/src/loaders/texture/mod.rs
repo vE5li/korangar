@@ -182,7 +182,7 @@ impl TextureLoader {
         Arc::new(texture)
     }
 
-    fn load(&self, path: &str, image_type: ImageType) -> Result<Arc<Texture>, LoadError> {
+    pub fn load(&self, path: &str, image_type: ImageType) -> Result<Arc<Texture>, LoadError> {
         let texture = match image_type {
             ImageType::Color => {
                 let (texture_data, transparent) = self.load_texture_data(path, false)?;
@@ -343,6 +343,11 @@ impl TextureLoader {
         timer.stop();
 
         Ok(image_buffer)
+    }
+
+    pub fn get(&self, path: &str, image_type: ImageType) -> Option<Arc<Texture>> {
+        let mut lock = self.cache.lock().unwrap();
+        lock.get(&(path.into(), image_type)).cloned()
     }
 
     pub fn get_or_load(&self, path: &str, image_type: ImageType) -> Result<Arc<Texture>, LoadError> {

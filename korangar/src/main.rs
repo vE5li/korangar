@@ -55,7 +55,7 @@ use korangar_debug::profile_block;
 use korangar_debug::profiling::Profiler;
 use korangar_interface::application::{Application, FocusState, FontSizeTrait, PositionTraitExt};
 use korangar_interface::state::{
-    MappedRemote, PlainTrackedState, Remote, TrackedState, TrackedStateExt, TrackedStateTake, TrackedStateVec,
+    MappedRemote, PlainTrackedState, Remote, TrackedState, TrackedStateExt, TrackedStateTake, TrackedStateVec, ValueState,
 };
 use korangar_interface::Interface;
 use korangar_networking::{
@@ -161,15 +161,14 @@ struct Client {
     networking_system: NetworkingSystem<NoPacketCallback>,
 
     action_loader: Arc<ActionLoader>,
-    animation_loader: Arc<AnimationLoader>,
     async_loader: Arc<AsyncLoader>,
     effect_loader: Arc<EffectLoader>,
     font_loader: Rc<RefCell<FontLoader>>,
     map_loader: Arc<MapLoader>,
     model_loader: Arc<ModelLoader>,
-    script_loader: Rc<ScriptLoader>,
     sprite_loader: Arc<SpriteLoader>,
     texture_loader: Arc<TextureLoader>,
+    library: Library,
 
     interface_renderer: InterfaceRenderer,
     bottom_interface_renderer: GameInterfaceRenderer,
@@ -388,8 +387,8 @@ impl Client {
             let effect_loader = Arc::new(EffectLoader::new(game_file_loader.clone()));
             let animation_loader = Arc::new(AnimationLoader::new());
 
-            let script_loader = Rc::new(ScriptLoader::new(&game_file_loader).unwrap_or_else(|_| {
-                // The scrip loader not being created correctly means that the lua files were
+            let library = Library::new(&game_file_loader).unwrap_or_else(|_| {
+                // The library not being created correctly means that the lua files were
                 // not valid. It's possible that the archive was copied from a
                 // different machine with a different architecture, so the one thing
                 // we can try is generating it again.
@@ -403,8 +402,8 @@ impl Client {
                 game_file_loader.remove_patched_lua_files();
                 game_file_loader.load_patched_lua_files();
 
-                ScriptLoader::new(&game_file_loader).unwrap()
-            }));
+                Library::new(&game_file_loader).unwrap()
+            });
 
             let async_loader = Arc::new(AsyncLoader::new(
                 action_loader.clone(),
@@ -594,15 +593,14 @@ impl Client {
             packet_history_callback,
             networking_system,
             action_loader,
-            animation_loader,
             async_loader,
             effect_loader,
             font_loader,
             map_loader,
             model_loader,
-            script_loader,
             sprite_loader,
             texture_loader,
+            library,
             interface_renderer,
             bottom_interface_renderer,
             middle_interface_renderer,
@@ -964,16 +962,13 @@ impl Client {
 
                     let entity_id = player.get_entity_id();
                     let entity_type = player.get_entity_type();
-                    let entity_part_files = player.get_entity_part_files(&self.script_loader);
+                    let entity_part_files = player.get_entity_part_files(&self.library);
 
-                    match self.animation_loader.get(&entity_part_files) {
-                        Some(animation_data) => {
-                            player.set_animation_data(animation_data);
-                        }
-                        None => {
-                            self.async_loader
-                                .request_animation_data_load(entity_id, entity_type, entity_part_files);
-                        }
+                    if let Some(animation_data) = self
+                        .async_loader
+                        .request_animation_data_load(entity_id, entity_type, entity_part_files)
+                    {
+                        player.set_animation_data(animation_data);
                     }
 
                     self.entities.push(player);
@@ -1023,21 +1018,18 @@ impl Client {
 
                         let entity_id = npc.get_entity_id();
                         let entity_type = npc.get_entity_type();
-                        let entity_part_files = npc.get_entity_part_files(&self.script_loader);
+                        let entity_part_files = npc.get_entity_part_files(&self.library);
 
                         // Sometimes (like after a job change) the server will tell the client
                         // that a new entity appeared, even though it was already on screen. So
                         // to prevent the entity existing twice, we remove the old one.
                         self.entities.retain(|entity| entity.get_entity_id() != entity_id);
 
-                        match self.animation_loader.get(&entity_part_files) {
-                            Some(animation_data) => {
-                                npc.set_animation_data(animation_data);
-                            }
-                            None => {
-                                self.async_loader
-                                    .request_animation_data_load(entity_id, entity_type, entity_part_files);
-                            }
+                        if let Some(animation_data) =
+                            self.async_loader
+                                .request_animation_data_load(entity_id, entity_type, entity_part_files)
+                        {
+                            npc.set_animation_data(animation_data);
                         }
 
                         self.entities.push(npc);
@@ -1165,10 +1157,10 @@ impl Client {
                 }
                 NetworkEvent::RemoveQuestEffect(entity_id) => self.particle_holder.remove_quest_icon(entity_id),
                 NetworkEvent::SetInventory { items } => {
-                    self.player_inventory.fill(&self.texture_loader, &self.script_loader, items);
+                    self.player_inventory.fill(&self.async_loader, &self.library, items);
                 }
                 NetworkEvent::IventoryItemAdded { item } => {
-                    self.player_inventory.add_item(&self.texture_loader, &self.script_loader, item);
+                    self.player_inventory.add_item(&self.async_loader, &self.library, item);
 
                     // TODO: Update the selling items. If you pick up an item
                     // that you already have the sell window
@@ -1202,11 +1194,13 @@ impl Client {
 
                     entity.set_job(job_id as usize);
 
-                    self.async_loader.request_animation_data_load(
+                    if let Some(animation_data) = self.async_loader.request_animation_data_load(
                         entity.get_entity_id(),
                         entity.get_entity_type(),
-                        entity.get_entity_part_files(&self.script_loader),
-                    );
+                        entity.get_entity_part_files(&self.library),
+                    ) {
+                        entity.set_animation_data(animation_data);
+                    }
                 }
                 NetworkEvent::ChangeHair { account_id, hair_id } => {
                     let entity = self
@@ -1217,11 +1211,13 @@ impl Client {
 
                     entity.set_hair(hair_id as usize);
 
-                    self.async_loader.request_animation_data_load(
+                    if let Some(animation_data) = self.async_loader.request_animation_data_load(
                         entity.get_entity_id(),
                         entity.get_entity_type(),
-                        entity.get_entity_part_files(&self.script_loader),
-                    );
+                        entity.get_entity_part_files(&self.library),
+                    ) {
+                        entity.set_animation_data(animation_data);
+                    }
                 }
                 NetworkEvent::LoggedOut => {
                     self.networking_system.disconnect_from_map_server();
@@ -1341,7 +1337,7 @@ impl Client {
                     self.shop_items.mutate(|shop_items| {
                         *shop_items = items
                             .into_iter()
-                            .map(|item| self.script_loader.load_market_item_metadata(&self.texture_loader, item))
+                            .map(|item| self.library.load_shop_item_metadata(&self.async_loader, item))
                             .collect()
                     });
 
@@ -1846,6 +1842,21 @@ impl Client {
                         entity.set_animation_data(animation_data);
                     }
                 }
+                (LoaderId::ItemSprite(item_id), LoadableResource::ItemSprite { texture, location }) => match location {
+                    ItemLocation::Inventory => {
+                        self.player_inventory.update_item_sprite(item_id, texture);
+                    }
+                    ItemLocation::Shop => {
+                        self.shop_items.mutate(|items| {
+                            items
+                                .iter_mut()
+                                .filter(|item| item.item_id == item_id)
+                                .for_each(|item| item.metadata.texture = Some(texture.clone()));
+
+                            ValueState::Mutated(())
+                        });
+                    }
+                },
                 (LoaderId::Map(..), LoadableResource::Map { map, player_position }) => {
                     let map = self.map.insert(map);
 

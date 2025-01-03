@@ -6,23 +6,32 @@ use hashbrown::HashMap;
 use korangar_debug::logging::print_debug;
 #[cfg(feature = "debug")]
 use korangar_util::texture_atlas::AtlasAllocation;
-use ragnarok_packets::{EntityId, TilePosition};
+use ragnarok_packets::{EntityId, ItemId, TilePosition};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
+use crate::graphics::Texture;
 use crate::loaders::error::LoadError;
-use crate::loaders::{ActionLoader, AnimationLoader, MapLoader, ModelLoader, SpriteLoader, TextureLoader};
+use crate::loaders::{ActionLoader, AnimationLoader, ImageType, MapLoader, ModelLoader, SpriteLoader, TextureLoader};
 #[cfg(feature = "debug")]
 use crate::threads;
 use crate::world::{AnimationData, EntityType, Map};
 
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
+pub enum ItemLocation {
+    Inventory,
+    Shop,
+}
+
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub enum LoaderId {
     AnimationData(EntityId),
+    ItemSprite(ItemId),
     Map(String),
 }
 
 pub enum LoadableResource {
     AnimationData(Arc<AnimationData>),
+    ItemSprite { texture: Arc<Texture>, location: ItemLocation },
     Map { map: Box<Map>, player_position: TilePosition },
 }
 
@@ -76,19 +85,61 @@ impl AsyncLoader {
         }
     }
 
-    pub fn request_animation_data_load(&self, entity_id: EntityId, entity_type: EntityType, entity_part_files: Vec<String>) {
-        let sprite_loader = self.sprite_loader.clone();
-        let action_loader = self.action_loader.clone();
-        let animation_loader = self.animation_loader.clone();
+    #[must_use]
+    pub fn request_animation_data_load(
+        &self,
+        entity_id: EntityId,
+        entity_type: EntityType,
+        entity_part_files: Vec<String>,
+    ) -> Option<Arc<AnimationData>> {
+        match self.animation_loader.get(&entity_part_files) {
+            Some(animation_data) => Some(animation_data),
+            None => {
+                let sprite_loader = self.sprite_loader.clone();
+                let action_loader = self.action_loader.clone();
+                let animation_loader = self.animation_loader.clone();
 
-        self.request_load(LoaderId::AnimationData(entity_id), move || {
-            let animation_data = match animation_loader.get(&entity_part_files) {
-                None => animation_loader.load(&sprite_loader, &action_loader, entity_type, &entity_part_files)?,
-                Some(animation_data) => animation_data,
-            };
+                self.request_load(LoaderId::AnimationData(entity_id), move || {
+                    let animation_data = match animation_loader.get(&entity_part_files) {
+                        Some(animation_data) => animation_data,
+                        None => animation_loader.load(&sprite_loader, &action_loader, entity_type, &entity_part_files)?,
+                    };
+                    Ok(LoadableResource::AnimationData(animation_data))
+                });
 
-            Ok(LoadableResource::AnimationData(animation_data))
-        });
+                None
+            }
+        }
+    }
+
+    #[must_use]
+    pub fn request_item_sprite_load(
+        &self,
+        item_location: ItemLocation,
+        item_id: ItemId,
+        path: &str,
+        image_type: ImageType,
+    ) -> Option<Arc<Texture>> {
+        match self.texture_loader.get(path, image_type) {
+            Some(texture) => Some(texture),
+            None => {
+                let texture_loader = self.texture_loader.clone();
+                let path = path.to_string();
+
+                self.request_load(LoaderId::ItemSprite(item_id), move || {
+                    let texture = match texture_loader.get(&path, image_type) {
+                        None => texture_loader.load(&path, image_type)?,
+                        Some(texture) => texture,
+                    };
+                    Ok(LoadableResource::ItemSprite {
+                        texture,
+                        location: item_location,
+                    })
+                });
+
+                None
+            }
+        }
     }
 
     pub fn request_map_load(

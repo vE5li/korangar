@@ -2,14 +2,17 @@ mod hotbar;
 mod skills;
 
 use std::cell::Ref;
+use std::sync::Arc;
 
 use korangar_interface::state::{PlainRemote, PlainTrackedState, TrackedState, TrackedStateExt, ValueState};
 use korangar_networking::{InventoryItem, InventoryItemDetails, NoMetadata};
-use ragnarok_packets::{EquipPosition, InventoryIndex};
+use ragnarok_packets::{EquipPosition, InventoryIndex, ItemId};
 
 pub use self::hotbar::Hotbar;
 pub use self::skills::{Skill, SkillTree};
-use crate::loaders::{ResourceMetadata, ScriptLoader, TextureLoader};
+use crate::graphics::Texture;
+use crate::loaders::AsyncLoader;
+use crate::world::{Library, ResourceMetadata};
 
 #[derive(Default)]
 pub struct Inventory {
@@ -17,16 +20,16 @@ pub struct Inventory {
 }
 
 impl Inventory {
-    pub fn fill(&mut self, texture_loader: &TextureLoader, script_loader: &ScriptLoader, items: Vec<InventoryItem<NoMetadata>>) {
+    pub fn fill(&mut self, async_loader: &AsyncLoader, library: &Library, items: Vec<InventoryItem<NoMetadata>>) {
         let items = items
             .into_iter()
-            .map(|item| script_loader.load_inventory_item_metadata(texture_loader, item))
+            .map(|item| library.load_inventory_item_metadata(async_loader, item))
             .collect();
 
         self.items.set(items);
     }
 
-    pub fn add_item(&mut self, texture_loader: &TextureLoader, script_loader: &ScriptLoader, item: InventoryItem<NoMetadata>) {
+    pub fn add_item(&mut self, async_loader: &AsyncLoader, library: &Library, item: InventoryItem<NoMetadata>) {
         self.items.with_mut(|items| {
             if let Some(found_item) = items.iter_mut().find(|inventory_item| inventory_item.index == item.index) {
                 let InventoryItemDetails::Regular { amount, .. } = &mut found_item.details else {
@@ -39,13 +42,23 @@ impl Inventory {
 
                 *amount += added_amount;
             } else {
-                let item = script_loader.load_inventory_item_metadata(texture_loader, item);
+                let item = library.load_inventory_item_metadata(async_loader, item);
 
                 items.push(item);
             }
 
             ValueState::Mutated(())
         });
+    }
+
+    pub fn update_item_sprite(&mut self, item_id: ItemId, texture: Arc<Texture>) {
+        self.items.with_mut(|items| {
+            items.iter_mut().filter(|item| item.item_id == item_id).for_each(|item| {
+                item.metadata.texture = Some(texture.clone());
+            });
+
+            ValueState::Mutated(())
+        })
     }
 
     pub fn remove_item(&mut self, index: InventoryIndex, remove_amount: u16) {

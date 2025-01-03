@@ -2,7 +2,7 @@ use korangar_networking::InventoryItem;
 use ragnarok_packets::{EquipPosition, HotbarSlot};
 
 use crate::inventory::Skill;
-use crate::loaders::ResourceMetadata;
+use crate::world::ResourceMetadata;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ItemSource {

@@ -22,13 +22,13 @@ use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 use crate::interface::theme::GameTheme;
 use crate::interface::windows::WindowCache;
-use crate::loaders::{GameFileLoader, ScriptLoader};
+use crate::loaders::GameFileLoader;
 use crate::renderer::GameInterfaceRenderer;
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
-use crate::world::{ActionEvent, AnimationActionType, AnimationData, AnimationState, Camera, Map};
+use crate::world::{ActionEvent, AnimationActionType, AnimationData, AnimationState, Camera, Library, Map};
 #[cfg(feature = "debug")]
 use crate::{Buffer, Color, ModelVertex};
 
@@ -297,13 +297,7 @@ fn get_sprite_path_for_player_job(job_id: usize) -> &'static str {
     }
 }
 
-fn get_entity_part_files(
-    script_loader: &ScriptLoader,
-    entity_type: EntityType,
-    job_id: usize,
-    sex: Sex,
-    head: Option<usize>,
-) -> Vec<String> {
+fn get_entity_part_files(library: &Library, entity_type: EntityType, job_id: usize, sex: Sex, head: Option<usize>) -> Vec<String> {
     let sex_sprite_path = match sex == Sex::Female {
         true => "¿©",
         false => "³²",
@@ -335,9 +329,9 @@ fn get_entity_part_files(
             player_body_path(sex_sprite_path, job_id),
             player_head_path(sex_sprite_path, head_id),
         ],
-        EntityType::Npc => vec![format!("npc\\{}", script_loader.get_job_name_from_id(job_id))],
-        EntityType::Monster => vec![format!("¸ó½ºÅÍ\\{}", script_loader.get_job_name_from_id(job_id))],
-        EntityType::Warp | EntityType::Hidden => vec![format!("npc\\{}", script_loader.get_job_name_from_id(job_id))], // TODO: change
+        EntityType::Npc => vec![format!("npc\\{}", library.get_job_identity_from_id(job_id))],
+        EntityType::Monster => vec![format!("¸ó½ºÅÍ\\{}", library.get_job_identity_from_id(job_id))],
+        EntityType::Warp | EntityType::Hidden => vec![format!("npc\\{}", library.get_job_identity_from_id(job_id))], // TODO: change
     }
 }
 
@@ -379,8 +373,8 @@ impl Common {
         }
     }
 
-    pub fn get_entity_part_files(&self, script_loader: &ScriptLoader) -> Vec<String> {
-        get_entity_part_files(script_loader, self.entity_type, self.job_id, self.sex, None)
+    pub fn get_entity_part_files(&self, library: &Library) -> Vec<String> {
+        get_entity_part_files(library, self.entity_type, self.job_id, self.sex, None)
     }
 
     pub fn update(&mut self, audio_engine: &AudioEngine<GameFileLoader>, map: &Map, camera: &dyn Camera, client_tick: ClientTick) {
@@ -881,9 +875,9 @@ impl Player {
         );
     }
 
-    pub fn get_entity_part_files(&self, script_loader: &ScriptLoader) -> Vec<String> {
+    pub fn get_entity_part_files(&self, library: &Library) -> Vec<String> {
         let common = self.get_common();
-        get_entity_part_files(script_loader, common.entity_type, common.job_id, common.sex, Some(self.hair_id))
+        get_entity_part_files(library, common.entity_type, common.job_id, common.sex, Some(self.hair_id))
     }
 }
 
@@ -1004,10 +998,10 @@ impl Entity {
         self.get_common_mut().animation_data = Some(animation_data)
     }
 
-    pub fn get_entity_part_files(&self, script_loader: &ScriptLoader) -> Vec<String> {
+    pub fn get_entity_part_files(&self, library: &Library) -> Vec<String> {
         match self {
-            Self::Player(player) => player.get_entity_part_files(script_loader),
-            Self::Npc(npc) => npc.get_common().get_entity_part_files(script_loader),
+            Self::Player(player) => player.get_entity_part_files(library),
+            Self::Npc(npc) => npc.get_common().get_entity_part_files(library),
         }
     }
 

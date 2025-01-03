@@ -9,7 +9,7 @@ use crate::interface::application::InterfaceSettings;
 use crate::interface::elements::InventoryContainer;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
-use crate::loaders::ResourceMetadata;
+use crate::world::ResourceMetadata;
 
 #[derive(new)]
 pub struct InventoryWindow {

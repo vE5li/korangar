@@ -35,7 +35,7 @@ pub struct InventoryItem<Meta> {
 }
 
 impl<Meta> InventoryItem<Meta> {
-    pub fn is_identifed(&self) -> bool {
+    pub fn is_identified(&self) -> bool {
         match &self.details {
             InventoryItemDetails::Regular { flags, .. } => flags.contains(RegularItemFlags::IDENTIFIED),
             InventoryItemDetails::Equippable { flags, .. } => flags.contains(EquippableItemFlags::IDENTIFIED),

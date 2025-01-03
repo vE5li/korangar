@@ -12,6 +12,7 @@ chrono = "0.4"
 cosmic-text = { version = "0.12", default-features = false }
 cpal = "0.15"
 derive-new = "0.7"
+encoding_rs = "0.8"
 etherparse = "0.16"
 fast-srgb8 = "1"
 flate2 = { version = "1", default-features = false }
@@ -31,6 +32,7 @@ option-ext = "0.2"
 pcap = "2.2"
 pollster = "0.4"
 proc-macro2 = "1.0"
+quick-xml = "0.37"
 quote = "1.0"
 ragnarok_bytes = { path = "ragnarok_bytes" }
 ragnarok_formats = { path = "ragnarok_formats" }
@@ -42,14 +44,12 @@ rayon = "1.10"
 reqwest = "0.12"
 ron = "0.8"
 serde = "1.0"
-serde-xml-rs = "0.6"
 spin_sleep = "1.3"
 syn = "2.0"
 tokio = { version = "1.42", default-features = false }
 walkdir = "2.5"
 wgpu = "23.0"
 winit = "0.30"
-xml-rs = "0.8"
 
 [profile.dev.build-override]
 opt-level = 3

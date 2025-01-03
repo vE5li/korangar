@@ -1,11 +1,13 @@
 mod client_info;
 
+use encoding_rs::Encoding;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::Timer;
 use korangar_util::FileLoader;
+use quick_xml::de::from_str;
+use quick_xml::events::Event;
+use quick_xml::Reader;
 use serde::{Deserialize, Serialize};
-use serde_xml_rs::de::Deserializer;
-use xml::reader::{EventReader, ParserConfig};
 
 pub use self::client_info::ClientInfo;
 use super::GameFileLoader;
@@ -17,23 +19,44 @@ pub fn load_client_info(game_file_loader: &GameFileLoader) -> ClientInfo {
     #[cfg(feature = "debug")]
     let timer = Timer::new("read clientinfo");
 
-    let clientinfo = game_file_loader
+    let client_info = game_file_loader
         .get("data\\sclientinfo.xml")
         .or_else(|_| game_file_loader.get("data\\clientinfo.xml"))
         .expect("failed to find clientinfo");
 
-    let source = String::from_utf8(clientinfo).unwrap();
+    let content = match get_xml_encoding(&client_info) {
+        Some(encoding) => {
+            let (cow, ..) = encoding.decode(&client_info);
+            cow
+        }
+        None => String::from_utf8_lossy(client_info.as_slice()),
+    };
 
-    // TODO: Make it work with euc-kr, since it panics
-    // with error: "Unsupported encoding: euc-kr"
-    let replaced_source = source.replace("euc-kr", "utf8");
-
-    let config = ParserConfig::new().trim_whitespace(true);
-    let event_reader = EventReader::new_with_config(replaced_source.as_bytes(), config);
-    let client_info = ClientInfo::deserialize(&mut Deserializer::new(event_reader)).unwrap();
+    let client_info: ClientInfo = from_str(&content).unwrap();
 
     #[cfg(feature = "debug")]
     timer.stop();
 
     client_info
+}
+
+fn get_xml_encoding(data: &[u8]) -> Option<&'static Encoding> {
+    let mut reader = Reader::from_reader(data);
+
+    let mut buffer = Vec::new();
+
+    loop {
+        match reader.read_event_into(&mut buffer) {
+            Ok(Event::Decl(xml_declaration)) => {
+                if let Some(Ok(encoding)) = xml_declaration.encoding() {
+                    return Encoding::for_label(encoding.as_ref());
+                }
+            }
+            Ok(Event::Eof) | Err(_) => break,
+            _ => (),
+        }
+        buffer.clear();
+    }
+
+    None
 }

@@ -80,8 +80,10 @@ impl Element<InterfaceSettings> for FrameView {
         let mouse_position = self.state.mouse_position.get();
         let number_of_frames = korangar_debug::profiling::get_number_of_saved_frames(visible_thread);
 
-        let bar_width = self.state.cached_size.width / number_of_frames as f32;
-        let clicked_frame = (mouse_position.left / bar_width) as usize;
+        let gap_width = 1.0;
+        let total_gaps = (number_of_frames - 1) as f32 * gap_width;
+        let bar_width = (self.state.cached_size.width - total_gaps) / number_of_frames as f32;
+        let clicked_frame = (mouse_position.left / (bar_width + gap_width)) as usize;
 
         let measurement = korangar_debug::profiling::get_frame_by_index(visible_thread, clicked_frame);
         vec![ClickAction::OpenWindow(Box::new(FrameInspectorWindow::new(measurement)))]

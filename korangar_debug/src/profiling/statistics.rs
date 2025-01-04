@@ -90,12 +90,12 @@ pub fn get_statistics_data(thread: impl LockThreadProfiler) -> (Vec<FrameData>, 
     let mut timing_map = HashMap::new();
 
     saved_frames.iter().take(frame_count).for_each(|frame_measurement| {
-        let root_measurement = &frame_measurement.root_measurement();
+        let root_measurement = frame_measurement.root_measurement();
         process_timing(root_measurement, &mut timing_map);
         root_measurement.indices.iter().for_each(|index| {
             let measurement = &frame_measurement[*index];
             process_timing(measurement, &mut timing_map)
-        })
+        });
     });
 
     let statistics_map = timing_map

@@ -29,6 +29,11 @@ impl FrameMeasurement {
         index
     }
 
+    /// Returns `true` if the frame has measurements.
+    pub fn has_measurements(&self) -> bool {
+        !self.buffer.is_empty()
+    }
+
     /// Returns the root measurement of the frame's measurement.
     pub fn root_measurement(&self) -> &Measurement {
         &self.buffer[0]

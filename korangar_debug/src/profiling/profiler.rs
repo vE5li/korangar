@@ -84,8 +84,9 @@ impl Profiler {
             );
         }
 
-        // Discard the currents frame measurement if profiling is halted.
-        if !PROFILER_HALTED.load(std::sync::atomic::Ordering::Relaxed) {
+        // Make sure that the profiler is not halted and only save the frame data when
+        // there is at least one measurement.
+        if !PROFILER_HALTED.load(std::sync::atomic::Ordering::Relaxed) && self.latest_frame.has_measurements() {
             self.saved_frames.push_default_or_recycle();
 
             // Swap the current and the replaced frame to avoid allocating new vectors on

@@ -5,6 +5,8 @@ use hashbrown::HashMap;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::print_debug;
 #[cfg(feature = "debug")]
+use korangar_debug::profiling::Profiler;
+#[cfg(feature = "debug")]
 use korangar_util::texture_atlas::AtlasAllocation;
 use ragnarok_packets::{EntityId, ItemId, TilePosition};
 use rayon::{ThreadPool, ThreadPoolBuilder};
@@ -100,6 +102,9 @@ impl AsyncLoader {
                 let animation_loader = self.animation_loader.clone();
 
                 self.request_load(LoaderId::AnimationData(entity_id), move || {
+                    #[cfg(feature = "debug")]
+                    let _load_measurement = Profiler::start_measurement("animation data load");
+
                     let animation_data = match animation_loader.get(&entity_part_files) {
                         Some(animation_data) => animation_data,
                         None => animation_loader.load(&sprite_loader, &action_loader, entity_type, &entity_part_files)?,
@@ -127,6 +132,9 @@ impl AsyncLoader {
                 let path = path.to_string();
 
                 self.request_load(LoaderId::ItemSprite(item_id), move || {
+                    #[cfg(feature = "debug")]
+                    let _load_measurement = Profiler::start_measurement("item sprite load");
+
                     let texture = match texture_loader.get(&path, image_type) {
                         None => texture_loader.load(&path, image_type)?,
                         Some(texture) => texture,
@@ -153,6 +161,9 @@ impl AsyncLoader {
         let texture_loader = self.texture_loader.clone();
 
         self.request_load(LoaderId::Map(map_name.clone()), move || {
+            #[cfg(feature = "debug")]
+            let _load_measurement = Profiler::start_measurement("map load");
+
             let map = map_loader.load(
                 map_name,
                 &model_loader,

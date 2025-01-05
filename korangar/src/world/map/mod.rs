@@ -219,7 +219,7 @@ impl Map {
         })
     }
 
-    // We want to make sure that the object set also caputres the lifetime of the
+    // We want to make sure that the object set also captures the lifetime of the
     // map, so we never have a stale object set.
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn cull_objects_in_sphere<'a>(

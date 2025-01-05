@@ -17,6 +17,7 @@ use event::{
     CharacterServerDisconnectedEvent, DisconnectedEvent, LoginServerDisconnectedEvent, MapServerDisconnectedEvent, NetworkEventList,
     NoNetworkEvents,
 };
+use ragnarok_bytes::encoding::UTF_8;
 use ragnarok_bytes::{ByteReader, FromBytes};
 use ragnarok_packets::handler::{DuplicateHandlerError, HandlerResult, NoPacketCallback, PacketCallback, PacketHandler};
 use ragnarok_packets::*;
@@ -320,6 +321,7 @@ where
 
                     let data = &buffer[..cut_off_buffer_base + received_bytes];
                     let mut byte_reader = ByteReader::without_metadata(data);
+                    byte_reader.set_encoding(UTF_8);
 
                     if read_account_id {
                         let account_id = AccountId::from_bytes(&mut byte_reader).unwrap();

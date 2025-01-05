@@ -33,7 +33,7 @@ impl SkillTree {
         let skills = skill_data
             .into_iter()
             .map(|skill_data| {
-                let file_path = format!("¾ÆÀÌÅÛ\\{}", skill_data.skill_name);
+                let file_path = format!("아이템\\{}", skill_data.skill_name);
                 let sprite = sprite_loader.get_or_load(&format!("{file_path}.spr")).unwrap();
                 let actions = action_loader.get_or_load(&format!("{file_path}.act")).unwrap();
 

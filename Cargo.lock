@@ -2684,6 +2684,7 @@ name = "ragnarok_bytes"
 version = "0.1.0"
 dependencies = [
  "cgmath",
+ "encoding_rs",
  "ragnarok_procedural",
 ]
 

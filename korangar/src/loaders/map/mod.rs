@@ -315,7 +315,7 @@ fn parse_generic_data<Data: FromBytes>(resource_file: &str, game_file_loader: &G
 fn get_water_texture_paths(water_type: i32) -> Vec<String> {
     let mut paths = Vec::with_capacity(32);
     for i in 0..32 {
-        let filename = format!("¿öÅÍ\\water{}{:02}.jpg", water_type, i);
+        let filename = format!("워터\\water{}{:02}.jpg", water_type, i);
         paths.push(filename);
     }
     paths

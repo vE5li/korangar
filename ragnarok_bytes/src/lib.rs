@@ -7,6 +7,7 @@ mod from_bytes;
 mod reader;
 mod to_bytes;
 
+pub use encoding_rs as encoding;
 #[cfg(feature = "derive")]
 pub use ragnarok_procedural::{ByteConvertable, FixedByteSize, FromBytes, ToBytes};
 

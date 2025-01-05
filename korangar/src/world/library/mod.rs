@@ -178,10 +178,8 @@ impl Library {
 
 fn fix_encoding(broken: String) -> String {
     let bytes: Vec<u8> = broken.chars().map(|char| char as u8).collect();
-    let (char, error) = EUC_KR.decode_without_bom_handling(&bytes);
-    if error {
-        broken.to_string()
-    } else {
-        char.to_string()
+    match EUC_KR.decode_without_bom_handling_and_without_replacement(&bytes) {
+        None => broken.to_string(),
+        Some(char) => char.to_string(),
     }
 }

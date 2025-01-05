@@ -84,11 +84,9 @@ where
     }
 
     pub fn decode_string(&mut self, bytes: &[u8]) -> String {
-        let (cow, error) = self.encoding.decode_without_bom_handling(bytes);
-        if error {
-            bytes.iter().map(|byte| *byte as char).collect()
-        } else {
-            cow.to_string()
+        match self.encoding.decode_without_bom_handling_and_without_replacement(bytes) {
+            None => bytes.iter().map(|byte| *byte as char).collect(),
+            Some(chars) => chars.to_string(),
         }
     }
 

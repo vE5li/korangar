@@ -26,7 +26,7 @@ pub fn load_client_info(game_file_loader: &GameFileLoader) -> ClientInfo {
 
     let content = match get_xml_encoding(&client_info) {
         Some(encoding) => {
-            let (cow, ..) = encoding.decode(&client_info);
+            let (cow, _) = encoding.decode_without_bom_handling(&client_info);
             cow
         }
         None => String::from_utf8_lossy(client_info.as_slice()),

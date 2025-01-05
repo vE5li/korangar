@@ -1,5 +1,7 @@
 use std::any::TypeId;
 
+use encoding_rs::{Encoding, EUC_KR};
+
 use crate::{ConversionError, ConversionErrorType, ConversionResult};
 
 /// Saved state of a [`ByteReader`] that can be restored.
@@ -20,6 +22,8 @@ pub(crate) struct TemporaryLimit {
 /// example a version).
 ///
 /// The reader is intended for reading data without lookahead.
+/// The reader reads strings with the default encoding of "EUC-KR", which can be
+/// changed by calling [`set_encoding`](ByteReader::set_encoding).
 ///
 /// The state of the reader can be saved at any time with
 /// [`create_save_point`](ByteReader::create_save_point), and restored with
@@ -34,6 +38,7 @@ where
     Meta: 'static,
 {
     data: &'a [u8],
+    encoding: &'static Encoding,
     offset: usize,
     limit: usize,
     metadata: Meta,
@@ -66,9 +71,24 @@ where
 
         Self {
             data,
+            encoding: EUC_KR,
             offset: 0,
             limit,
             metadata,
+        }
+    }
+
+    /// Sets the encoding used to decode strings.
+    pub fn set_encoding(&mut self, encoding: &'static Encoding) {
+        self.encoding = encoding;
+    }
+
+    pub fn decode_string(&mut self, bytes: &[u8]) -> String {
+        let (cow, error) = self.encoding.decode_without_bom_handling(bytes);
+        if error {
+            bytes.iter().map(|byte| *byte as char).collect()
+        } else {
+            cow.to_string()
         }
     }
 

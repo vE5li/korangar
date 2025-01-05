@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use encoding_rs::EUC_KR;
 use hashbrown::HashMap;
 use korangar_networking::{InventoryItem, NoMetadata, ShopItem};
 use korangar_util::FileLoader;
@@ -108,11 +109,12 @@ impl Library {
         if let Ok(table) = globals.get::<mlua::Table>("tbl") {
             for (item_id, item_table) in table.pairs::<u32, mlua::Table>().flatten() {
                 let info = ItemInfo {
-                    identified_name: item_table.get("identifiedDisplayName").ok(),
-                    unidentified_name: item_table.get("unidentifiedDisplayName").ok(),
-                    identified_resource: item_table.get("identifiedResourceName").ok(),
-                    unidentified_resource: item_table.get("unidentifiedResourceName").ok(),
+                    identified_name: item_table.get("identifiedDisplayName").ok().map(fix_encoding),
+                    unidentified_name: item_table.get("unidentifiedDisplayName").ok().map(fix_encoding),
+                    identified_resource: item_table.get("identifiedResourceName").ok().map(fix_encoding),
+                    unidentified_resource: item_table.get("unidentifiedResourceName").ok().map(fix_encoding),
                 };
+
                 result.insert(ItemId(item_id), info);
             }
         }
@@ -142,7 +144,7 @@ impl Library {
             true => self.item_table.get(&item_id).and_then(|info| info.identified_resource.as_deref()),
             false => self.item_table.get(&item_id).and_then(|info| info.unidentified_resource.as_deref()),
         }
-        .unwrap_or("»ç°ú")
+        .unwrap_or("사과") // Apple
     }
 
     pub fn load_inventory_item_metadata(
@@ -153,7 +155,7 @@ impl Library {
         let is_identified = item.is_identified();
 
         let resource_name = self.get_item_resource_from_id(item.item_id, is_identified);
-        let full_path = format!("À¯ÀúÀÎÅÍÆäÀÌ½º\\item\\{resource_name}.bmp");
+        let full_path = format!("유저인터페이스\\item\\{resource_name}.bmp");
         let texture = async_loader.request_item_sprite_load(ItemLocation::Inventory, item.item_id, &full_path, ImageType::Color);
         let name = self.get_item_name_from_id(item.item_id, is_identified).to_string();
 
@@ -164,12 +166,22 @@ impl Library {
 
     pub fn load_shop_item_metadata(&self, async_loader: &AsyncLoader, item: ShopItem<NoMetadata>) -> ShopItem<ResourceMetadata> {
         let resource_name = self.get_item_resource_from_id(item.item_id, true);
-        let full_path = format!("À¯ÀúÀÎÅÍÆäÀÌ½º\\item\\{resource_name}.bmp");
+        let full_path = format!("유저인터페이스\\item\\{resource_name}.bmp");
         let texture = async_loader.request_item_sprite_load(ItemLocation::Shop, item.item_id, &full_path, ImageType::Color);
         let name = self.get_item_name_from_id(item.item_id, true).to_string();
 
         let metadata = ResourceMetadata { texture, name };
 
         ShopItem { metadata, ..item }
+    }
+}
+
+fn fix_encoding(broken: String) -> String {
+    let bytes: Vec<u8> = broken.chars().map(|char| char as u8).collect();
+    let (char, error) = EUC_KR.decode_without_bom_handling(&bytes);
+    if error {
+        broken.to_string()
+    } else {
+        char.to_string()
     }
 }

@@ -108,7 +108,7 @@ impl QuestIcon {
         let effect_id = quest_effect.effect as usize;
         let texture = texture_loader
             .get_or_load(
-                &format!("À¯ÀúÀÎÅÍÆäÀÌ½º\\minimap\\quest_{}_{}.bmp", effect_id, 1), /* 1 - 3 */
+                &format!("유저인터페이스\\minimap\\quest_{}_{}.bmp", effect_id, 1), /* 1 - 3 */
                 ImageType::Color,
             )
             .unwrap();

@@ -107,7 +107,7 @@ const CLIENT_NAME: &str = "Korangar";
 const ROLLING_CUTTER_ID: SkillId = SkillId(2036);
 const DEFAULT_MAP: &str = "geffen";
 const DEFAULT_BACKGROUND_MUSIC: Option<&str> = Some("bgm\\01.mp3");
-const MAIN_MENU_CLICK_SOUND_EFFECT: &str = "¹öÆ°¼Ò¸®.wav";
+const MAIN_MENU_CLICK_SOUND_EFFECT: &str = "버튼소리.wav";
 // TODO: The number of point lights that can cast shadows should be configurable
 // through the graphics settings. For now I just chose an arbitrary smaller
 // number that should be playable on most devices.

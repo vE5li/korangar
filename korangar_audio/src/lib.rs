@@ -15,17 +15,13 @@ use std::time::{Duration, Instant};
 
 use cgmath::{InnerSpace, Matrix3, Point3, Quaternion, Vector3};
 use cpal::BufferSize;
-use kira::manager::backend::cpal::{CpalBackend, CpalBackendSettings};
-use kira::manager::{AudioManager, AudioManagerSettings, Capacities};
+use kira::backend::cpal::{CpalBackend, CpalBackendSettings};
+use kira::listener::ListenerHandle;
 use kira::sound::static_sound::{StaticSoundData, StaticSoundHandle};
 use kira::sound::streaming::{StreamingSoundData, StreamingSoundHandle};
 use kira::sound::{FromFileError, PlaybackState};
-use kira::spatial::emitter::{EmitterDistances, EmitterHandle, EmitterSettings};
-use kira::spatial::listener::{ListenerHandle, ListenerSettings};
-use kira::spatial::scene::{SpatialSceneHandle, SpatialSceneSettings};
-use kira::track::{TrackBuilder, TrackHandle};
-use kira::tween::{Easing, Tween, Value};
-use kira::{Frame, Volume};
+use kira::track::{MainTrackBuilder, SpatialTrackBuilder, SpatialTrackDistances, SpatialTrackHandle, TrackBuilder, TrackHandle};
+use kira::{AudioManager, AudioManagerSettings, Capacities, Decibels, Easing, Frame, Tween};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize};
 use korangar_util::collision::{KDTree, Sphere};
@@ -65,11 +61,12 @@ struct QueuedSoundEffect {
 struct AmbientSoundConfig {
     sound_effect_key: SoundEffectKey,
     bounds: Sphere,
-    volume: f32,
+    volume: Decibels,
     cycle: Option<f32>,
 }
 
 struct PlayingAmbient {
+    key: AmbientKey,
     data: StaticSoundData,
     handle: StaticSoundHandle,
     cycle: f32,
@@ -106,7 +103,7 @@ pub struct AudioEngine<F> {
 }
 
 struct EngineContext<F> {
-    active_emitters: HashMap<AmbientKey, EmitterHandle>,
+    active_spatial_tracks: HashMap<AmbientKey, SpatialTrackHandle>,
     spatial_listener: ListenerHandle,
     ambient_sound: SimpleSlab<AmbientKey, AmbientSoundConfig>,
     spatial_sound_effect_track: TrackHandle,
@@ -127,7 +124,6 @@ struct EngineContext<F> {
     query_result: Vec<AmbientKey>,
     queued_background_music_track: Option<String>,
     queued_sound_effect: Vec<QueuedSoundEffect>,
-    scene: SpatialSceneHandle,
     scratchpad: Vec<AmbientKey>,
     sound_effect_paths: GenerationalSlab<SoundEffectKey, String>,
     sound_effect_track: TrackHandle,
@@ -138,7 +134,8 @@ impl<F: FileLoader> AudioEngine<F> {
     pub fn new(game_file_loader: Arc<F>) -> AudioEngine<F> {
         let mut manager = AudioManager::<CpalBackend>::new(AudioManagerSettings {
             capacities: Capacities::default(),
-            main_track_builder: TrackBuilder::default(),
+            main_track_builder: MainTrackBuilder::default(),
+            internal_buffer_size: 128,
             backend_settings: CpalBackendSettings {
                 device: None,
                 // At sampling rate of 48 kHz 1200 frames take 25 ms.
@@ -146,9 +143,6 @@ impl<F: FileLoader> AudioEngine<F> {
             },
         })
         .expect("Can't initialize audio backend");
-        let mut scene = manager
-            .add_spatial_scene(SpatialSceneSettings::default())
-            .expect("Can't create spatial scene");
         let background_music_track = manager
             .add_sub_track(TrackBuilder::new())
             .expect("Can't create background music track");
@@ -158,11 +152,8 @@ impl<F: FileLoader> AudioEngine<F> {
             .expect("Can't create spatial sound effect track");
         let position = Vector3::new(0.0, 0.0, 0.0);
         let orientation = Quaternion::new(0.0, 0.0, 0.0, 0.0);
-        let spatial_listener = scene
-            .add_listener(position, orientation, ListenerSettings {
-                track: spatial_sound_effect_track.id(),
-            })
-            .expect("Can't create ambient listener");
+        let spatial_listener = manager.add_listener(position, orientation).expect("Can't create spatial listener");
+
         let loading_sound_effect = HashSet::new();
         let cache = SimpleCache::new(
             NonZeroU32::new(MAX_CACHE_COUNT).unwrap(),
@@ -175,7 +166,7 @@ impl<F: FileLoader> AudioEngine<F> {
         let object_kdtree = KDTree::empty();
 
         let engine_context = Mutex::new(EngineContext {
-            active_emitters: HashMap::default(),
+            active_spatial_tracks: HashMap::default(),
             spatial_listener,
             ambient_sound: SimpleSlab::default(),
             spatial_sound_effect_track,
@@ -196,7 +187,6 @@ impl<F: FileLoader> AudioEngine<F> {
             query_result: Vec::default(),
             queued_background_music_track: None,
             queued_sound_effect: Vec::default(),
-            scene,
             scratchpad: Vec::default(),
             sound_effect_paths: GenerationalSlab::default(),
             sound_effect_track,
@@ -206,11 +196,10 @@ impl<F: FileLoader> AudioEngine<F> {
 
     /// Mutes or unmutes the audio.
     pub fn mute(&self, enable: bool) {
-        let mut volume = Volume::Amplitude(1.0);
-        if enable {
-            volume = Volume::Amplitude(0.0);
-        }
-        self.set_main_volume(volume);
+        match enable {
+            true => self.set_main_volume(0.0),
+            false => self.set_main_volume(1.0),
+        };
     }
 
     /// This function needs the full file path with the file extension.
@@ -261,23 +250,32 @@ impl<F: FileLoader> AudioEngine<F> {
     }
 
     /// Sets the global volume.
-    pub fn set_main_volume(&self, volume: impl Into<Value<Volume>>) {
-        self.engine_context.lock().unwrap().set_main_volume(volume)
+    pub fn set_main_volume(&self, volume: f32) {
+        self.engine_context.lock().unwrap().set_main_volume(linear_to_decibel(volume))
     }
 
     /// Sets the volume of the background music.
-    pub fn set_background_music_volume(&self, volume: impl Into<Value<Volume>>) {
-        self.engine_context.lock().unwrap().set_background_music_volume(volume)
+    pub fn set_background_music_volume(&self, volume: f32) {
+        self.engine_context
+            .lock()
+            .unwrap()
+            .set_background_music_volume(linear_to_decibel(volume))
     }
 
     /// Sets the volume of sound effect.
-    pub fn set_sound_effect_volume(&self, volume: impl Into<Value<Volume>>) {
-        self.engine_context.lock().unwrap().set_sound_effect_volume(volume)
+    pub fn set_sound_effect_volume(&self, volume: f32) {
+        self.engine_context
+            .lock()
+            .unwrap()
+            .set_sound_effect_volume(linear_to_decibel(volume))
     }
 
     /// Sets the volume of spatial sound effects.
-    pub fn set_spatial_sound_effect_volume(&self, volume: impl Into<Value<Volume>>) {
-        self.engine_context.lock().unwrap().set_spatial_sound_effect_volume(volume)
+    pub fn set_spatial_sound_effect_volume(&self, volume: f32) {
+        self.engine_context
+            .lock()
+            .unwrap()
+            .set_spatial_sound_effect_volume(linear_to_decibel(volume))
     }
 
     /// Plays the background music track. Fades out the currently playing
@@ -329,10 +327,10 @@ impl<F: FileLoader> AudioEngine<F> {
         self.engine_context
             .lock()
             .unwrap()
-            .add_ambient_sound(sound_effect_key, position, range, volume, cycle)
+            .add_ambient_sound(sound_effect_key, position, range, linear_to_decibel(volume), cycle)
     }
 
-    /// Removes all ambient sound emitters from the spatial scene.
+    /// Removes all ambient-sound tracks.
     pub fn clear_ambient_sound(&self) {
         self.engine_context.lock().unwrap().clear_ambient_sound()
     }
@@ -350,28 +348,28 @@ impl<F: FileLoader> AudioEngine<F> {
 }
 
 impl<F: FileLoader> EngineContext<F> {
-    fn set_main_volume(&mut self, volume: impl Into<Value<Volume>>) {
+    fn set_main_volume(&mut self, volume: Decibels) {
         self.manager.main_track().set_volume(volume, Tween {
             duration: Duration::from_millis(500),
             ..Default::default()
         });
     }
 
-    fn set_background_music_volume(&mut self, volume: impl Into<Value<Volume>>) {
+    fn set_background_music_volume(&mut self, volume: Decibels) {
         self.background_music_track.set_volume(volume, Tween {
             duration: Duration::from_millis(500),
             ..Default::default()
         });
     }
 
-    fn set_sound_effect_volume(&mut self, volume: impl Into<Value<Volume>>) {
+    fn set_sound_effect_volume(&mut self, volume: Decibels) {
         self.sound_effect_track.set_volume(volume, Tween {
             duration: Duration::from_millis(500),
             ..Default::default()
         });
     }
 
-    fn set_spatial_sound_effect_volume(&mut self, volume: impl Into<Value<Volume>>) {
+    fn set_spatial_sound_effect_volume(&mut self, volume: Decibels) {
         self.spatial_sound_effect_track.set_volume(volume, Tween {
             duration: Duration::from_millis(500),
             ..Default::default()
@@ -418,8 +416,7 @@ impl<F: FileLoader> EngineContext<F> {
             .get(&sound_effect_key)
             .map(|cached_sound_effect| cached_sound_effect.0.clone())
         {
-            let data = data.output_destination(&self.sound_effect_track);
-            if let Err(_error) = self.manager.play(data.clone()) {
+            if let Err(_error) = self.sound_effect_track.play(data.clone()) {
                 #[cfg(feature = "debug")]
                 print_debug!("[{}] can't play sound effect: {:?}", "error".red(), _error);
             }
@@ -446,28 +443,27 @@ impl<F: FileLoader> EngineContext<F> {
             .get(&sound_effect_key)
             .map(|cached_sound_effect| cached_sound_effect.0.clone())
         {
-            let settings = EmitterSettings {
-                distances: EmitterDistances {
+            let spatial_track = SpatialTrackBuilder::new()
+                .persist_until_sounds_finish(true)
+                .distances(SpatialTrackDistances {
                     min_distance: 5.0,
                     max_distance: range,
-                },
-                attenuation_function: Some(Easing::Linear),
-                enable_spatialization: true,
-                persist_until_sounds_finish: true,
-            };
+                })
+                .attenuation_function(Easing::Linear);
 
-            match self.scene.add_emitter(position, settings) {
-                Ok(emitter_handle) => {
-                    let data = adjust_ambient_sound(data, &emitter_handle, 1.0);
-
-                    if let Err(_error) = self.manager.play(data) {
+            match self
+                .spatial_sound_effect_track
+                .add_spatial_sub_track(&self.spatial_listener, position, spatial_track)
+            {
+                Ok(mut spatial_track_handle) => {
+                    if let Err(_error) = spatial_track_handle.play(data) {
                         #[cfg(feature = "debug")]
                         print_debug!("[{}] can't play sound effect: {:?}", "error".red(), _error);
                     }
                 }
                 Err(_error) => {
                     #[cfg(feature = "debug")]
-                    print_debug!("[{}] can't add spatial sound emitter: {:?}", "error".red(), _error);
+                    print_debug!("[{}] can't add spatial sound track: {:?}", "error".red(), _error);
                 }
             };
         }
@@ -502,23 +498,27 @@ impl<F: FileLoader> EngineContext<F> {
             // Kira uses a RH coordinate system, so we need to convert our LH vectors.
             let position = sound_config.bounds.center();
             let position = Vector3::new(position.x, position.y, -position.z);
-            let emitter_settings = EmitterSettings {
-                distances: EmitterDistances {
+
+            let spatial_track = SpatialTrackBuilder::new()
+                .persist_until_sounds_finish(true)
+                .distances(SpatialTrackDistances {
                     min_distance: 5.0,
                     max_distance: sound_config.bounds.radius(),
-                },
-                attenuation_function: Some(Easing::Linear),
-                enable_spatialization: true,
-                persist_until_sounds_finish: true,
-            };
-            let emitter_handle = match self.scene.add_emitter(position, emitter_settings) {
-                Ok(emitter_handle) => emitter_handle,
-                Err(_error) => {
-                    #[cfg(feature = "debug")]
-                    print_debug!("[{}] can't add ambient sound emitter: {:?}", "error".red(), _error);
-                    continue;
-                }
-            };
+                })
+                .attenuation_function(Easing::Linear);
+
+            let mut spatial_track_handle =
+                match self
+                    .spatial_sound_effect_track
+                    .add_spatial_sub_track(&self.spatial_listener, position, spatial_track)
+                {
+                    Ok(spatial_track_handle) => spatial_track_handle,
+                    Err(_error) => {
+                        #[cfg(feature = "debug")]
+                        print_debug!("[{}] can't add ambient sound track: {:?}", "error".red(), _error);
+                        continue;
+                    }
+                };
 
             let sound_effect_key = sound_config.sound_effect_key;
             if let Some(data) = self
@@ -526,11 +526,12 @@ impl<F: FileLoader> EngineContext<F> {
                 .get(&sound_effect_key)
                 .map(|cached_sound_effect| cached_sound_effect.0.clone())
             {
-                let data = adjust_ambient_sound(data, &emitter_handle, sound_config.volume);
-                match self.manager.play(data.clone()) {
+                let data = data.volume(sound_config.volume);
+                match spatial_track_handle.play(data.clone()) {
                     Ok(handle) => {
                         if let Some(cycle) = sound_config.cycle {
                             self.cycling_ambient.insert(ambient_key, PlayingAmbient {
+                                key: ambient_key,
                                 data,
                                 handle,
                                 cycle,
@@ -554,13 +555,13 @@ impl<F: FileLoader> EngineContext<F> {
                 );
             }
 
-            self.active_emitters.insert(ambient_key, emitter_handle);
+            self.active_spatial_tracks.insert(ambient_key, spatial_track_handle);
         }
 
         // Remove ambient sound that are out of reach.
         difference(&mut self.previous_query_result, &mut self.query_result, &mut self.scratchpad);
         for ambient_key in self.scratchpad.iter() {
-            let _ = self.active_emitters.remove(ambient_key);
+            let _ = self.active_spatial_tracks.remove(ambient_key);
             let _ = self.cycling_ambient.remove(ambient_key);
         }
 
@@ -597,7 +598,7 @@ impl<F: FileLoader> EngineContext<F> {
         sound_effect_key: SoundEffectKey,
         position: Point3<f32>,
         range: f32,
-        volume: f32,
+        volume: Decibels,
         cycle: Option<f32>,
     ) -> AmbientKey {
         self.ambient_sound
@@ -616,7 +617,7 @@ impl<F: FileLoader> EngineContext<F> {
         self.scratchpad.clear();
 
         self.ambient_sound.clear();
-        self.active_emitters.clear();
+        self.active_spatial_tracks.clear();
         self.cycling_ambient.clear();
     }
 
@@ -703,46 +704,46 @@ impl<F: FileLoader> EngineContext<F> {
 
             match queued.sound_type {
                 QueuedSoundEffectType::Sound => {
-                    if let Err(_error) = self.manager.play(data.output_destination(&self.sound_effect_track)) {
+                    if let Err(_error) = self.sound_effect_track.play(data) {
                         #[cfg(feature = "debug")]
                         print_debug!("[{}] can't play sound effect: {:?}", "error".red(), _error);
                     }
                 }
                 QueuedSoundEffectType::SpatialSound { position, range } => {
-                    let settings = EmitterSettings {
-                        distances: EmitterDistances {
+                    let spatial_track = SpatialTrackBuilder::new()
+                        .persist_until_sounds_finish(true)
+                        .distances(SpatialTrackDistances {
                             min_distance: 5.0,
                             max_distance: range,
-                        },
-                        attenuation_function: Some(Easing::Linear),
-                        enable_spatialization: true,
-                        persist_until_sounds_finish: true,
-                    };
+                        })
+                        .attenuation_function(Easing::Linear);
 
-                    match self.scene.add_emitter(position, settings) {
-                        Ok(emitter_handle) => {
-                            let data = adjust_ambient_sound(data, &emitter_handle, 1.0);
-
-                            if let Err(_error) = self.manager.play(data) {
+                    match self
+                        .spatial_sound_effect_track
+                        .add_spatial_sub_track(&self.spatial_listener, position, spatial_track)
+                    {
+                        Ok(mut spatial_track_handle) => {
+                            if let Err(_error) = spatial_track_handle.play(data) {
                                 #[cfg(feature = "debug")]
                                 print_debug!("[{}] can't play sound effect: {:?}", "error".red(), _error);
                             }
                         }
                         Err(_error) => {
                             #[cfg(feature = "debug")]
-                            print_debug!("[{}] can't add spatial sound emitter: {:?}", "error".red(), _error);
+                            print_debug!("[{}] can't add spatial sound track: {:?}", "error".red(), _error);
                         }
                     };
                 }
                 QueuedSoundEffectType::AmbientSound { ambient_key } => {
-                    if let Some(emitter_handle) = self.active_emitters.get(&ambient_key)
+                    if let Some(spatial_track_handle) = self.active_spatial_tracks.get_mut(&ambient_key)
                         && let Some(sound_config) = self.ambient_sound.get(ambient_key)
                     {
-                        let data = adjust_ambient_sound(data, emitter_handle, sound_config.volume);
-                        match self.manager.play(data.clone()) {
+                        let data = data.volume(sound_config.volume);
+                        match spatial_track_handle.play(data.clone()) {
                             Ok(handle) => {
                                 if let Some(cycle) = sound_config.cycle {
                                     self.cycling_ambient.insert(ambient_key, PlayingAmbient {
+                                        key: ambient_key,
                                         data,
                                         handle,
                                         cycle,
@@ -770,15 +771,17 @@ impl<F: FileLoader> EngineContext<F> {
         for (_, playing) in self.cycling_ambient.iter_mut().filter(|(_, playing)| {
             playing.handle.state() != PlaybackState::Playing && now.duration_since(playing.last_start).as_secs_f32() >= playing.cycle
         }) {
-            playing.last_start = now;
+            if let Some(spatial_track) = self.active_spatial_tracks.get_mut(&playing.key) {
+                playing.last_start = now;
 
-            match self.manager.play(playing.data.clone()) {
-                Ok(handle) => {
-                    playing.handle = handle;
-                }
-                Err(_error) => {
-                    #[cfg(feature = "debug")]
-                    print_debug!("[{}] can't play ambient sound effect: {:?}", "error".red(), _error);
+                match spatial_track.play(playing.data.clone()) {
+                    Ok(handle) => {
+                        playing.handle = handle;
+                    }
+                    Err(_error) => {
+                        #[cfg(feature = "debug")]
+                        print_debug!("[{}] can't play ambient sound effect: {:?}", "error".red(), _error);
+                    }
                 }
             }
         }
@@ -806,9 +809,8 @@ impl<F: FileLoader> EngineContext<F> {
         // the music again.
         let duration = data.duration().as_secs_f64() - 0.05;
         let data = data.loop_region(..duration);
-        let data = data.output_destination(&self.background_music_track);
 
-        let handle = match self.manager.play(data) {
+        let handle = match self.background_music_track.play(data) {
             Ok(handle) => handle,
             Err(_error) => {
                 #[cfg(feature = "debug")]
@@ -822,12 +824,6 @@ impl<F: FileLoader> EngineContext<F> {
             handle,
         });
     }
-}
-
-fn adjust_ambient_sound(mut data: StaticSoundData, emitter_handle: &EmitterHandle, volume: f32) -> StaticSoundData {
-    // Kira does the volume mapping from linear to logarithmic for us.
-    data.settings.volume = Volume::Amplitude(volume as f64).into();
-    data.output_destination(emitter_handle)
 }
 
 fn queue_sound_effect_playback(
@@ -964,6 +960,14 @@ fn difference<T: Ord + Copy>(vector_1: &mut [T], vector_2: &mut [T], result: &mu
     }
 
     result.extend_from_slice(&vector_1[i..]);
+}
+
+fn linear_to_decibel(linear: f32) -> Decibels {
+    if linear <= 0.0 {
+        Decibels::SILENCE
+    } else {
+        Decibels::from(20.0 * linear.log10())
+    }
 }
 
 #[cfg(test)]

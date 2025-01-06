@@ -19,7 +19,7 @@ flate2 = { version = "1", default-features = false }
 glidesort = "0.1"
 hashbrown = "0.15"
 image = { version = "0.25", default-features = false }
-kira = { version = "0.9", default-features = false }
+kira = { version = "0.10", default-features = false }
 korangar_audio = { path = "korangar_audio" }
 korangar_debug = { path = "korangar_debug" }
 korangar_interface = { path = "korangar_interface" }

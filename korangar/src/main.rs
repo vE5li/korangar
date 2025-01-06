@@ -164,8 +164,6 @@ struct Client {
     async_loader: Arc<AsyncLoader>,
     effect_loader: Arc<EffectLoader>,
     font_loader: Rc<RefCell<FontLoader>>,
-    map_loader: Arc<MapLoader>,
-    model_loader: Arc<ModelLoader>,
     sprite_loader: Arc<SpriteLoader>,
     texture_loader: Arc<TextureLoader>,
     library: Library,
@@ -596,8 +594,6 @@ impl Client {
             async_loader,
             effect_loader,
             font_loader,
-            map_loader,
-            model_loader,
             sprite_loader,
             texture_loader,
             library,
@@ -860,41 +856,21 @@ impl Client {
                     let server = self.saved_character_server.clone().unwrap();
                     self.networking_system.connect_to_character_server(login_data, server);
 
+                    self.map = None;
                     self.entities.clear();
                     self.particle_holder.clear();
                     self.effect_holder.clear();
                     self.point_light_manager.clear();
                     self.audio_engine.play_background_music_track(None);
 
-                    let map = self
-                        .map_loader
-                        .load(
-                            DEFAULT_MAP.to_string(),
-                            &self.model_loader,
-                            self.texture_loader.clone(),
-                            #[cfg(feature = "debug")]
-                            &self.tile_texture_mapping,
-                        )
-                        .expect("failed to load initial map");
-
-                    let map = self.map.insert(map);
-
-                    map.set_ambient_sound_sources(&self.audio_engine);
-                    self.audio_engine.play_background_music_track(DEFAULT_BACKGROUND_MUSIC);
-
                     self.interface.close_all_windows_except(&mut self.focus_state);
 
-                    let character_selection_window = CharacterSelectionWindow::new(
-                        self.saved_characters.new_remote(),
-                        self.move_request.new_remote(),
-                        self.saved_slot_count,
+                    self.async_loader.request_map_load(
+                        DEFAULT_MAP.to_string(),
+                        TilePosition::new(0, 0),
+                        #[cfg(feature = "debug")]
+                        self.tile_texture_mapping.clone(),
                     );
-                    self.interface
-                        .open_window(&self.application, &mut self.focus_state, &character_selection_window);
-
-                    self.start_camera.set_focus_point(cgmath::Point3::new(600.0, 0.0, 240.0));
-                    self.directional_shadow_camera
-                        .set_focus_point(cgmath::Point3::new(600.0, 0.0, 240.0));
                 }
                 NetworkEvent::ResurrectPlayer { entity_id } => {
                     // If the resurrected player is us, close the resurrect window.
@@ -1857,22 +1833,44 @@ impl Client {
                         });
                     }
                 },
-                (LoaderId::Map(..), LoadableResource::Map { map, player_position }) => {
-                    let map = self.map.insert(map);
+                (LoaderId::Map(..), LoadableResource::Map { map, player_position }) => match self.entities.is_empty() {
+                    true => {
+                        // Load of main menu map
+                        let map = self.map.insert(map);
 
-                    map.set_ambient_sound_sources(&self.audio_engine);
-                    self.audio_engine.play_background_music_track(map.background_music_track_name());
+                        map.set_ambient_sound_sources(&self.audio_engine);
+                        self.audio_engine.play_background_music_track(DEFAULT_BACKGROUND_MUSIC);
 
-                    let player_position = Vector2::new(player_position.x as usize, player_position.y as usize);
-                    self.entities[0].set_position(map, player_position, client_tick);
-                    self.player_camera.set_focus_point(self.entities[0].get_position());
+                        let character_selection_window = CharacterSelectionWindow::new(
+                            self.saved_characters.new_remote(),
+                            self.move_request.new_remote(),
+                            self.saved_slot_count,
+                        );
+                        self.interface
+                            .open_window(&self.application, &mut self.focus_state, &character_selection_window);
 
-                    self.particle_holder.clear();
-                    self.effect_holder.clear();
-                    self.point_light_manager.clear();
-                    self.interface.schedule_render();
-                    let _ = self.networking_system.map_loaded();
-                }
+                        self.start_camera.set_focus_point(cgmath::Point3::new(600.0, 0.0, 240.0));
+                        self.directional_shadow_camera
+                            .set_focus_point(cgmath::Point3::new(600.0, 0.0, 240.0));
+                    }
+                    false => {
+                        // Normal map switch
+                        let map = self.map.insert(map);
+
+                        map.set_ambient_sound_sources(&self.audio_engine);
+                        self.audio_engine.play_background_music_track(map.background_music_track_name());
+
+                        let player_position = Vector2::new(player_position.x as usize, player_position.y as usize);
+                        self.entities[0].set_position(map, player_position, client_tick);
+                        self.player_camera.set_focus_point(self.entities[0].get_position());
+
+                        self.particle_holder.clear();
+                        self.effect_holder.clear();
+                        self.point_light_manager.clear();
+                        self.interface.schedule_render();
+                        let _ = self.networking_system.map_loaded();
+                    }
+                },
                 _ => {}
             }
         }

@@ -2,6 +2,7 @@
 target/
 
 # Korangar
+korangar/archive/data/font/*
 korangar/client/
 korangar/data.grf
 korangar/rdata.grf

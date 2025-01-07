@@ -36,6 +36,7 @@ rayon = { workspace = true }
 ron = { workspace = true }
 serde = { workspace = true }
 spin_sleep = { workspace = true }
+sys-locale = { workspace = true }
 walkdir = { workspace = true }
 wgpu = { workspace = true }
 winit = { workspace = true }

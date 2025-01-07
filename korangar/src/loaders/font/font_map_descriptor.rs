@@ -25,11 +25,7 @@ struct Bounds {
     top: f64,
 }
 
-pub(crate) fn parse_glyph_cache(
-    font_description_content: String,
-    font_map_width: u32,
-    font_map_height: u32,
-) -> HashMap<u16, GlyphCoordinate> {
+pub(crate) fn parse_glyphs(font_description_content: String, font_map_width: u32, font_map_height: u32) -> HashMap<u16, GlyphCoordinate> {
     let font_map_width = font_map_width as f32;
     let font_map_height = font_map_height as f32;
 

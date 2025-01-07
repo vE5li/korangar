@@ -1,7 +1,6 @@
 mod builder;
 
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use korangar_interface::application::{Application, FontSizeTraitExt};
 use korangar_interface::elements::{Element, ElementState};
@@ -22,7 +21,7 @@ use crate::renderer::InterfaceRenderer;
 
 pub struct Chat {
     messages: PlainRemote<Vec<ChatMessage>>,
-    font_loader: Rc<RefCell<FontLoader>>,
+    font_loader: Arc<FontLoader>,
     state: ElementState<InterfaceSettings>,
 }
 
@@ -55,7 +54,6 @@ impl Element<InterfaceSettings> for Chat {
         for message in self.messages.get().iter() {
             height += self
                 .font_loader
-                .borrow_mut()
                 .get_text_dimensions(
                     &message.text,
                     theme.chat.font_size.get().scaled(application.get_scaling()),

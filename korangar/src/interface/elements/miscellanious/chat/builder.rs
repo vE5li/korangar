@@ -1,5 +1,4 @@
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use korangar_interface::builder::Unset;
 use korangar_interface::state::PlainRemote;
@@ -33,12 +32,12 @@ impl<Font> ChatBuilder<Unset, Font> {
 }
 
 impl<Messages> ChatBuilder<Messages, Unset> {
-    pub fn with_font_loader(self, font_loader: Rc<RefCell<FontLoader>>) -> ChatBuilder<Messages, Rc<RefCell<FontLoader>>> {
+    pub fn with_font_loader(self, font_loader: Arc<FontLoader>) -> ChatBuilder<Messages, Arc<FontLoader>> {
         ChatBuilder { font_loader, ..self }
     }
 }
 
-impl ChatBuilder<PlainRemote<Vec<ChatMessage>>, Rc<RefCell<FontLoader>>> {
+impl ChatBuilder<PlainRemote<Vec<ChatMessage>>, Arc<FontLoader>> {
     /// Take the builder and turn it into a [`Chat`].
     ///
     /// NOTE: This method is only available if

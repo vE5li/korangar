@@ -1,5 +1,4 @@
 use std::cell::{Ref, RefCell};
-use std::rc::Rc;
 use std::sync::Arc;
 
 #[cfg(feature = "debug")]
@@ -9,7 +8,7 @@ use korangar_interface::application::FontSizeTraitExt;
 
 use crate::graphics::{Color, RectangleInstruction, Texture};
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
-use crate::loaders::{FontLoader, FontSize, GlyphInstruction, Scaling, TextLayout};
+use crate::loaders::{FontLoader, FontSize, GlyphInstruction, Scaling};
 #[cfg(feature = "debug")]
 use crate::loaders::{ImageType, TextureLoader};
 #[cfg(feature = "debug")]
@@ -31,7 +30,8 @@ pub enum AlignHorizontal {
 /// the health bars).
 pub struct GameInterfaceRenderer {
     instructions: RefCell<Vec<RectangleInstruction>>,
-    font_loader: Rc<RefCell<FontLoader>>,
+    glyphs: RefCell<Vec<GlyphInstruction>>,
+    font_loader: Arc<FontLoader>,
     window_size: ScreenSize,
     scaling: Scaling,
     #[cfg(feature = "debug")]
@@ -97,10 +97,11 @@ impl GameInterfaceRenderer {
     pub fn new(
         window_size: ScreenSize,
         scaling: Scaling,
-        font_loader: Rc<RefCell<FontLoader>>,
+        font_loader: Arc<FontLoader>,
         #[cfg(feature = "debug")] texture_loader: &TextureLoader,
     ) -> Self {
         let instructions = RefCell::new(Vec::new());
+        let glyphs = RefCell::new(Vec::new());
 
         #[cfg(feature = "debug")]
         let object_marker_texture = texture_loader.get_or_load("marker_object.png", ImageType::Sdf).unwrap();
@@ -117,6 +118,7 @@ impl GameInterfaceRenderer {
 
         Self {
             instructions,
+            glyphs,
             font_loader,
             window_size,
             scaling,
@@ -138,7 +140,8 @@ impl GameInterfaceRenderer {
     pub fn from_renderer(other: &Self) -> Self {
         Self {
             instructions: RefCell::new(Vec::default()),
-            font_loader: Rc::clone(&other.font_loader),
+            glyphs: RefCell::new(Vec::default()),
+            font_loader: Arc::clone(&other.font_loader),
             window_size: other.window_size,
             scaling: other.scaling,
             #[cfg(feature = "debug")]
@@ -182,7 +185,11 @@ impl GameInterfaceRenderer {
     ) {
         let font_size = font_size.scaled(self.scaling);
 
-        let TextLayout { glyphs, size } = self.font_loader.borrow_mut().get_text_layout(text, color, font_size, 1.0, f32::MAX);
+        let mut glyphs = self.glyphs.borrow_mut();
+
+        let size = self
+            .font_loader
+            .layout_text(text, color, font_size, 1.0, f32::MAX, Some(&mut glyphs));
 
         let horizontal_offset = match align_horizontal {
             AlignHorizontal::Left => 0.0,
@@ -191,7 +198,7 @@ impl GameInterfaceRenderer {
 
         let mut instructions = self.instructions.borrow_mut();
 
-        glyphs.iter().for_each(
+        glyphs.drain(..).for_each(
             |GlyphInstruction {
                  position,
                  texture_coordinate,
@@ -213,7 +220,7 @@ impl GameInterfaceRenderer {
                 instructions.push(RectangleInstruction::Text {
                     screen_position,
                     screen_size,
-                    color: *color,
+                    color,
                     texture_position,
                     texture_size,
                 });

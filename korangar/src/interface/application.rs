@@ -1,4 +1,5 @@
 use std::marker::ConstParamTy;
+use std::sync::Arc;
 
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize};
@@ -21,6 +22,8 @@ use crate::graphics::Color;
 use crate::input::{MouseInputMode, UserEvent};
 use crate::loaders::{FontLoader, FontSize, Scaling};
 use crate::renderer::InterfaceRenderer;
+
+const DEFAULT_FONTS: &[&str] = &["NotoSans", "NotoSansKR"];
 
 impl korangar_interface::application::ColorTrait for Color {
     fn is_transparent(&self) -> bool {
@@ -177,6 +180,7 @@ impl<const KIND: InternalThemeKind> PrototypeElement<InterfaceSettings> for Them
 
 #[derive(Serialize, Deserialize)]
 struct InterfaceSettingsStorage {
+    fonts: Vec<String>,
     menu_theme: String,
     main_theme: String,
     game_theme: String,
@@ -185,12 +189,14 @@ struct InterfaceSettingsStorage {
 
 impl Default for InterfaceSettingsStorage {
     fn default() -> Self {
+        let fonts = Vec::from_iter(DEFAULT_FONTS.iter().map(|font| font.to_string()));
         let main_theme = "client/themes/main.ron".to_string();
         let menu_theme = "client/themes/menu.ron".to_string();
         let game_theme = "client/themes/game.ron".to_string();
         let scaling = Scaling::new(1.0);
 
         Self {
+            fonts,
             main_theme,
             menu_theme,
             game_theme,
@@ -231,6 +237,7 @@ impl InterfaceSettingsStorage {
 
 #[derive(PrototypeElement)]
 pub struct InterfaceSettings {
+    fonts: Vec<String>,
     #[name("Main theme")]
     pub main_theme: ThemeSelector<{ InternalThemeKind::Main }>,
     #[name("Menu theme")]
@@ -245,6 +252,7 @@ pub struct InterfaceSettings {
 impl InterfaceSettings {
     pub fn load_or_default() -> Self {
         let InterfaceSettingsStorage {
+            fonts,
             menu_theme,
             main_theme,
             game_theme,
@@ -252,12 +260,13 @@ impl InterfaceSettings {
         } = InterfaceSettingsStorage::load_or_default();
 
         let themes = Themes::new(
-            InterfaceTheme::new::<super::theme::DefaultMenu>(&menu_theme),
-            InterfaceTheme::new::<super::theme::DefaultMain>(&main_theme),
+            InterfaceTheme::new::<DefaultMenu>(&menu_theme),
+            InterfaceTheme::new::<DefaultMain>(&main_theme),
             GameTheme::new(&menu_theme),
         );
 
         Self {
+            fonts,
             main_theme: ThemeSelector(main_theme),
             menu_theme: ThemeSelector(menu_theme),
             game_theme: ThemeSelector(game_theme),
@@ -277,6 +286,10 @@ impl InterfaceSettings {
 
     pub fn get_game_theme(&self) -> &GameTheme {
         &self.themes.game
+    }
+
+    pub fn get_fonts(&self) -> &[String] {
+        &self.fonts
     }
 }
 
@@ -317,7 +330,7 @@ impl Application for InterfaceSettings {
     type CustomEvent = UserEvent;
     type DropResource = PartialMove;
     type DropResult = Move;
-    type FontLoader = std::rc::Rc<std::cell::RefCell<FontLoader>>;
+    type FontLoader = Arc<FontLoader>;
     type FontSize = FontSize;
     type MouseInputMode = MouseInputMode;
     type PartialSize = PartialScreenSize;
@@ -343,6 +356,7 @@ impl Application for InterfaceSettings {
 impl Drop for InterfaceSettings {
     fn drop(&mut self) {
         InterfaceSettingsStorage {
+            fonts: self.fonts.to_owned(),
             menu_theme: self.menu_theme.get_file().to_owned(),
             main_theme: self.main_theme.get_file().to_owned(),
             game_theme: self.game_theme.get_file().to_owned(),

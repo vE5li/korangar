@@ -1,5 +1,4 @@
 use std::cell::{Ref, RefCell};
-use std::rc::Rc;
 use std::sync::Arc;
 
 use cgmath::EuclideanSpace;
@@ -8,13 +7,14 @@ use korangar_interface::application::Application;
 use crate::graphics::{Color, InterfaceRectangleInstruction, Texture};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
-use crate::loaders::{FontLoader, GlyphInstruction, ImageType, TextLayout, TextureLoader};
+use crate::loaders::{FontLoader, GlyphInstruction, ImageType, TextureLoader};
 use crate::renderer::SpriteRenderer;
 
 /// Renders the interface provided by 'korangar_interface'.
 pub struct InterfaceRenderer {
     instructions: RefCell<Vec<InterfaceRectangleInstruction>>,
-    font_loader: Rc<RefCell<FontLoader>>,
+    glyphs: RefCell<Vec<GlyphInstruction>>,
+    font_loader: Arc<FontLoader>,
     filled_box_texture: Arc<Texture>,
     unfilled_box_texture: Arc<Texture>,
     expanded_arrow_texture: Arc<Texture>,
@@ -27,11 +27,12 @@ pub struct InterfaceRenderer {
 impl InterfaceRenderer {
     pub fn new(
         window_size: ScreenSize,
-        font_loader: Rc<RefCell<FontLoader>>,
+        font_loader: Arc<FontLoader>,
         texture_loader: &TextureLoader,
         high_quality_interface: bool,
     ) -> Self {
         let instructions = RefCell::new(Vec::default());
+        let glyphs = RefCell::new(Vec::default());
 
         let filled_box_texture = texture_loader.get_or_load("filled_box.png", ImageType::Sdf).unwrap();
         let unfilled_box_texture = texture_loader.get_or_load("unfilled_box.png", ImageType::Sdf).unwrap();
@@ -42,6 +43,7 @@ impl InterfaceRenderer {
 
         Self {
             instructions,
+            glyphs,
             font_loader,
             filled_box_texture,
             unfilled_box_texture,
@@ -94,10 +96,7 @@ impl korangar_interface::application::InterfaceRenderer<InterfaceSettings> for I
             available_width *= 2.0;
         }
 
-        let mut size = self
-            .font_loader
-            .borrow_mut()
-            .get_text_dimensions(text, font_size, 1.0, available_width);
+        let mut size = self.font_loader.get_text_dimensions(text, font_size, 1.0, available_width);
 
         if self.high_quality_interface {
             size = size / 2.0;
@@ -146,12 +145,20 @@ impl korangar_interface::application::InterfaceRenderer<InterfaceSettings> for I
             font_size = font_size * 2.0;
         }
 
-        let TextLayout { glyphs, mut size, .. } =
-            self.font_loader
-                .borrow_mut()
-                .get_text_layout(text, color, font_size, 1.0, screen_clip.right - text_position.left);
+        let mut glyphs = self.glyphs.borrow_mut();
 
-        glyphs.iter().for_each(
+        let mut size = self.font_loader.layout_text(
+            text,
+            color,
+            font_size,
+            1.0,
+            screen_clip.right - text_position.left,
+            Some(&mut glyphs),
+        );
+
+        let mut instructions = self.instructions.borrow_mut();
+
+        glyphs.drain(..).for_each(
             |GlyphInstruction {
                  position,
                  texture_coordinate,
@@ -170,13 +177,13 @@ impl korangar_interface::application::InterfaceRenderer<InterfaceSettings> for I
                 let texture_position = texture_coordinate.min.to_vec();
                 let texture_size = texture_coordinate.max - texture_coordinate.min;
 
-                self.instructions.borrow_mut().push(InterfaceRectangleInstruction::Text {
+                instructions.push(InterfaceRectangleInstruction::Text {
                     screen_position,
                     screen_size,
                     screen_clip,
                     texture_position,
                     texture_size,
-                    color: *color,
+                    color,
                 });
             },
         );

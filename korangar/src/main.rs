@@ -35,10 +35,8 @@ mod settings;
 mod system;
 mod world;
 
-use std::cell::RefCell;
 use std::io::Cursor;
 use std::net::{SocketAddr, ToSocketAddrs};
-use std::rc::Rc;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
@@ -163,7 +161,7 @@ struct Client {
     action_loader: Arc<ActionLoader>,
     async_loader: Arc<AsyncLoader>,
     effect_loader: Arc<EffectLoader>,
-    font_loader: Rc<RefCell<FontLoader>>,
+    font_loader: Arc<FontLoader>,
     sprite_loader: Arc<SpriteLoader>,
     texture_loader: Arc<TextureLoader>,
     library: Library,
@@ -278,6 +276,7 @@ impl Client {
             let picker_value = Arc::new(AtomicU64::new(0));
             let input_system = InputSystem::new(picker_value.clone());
             let graphics_settings = PlainTrackedState::new(GraphicsSettings::new());
+            let application = InterfaceSettings::load_or_default();
 
             let lighting_mode = graphics_settings.mapped(|settings| &settings.lighting_mode).new_remote();
             let vsync = graphics_settings.mapped(|settings| &settings.vsync).new_remote();
@@ -373,7 +372,7 @@ impl Client {
 
             let model_loader = Arc::new(ModelLoader::new(game_file_loader.clone()));
             let texture_loader = Arc::new(TextureLoader::new(device.clone(), queue.clone(), game_file_loader.clone()));
-            let font_loader = Rc::new(RefCell::new(FontLoader::new(&game_file_loader, &texture_loader)));
+            let font_loader = Arc::new(FontLoader::new(application.get_fonts(), &game_file_loader, &texture_loader));
             let map_loader = Arc::new(MapLoader::new(
                 device.clone(),
                 queue.clone(),
@@ -463,7 +462,6 @@ impl Client {
         });
 
         time_phase!("initialize interface", {
-            let application = InterfaceSettings::load_or_default();
             let mut interface = Interface::new(INITIAL_SCREEN_SIZE);
             let mut focus_state = FocusState::default();
             let mouse_cursor = MouseCursor::new(&sprite_loader, &action_loader);
@@ -2309,7 +2307,6 @@ impl Client {
             let bottom_layer_instructions = self.bottom_interface_renderer.get_instructions();
             let middle_layer_instructions = self.middle_interface_renderer.get_instructions();
             let top_layer_instructions = self.top_interface_renderer.get_instructions();
-            let font_loader = self.font_loader.borrow();
 
             let render_instruction = RenderInstruction {
                 clear_interface,
@@ -2349,7 +2346,7 @@ impl Client {
                 effects: self.effect_renderer.get_instructions(),
                 water: water_instruction,
                 map_picker_tile_vertex_buffer: Some(map.get_tile_picker_vertex_buffer()),
-                font_map_texture: Some(font_loader.get_font_map()),
+                font_map_texture: Some(self.font_loader.get_font_map()),
                 #[cfg(feature = "debug")]
                 render_settings: *self.render_settings.get(),
                 #[cfg(feature = "debug")]

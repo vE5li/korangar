@@ -1,5 +1,4 @@
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use derive_new::new;
 use korangar_interface::elements::{ButtonBuilder, ElementWrap, InputFieldBuilder, ScrollView};
@@ -26,7 +25,7 @@ pub struct ChatMessage {
 #[derive(new)]
 pub struct ChatWindow {
     messages: PlainRemote<Vec<ChatMessage>>,
-    font_loader: Rc<RefCell<FontLoader>>,
+    font_loader: Arc<FontLoader>,
 }
 
 impl ChatWindow {

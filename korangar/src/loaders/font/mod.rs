@@ -1,30 +1,29 @@
 mod color_span_iterator;
+mod font_file;
 mod font_map_descriptor;
 
-use std::io::{Cursor, Read};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use cgmath::{Point2, Vector2};
-use cosmic_text::{Attrs, Buffer, Family, FontSystem, Metrics, Shaping};
-use flate2::bufread::GzDecoder;
+use cosmic_text::fontdb::ID;
+use cosmic_text::{fontdb, Attrs, Buffer, Family, FontSystem, Metrics, Shaping};
 use hashbrown::HashMap;
-use image::{ImageFormat, ImageReader};
+use image::{imageops, ImageBuffer, Rgba, RgbaImage};
+#[cfg(feature = "debug")]
+use korangar_debug::logging::print_debug;
+#[cfg(feature = "debug")]
+use korangar_debug::logging::Colorize;
 use korangar_interface::application::FontSizeTrait;
 use korangar_interface::elements::ElementDisplay;
-use korangar_util::{FileLoader, Rectangle};
+use korangar_util::Rectangle;
 use serde::{Deserialize, Serialize};
 
 use self::color_span_iterator::ColorSpanIterator;
-use self::font_map_descriptor::parse_glyph_cache;
 use super::{GameFileLoader, TextureLoader};
-use crate::graphics::{Color, Texture};
+use crate::graphics::{Color, Texture, MAX_TEXTURE_SIZE};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ArrayType, ScreenSize};
-
-const FONT_FILE_PATH: &str = "data\\font\\NotoSans.ttf";
-const FONT_MAP_DESCRIPTION_FILE_PATH: &str = "data\\font\\NotoSans.csv.gz";
-const FONT_MAP_FILE_PATH: &str = "data\\font\\NotoSans.png";
-const FONT_FAMILY_NAME: &str = "Noto Sans";
+use crate::loaders::font::font_file::FontFile;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -104,11 +103,6 @@ impl korangar_interface::application::ScalingTrait for Scaling {
     }
 }
 
-pub struct TextLayout {
-    pub glyphs: Vec<GlyphInstruction>,
-    pub size: Vector2<f32>,
-}
-
 pub struct GlyphInstruction {
     pub position: Rectangle<f32>,
     pub texture_coordinate: Rectangle<f32>,
@@ -125,45 +119,130 @@ pub(crate) struct GlyphCoordinate {
 }
 
 pub struct FontLoader {
-    font_system: FontSystem,
+    font_system: Mutex<FontSystem>,
+    primary_font_family: String,
     font_map: Arc<Texture>,
-    glyph_cache: HashMap<u16, GlyphCoordinate>,
+    glyph_cache: HashMap<ID, Arc<HashMap<u16, GlyphCoordinate>>>,
 }
 
 impl FontLoader {
-    pub fn new(game_file_loader: &GameFileLoader, texture_loader: &TextureLoader) -> Self {
-        let font_data = game_file_loader.get(FONT_FILE_PATH).unwrap();
-        let mut font_system = FontSystem::new();
-        font_system.db_mut().load_font_data(font_data);
+    pub fn new(fonts: &[String], game_file_loader: &GameFileLoader, texture_loader: &TextureLoader) -> Self {
+        assert_ne!(fonts.len(), 0, "no font defined");
 
-        let font_map_data = game_file_loader.get(FONT_MAP_FILE_PATH).unwrap();
-        let font_map_reader = ImageReader::with_format(Cursor::new(font_map_data), ImageFormat::Png);
-        let font_map_decoder = font_map_reader.decode().unwrap();
-        let font_map_rgba_image = font_map_decoder.into_rgba8();
-        let font_map = texture_loader.create_msdf("font map", font_map_rgba_image);
-        let font_map_size = font_map.get_size();
+        let mut font_system = FontSystem::new_with_locale_and_db(Self::system_locale(), fontdb::Database::new());
+        let mut glyph_cache = HashMap::new();
 
-        let mut font_description_data = game_file_loader.get(FONT_MAP_DESCRIPTION_FILE_PATH).unwrap();
+        let fonts: Vec<FontFile> = fonts
+            .iter()
+            .filter_map(|font_name| FontFile::new(font_name, game_file_loader, &mut font_system))
+            .collect();
 
-        if FONT_MAP_DESCRIPTION_FILE_PATH.ends_with(".gz") {
-            let mut decoder = GzDecoder::new(&font_description_data[..]);
-            let mut data = Vec::with_capacity(font_description_data.len() * 2);
-            decoder.read_to_end(&mut data).unwrap();
-            font_description_data = data;
-        }
+        let primary_font_family = Self::extract_primary_font_family(&font_system, &fonts);
+        let font_map_image_data = Self::merge_font_maps(&mut glyph_cache, &mut font_system, fonts);
 
-        let font_description_content = String::from_utf8(font_description_data).unwrap();
-        let glyph_cache = parse_glyph_cache(font_description_content, font_map_size.width, font_map_size.height);
+        let font_map = texture_loader.create_msdf("font map", font_map_image_data);
 
         Self {
-            font_system,
+            font_system: Mutex::new(font_system),
+            primary_font_family,
             font_map,
             glyph_cache,
         }
     }
 
-    pub fn get_text_dimensions(&mut self, text: &str, font_size: FontSize, line_height_scale: f32, available_width: f32) -> ScreenSize {
-        let TextLayout { size, .. } = self.get_text_layout(text, Color::BLACK, font_size, line_height_scale, available_width);
+    fn system_locale() -> String {
+        sys_locale::get_locale().unwrap_or_else(|| {
+            #[cfg(feature = "debug")]
+            print_debug!("[{}] failed to get system locale, falling back to en-US", "warning".yellow());
+            "en-US".to_string()
+        })
+    }
+
+    fn extract_primary_font_family(font_system: &FontSystem, fonts: &[FontFile]) -> String {
+        let primary_font_id = fonts
+            .first()
+            .and_then(|font| font.ids.first())
+            .copied()
+            .expect("no primary font ID found");
+
+        font_system
+            .db()
+            .face(primary_font_id)
+            .and_then(|face| face.families.first().map(|(family, _)| family.clone()))
+            .expect("primary font has no family name")
+    }
+
+    fn merge_font_maps(
+        glyph_cache: &mut HashMap<ID, Arc<HashMap<u16, GlyphCoordinate>>>,
+        font_system: &mut FontSystem,
+        mut fonts: Vec<FontFile>,
+    ) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+        if fonts.len() == 1 {
+            let FontFile { ids, font_map, glyphs } = fonts.drain(..).take(1).next().unwrap();
+
+            for &id in &ids {
+                glyph_cache.insert(id, glyphs.clone());
+            }
+            font_system.cache_fonts(ids);
+
+            font_map
+        } else {
+            let overall_height: u32 = fonts.iter().map(|font| font.font_map.height()).sum();
+
+            assert!(
+                overall_height <= MAX_TEXTURE_SIZE,
+                "aggregated font map is higher than max texture size"
+            );
+            assert_ne!(overall_height, 0, "aggregated font map height is zero");
+
+            let mut font_map_image_data = RgbaImage::new(MAX_TEXTURE_SIZE, overall_height);
+            let mut start_height = 0;
+
+            for font in fonts {
+                let FontFile { ids, font_map, glyphs } = font;
+
+                let font_map_height = font_map.height() as f32;
+
+                let adjusted_glyphs: Arc<HashMap<u16, GlyphCoordinate>> = Arc::new(
+                    glyphs
+                        .iter()
+                        .map(|(&index, &coordinate)| {
+                            let mut new_coordinate = coordinate;
+
+                            let y_offset = start_height as f32 / overall_height as f32;
+                            let scale_factor = font_map_height / overall_height as f32;
+
+                            new_coordinate.texture_coordinate = Rectangle::new(
+                                Point2::new(
+                                    coordinate.texture_coordinate.min.x,
+                                    coordinate.texture_coordinate.min.y * scale_factor + y_offset,
+                                ),
+                                Point2::new(
+                                    coordinate.texture_coordinate.max.x,
+                                    coordinate.texture_coordinate.max.y * scale_factor + y_offset,
+                                ),
+                            );
+
+                            (index, new_coordinate)
+                        })
+                        .collect(),
+                );
+
+                for &id in &ids {
+                    glyph_cache.insert(id, adjusted_glyphs.clone());
+                }
+                font_system.cache_fonts(ids);
+
+                imageops::replace(&mut font_map_image_data, &font_map, 0, start_height);
+                start_height += font_map_height as i64;
+            }
+
+            font_map_image_data
+        }
+    }
+
+    pub fn get_text_dimensions(&self, text: &str, font_size: FontSize, line_height_scale: f32, available_width: f32) -> ScreenSize {
+        let size = self.layout_text(text, Color::BLACK, font_size, line_height_scale, available_width, None);
 
         ScreenSize {
             width: size.x,
@@ -175,43 +254,58 @@ impl FontLoader {
     //       But that would need us to re-evaluate on how we render test in general.
     //       We also don't really use the "line_height_scale", which would provide
     //       an easy way to handle "line height".
-    pub fn get_text_layout(
-        &mut self,
+    /// Writes the text layout for the given text into the `glyphs` buffer and
+    /// returns the size of the text in pixels.
+    ///
+    /// Does not clear the glyph buffer before writing into it.
+    pub fn layout_text(
+        &self,
         text: &str,
         default_color: Color,
         font_size: FontSize,
         line_height_scale: f32,
         available_width: f32,
-    ) -> TextLayout {
-        let mut glyphs = Vec::with_capacity(text.len());
+        mut glyphs: Option<&mut Vec<GlyphInstruction>>,
+    ) -> Vector2<f32> {
         let mut text_width = 0f32;
         let mut text_height = 0f32;
 
         let metrics = Metrics::relative(font_size.0, line_height_scale);
-        let mut buffer = Buffer::new(&mut self.font_system, metrics);
-        let attributes = Attrs::new().family(Family::Name(FONT_FAMILY_NAME));
+        let attributes = Attrs::new().family(Family::Name(&self.primary_font_family));
 
-        buffer.set_size(&mut self.font_system, Some(available_width), None);
-        buffer.set_rich_text(
-            &mut self.font_system,
-            ColorSpanIterator::new(text, default_color, attributes),
-            attributes,
-            Shaping::Advanced,
-        );
+        // We try to hold the mutex lock as short as possible.
+        let buffer = {
+            let mut font_system = self.font_system.lock().unwrap();
+            let mut buffer = Buffer::new(&mut font_system, metrics);
+
+            buffer.set_size(&mut font_system, Some(available_width), None);
+            buffer.set_rich_text(
+                &mut font_system,
+                ColorSpanIterator::new(text, default_color, attributes),
+                attributes,
+                Shaping::Advanced,
+            );
+
+            buffer
+        };
 
         for run in buffer.layout_runs() {
             text_width = text_width.max(run.line_w);
             text_height += run.line_height;
 
+            let Some(glyphs) = glyphs.as_mut() else { continue };
+
             for layout_glyph in run.glyphs.iter() {
                 let physical_glyph = layout_glyph.physical((0.0, 0.0), 1.0);
 
-                let Some(glyph_coordinate) = self.glyph_cache.get(&layout_glyph.glyph_id).copied().map(|mut glyph| {
-                    glyph.width *= font_size.0;
-                    glyph.height *= font_size.0;
-                    glyph.offset_left *= font_size.0;
-                    glyph.offset_top *= font_size.0;
-                    glyph
+                let Some(glyph_coordinate) = self.glyph_cache.get(&layout_glyph.font_id).and_then(|font| {
+                    font.get(&layout_glyph.glyph_id).copied().map(|mut glyph| {
+                        glyph.width *= font_size.0;
+                        glyph.height *= font_size.0;
+                        glyph.offset_left *= font_size.0;
+                        glyph.offset_top *= font_size.0;
+                        glyph
+                    })
                 }) else {
                     continue;
                 };
@@ -232,10 +326,7 @@ impl FontLoader {
             }
         }
 
-        TextLayout {
-            glyphs,
-            size: Vector2::new(text_width, text_height),
-        }
+        Vector2::new(text_width, text_height)
     }
 
     /// The texture of the static font map.
@@ -244,8 +335,8 @@ impl FontLoader {
     }
 }
 
-impl korangar_interface::application::FontLoaderTrait<InterfaceSettings> for std::rc::Rc<std::cell::RefCell<FontLoader>> {
+impl korangar_interface::application::FontLoaderTrait<InterfaceSettings> for Arc<FontLoader> {
     fn get_text_dimensions(&self, text: &str, font_size: FontSize, available_width: f32) -> ScreenSize {
-        self.borrow_mut().get_text_dimensions(text, font_size, 1.0, available_width)
+        FontLoader::get_text_dimensions(&self, text, font_size, 1.0, available_width)
     }
 }

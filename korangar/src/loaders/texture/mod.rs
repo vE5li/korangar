@@ -17,7 +17,7 @@ use wgpu::{
 
 use super::error::LoadError;
 use super::{FALLBACK_BMP_FILE, FALLBACK_JPEG_FILE, FALLBACK_PNG_FILE, FALLBACK_TGA_FILE, MIP_LEVELS};
-use crate::graphics::{Lanczos3Drawer, MipMapRenderPassContext, Texture};
+use crate::graphics::{Lanczos3Drawer, MipMapRenderPassContext, Texture, TextureCompression};
 use crate::loaders::GameFileLoader;
 
 const MAX_CACHE_COUNT: u32 = 512;
@@ -56,79 +56,100 @@ impl TextureLoader {
         }
     }
 
-    fn create(&self, name: &str, image: RgbaImage, transparent: bool) -> Arc<Texture> {
+    fn create_raw(
+        &self,
+        name: &str,
+        width: u32,
+        height: u32,
+        mip_level_count: u32,
+        format: TextureFormat,
+        transparent: bool,
+        data: &[u8],
+    ) -> Arc<Texture> {
         let texture = Texture::new_with_data(
             &self.device,
             &self.queue,
             &TextureDescriptor {
                 label: Some(name),
                 size: Extent3d {
-                    width: image.width(),
-                    height: image.height(),
+                    width,
+                    height,
                     depth_or_array_layers: 1,
                 },
-                mip_level_count: 1,
+                mip_level_count,
                 sample_count: 1,
                 dimension: TextureDimension::D2,
-                format: TextureFormat::Rgba8UnormSrgb,
+                format,
                 usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING,
                 view_formats: &[],
             },
-            image.as_raw(),
+            data,
             transparent,
         );
         Arc::new(texture)
     }
 
+    pub fn create_color(&self, name: &str, image: RgbaImage, transparent: bool) -> Arc<Texture> {
+        self.create_raw(
+            name,
+            image.width(),
+            image.height(),
+            1,
+            TextureFormat::Rgba8UnormSrgb,
+            transparent,
+            image.as_raw(),
+        )
+    }
+
     pub fn create_sdf(&self, name: &str, image: GrayImage) -> Arc<Texture> {
-        let texture = Texture::new_with_data(
-            &self.device,
-            &self.queue,
-            &TextureDescriptor {
-                label: Some(name),
-                size: Extent3d {
-                    width: image.width(),
-                    height: image.height(),
-                    depth_or_array_layers: 1,
-                },
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: TextureDimension::D2,
-                format: TextureFormat::R8Unorm,
-                usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING,
-                view_formats: &[],
-            },
-            image.as_raw(),
+        self.create_raw(
+            name,
+            image.width(),
+            image.height(),
+            1,
+            TextureFormat::R8Unorm,
             false,
-        );
-        Arc::new(texture)
+            image.as_raw(),
+        )
     }
 
-    pub fn create_msdf(&self, name: &str, image: RgbaImage) -> Arc<Texture> {
-        let texture = Texture::new_with_data(
-            &self.device,
-            &self.queue,
-            &TextureDescriptor {
-                label: Some(name),
-                size: Extent3d {
-                    width: image.width(),
-                    height: image.height(),
-                    depth_or_array_layers: 1,
-                },
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: TextureDimension::D2,
-                format: TextureFormat::Rgba8Unorm,
-                usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING,
-                view_formats: &[],
-            },
-            image.as_raw(),
+    pub(crate) fn create_msdf(&self, name: &str, image: RgbaImage) -> Arc<Texture> {
+        self.create_raw(
+            name,
+            image.width(),
+            image.height(),
+            1,
+            TextureFormat::Rgba8Unorm,
             false,
-        );
-        Arc::new(texture)
+            image.as_raw(),
+        )
     }
 
-    fn create_with_mip_maps(&self, name: &str, image: RgbaImage, transparent: bool) -> Arc<Texture> {
+    pub(crate) fn create_with_mipmaps(
+        &self,
+        name: &str,
+        texture_compression: TextureCompression,
+        mips_level: u32,
+        transparent: bool,
+        image: RgbaImage,
+    ) -> Arc<Texture> {
+        #[cfg(feature = "texture_compression")]
+        match texture_compression.is_uncompressed() {
+            true => self.create_uncompressed_with_mipmaps(name, texture_compression, mips_level, transparent, image),
+            false => self.create_compressed_with_mipmaps(name, texture_compression, mips_level, transparent, image),
+        }
+        #[cfg(not(feature = "texture_compression"))]
+        self.create_uncompressed_with_mipmaps(name, texture_compression, mips_level, transparent, image)
+    }
+
+    pub(crate) fn create_uncompressed_with_mipmaps(
+        &self,
+        name: &str,
+        _texture_compression: TextureCompression,
+        mips_level: u32,
+        transparent: bool,
+        image: RgbaImage,
+    ) -> Arc<Texture> {
         let texture = Texture::new_with_data(
             &self.device,
             &self.queue,
@@ -150,43 +171,183 @@ impl TextureLoader {
             transparent,
         );
 
-        let mut mip_views = Vec::with_capacity(MIP_LEVELS as usize);
+        if mips_level > 1 {
+            let mut mip_views = Vec::with_capacity(mips_level as usize);
 
-        for level in 0..MIP_LEVELS {
-            let view = texture.get_texture().create_view(&TextureViewDescriptor {
-                label: Some(&format!("mip map level {level}")),
-                format: None,
-                dimension: Some(TextureViewDimension::D2),
-                aspect: TextureAspect::All,
-                base_mip_level: level,
-                mip_level_count: Some(1),
-                base_array_layer: 0,
-                array_layer_count: Some(1),
+            for level in 0..mips_level {
+                let view = texture.get_texture().create_view(&TextureViewDescriptor {
+                    label: Some(&format!("mip map level {level}")),
+                    format: None,
+                    dimension: Some(TextureViewDimension::D2),
+                    aspect: TextureAspect::All,
+                    base_mip_level: level,
+                    mip_level_count: Some(1),
+                    base_array_layer: 0,
+                    array_layer_count: Some(1),
+                });
+                mip_views.push(view);
+            }
+
+            let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor {
+                label: Some("TextureLoader"),
             });
-            mip_views.push(view);
+
+            for index in 0..(mips_level - 1) as usize {
+                let mut pass =
+                    self.mip_map_render_context
+                        .create_pass(&self.device, &mut encoder, &mip_views[index], &mip_views[index + 1]);
+
+                self.lanczos3_drawer.draw(&mut pass);
+            }
+
+            self.queue.submit(Some(encoder.finish()));
         }
-
-        let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor {
-            label: Some("TextureLoader"),
-        });
-
-        for index in 0..(MIP_LEVELS - 1) as usize {
-            let mut pass = self
-                .mip_map_render_context
-                .create_pass(&self.device, &mut encoder, &mip_views[index], &mip_views[index + 1]);
-            self.lanczos3_drawer.draw(&mut pass);
-        }
-
-        self.queue.submit(Some(encoder.finish()));
 
         Arc::new(texture)
+    }
+
+    #[cfg(feature = "texture_compression")]
+    pub(crate) fn create_compressed_with_mipmaps(
+        &self,
+        name: &str,
+        texture_compression: TextureCompression,
+        mips_level: u32,
+        transparent: bool,
+        image: RgbaImage,
+    ) -> Arc<Texture> {
+        use fast_image_resize::images::Image;
+        use fast_image_resize::{FilterType, PixelType, ResizeAlg, ResizeOptions, Resizer, SrcCropping};
+        use image::DynamicImage;
+        use intel_tex_2::{bc3, bc7, RgbaSurface};
+        use rayon::iter::{IndexedParallelIterator, ParallelIterator};
+        use rayon::prelude::ParallelSliceMut;
+
+        const BC_BLOCK_SIZE: usize = 16;
+        const BC_STRIP_HEIGHT: usize = 16;
+
+        #[cfg(feature = "debug")]
+        let timer = Timer::new_dynamic(format!("pre-process texture for {}", name.magenta()));
+
+        let mut width = image.width();
+        let mut height = image.height();
+
+        let base_width = width;
+        let base_height = height;
+
+        assert_eq!(width % 4, 0, "Texture width must be aligned to 4 pixels");
+        assert_eq!(height % 4, 0, "Texture height must be aligned to 4 pixels");
+
+        let mut total_size = 0;
+        let mut mip_width = width as usize;
+        let mut mip_height = height as usize;
+
+        for _ in 0..mips_level {
+            let mip_size = (mip_width / 4) * (mip_height / 4) * BC_BLOCK_SIZE;
+
+            total_size += mip_size;
+
+            mip_width = (mip_width / 2).max(4);
+            mip_height = (mip_height / 2).max(4);
+        }
+
+        let mut final_buffer = vec![0u8; total_size];
+        let mut current_image = image;
+        let mut offset = 0;
+
+        let mut resizer = Resizer::new();
+        let resize_options = ResizeOptions {
+            algorithm: ResizeAlg::Convolution(FilterType::Lanczos3),
+            cropping: SrcCropping::None,
+            mul_div_alpha: true,
+        };
+
+        let bc7_settings = match texture_compression {
+            TextureCompression::Bc7UltraFast => bc7::alpha_ultra_fast_settings(),
+            TextureCompression::Bc7VeryFast => bc7::alpha_very_fast_settings(),
+            TextureCompression::Bc7Fast => bc7::alpha_fast_settings(),
+            TextureCompression::Bc7Slow => bc7::alpha_basic_settings(),
+            TextureCompression::Bc7Slowest => bc7::alpha_slow_settings(),
+            TextureCompression::Bc3 | TextureCompression::Off => bc7::alpha_slow_settings(),
+        };
+
+        for level in 0..mips_level {
+            if level > 0 {
+                width = (width / 2).max(4);
+                height = (height / 2).max(4);
+
+                let mut dst_image = Image::new(width, height, PixelType::U8x4);
+                resizer
+                    .resize(&DynamicImage::ImageRgba8(current_image), &mut dst_image, &resize_options)
+                    .unwrap();
+
+                current_image = RgbaImage::from_raw(width, height, dst_image.into_vec()).unwrap();
+            }
+
+            assert_eq!(width % 4, 0, "Mipmap width must be aligned to 4 pixels");
+            assert_eq!(height % 4, 0, "Mipmap height must be aligned to 4 pixels");
+
+            let surface = RgbaSurface {
+                data: current_image.as_raw(),
+                width,
+                height,
+                stride: width * 4,
+            };
+
+            let bytes_per_row = width as usize * 4;
+            let blocks_per_row = width as usize / 4;
+            let strip_output_size = blocks_per_row * BC_STRIP_HEIGHT / 4 * BC_BLOCK_SIZE;
+            let mip_size = (width / 4) as usize * (height / 4) as usize * BC_BLOCK_SIZE;
+
+            final_buffer[offset..offset + mip_size]
+                .par_chunks_mut(strip_output_size)
+                .enumerate()
+                .for_each(|(strip_idx, output_chunk)| {
+                    let strip_y = strip_idx * BC_STRIP_HEIGHT;
+                    let strip_height = (height as usize - strip_y).min(BC_STRIP_HEIGHT);
+                    let strip_height = strip_height - (strip_height % 4);
+
+                    let src_offset = strip_y * bytes_per_row;
+                    let strip_surface = RgbaSurface {
+                        data: &surface.data[src_offset..],
+                        width,
+                        height: strip_height as u32,
+                        stride: surface.stride,
+                    };
+
+                    match texture_compression {
+                        TextureCompression::Bc3 => {
+                            bc3::compress_blocks_into(&strip_surface, output_chunk);
+                        }
+                        _ => {
+                            bc7::compress_blocks_into(&bc7_settings, &strip_surface, output_chunk);
+                        }
+                    }
+                });
+
+            offset += mip_size;
+        }
+
+        let texture = self.create_raw(
+            name,
+            base_width,
+            base_height,
+            mips_level,
+            texture_compression.into(),
+            transparent,
+            &final_buffer,
+        );
+
+        #[cfg(feature = "debug")]
+        timer.stop();
+
+        texture
     }
 
     pub fn load(&self, path: &str, image_type: ImageType) -> Result<Arc<Texture>, LoadError> {
         let texture = match image_type {
             ImageType::Color => {
                 let (texture_data, transparent) = self.load_texture_data(path, false)?;
-                self.create(path, texture_data, transparent)
+                self.create_color(path, texture_data, transparent)
             }
             ImageType::Sdf => {
                 let texture_data = self.load_grayscale_texture_data(path)?;
@@ -382,6 +543,7 @@ pub struct TextureAtlasFactory {
     lookup: HashMap<String, TextureAtlasEntry>,
     create_mip_map: bool,
     transparent: bool,
+    texture_compression: TextureCompression,
 }
 
 #[derive(Copy, Clone)]
@@ -397,8 +559,9 @@ impl TextureAtlasFactory {
         name: impl Into<String>,
         add_padding: bool,
         paths: &[&str],
+        texture_compression: TextureCompression,
     ) -> (Vec<AtlasAllocation>, Arc<Texture>) {
-        let mut factory = Self::new(texture_loader, name, add_padding, false);
+        let mut factory = Self::new(texture_loader, name, add_padding, false, texture_compression);
 
         let mut ids: Vec<TextureAtlasEntry> = paths.iter().map(|path| factory.register(path)).collect();
         factory.build_atlas();
@@ -412,7 +575,13 @@ impl TextureAtlasFactory {
         (mapping, texture)
     }
 
-    pub fn new(texture_loader: Arc<TextureLoader>, name: impl Into<String>, add_padding: bool, create_mip_map: bool) -> Self {
+    pub fn new(
+        texture_loader: Arc<TextureLoader>,
+        name: impl Into<String>,
+        add_padding: bool,
+        create_mip_map: bool,
+        texture_compression: TextureCompression,
+    ) -> Self {
         let mip_level_count = if create_mip_map { NonZeroU32::new(MIP_LEVELS) } else { None };
 
         Self {
@@ -422,6 +591,7 @@ impl TextureAtlasFactory {
             lookup: HashMap::default(),
             create_mip_map,
             transparent: false,
+            texture_compression,
         }
     }
 
@@ -455,18 +625,15 @@ impl TextureAtlasFactory {
     }
 
     pub fn upload_texture_atlas_texture(self) -> Arc<Texture> {
-        if self.create_mip_map {
-            self.texture_loader.create_with_mip_maps(
-                &format!("{} texture atlas", self.name),
-                self.texture_atlas.get_atlas(),
-                self.transparent,
-            )
-        } else {
-            self.texture_loader.create(
-                &format!("{} texture atlas", self.name),
-                self.texture_atlas.get_atlas(),
-                self.transparent,
-            )
-        }
+        let atlas = self.texture_atlas.get_atlas();
+        let name = format!("{} texture atlas", self.name);
+
+        let mips_level = match self.create_mip_map {
+            true => MIP_LEVELS,
+            false => 1,
+        };
+
+        self.texture_loader
+            .create_with_mipmaps(&name, self.texture_compression, mips_level, self.transparent, atlas)
     }
 }

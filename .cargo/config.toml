@@ -1,0 +1,8 @@
+# Steam Hardware survey: https://store.steampowered.com/hwsurvey/Steam-Hardware-Software-Survey-Welcome-to-Steam
+[target.'cfg(target_arch="x86_64")']
+rustflags = ["-C", "target-feature=+aes,+avx,+avx2,+cmpxchg16b,+fma,+sse3,+ssse3,+sse4.1,+sse4.2"]
+
+# On linux nighly Rust uses rust-lld, which runs into problems with linking C++ code.
+# Bug Ticket: https://github.com/rust-lang/rust/issues/135257
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-Zlinker-features=-lld"]

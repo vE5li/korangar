@@ -7,8 +7,8 @@ use hashbrown::HashMap;
 use korangar_util::container::Cacheable;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource,
-    BindingType, Device, Extent3d, ImageDataLayout, Queue, ShaderStages, TextureAspect, TextureDescriptor, TextureDimension, TextureFormat,
-    TextureSampleType, TextureUsages, TextureView, TextureViewDescriptor, TextureViewDimension,
+    BindingType, Device, Extent3d, ImageCopyTexture, ImageDataLayout, Origin3d, Queue, ShaderStages, TextureAspect, TextureDescriptor,
+    TextureDimension, TextureFormat, TextureSampleType, TextureUsages, TextureView, TextureViewDescriptor, TextureViewDimension,
 };
 
 use crate::interface::layout::ScreenSize;
@@ -73,24 +73,54 @@ impl Texture {
         }
     }
 
-    /// This function doesn't upload mip-map data. Mip maps should be written
-    /// using the `MipMapRenderPassContext` & `Lanczos3Drawer`.
     pub fn new_with_data(device: &Device, queue: &Queue, descriptor: &TextureDescriptor, image_data: &[u8], transparent: bool) -> Self {
         let id = TEXTURE_ID.fetch_add(1, Ordering::Relaxed);
         let label = descriptor.label.map(|label| label.to_string());
         let texture = device.create_texture(descriptor);
-        let block_size = texture.format().block_copy_size(None).unwrap();
+        let format = texture.format();
 
-        queue.write_texture(
-            texture.as_image_copy(),
-            image_data,
-            ImageDataLayout {
-                offset: 0,
-                bytes_per_row: Some(descriptor.size.width * block_size),
-                rows_per_image: Some(descriptor.size.height),
-            },
-            descriptor.size,
-        );
+        let (block_width, block_height) = format.block_dimensions();
+        let block_size = format.block_copy_size(None).unwrap();
+
+        let mut offset = 0;
+        let mut mip_width = descriptor.size.width;
+        let mut mip_height = descriptor.size.height;
+
+        for mip_level in 0..descriptor.mip_level_count {
+            let width_blocks = mip_width.div_ceil(block_width);
+            let height_blocks = mip_height.div_ceil(block_height);
+
+            let bytes_per_row = width_blocks * block_size;
+            let mip_size = bytes_per_row * height_blocks;
+
+            if offset + mip_size as usize <= image_data.len() {
+                queue.write_texture(
+                    ImageCopyTexture {
+                        texture: &texture,
+                        mip_level,
+                        origin: Origin3d::ZERO,
+                        aspect: TextureAspect::All,
+                    },
+                    &image_data[offset..offset + mip_size as usize],
+                    ImageDataLayout {
+                        offset: 0,
+                        bytes_per_row: Some(bytes_per_row),
+                        rows_per_image: None,
+                    },
+                    Extent3d {
+                        width: mip_width,
+                        height: mip_height,
+                        depth_or_array_layers: 1,
+                    },
+                );
+
+                offset += mip_size as usize;
+                mip_width = (mip_width / 2).max(1);
+                mip_height = (mip_height / 2).max(1);
+            } else {
+                break;
+            }
+        }
 
         let texture_view = texture.create_view(&TextureViewDescriptor {
             label: descriptor.label,

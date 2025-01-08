@@ -5,6 +5,7 @@ use std::num::NonZeroU32;
 #[cfg(feature = "debug")]
 use derive_new::new;
 use serde::{Deserialize, Serialize};
+use wgpu::TextureFormat;
 
 use crate::interface::layout::ScreenSize;
 
@@ -156,6 +157,37 @@ impl Display for ScreenSpaceAntiAliasing {
         match self {
             ScreenSpaceAntiAliasing::Off => "Off".fmt(f),
             ScreenSpaceAntiAliasing::Fxaa => "FXAA".fmt(f),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum TextureCompression {
+    Off,
+    Bc3,
+    Bc7UltraFast,
+    Bc7VeryFast,
+    Bc7Fast,
+    Bc7Slow,
+    Bc7Slowest,
+}
+
+impl TextureCompression {
+    pub fn is_uncompressed(&self) -> bool {
+        *self == TextureCompression::Off
+    }
+}
+
+impl From<TextureCompression> for TextureFormat {
+    fn from(value: TextureCompression) -> Self {
+        match value {
+            TextureCompression::Off => TextureFormat::Rgba8UnormSrgb,
+            TextureCompression::Bc3 => TextureFormat::Bc3RgbaUnormSrgb,
+            TextureCompression::Bc7UltraFast
+            | TextureCompression::Bc7VeryFast
+            | TextureCompression::Bc7Fast
+            | TextureCompression::Bc7Slow
+            | TextureCompression::Bc7Slowest => TextureFormat::Bc7RgbaUnormSrgb,
         }
     }
 }

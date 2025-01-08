@@ -12,10 +12,12 @@ chrono = { workspace = true }
 cosmic-text = { workspace = true, features = ["std", "fontconfig"] }
 derive-new = { workspace = true }
 encoding_rs = { workspace = true }
+fast_image_resize = { workspace = true, features = ["image", "rayon"], optional = true }
 flate2 = { workspace = true, features = ["zlib-rs"] }
 hashbrown = { workspace = true }
 glidesort = { workspace = true }
 image = { workspace = true, features = ["bmp", "jpeg", "png", "tga", "rayon"] }
+intel_tex_2 = { workspace = true, optional = true }
 korangar_audio = { workspace = true }
 korangar_debug = { workspace = true, optional = true }
 korangar_interface = { workspace = true, features = ["serde", "cgmath"] }
@@ -42,8 +44,10 @@ wgpu = { workspace = true }
 winit = { workspace = true }
 
 [features]
+default = ["texture_compression"]
 debug = ["korangar_debug", "korangar_audio/debug", "ragnarok_packets/debug", "random_color"]
 patched_as_folder = []
 plain = ["korangar_debug/plain"]
 unicode = ["korangar_debug/unicode"]
 flac = ["korangar_audio/flac"]
+texture_compression = ["fast_image_resize", "intel_tex_2"]

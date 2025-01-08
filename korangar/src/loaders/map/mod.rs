@@ -21,7 +21,7 @@ use wgpu::{BufferUsages, Device, Queue};
 pub use self::vertices::MAP_TILE_SIZE;
 use self::vertices::{generate_tile_vertices, ground_vertices};
 use super::error::LoadError;
-use crate::graphics::{Buffer, ModelVertex, NativeModelVertex, Texture};
+use crate::graphics::{Buffer, ModelVertex, NativeModelVertex, Texture, TextureCompression};
 use crate::loaders::{GameFileLoader, ImageType, ModelLoader, TextureAtlasFactory, TextureLoader};
 use crate::world::{LightSourceKey, Model};
 use crate::{EffectSourceExt, LightSourceExt, Map, Object, ObjectKey, SoundSourceExt};
@@ -57,6 +57,7 @@ pub struct MapLoader {
 impl MapLoader {
     pub fn load(
         &self,
+        texture_compression: TextureCompression,
         resource_file: String,
         model_loader: &ModelLoader,
         texture_loader: Arc<TextureLoader>,
@@ -65,7 +66,7 @@ impl MapLoader {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load map from {}", &resource_file));
 
-        let mut texture_atlas_factory = TextureAtlasFactory::new(texture_loader.clone(), "map", true, true);
+        let mut texture_atlas_factory = TextureAtlasFactory::new(texture_loader.clone(), "map", true, true, texture_compression);
         let mut deferred_vertex_generation: Vec<DeferredVertexGeneration> = Vec::new();
 
         let map_file_name = format!("data\\{}.rsw", resource_file);
@@ -207,6 +208,7 @@ impl MapLoader {
             .filter(|_| !(water_bounds.min == Point2::from_value(f32::MAX) && water_bounds.max == Point2::from_value(f32::MIN)));
 
         let map = Map::new(
+            resource_file,
             gat_data.map_width as usize,
             gat_data.map_height as usize,
             water_settings,

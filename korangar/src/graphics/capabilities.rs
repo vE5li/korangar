@@ -17,6 +17,7 @@ pub struct Capabilities {
     bindless: bool,
     multidraw_indirect: bool,
     clamp_to_border: bool,
+    texture_compression: bool,
     #[cfg(feature = "debug")]
     polygon_mode_line: bool,
     required_features: Features,
@@ -37,6 +38,7 @@ impl Capabilities {
             bindless: false,
             multidraw_indirect: false,
             clamp_to_border: false,
+            texture_compression: false,
             #[cfg(feature = "debug")]
             polygon_mode_line: false,
             required_features: Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES,
@@ -58,6 +60,7 @@ impl Capabilities {
                 adapter_features,
                 Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING,
             );
+            Self::check_feature(adapter_features, Features::TEXTURE_COMPRESSION_BC);
             Self::check_feature(adapter_features, Features::TEXTURE_BINDING_ARRAY);
             Self::check_feature(adapter_features, Features::POLYGON_MODE_LINE);
         }
@@ -83,6 +86,11 @@ impl Capabilities {
         if adapter_features.contains(Features::ADDRESS_MODE_CLAMP_TO_BORDER | Features::ADDRESS_MODE_CLAMP_TO_ZERO) {
             capabilities.clamp_to_border = true;
             capabilities.required_features |= Features::ADDRESS_MODE_CLAMP_TO_BORDER | Features::ADDRESS_MODE_CLAMP_TO_ZERO;
+        }
+
+        if adapter_features.contains(Features::TEXTURE_COMPRESSION_BC) {
+            capabilities.texture_compression = true;
+            capabilities.required_features |= Features::TEXTURE_COMPRESSION_BC;
         }
 
         #[cfg(feature = "debug")]
@@ -133,6 +141,11 @@ impl Capabilities {
     /// a specific value.
     pub fn supports_clamp_to_border(&self) -> bool {
         self.clamp_to_border
+    }
+
+    /// Returns `true` if the backend supports BC texture compression.
+    pub fn supports_texture_compression(&self) -> bool {
+        self.texture_compression
     }
 
     /// Returns `true` if the backend allows drawing triangles as lines

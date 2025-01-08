@@ -1,4 +1,5 @@
 use std::cmp::PartialEq;
+use std::num::NonZero;
 use std::sync::{Arc, Mutex};
 
 use hashbrown::HashMap;
@@ -11,7 +12,7 @@ use korangar_util::texture_atlas::AtlasAllocation;
 use ragnarok_packets::{EntityId, ItemId, TilePosition};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
-use crate::graphics::Texture;
+use crate::graphics::{Texture, TextureCompression};
 use crate::loaders::error::LoadError;
 use crate::loaders::{ActionLoader, AnimationLoader, ImageType, MapLoader, ModelLoader, SpriteLoader, TextureLoader};
 #[cfg(feature = "debug")]
@@ -33,8 +34,14 @@ pub enum LoaderId {
 
 pub enum LoadableResource {
     AnimationData(Arc<AnimationData>),
-    ItemSprite { texture: Arc<Texture>, location: ItemLocation },
-    Map { map: Box<Map>, player_position: TilePosition },
+    ItemSprite {
+        texture: Arc<Texture>,
+        location: ItemLocation,
+    },
+    Map {
+        map: Box<Map>,
+        player_position: Option<TilePosition>,
+    },
 }
 
 enum LoadStatus {
@@ -49,6 +56,12 @@ impl PartialEq for LoadStatus {
     }
 }
 
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+enum TaskType {
+    Light,
+    Heavy,
+}
+
 pub struct AsyncLoader {
     action_loader: Arc<ActionLoader>,
     animation_loader: Arc<AnimationLoader>,
@@ -57,7 +70,8 @@ pub struct AsyncLoader {
     sprite_loader: Arc<SpriteLoader>,
     texture_loader: Arc<TextureLoader>,
     pending_loads: Arc<Mutex<HashMap<LoaderId, LoadStatus>>>,
-    thread_pool: ThreadPool,
+    light_task_thread_pool: ThreadPool,
+    heavy_task_thread_pool: ThreadPool,
 }
 
 impl AsyncLoader {
@@ -69,9 +83,17 @@ impl AsyncLoader {
         sprite_loader: Arc<SpriteLoader>,
         texture_loader: Arc<TextureLoader>,
     ) -> Self {
-        let thread_pool = ThreadPoolBuilder::new()
+        let parallelism = std::thread::available_parallelism().unwrap_or_else(|_| NonZero::new(2).unwrap());
+
+        let light_task_thread_pool = ThreadPoolBuilder::new()
             .num_threads(1)
-            .thread_name(|_| "async loader".to_string())
+            .thread_name(|number| format!("light task thread pool {number}"))
+            .build()
+            .unwrap();
+
+        let heavy_task_thread_pool = ThreadPoolBuilder::new()
+            .num_threads(parallelism.get())
+            .thread_name(|number| format!("heavy task thread pool {number}"))
             .build()
             .unwrap();
 
@@ -83,7 +105,8 @@ impl AsyncLoader {
             sprite_loader,
             texture_loader,
             pending_loads: Arc::new(Mutex::new(HashMap::new())),
-            thread_pool,
+            light_task_thread_pool,
+            heavy_task_thread_pool,
         }
     }
 
@@ -101,7 +124,7 @@ impl AsyncLoader {
                 let action_loader = self.action_loader.clone();
                 let animation_loader = self.animation_loader.clone();
 
-                self.request_load(LoaderId::AnimationData(entity_id), move || {
+                self.request_load(TaskType::Light, LoaderId::AnimationData(entity_id), move || {
                     #[cfg(feature = "debug")]
                     let _load_measurement = Profiler::start_measurement("animation data load");
 
@@ -131,7 +154,7 @@ impl AsyncLoader {
                 let texture_loader = self.texture_loader.clone();
                 let path = path.to_string();
 
-                self.request_load(LoaderId::ItemSprite(item_id), move || {
+                self.request_load(TaskType::Light, LoaderId::ItemSprite(item_id), move || {
                     #[cfg(feature = "debug")]
                     let _load_measurement = Profiler::start_measurement("item sprite load");
 
@@ -152,19 +175,21 @@ impl AsyncLoader {
 
     pub fn request_map_load(
         &self,
+        texture_compression: TextureCompression,
         map_name: String,
-        player_position: TilePosition,
+        player_position: Option<TilePosition>,
         #[cfg(feature = "debug")] tile_texture_mapping: Arc<Vec<AtlasAllocation>>,
     ) {
         let map_loader = self.map_loader.clone();
         let model_loader = self.model_loader.clone();
         let texture_loader = self.texture_loader.clone();
 
-        self.request_load(LoaderId::Map(map_name.clone()), move || {
+        self.request_load(TaskType::Heavy, LoaderId::Map(map_name.clone()), move || {
             #[cfg(feature = "debug")]
             let _load_measurement = Profiler::start_measurement("map load");
 
             let map = map_loader.load(
+                texture_compression,
                 map_name,
                 &model_loader,
                 texture_loader,
@@ -175,7 +200,7 @@ impl AsyncLoader {
         });
     }
 
-    fn request_load<F>(&self, id: LoaderId, load_function: F)
+    fn request_load<F>(&self, task_type: TaskType, id: LoaderId, load_function: F)
     where
         F: FnOnce() -> Result<LoadableResource, LoadError> + Send + 'static,
     {
@@ -183,7 +208,12 @@ impl AsyncLoader {
 
         pending_loads.lock().unwrap().insert(id.clone(), LoadStatus::Loading);
 
-        self.thread_pool.spawn(move || {
+        let thread_pool = match task_type {
+            TaskType::Light => &self.light_task_thread_pool,
+            TaskType::Heavy => &self.heavy_task_thread_pool,
+        };
+
+        thread_pool.spawn(move || {
             #[cfg(feature = "debug")]
             let _measurement = threads::Loader::start_frame();
 

@@ -108,11 +108,12 @@ impl Surface {
                 .get_current_texture()
                 .expect("Failed to acquire next surface texture!"),
             Err(
-                // If the surface is outdated, or was lost, reconfigure it.
-                wgpu::SurfaceError::Outdated
-                | wgpu::SurfaceError::Lost
+                wgpu::SurfaceError::Lost
+                | wgpu::SurfaceError::Other
                 // If OutOfMemory happens, reconfiguring may not help, but we might as well try.
-                | wgpu::SurfaceError::OutOfMemory,
+                | wgpu::SurfaceError::OutOfMemory
+                // If the surface is outdated, or was lost, reconfigure it.
+                | wgpu::SurfaceError::Outdated
             ) => {
                 self.surface.configure(&self.device, &self.config);
                 self.surface

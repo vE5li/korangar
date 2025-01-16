@@ -7,8 +7,8 @@ use hashbrown::HashMap;
 use korangar_util::container::Cacheable;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource,
-    BindingType, Device, Extent3d, ImageDataLayout, Queue, ShaderStages, TextureAspect, TextureDescriptor, TextureDimension, TextureFormat,
-    TextureSampleType, TextureUsages, TextureView, TextureViewDescriptor, TextureViewDimension,
+    BindingType, Device, Extent3d, Queue, ShaderStages, TexelCopyBufferLayout, TextureAspect, TextureDescriptor, TextureDimension,
+    TextureFormat, TextureSampleType, TextureUsages, TextureView, TextureViewDescriptor, TextureViewDimension,
 };
 
 use crate::interface::layout::ScreenSize;
@@ -47,7 +47,14 @@ impl Texture {
         let texture = device.create_texture(descriptor);
         let texture_view = texture.create_view(&TextureViewDescriptor {
             label: descriptor.label,
-            ..Default::default()
+            format: None,
+            dimension: None,
+            usage: None,
+            aspect: TextureAspect::default(),
+            base_mip_level: 0,
+            mip_level_count: None,
+            base_array_layer: 0,
+            array_layer_count: None,
         });
 
         let bind_group = device.create_bind_group(&BindGroupDescriptor {
@@ -84,7 +91,7 @@ impl Texture {
         queue.write_texture(
             texture.as_image_copy(),
             image_data,
-            ImageDataLayout {
+            TexelCopyBufferLayout {
                 offset: 0,
                 bytes_per_row: Some(descriptor.size.width * block_size),
                 rows_per_image: Some(descriptor.size.height),
@@ -94,7 +101,14 @@ impl Texture {
 
         let texture_view = texture.create_view(&TextureViewDescriptor {
             label: descriptor.label,
-            ..Default::default()
+            format: None,
+            dimension: None,
+            usage: None,
+            aspect: TextureAspect::default(),
+            base_mip_level: 0,
+            mip_level_count: None,
+            base_array_layer: 0,
+            array_layer_count: None,
         });
 
         let bind_group = device.create_bind_group(&BindGroupDescriptor {
@@ -223,7 +237,8 @@ impl CubeArrayTexture {
                 label: Some("cube array face view"),
                 format: None,
                 dimension: Some(TextureViewDimension::D2),
-                aspect: wgpu::TextureAspect::All,
+                usage: None,
+                aspect: TextureAspect::All,
                 base_mip_level: 0,
                 mip_level_count: None,
                 base_array_layer: cube_index * 6 + face_index,
@@ -248,7 +263,8 @@ impl CubeArrayTexture {
             label: Some("cube array view"),
             format: None,
             dimension: Some(TextureViewDimension::CubeArray),
-            aspect: wgpu::TextureAspect::All,
+            usage: None,
+            aspect: TextureAspect::All,
             base_mip_level: 0,
             mip_level_count: None,
             base_array_layer: 0,
@@ -326,7 +342,14 @@ impl AttachmentTexture {
         let texture = device.create_texture(&descriptor);
         let texture_view = texture.create_view(&TextureViewDescriptor {
             label: descriptor.label,
-            ..Default::default()
+            format: None,
+            dimension: None,
+            usage: None,
+            aspect: TextureAspect::default(),
+            base_mip_level: 0,
+            mip_level_count: None,
+            base_array_layer: 0,
+            array_layer_count: None,
         });
 
         let sample_type = descriptor.format.sample_type(Some(TextureAspect::All), None).unwrap();
@@ -481,7 +504,14 @@ impl StorageTexture {
         });
         let texture_view = texture.create_view(&TextureViewDescriptor {
             label: Some(label),
-            ..Default::default()
+            format: None,
+            dimension: None,
+            usage: None,
+            aspect: TextureAspect::default(),
+            base_mip_level: 0,
+            mip_level_count: None,
+            base_array_layer: 0,
+            array_layer_count: None,
         });
 
         Self {

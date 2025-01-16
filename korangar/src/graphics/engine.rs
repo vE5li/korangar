@@ -9,8 +9,8 @@ use korangar_debug::logging::{print_debug, Colorize};
 use korangar_debug::profile_block;
 use wgpu::util::StagingBelt;
 use wgpu::{
-    Adapter, CommandBuffer, CommandEncoder, CommandEncoderDescriptor, Device, Extent3d, ImageCopyBuffer, ImageCopyTexture, ImageDataLayout,
-    Instance, Maintain, Origin3d, Queue, SurfaceTexture, TextureAspect, TextureFormat, TextureViewDescriptor,
+    Adapter, CommandBuffer, CommandEncoder, CommandEncoderDescriptor, Device, Extent3d, Instance, Maintain, Origin3d, Queue,
+    SurfaceTexture, TexelCopyBufferInfo, TexelCopyBufferLayout, TexelCopyTextureInfo, TextureAspect, TextureFormat, TextureViewDescriptor,
 };
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
@@ -882,15 +882,15 @@ impl GraphicsEngine {
                 let y = (unpadded_texture_size.height - 1).min(instruction.picker_position.top as u32);
 
                 picker_encoder.copy_texture_to_buffer(
-                    ImageCopyTexture {
+                    TexelCopyTextureInfo {
                         texture: engine_context.global_context.picker_buffer_texture.get_texture(),
                         mip_level: 0,
                         origin: Origin3d { x, y, z: 0 },
                         aspect: TextureAspect::All,
                     },
-                    ImageCopyBuffer {
+                    TexelCopyBufferInfo {
                         buffer: engine_context.global_context.picker_value_buffer.get_buffer(),
-                        layout: ImageDataLayout {
+                        layout: TexelCopyBufferLayout {
                             offset: 0,
                             bytes_per_row,
                             rows_per_image: None,

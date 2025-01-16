@@ -157,6 +157,7 @@ impl TextureLoader {
                 label: Some(&format!("mip map level {level}")),
                 format: None,
                 dimension: Some(TextureViewDimension::D2),
+                usage: None,
                 aspect: TextureAspect::All,
                 base_mip_level: level,
                 mip_level_count: Some(1),

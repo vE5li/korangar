@@ -38,7 +38,7 @@ serde = { workspace = true }
 spin_sleep = { workspace = true }
 sys-locale = { workspace = true }
 walkdir = { workspace = true }
-wgpu = { workspace = true }
+wgpu = { workspace = true, features = ["static-dxc"] }
 winit = { workspace = true }
 
 [features]

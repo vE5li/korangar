@@ -96,7 +96,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
                             view_dimension: TextureViewDimension::D2,
                             multisampled: false,
                         },
-                        count: capabilities.get_max_texture_binding_array_count(),
+                        count: None,
                     },
                     BindGroupLayoutEntry {
                         binding: 2,
@@ -106,7 +106,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
                             view_dimension: TextureViewDimension::D2,
                             multisampled: false,
                         },
-                        count: None,
+                        count: capabilities.get_max_texture_binding_array_count(),
                     },
                 ],
             })
@@ -143,8 +143,8 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
                 device,
                 &bind_group_layout,
                 &instance_data_buffer,
-                &[global_context.solid_pixel_texture.get_texture_view()],
                 global_context.solid_pixel_texture.get_texture_view(),
+                &[global_context.solid_pixel_texture.get_texture_view()],
             )
         } else {
             Self::create_bind_group(
@@ -384,8 +384,8 @@ impl Prepare for InterfaceRectangleDrawer {
                 device,
                 &self.bind_group_layout,
                 &self.instance_data_buffer,
-                &texture_views,
                 font_map_texture.get_texture_view(),
+                &texture_views,
             );
         } else {
             for instruction in instructions.interface.iter() {
@@ -501,8 +501,9 @@ impl InterfaceRectangleDrawer {
         device: &Device,
         bind_group_layout: &BindGroupLayout,
         instance_data_buffer: &Buffer<InstanceData>,
-        texture_views: &[&TextureView],
+
         msdf_font_map: &TextureView,
+        texture_views: &[&TextureView],
     ) -> BindGroup {
         device.create_bind_group(&BindGroupDescriptor {
             label: Some(DRAWER_NAME),
@@ -514,11 +515,11 @@ impl InterfaceRectangleDrawer {
                 },
                 BindGroupEntry {
                     binding: 1,
-                    resource: BindingResource::TextureViewArray(texture_views),
+                    resource: BindingResource::TextureView(msdf_font_map),
                 },
                 BindGroupEntry {
                     binding: 2,
-                    resource: BindingResource::TextureView(msdf_font_map),
+                    resource: BindingResource::TextureViewArray(texture_views),
                 },
             ],
         })

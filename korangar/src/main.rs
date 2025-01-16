@@ -71,9 +71,13 @@ use ragnarok_packets::{
 };
 use renderer::InterfaceRenderer;
 use settings::AudioSettings;
+use wgpu::util::initialize_adapter_from_env_or_default;
+use wgpu::{
+    BackendOptions, Backends, DeviceDescriptor, Dx12BackendOptions, Dx12Compiler, GlBackendOptions, Gles3MinorVersion, Instance,
+    InstanceDescriptor, InstanceFlags, MemoryHints,
+};
 #[cfg(feature = "debug")]
 use wgpu::{Device, Queue};
-use wgpu::{Dx12Compiler, Instance, InstanceFlags, MemoryHints};
 use winit::application::ApplicationHandler;
 use winit::dpi::{LogicalSize, PhysicalSize};
 use winit::event::WindowEvent;
@@ -297,23 +301,20 @@ impl Client {
         });
 
         time_phase!("create adapter", {
-            let trace_dir = std::env::var("WGPU_TRACE");
-            let backends = wgpu::util::backend_bits_from_env().unwrap_or_default();
-            let dx12_shader_compiler = wgpu::util::dx12_shader_compiler_from_env().unwrap_or(Dx12Compiler::Dxc {
-                dxil_path: None,
-                dxc_path: None,
-            });
-            let gles_minor_version = wgpu::util::gles_minor_version_from_env().unwrap_or_default();
-            let flags = InstanceFlags::from_build_config().with_env();
-
-            let instance = Instance::new(wgpu::InstanceDescriptor {
-                backends,
-                flags,
-                dx12_shader_compiler,
-                gles_minor_version,
+            let instance = Instance::new(&InstanceDescriptor {
+                backends: Backends::all().with_env(),
+                flags: InstanceFlags::from_build_config().with_env(),
+                backend_options: BackendOptions {
+                    gl: GlBackendOptions {
+                        gles_minor_version: Gles3MinorVersion::Automatic.with_env(),
+                    },
+                    dx12: Dx12BackendOptions {
+                        shader_compiler: Dx12Compiler::StaticDxc.with_env(),
+                    },
+                },
             });
 
-            let adapter = pollster::block_on(async { wgpu::util::initialize_adapter_from_env_or_default(&instance, None).await.unwrap() });
+            let adapter = pollster::block_on(async { initialize_adapter_from_env_or_default(&instance, None).await.unwrap() });
             let adapter = Arc::new(adapter);
 
             #[cfg(feature = "debug")]
@@ -331,13 +332,13 @@ impl Client {
             let (device, queue) = pollster::block_on(async {
                 adapter
                     .request_device(
-                        &wgpu::DeviceDescriptor {
+                        &DeviceDescriptor {
                             label: None,
                             required_features: capabilities.get_required_features(),
                             required_limits: capabilities.get_required_limits(),
                             memory_hints: MemoryHints::Performance,
                         },
-                        trace_dir.ok().as_ref().map(std::path::Path::new),
+                        std::env::var("WGPU_TRACE").ok().as_ref().map(std::path::Path::new),
                     )
                     .await
                     .unwrap()

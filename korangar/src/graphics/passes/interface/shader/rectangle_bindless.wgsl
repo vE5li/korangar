@@ -41,8 +41,8 @@ struct VertexOutput {
 @group(0) @binding(1) var nearest_sampler: sampler;
 @group(0) @binding(2) var linear_sampler: sampler;
 @group(1) @binding(0) var<storage, read> instance_data: array<InstanceData>;
-@group(1) @binding(1) var textures: binding_array<texture_2d<f32>>;
-@group(1) @binding(2) var msdf_font_map: texture_2d<f32>;
+@group(1) @binding(1) var msdf_font_map: texture_2d<f32>;
+@group(1) @binding(2) var textures: binding_array<texture_2d<f32>>;
 
 const BREATHING_ROOM = 0.5;
 const BORDER_THRESHOLD = 2.0;

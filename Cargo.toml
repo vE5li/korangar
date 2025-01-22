@@ -5,6 +5,7 @@ members = ["korangar", "ragnarok_*", "korangar_*"]
 [workspace.dependencies]
 arrayvec = "0.7"
 bitflags = "2.6"
+block_compression = { version = "0.2", default-features = false }
 bumpalo = "3.16"
 bytemuck = "1.21"
 cgmath = "0.18"
@@ -51,6 +52,9 @@ tokio = { version = "1.42", default-features = false }
 walkdir = "2.5"
 wgpu = "24"
 winit = "0.30"
+
+[profile.release]
+lto = "thin"
 
 [profile.dev.build-override]
 opt-level = 3

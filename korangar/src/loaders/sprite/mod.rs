@@ -11,9 +11,8 @@ use korangar_util::FileLoader;
 use ragnarok_bytes::{ByteReader, FromBytes};
 use ragnarok_formats::sprite::{PaletteColor, RgbaImageData, SpriteData};
 use ragnarok_formats::version::InternalVersion;
-use wgpu::{Device, Extent3d, Queue, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages};
 
-use super::FALLBACK_SPRITE_FILE;
+use super::{TextureLoader, FALLBACK_SPRITE_FILE};
 use crate::graphics::Texture;
 use crate::loaders::error::LoadError;
 use crate::loaders::GameFileLoader;
@@ -37,18 +36,16 @@ impl Cacheable for Sprite {
 }
 
 pub struct SpriteLoader {
-    device: Arc<Device>,
-    queue: Arc<Queue>,
     game_file_loader: Arc<GameFileLoader>,
+    texture_loader: Arc<TextureLoader>,
     cache: Mutex<SimpleCache<String, Arc<Sprite>>>,
 }
 
 impl SpriteLoader {
-    pub fn new(device: Arc<Device>, queue: Arc<Queue>, game_file_loader: Arc<GameFileLoader>) -> Self {
+    pub fn new(game_file_loader: Arc<GameFileLoader>, texture_loader: Arc<TextureLoader>) -> Self {
         Self {
-            device,
-            queue,
             game_file_loader,
+            texture_loader,
             cache: Mutex::new(SimpleCache::new(
                 NonZeroU32::new(MAX_CACHE_COUNT).unwrap(),
                 NonZeroUsize::new(MAX_CACHE_SIZE).unwrap(),
@@ -151,29 +148,11 @@ impl SpriteLoader {
             .map(|mut image_data| {
                 premultiply_alpha(&mut image_data.data);
 
-                let texture = Texture::new_with_data(
-                    &self.device,
-                    &self.queue,
-                    &TextureDescriptor {
-                        label: Some(path),
-                        size: Extent3d {
-                            width: image_data.width as u32,
-                            height: image_data.height as u32,
-                            depth_or_array_layers: 1,
-                        },
-                        mip_level_count: 1,
-                        sample_count: 1,
-                        dimension: TextureDimension::D2,
-                        format: TextureFormat::Rgba8UnormSrgb,
-                        usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING,
-                        view_formats: &[],
-                    },
-                    RgbaImage::from_raw(image_data.width as u32, image_data.height as u32, image_data.data)
-                        .unwrap()
-                        .as_raw(),
+                self.texture_loader.create_color(
+                    path,
+                    RgbaImage::from_raw(image_data.width as u32, image_data.height as u32, image_data.data).unwrap(),
                     false,
-                );
-                Arc::new(texture)
+                )
             })
             .collect();
 

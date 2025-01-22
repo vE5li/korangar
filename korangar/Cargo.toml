@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 arrayvec = { workspace = true }
+block_compression = { workspace = true, features = ["bc7", "wgpu"] }
 bumpalo = { workspace = true, features = ["allocator_api"] }
 bytemuck = { workspace = true, features = ["derive", "extern_crate_std", "min_const_generics"] }
 cgmath = { workspace = true, features = ["mint", "serde"] }

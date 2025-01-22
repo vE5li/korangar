@@ -11,7 +11,7 @@ use korangar_util::texture_atlas::AtlasAllocation;
 use ragnarok_packets::{EntityId, ItemId, TilePosition};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
-use crate::graphics::Texture;
+use crate::graphics::{Texture, TextureCompression};
 use crate::loaders::error::LoadError;
 use crate::loaders::{ActionLoader, AnimationLoader, ImageType, MapLoader, ModelLoader, SpriteLoader, TextureLoader};
 #[cfg(feature = "debug")]
@@ -33,8 +33,14 @@ pub enum LoaderId {
 
 pub enum LoadableResource {
     AnimationData(Arc<AnimationData>),
-    ItemSprite { texture: Arc<Texture>, location: ItemLocation },
-    Map { map: Box<Map>, player_position: TilePosition },
+    ItemSprite {
+        texture: Arc<Texture>,
+        location: ItemLocation,
+    },
+    Map {
+        map: Box<Map>,
+        player_position: Option<TilePosition>,
+    },
 }
 
 enum LoadStatus {
@@ -71,7 +77,7 @@ impl AsyncLoader {
     ) -> Self {
         let thread_pool = ThreadPoolBuilder::new()
             .num_threads(1)
-            .thread_name(|_| "async loader".to_string())
+            .thread_name(|number| format!("light task thread pool {number}"))
             .build()
             .unwrap();
 
@@ -152,8 +158,9 @@ impl AsyncLoader {
 
     pub fn request_map_load(
         &self,
+        texture_compression: TextureCompression,
         map_name: String,
-        player_position: TilePosition,
+        player_position: Option<TilePosition>,
         #[cfg(feature = "debug")] tile_texture_mapping: Arc<Vec<AtlasAllocation>>,
     ) {
         let map_loader = self.map_loader.clone();
@@ -165,6 +172,7 @@ impl AsyncLoader {
             let _load_measurement = Profiler::start_measurement("map load");
 
             let map = map_loader.load(
+                texture_compression,
                 map_name,
                 &model_loader,
                 texture_loader,

@@ -116,6 +116,7 @@ impl MarkerIdentifier {
 
 #[derive(new)]
 pub struct Map {
+    resource_file: String,
     width: usize,
     height: usize,
     water_settings: Option<WaterSettings>,
@@ -145,6 +146,10 @@ pub struct Map {
 impl Map {
     pub fn water_bounds(&self) -> Rectangle<f32> {
         self.water_bounds
+    }
+
+    pub fn get_resource_file(&self) -> &str {
+        &self.resource_file
     }
 
     pub fn get_world_position(&self, position: Vector2<usize>) -> Point3<f32> {

@@ -2,6 +2,7 @@ use std::io::Cursor;
 use std::num::{NonZeroU32, NonZeroUsize};
 use std::sync::{Arc, Mutex};
 
+use block_compression::{CompressionVariant, GpuBlockCompressor};
 use hashbrown::HashMap;
 use image::{GrayImage, ImageBuffer, ImageFormat, ImageReader, Rgba, RgbaImage};
 #[cfg(feature = "debug")]
@@ -11,13 +12,14 @@ use korangar_util::container::SimpleCache;
 use korangar_util::texture_atlas::{AllocationId, AtlasAllocation, OfflineTextureAtlas};
 use korangar_util::FileLoader;
 use wgpu::{
-    CommandEncoderDescriptor, Device, Extent3d, Queue, TextureAspect, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
-    TextureViewDescriptor, TextureViewDimension,
+    BufferDescriptor, BufferUsages, CommandEncoderDescriptor, ComputePassDescriptor, Device, Extent3d, Origin3d, Queue,
+    TexelCopyBufferInfo, TexelCopyBufferLayout, TexelCopyTextureInfo, TextureAspect, TextureDescriptor, TextureDimension, TextureFormat,
+    TextureUsages, TextureViewDescriptor, TextureViewDimension,
 };
 
 use super::error::LoadError;
 use super::{FALLBACK_BMP_FILE, FALLBACK_JPEG_FILE, FALLBACK_PNG_FILE, FALLBACK_TGA_FILE, MIP_LEVELS};
-use crate::graphics::{Lanczos3Drawer, MipMapRenderPassContext, Texture};
+use crate::graphics::{Lanczos3Drawer, MipMapRenderPassContext, Texture, TextureCompression};
 use crate::loaders::GameFileLoader;
 
 const MAX_CACHE_COUNT: u32 = 512;
@@ -36,12 +38,14 @@ pub struct TextureLoader {
     game_file_loader: Arc<GameFileLoader>,
     mip_map_render_context: MipMapRenderPassContext,
     lanczos3_drawer: Lanczos3Drawer,
+    block_compressor: Mutex<GpuBlockCompressor>,
     cache: Mutex<SimpleCache<(String, ImageType), Arc<Texture>>>,
 }
 
 impl TextureLoader {
     pub fn new(device: Arc<Device>, queue: Arc<Queue>, game_file_loader: Arc<GameFileLoader>) -> Self {
         let lanczos3_drawer = Lanczos3Drawer::new(&device);
+        let block_compressor = Mutex::new(GpuBlockCompressor::new(device.clone(), queue.clone()));
 
         Self {
             device,
@@ -49,6 +53,7 @@ impl TextureLoader {
             game_file_loader,
             mip_map_render_context: MipMapRenderPassContext::default(),
             lanczos3_drawer,
+            block_compressor,
             cache: Mutex::new(SimpleCache::new(
                 NonZeroU32::new(MAX_CACHE_COUNT).unwrap(),
                 NonZeroUsize::new(MAX_CACHE_SIZE).unwrap(),
@@ -56,79 +61,97 @@ impl TextureLoader {
         }
     }
 
-    fn create(&self, name: &str, image: RgbaImage, transparent: bool) -> Arc<Texture> {
+    fn create_raw(
+        &self,
+        name: &str,
+        width: u32,
+        height: u32,
+        mip_level_count: u32,
+        format: TextureFormat,
+        transparent: bool,
+        data: &[u8],
+    ) -> Arc<Texture> {
         let texture = Texture::new_with_data(
             &self.device,
             &self.queue,
             &TextureDescriptor {
                 label: Some(name),
                 size: Extent3d {
-                    width: image.width(),
-                    height: image.height(),
+                    width,
+                    height,
                     depth_or_array_layers: 1,
                 },
-                mip_level_count: 1,
+                mip_level_count,
                 sample_count: 1,
                 dimension: TextureDimension::D2,
-                format: TextureFormat::Rgba8UnormSrgb,
+                format,
                 usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING,
                 view_formats: &[],
             },
-            image.as_raw(),
+            data,
             transparent,
         );
         Arc::new(texture)
     }
 
+    pub fn create_color(&self, name: &str, image: RgbaImage, transparent: bool) -> Arc<Texture> {
+        self.create_raw(
+            name,
+            image.width(),
+            image.height(),
+            1,
+            TextureFormat::Rgba8UnormSrgb,
+            transparent,
+            image.as_raw(),
+        )
+    }
+
     pub fn create_sdf(&self, name: &str, image: GrayImage) -> Arc<Texture> {
-        let texture = Texture::new_with_data(
-            &self.device,
-            &self.queue,
-            &TextureDescriptor {
-                label: Some(name),
-                size: Extent3d {
-                    width: image.width(),
-                    height: image.height(),
-                    depth_or_array_layers: 1,
-                },
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: TextureDimension::D2,
-                format: TextureFormat::R8Unorm,
-                usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING,
-                view_formats: &[],
-            },
-            image.as_raw(),
+        self.create_raw(
+            name,
+            image.width(),
+            image.height(),
+            1,
+            TextureFormat::R8Unorm,
             false,
-        );
-        Arc::new(texture)
+            image.as_raw(),
+        )
     }
 
-    pub fn create_msdf(&self, name: &str, image: RgbaImage) -> Arc<Texture> {
-        let texture = Texture::new_with_data(
-            &self.device,
-            &self.queue,
-            &TextureDescriptor {
-                label: Some(name),
-                size: Extent3d {
-                    width: image.width(),
-                    height: image.height(),
-                    depth_or_array_layers: 1,
-                },
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: TextureDimension::D2,
-                format: TextureFormat::Rgba8Unorm,
-                usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING,
-                view_formats: &[],
-            },
-            image.as_raw(),
+    pub(crate) fn create_msdf(&self, name: &str, image: RgbaImage) -> Arc<Texture> {
+        self.create_raw(
+            name,
+            image.width(),
+            image.height(),
+            1,
+            TextureFormat::Rgba8Unorm,
             false,
-        );
-        Arc::new(texture)
+            image.as_raw(),
+        )
     }
 
-    fn create_with_mip_maps(&self, name: &str, image: RgbaImage, transparent: bool) -> Arc<Texture> {
+    pub(crate) fn create_with_mipmaps(
+        &self,
+        name: &str,
+        texture_compression: TextureCompression,
+        mips_level: u32,
+        transparent: bool,
+        image: RgbaImage,
+    ) -> Arc<Texture> {
+        match texture_compression.is_uncompressed() {
+            true => self.create_uncompressed_with_mipmaps(name, texture_compression, mips_level, transparent, image),
+            false => self.create_compressed_with_mipmaps(name, texture_compression, mips_level, transparent, image),
+        }
+    }
+
+    pub(crate) fn create_uncompressed_with_mipmaps(
+        &self,
+        name: &str,
+        _texture_compression: TextureCompression,
+        mips_level: u32,
+        transparent: bool,
+        image: RgbaImage,
+    ) -> Arc<Texture> {
         let texture = Texture::new_with_data(
             &self.device,
             &self.queue,
@@ -150,12 +173,129 @@ impl TextureLoader {
             transparent,
         );
 
-        let mut mip_views = Vec::with_capacity(MIP_LEVELS as usize);
+        if mips_level > 1 {
+            let mut mip_views = Vec::with_capacity(mips_level as usize);
 
-        for level in 0..MIP_LEVELS {
-            let view = texture.get_texture().create_view(&TextureViewDescriptor {
-                label: Some(&format!("mip map level {level}")),
-                format: None,
+            for level in 0..mips_level {
+                let view = texture.get_texture().create_view(&TextureViewDescriptor {
+                    label: Some(&format!("mip map level {level}")),
+                    format: None,
+                    dimension: Some(TextureViewDimension::D2),
+                    usage: None,
+                    aspect: TextureAspect::All,
+                    base_mip_level: level,
+                    mip_level_count: Some(1),
+                    base_array_layer: 0,
+                    array_layer_count: Some(1),
+                });
+                mip_views.push(view);
+            }
+
+            let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor {
+                label: Some("TextureLoader"),
+            });
+
+            for index in 0..(mips_level - 1) as usize {
+                let mut pass =
+                    self.mip_map_render_context
+                        .create_pass(&self.device, &mut encoder, &mip_views[index], &mip_views[index + 1]);
+
+                self.lanczos3_drawer.draw(&mut pass);
+            }
+
+            self.queue.submit(Some(encoder.finish()));
+        }
+
+        Arc::new(texture)
+    }
+
+    pub(crate) fn create_compressed_with_mipmaps(
+        &self,
+        name: &str,
+        texture_compression: TextureCompression,
+        mips_level: u32,
+        transparent: bool,
+        image: RgbaImage,
+    ) -> Arc<Texture> {
+        let width = image.width();
+        let height = image.height();
+
+        assert_eq!(width % 4, 0, "Texture width must be aligned to 4 pixels");
+        assert_eq!(height % 4, 0, "Texture height must be aligned to 4 pixels");
+
+        let temp_texture = Texture::new(
+            &self.device,
+            &TextureDescriptor {
+                label: Some("temporary mip texture"),
+                size: Extent3d {
+                    width,
+                    height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: mips_level,
+                sample_count: 1,
+                dimension: TextureDimension::D2,
+                format: TextureFormat::Rgba8UnormSrgb,
+                usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST | TextureUsages::RENDER_ATTACHMENT,
+                view_formats: &[TextureFormat::Rgba8Unorm],
+            },
+            transparent,
+        );
+
+        self.queue.write_texture(
+            temp_texture.get_texture().as_image_copy(),
+            &image,
+            TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(width * 4),
+                rows_per_image: None,
+            },
+            Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+        );
+
+        let texture = Texture::new(
+            &self.device,
+            &TextureDescriptor {
+                label: Some(name),
+                size: Extent3d {
+                    width,
+                    height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: mips_level,
+                sample_count: 1,
+                dimension: TextureDimension::D2,
+                format: texture_compression.into(),
+                usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
+            },
+            transparent,
+        );
+
+        let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor {
+            label: Some("compression encoder"),
+        });
+
+        let mut mip_views = Vec::with_capacity(mips_level as usize);
+        let variant = CompressionVariant::try_from(texture_compression).unwrap();
+
+        let mut total_size = 0;
+        let mut offsets = Vec::with_capacity(mips_level as usize);
+
+        for level in 0..mips_level {
+            let mip_width = width >> level;
+            let mip_height = height >> level;
+
+            offsets.push(total_size);
+            total_size += variant.blocks_byte_size(mip_width, mip_height);
+
+            let view = temp_texture.get_texture().create_view(&TextureViewDescriptor {
+                label: Some(&format!("mip {level} view")),
+                format: Some(TextureFormat::Rgba8UnormSrgb),
                 dimension: Some(TextureViewDimension::D2),
                 usage: None,
                 aspect: TextureAspect::All,
@@ -164,18 +304,85 @@ impl TextureLoader {
                 base_array_layer: 0,
                 array_layer_count: Some(1),
             });
+
             mip_views.push(view);
         }
 
-        let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor {
-            label: Some("TextureLoader"),
-        });
-
-        for index in 0..(MIP_LEVELS - 1) as usize {
+        for index in 0..(mips_level - 1) as usize {
             let mut pass = self
                 .mip_map_render_context
                 .create_pass(&self.device, &mut encoder, &mip_views[index], &mip_views[index + 1]);
             self.lanczos3_drawer.draw(&mut pass);
+        }
+
+        let output_buffer = self.device.create_buffer(&BufferDescriptor {
+            label: Some("compressed output buffer"),
+            size: total_size as u64,
+            usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC,
+            mapped_at_creation: false,
+        });
+
+        let mut block_compressor = self.block_compressor.lock().unwrap();
+
+        for level in 0..mips_level {
+            let mip_width = width >> level;
+            let mip_height = height >> level;
+
+            block_compressor.add_compression_task(
+                variant,
+                &temp_texture.get_texture().create_view(&TextureViewDescriptor {
+                    label: Some(&format!("compression mip {level} view")),
+                    format: Some(TextureFormat::Rgba8Unorm),
+                    base_mip_level: level,
+                    mip_level_count: Some(1),
+                    dimension: Some(TextureViewDimension::D2),
+                    usage: None,
+                    aspect: TextureAspect::All,
+                    base_array_layer: 0,
+                    array_layer_count: Some(1),
+                }),
+                mip_width,
+                mip_height,
+                &output_buffer,
+                Some(offsets[level as usize] as u32),
+            );
+        }
+
+        {
+            let mut pass = encoder.begin_compute_pass(&ComputePassDescriptor {
+                label: Some("texture compression pass"),
+                timestamp_writes: None,
+            });
+            block_compressor.compress(&mut pass);
+        }
+
+        drop(block_compressor);
+
+        for level in 0..mips_level {
+            let mip_width = width >> level;
+            let mip_height = height >> level;
+
+            encoder.copy_buffer_to_texture(
+                TexelCopyBufferInfo {
+                    buffer: &output_buffer,
+                    layout: TexelCopyBufferLayout {
+                        offset: offsets[level as usize] as u64,
+                        bytes_per_row: Some(variant.bytes_per_row(mip_width)),
+                        rows_per_image: Some(mip_height),
+                    },
+                },
+                TexelCopyTextureInfo {
+                    texture: texture.get_texture(),
+                    mip_level: level,
+                    origin: Origin3d::ZERO,
+                    aspect: TextureAspect::All,
+                },
+                Extent3d {
+                    width: mip_width,
+                    height: mip_height,
+                    depth_or_array_layers: 1,
+                },
+            );
         }
 
         self.queue.submit(Some(encoder.finish()));
@@ -187,7 +394,7 @@ impl TextureLoader {
         let texture = match image_type {
             ImageType::Color => {
                 let (texture_data, transparent) = self.load_texture_data(path, false)?;
-                self.create(path, texture_data, transparent)
+                self.create_color(path, texture_data, transparent)
             }
             ImageType::Sdf => {
                 let texture_data = self.load_grayscale_texture_data(path)?;
@@ -383,6 +590,7 @@ pub struct TextureAtlasFactory {
     lookup: HashMap<String, TextureAtlasEntry>,
     create_mip_map: bool,
     transparent: bool,
+    texture_compression: TextureCompression,
 }
 
 #[derive(Copy, Clone)]
@@ -398,8 +606,9 @@ impl TextureAtlasFactory {
         name: impl Into<String>,
         add_padding: bool,
         paths: &[&str],
+        texture_compression: TextureCompression,
     ) -> (Vec<AtlasAllocation>, Arc<Texture>) {
-        let mut factory = Self::new(texture_loader, name, add_padding, false);
+        let mut factory = Self::new(texture_loader, name, add_padding, false, texture_compression);
 
         let mut ids: Vec<TextureAtlasEntry> = paths.iter().map(|path| factory.register(path)).collect();
         factory.build_atlas();
@@ -413,7 +622,13 @@ impl TextureAtlasFactory {
         (mapping, texture)
     }
 
-    pub fn new(texture_loader: Arc<TextureLoader>, name: impl Into<String>, add_padding: bool, create_mip_map: bool) -> Self {
+    pub fn new(
+        texture_loader: Arc<TextureLoader>,
+        name: impl Into<String>,
+        add_padding: bool,
+        create_mip_map: bool,
+        texture_compression: TextureCompression,
+    ) -> Self {
         let mip_level_count = if create_mip_map { NonZeroU32::new(MIP_LEVELS) } else { None };
 
         Self {
@@ -423,6 +638,7 @@ impl TextureAtlasFactory {
             lookup: HashMap::default(),
             create_mip_map,
             transparent: false,
+            texture_compression,
         }
     }
 
@@ -456,18 +672,15 @@ impl TextureAtlasFactory {
     }
 
     pub fn upload_texture_atlas_texture(self) -> Arc<Texture> {
-        if self.create_mip_map {
-            self.texture_loader.create_with_mip_maps(
-                &format!("{} texture atlas", self.name),
-                self.texture_atlas.get_atlas(),
-                self.transparent,
-            )
-        } else {
-            self.texture_loader.create(
-                &format!("{} texture atlas", self.name),
-                self.texture_atlas.get_atlas(),
-                self.transparent,
-            )
-        }
+        let atlas = self.texture_atlas.get_atlas();
+        let name = format!("{} texture atlas", self.name);
+
+        let mips_level = match self.create_mip_map {
+            true => MIP_LEVELS,
+            false => 1,
+        };
+
+        self.texture_loader
+            .create_with_mipmaps(&name, self.texture_compression, mips_level, self.transparent, atlas)
     }
 }

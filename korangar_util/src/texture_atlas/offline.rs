@@ -9,10 +9,6 @@ use super::AtlasAllocation;
 use crate::container::{SecondarySimpleSlab, SimpleSlab};
 use crate::{create_simple_key, Rectangle};
 
-/// Factor we used to increase the texture size for inefficiency in
-/// the packing algorithm.
-const EFFICIENCY_FACTOR: f32 = 1.05;
-
 create_simple_key!(AllocationId, "A key for an allocation");
 
 /// A texture atlas implementation using the MAXRECTS-BSSF (Best Short Side Fit)
@@ -161,18 +157,10 @@ impl OfflineTextureAtlas {
                 } else {
                     success = false;
 
-                    if self.mip_level_count > 1 {
-                        if width <= height {
-                            width *= 2
-                        } else {
-                            height *= 2
-                        }
+                    if width <= height {
+                        width *= 2;
                     } else {
-                        let current_area = width * height;
-                        let adjusted_area = (current_area as f32 * EFFICIENCY_FACTOR) as u32;
-                        let side = (adjusted_area as f32).sqrt() as u32;
-                        width = side;
-                        height = side;
+                        height *= 2;
                     }
 
                     break;
@@ -205,27 +193,18 @@ impl OfflineTextureAtlas {
     fn estimate_initial_size(&self, deferred_allocations: &[(AllocationId, DeferredAllocation)]) -> (u32, u32) {
         let total_area: u32 = deferred_allocations.iter().map(|r| r.1.padded_size.x * r.1.padded_size.y).sum();
 
-        if self.mip_level_count > 1 {
-            let mut width = 128;
-            let mut height = 128;
-            let mut expand_width = true;
+        let mut width = 128;
+        let mut height = 128;
 
-            while (width * height) < total_area {
-                if expand_width {
-                    width *= 2;
-                    expand_width = false;
-                } else {
-                    height *= 2;
-                    expand_width = true;
-                }
+        while (width * height) < total_area {
+            if width <= height {
+                width *= 2;
+            } else {
+                height *= 2;
             }
-
-            (width, height)
-        } else {
-            let adjusted_area = (total_area as f32 * EFFICIENCY_FACTOR) as u32;
-            let side = (adjusted_area as f32).sqrt() as u32;
-            (side, side)
         }
+
+        (width, height)
     }
 
     fn allocate(&mut self, padded_size: Vector2<u32>, original_size: Vector2<u32>) -> Option<AtlasAllocation> {

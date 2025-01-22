@@ -47,7 +47,7 @@ fn fs_main(input: VertexOutput) -> @builtin(frag_depth) f32 {
 
     let light_distance = length(input.world_position.xyz - pass_uniforms.light_position.xyz);
 
-    if (diffuse_color.a != 1.0) {
+    if (diffuse_color.a == 0.0) {
         discard;
     }
 

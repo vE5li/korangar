@@ -42,7 +42,7 @@ fn vs_main(
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     var diffuse_color = textureSampleLevel(texture, texture_sampler, input.texture_coordinates, 0.0);
 
-    if (diffuse_color.a < 1.0) {
+    if (diffuse_color.a == 0.0) {
         discard;
     }
 

@@ -51,12 +51,6 @@ pub struct GraphicsEngineDescriptor {
 /// Set 3: Resource Bindings (for example a texture group of a map)
 pub struct GraphicsEngine {
     capabilities: Capabilities,
-    instance: Instance,
-    adapter: Arc<Adapter>,
-    device: Arc<Device>,
-    queue: Arc<Queue>,
-    staging_belt: StagingBelt,
-    surface: Option<Surface>,
     frame_pacer: FramePacer,
     cpu_stage: FrameStage<Instant>,
     limit_framerate: bool,
@@ -66,6 +60,12 @@ pub struct GraphicsEngine {
     picker_value: Arc<AtomicU64>,
     entity_sort_buffer: Vec<EntityInstruction>,
     model_sort_buffer: Vec<ModelInstruction>,
+    staging_belt: StagingBelt,
+    queue: Arc<Queue>,
+    device: Arc<Device>,
+    adapter: Arc<Adapter>,
+    instance: Instance,
+    surface: Option<Surface>,
 }
 
 struct EngineContext {
@@ -120,12 +120,6 @@ impl GraphicsEngine {
 
         Self {
             capabilities: descriptor.capabilities,
-            instance: descriptor.instance,
-            adapter: descriptor.adapter,
-            device: descriptor.device,
-            queue: descriptor.queue,
-            staging_belt,
-            surface: None,
             frame_pacer,
             cpu_stage,
             limit_framerate: false,
@@ -135,6 +129,12 @@ impl GraphicsEngine {
             picker_value: descriptor.picker_value,
             entity_sort_buffer: vec![],
             model_sort_buffer: vec![],
+            staging_belt,
+            queue: descriptor.queue,
+            device: descriptor.device,
+            adapter: descriptor.adapter,
+            instance: descriptor.instance,
+            surface: None,
         }
     }
 

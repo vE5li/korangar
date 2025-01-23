@@ -4,7 +4,7 @@ members = ["korangar", "ragnarok_*", "korangar_*"]
 
 [workspace.dependencies]
 arrayvec = "0.7"
-bitflags = "2.6"
+bitflags = "2.8"
 block_compression = { version = "0.2", default-features = false }
 bumpalo = "3.16"
 bytemuck = "1.21"
@@ -14,7 +14,7 @@ cosmic-text = { version = "0.12", default-features = false }
 cpal = "0.15"
 derive-new = "0.7"
 encoding_rs = "0.8"
-etherparse = "0.16"
+etherparse = "0.17"
 fast-srgb8 = "1"
 flate2 = { version = "1", default-features = false }
 glidesort = "0.1"
@@ -48,7 +48,7 @@ serde = "1.0"
 spin_sleep = "1.3"
 syn = "2.0"
 sys-locale = "0.3"
-tokio = { version = "1.42", default-features = false }
+tokio = { version = "1.43", default-features = false }
 walkdir = "2.5"
 wgpu = "24"
 winit = "0.30"

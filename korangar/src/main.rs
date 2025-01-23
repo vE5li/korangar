@@ -148,20 +148,6 @@ fn main() {
 }
 
 struct Client {
-    window: Option<Arc<Window>>,
-    #[cfg(feature = "debug")]
-    device: Arc<Device>,
-    #[cfg(feature = "debug")]
-    queue: Arc<Queue>,
-    graphics_engine: GraphicsEngine,
-    audio_engine: Arc<AudioEngine<GameFileLoader>>,
-    #[cfg(feature = "debug")]
-    packet_history_callback: PacketHistoryCallback,
-    #[cfg(feature = "debug")]
-    networking_system: NetworkingSystem<PacketHistoryCallback>,
-    #[cfg(not(feature = "debug"))]
-    networking_system: NetworkingSystem<NoPacketCallback>,
-
     action_loader: Arc<ActionLoader>,
     async_loader: Arc<AsyncLoader>,
     effect_loader: Arc<EffectLoader>,
@@ -272,6 +258,20 @@ struct Client {
     main_menu_click_sound_effect: SoundEffectKey,
 
     map: Option<Box<Map>>,
+
+    #[cfg(feature = "debug")]
+    packet_history_callback: PacketHistoryCallback,
+    #[cfg(feature = "debug")]
+    networking_system: NetworkingSystem<PacketHistoryCallback>,
+    #[cfg(not(feature = "debug"))]
+    networking_system: NetworkingSystem<NoPacketCallback>,
+    audio_engine: Arc<AudioEngine<GameFileLoader>>,
+    graphics_engine: GraphicsEngine,
+    #[cfg(feature = "debug")]
+    queue: Arc<Queue>,
+    #[cfg(feature = "debug")]
+    device: Arc<Device>,
+    window: Option<Arc<Window>>,
 }
 
 impl Client {
@@ -590,16 +590,6 @@ impl Client {
         });
 
         Self {
-            window: None,
-            #[cfg(feature = "debug")]
-            device,
-            #[cfg(feature = "debug")]
-            queue,
-            graphics_engine,
-            audio_engine,
-            #[cfg(feature = "debug")]
-            packet_history_callback,
-            networking_system,
             action_loader,
             async_loader,
             effect_loader,
@@ -700,6 +690,16 @@ impl Client {
             chat_messages,
             main_menu_click_sound_effect,
             map: Some(map),
+            #[cfg(feature = "debug")]
+            packet_history_callback,
+            networking_system,
+            audio_engine,
+            graphics_engine,
+            #[cfg(feature = "debug")]
+            queue,
+            #[cfg(feature = "debug")]
+            device,
+            window: None,
         }
     }
 

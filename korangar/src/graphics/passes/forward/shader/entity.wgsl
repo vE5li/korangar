@@ -74,9 +74,7 @@ struct FragmentOutput {
 const TILE_SIZE: u32 = 16;
 
 @group(0) @binding(0) var<uniform> global_uniforms: GlobalUniforms;
-@group(0) @binding(1) var nearest_sampler: sampler;
 @group(0) @binding(2) var linear_sampler: sampler;
-@group(0) @binding(3) var texture_sampler: sampler;
 @group(0) @binding(4) var shadow_map_sampler: sampler_comparison;
 @group(1) @binding(0) var<uniform> directional_light: DirectionalLightUniforms;
 @group(1) @binding(1) var shadow_map: texture_depth_2d;
@@ -131,9 +129,23 @@ fn vs_main(
 
 @fragment
 fn fs_main(input: VertexOutput) -> FragmentOutput {
-    let diffuse_color = textureSample(texture, texture_sampler, input.texture_coordinates);
-    var alpha_channel = textureSample(texture, nearest_sampler, input.texture_coordinates).a;
-    alpha_channel *= input.color.a;
+    let texture_dimensions = vec2<f32>(textureDimensions(texture));
+    let inverse_texture_dimensions = vec2<f32>(1.0) / texture_dimensions;
+
+    let pixel_info = compute_pixel_weights(
+        input.texture_coordinates,
+        texture_dimensions,
+        inverse_texture_dimensions,
+        1.0
+    );
+
+    let diffuse_color = sample_bandlimited_pixel(
+        input.texture_coordinates,
+        pixel_info,
+        0.0
+    );
+
+    var alpha_channel = diffuse_color.a;
 
     if (alpha_channel == 0.0) {
         discard;
@@ -355,4 +367,50 @@ fn get_soft_shadow(shadow_coords: vec3<f32>, shadow_map_dimensions: vec2<u32>) -
 fn linearToNonLinear(linear_depth: f32) -> f32 {
     const NEAR_PLANE = 0.1;
     return NEAR_PLANE / (linear_depth + 1e-7);
+}
+
+// Bandlimited pixel filter based on TheMaister.
+// https://themaister.net/blog/2018/08/25/pseudo-bandlimited-pixel-art-filtering-in-3d-a-mathematical-derivation/
+struct BandlimitedPixelInfo {
+    uv0: vec2<f32>,
+    length: f32,
+}
+
+const BANDLIMITED_PI_HALF: f32 = 0.5 * 3.14159265359;
+
+fn compute_pixel_weights(uv: vec2<f32>, texture_size: vec2<f32>, inverse_texture_size: vec2<f32>, extent_mod: f32) -> BandlimitedPixelInfo {
+	// Get derivatives in texel space.
+	// Need a non-zero derivative.
+    let extent = max(fwidth(uv) * texture_size * extent_mod, vec2<f32>(1.0 / 256.0));
+
+	// Get base pixel and phase, range [0, 1).
+    let pixel = uv * texture_size - 0.5;
+    let base_pixel = floor(pixel);
+    let phase = pixel - base_pixel;
+
+    var info: BandlimitedPixelInfo;
+
+    if (any(extent > vec2<f32>(1.0))) {
+		// We need to just do regular minimization filtering.
+        return BandlimitedPixelInfo(vec2<f32>(0.0), 0.0);
+    } else {
+		// We can resolve the filter by just sampling a single 2x2 block.
+		// Lerp between normal sampling at LOD 0, and bandlimited pixel filter at LOD -1.
+        let shift = 0.5 + 0.5 * sin(BANDLIMITED_PI_HALF * clamp((phase - 0.5) / min(extent, vec2<f32>(0.5)), vec2<f32>(-1.0), vec2<f32>(1.0)));
+        let max_extent = max(extent.x, extent.y);
+        let length = clamp(2.0 - 2.0 * max_extent, 0.0, 1.0);
+
+        return BandlimitedPixelInfo((base_pixel + 0.5 + shift) * inverse_texture_size, length);
+    }
+}
+
+fn sample_bandlimited_pixel(uv: vec2<f32>, info: BandlimitedPixelInfo, lod_bias: f32) -> vec4<f32> {
+    var color = textureSampleLevel(texture, linear_sampler, uv, lod_bias);
+
+    if (info.length > 0.0) {
+        let bandlimited = textureSampleLevel(texture, linear_sampler, info.uv0, 0.0);
+        color = mix(color, bandlimited, info.length);
+    }
+
+    return color;
 }

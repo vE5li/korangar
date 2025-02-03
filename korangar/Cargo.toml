@@ -15,7 +15,6 @@ derive-new = { workspace = true }
 encoding_rs = { workspace = true }
 flate2 = { workspace = true, features = ["zlib-rs"] }
 hashbrown = { workspace = true }
-glidesort = { workspace = true }
 image = { workspace = true, features = ["bmp", "jpeg", "png", "tga", "rayon"] }
 korangar_audio = { workspace = true }
 korangar_debug = { workspace = true, optional = true }

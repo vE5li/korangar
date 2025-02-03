@@ -37,7 +37,8 @@ impl Model {
     ) {
         self.root_nodes
             .iter()
-            .for_each(|node| node.render_geometry(instructions, transform, client_tick, camera));
+            .enumerate()
+            .for_each(|(node_index, node)| node.render_geometry(instructions, transform, client_tick, camera, node_index));
     }
 
     #[cfg(feature = "debug")]

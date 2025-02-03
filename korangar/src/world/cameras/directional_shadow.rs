@@ -1,4 +1,4 @@
-use cgmath::{Array, EuclideanSpace, InnerSpace, Matrix4, Point3, Transform, Vector2, Vector3, Zero};
+use cgmath::{EuclideanSpace, InnerSpace, Matrix4, Point3, Transform, Vector2, Vector3, Zero};
 
 use super::Camera;
 use crate::graphics::orthographic_reverse_lh;

@@ -87,9 +87,12 @@ fn get_directional_light_color_intensity(directional_color: Color, intensity: f3
 }
 
 pub fn get_light_direction(day_timer: f32) -> Vector3<f32> {
+    const STEP_SIZE: f32 = 0.005;
+    let truncated_time = (day_timer / STEP_SIZE).floor() * STEP_SIZE;
+
     let sun_offset = -std::f32::consts::FRAC_PI_2;
-    let c = (day_timer + sun_offset).cos();
-    let s = (day_timer + sun_offset).sin();
+    let c = (truncated_time + sun_offset).cos();
+    let s = (truncated_time + sun_offset).sin();
 
     match c.is_sign_positive() {
         true => Vector3::new(s, c, -0.5),

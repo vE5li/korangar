@@ -66,10 +66,18 @@ impl Node {
         transform: &Transform,
         client_tick: ClientTick,
         camera: &dyn Camera,
+        node_index: usize,
     ) {
+        // Some models have multiple nodes with the same position. This can lead so
+        // z-fighting, when we sort the model instructions later with an unstable,
+        // non-allocating sort. To remove this z-fighting, we add a very small offset to
+        // the nodes, so that they always have the same order from the same view
+        // perspective.
+        let draw_oder_offset = (node_index as f32) * 1.1920929e-4_f32;
+
         let model_matrix = self.world_matrix(transform, client_tick);
         let position = model_matrix.transform_point(self.centroid);
-        let distance = camera.distance_to(position);
+        let distance = camera.distance_to(position) + draw_oder_offset;
 
         instructions.push(ModelInstruction {
             model_matrix,
@@ -81,6 +89,7 @@ impl Node {
 
         self.child_nodes
             .iter()
-            .for_each(|node| node.render_geometry(instructions, transform, client_tick, camera));
+            .enumerate()
+            .for_each(|(node_index, node)| node.render_geometry(instructions, transform, client_tick, camera, node_index));
     }
 }

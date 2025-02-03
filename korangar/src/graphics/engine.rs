@@ -16,9 +16,8 @@ use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
 use super::{
-    AntiAliasingResource, Capabilities, EntityInstruction, FramePacer, FrameStage, GlobalContext, LimitFramerate, ModelInstruction, Msaa,
-    Prepare, PresentModeInfo, ScreenSpaceAntiAliasing, ShadowDetail, Ssaa, Surface, TextureCompression, TextureSamplerType,
-    RENDER_TO_TEXTURE_FORMAT,
+    AntiAliasingResource, Capabilities, FramePacer, FrameStage, GlobalContext, LimitFramerate, Msaa, Prepare, PresentModeInfo,
+    ScreenSpaceAntiAliasing, ShadowDetail, Ssaa, Surface, TextureCompression, TextureSamplerType, RENDER_TO_TEXTURE_FORMAT,
 };
 use crate::graphics::instruction::RenderInstruction;
 use crate::graphics::passes::*;
@@ -58,8 +57,6 @@ pub struct GraphicsEngine {
     texture_loader: Arc<TextureLoader>,
     engine_context: Option<EngineContext>,
     picker_value: Arc<AtomicU64>,
-    entity_sort_buffer: Vec<EntityInstruction>,
-    model_sort_buffer: Vec<ModelInstruction>,
     staging_belt: StagingBelt,
     queue: Arc<Queue>,
     device: Arc<Device>,
@@ -127,8 +124,6 @@ impl GraphicsEngine {
             texture_loader: descriptor.texture_loader,
             engine_context: None,
             picker_value: descriptor.picker_value,
-            entity_sort_buffer: vec![],
-            model_sort_buffer: vec![],
             staging_belt,
             queue: descriptor.queue,
             device: descriptor.device,
@@ -691,21 +686,23 @@ impl GraphicsEngine {
         self.frame_pacer.end_frame_stage(self.cpu_stage, Instant::now());
     }
 
-    /// We use glidesort here, since we need a stable sorting algorith, or else
-    /// we could get Z-fighting and also want to re-use the sorting buffers
-    /// between frames, so that we don't need to allocate each time.
+    // We currently use unstable sort, since it's the only way to sort without
+    // allocating using std. For models, this isn't a problem, since models
+    // normally have a proper order and don't "overlay" each other, except in
+    // cases when a model has multiple nodes. In that case we currently add
+    // a small very offset for each node in an index, based on the node order.
+    // For entities this might be a problem, but since they move dynamically, this
+    // shouldn't be distracting, since it's very rare.
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     fn sort_instructions(&mut self, instructions: &mut RenderInstruction) {
         // Back to front for entities.
-        glidesort::sort_with_vec_by(instructions.entities, &mut self.entity_sort_buffer, |a, b| {
-            b.distance.total_cmp(&a.distance)
-        });
+        instructions.entities.sort_unstable_by(|a, b| b.distance.total_cmp(&a.distance));
 
         for batch in instructions.model_batches {
             let start = batch.offset;
             let end = batch.offset + batch.count;
 
-            glidesort::sort_with_vec_by(&mut instructions.models[start..end], &mut self.model_sort_buffer, |a, b| {
+            instructions.models[start..end].sort_unstable_by(|a, b| {
                 match (a.transparent, b.transparent) {
                     // Front to back for opaque models.
                     (false, false) => a.distance.total_cmp(&b.distance),

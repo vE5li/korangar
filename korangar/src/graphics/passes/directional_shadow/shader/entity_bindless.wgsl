@@ -36,7 +36,7 @@ struct VertexOutput {
     @location(7) alpha: f32,
 }
 
-@group(0) @binding(3) var texture_sampler: sampler;
+@group(0) @binding(2) var linear_sampler: sampler;
 @group(1) @binding(0) var<uniform> pass_uniforms: PassUniforms;
 @group(2) @binding(0) var<storage, read> instance_data: array<InstanceData>;
 @group(2) @binding(1) var textures: binding_array<texture_2d<f32>>;
@@ -83,7 +83,7 @@ fn vs_main(
 
 @fragment
 fn fs_main(input: VertexOutput) -> @builtin(frag_depth) f32 {
-    let diffuse_color = textureSampleLevel(textures[input.texture_index], texture_sampler, input.texture_coordinates, 0.0);
+    let diffuse_color = textureSampleLevel(textures[input.texture_index], linear_sampler, input.texture_coordinates, 0.0);
     if (diffuse_color.a != 1.0 || input.alpha != 1.0) {
         discard;
     }

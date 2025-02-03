@@ -1967,12 +1967,14 @@ impl Client {
             let update_shadow_camera_measurement = Profiler::start_measurement("update directional shadow camera");
 
             let lighting_mode = *self.lighting_mode.get();
+            let shadow_detail = *self.shadow_detail.get();
             let shadow_quality = *self.shadow_quality.get();
+            let shadow_map_size = shadow_detail.directional_shadow_resolution();
             let ambient_light_color = map.get_ambient_light_color(lighting_mode, day_timer);
             let (directional_light_direction, directional_light_color) = map.get_directional_light(lighting_mode, day_timer);
 
             self.directional_shadow_camera
-                .update(directional_light_direction, current_camera.view_direction());
+                .update(directional_light_direction, current_camera.view_direction(), shadow_map_size);
             self.directional_shadow_camera.generate_view_projection(window_size);
 
             let (directional_light_view_matrix, directional_light_projection_matrix) =

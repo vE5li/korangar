@@ -14,7 +14,7 @@ struct VertexOutput {
     @location(0) texture_coordinates: vec2<f32>,
 }
 
-@group(0) @binding(3) var texture_sampler: sampler;
+@group(0) @binding(2) var linear_sampler: sampler;
 @group(1) @binding(0) var<uniform> pass_uniforms: PassUniforms;
 @group(2) @binding(0) var<storage, read> instance_data: array<InstanceData>;
 @group(3) @binding(0) var texture: texture_2d<f32>;
@@ -40,7 +40,7 @@ fn vs_main(
 
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
-    var diffuse_color = textureSampleLevel(texture, texture_sampler, input.texture_coordinates, 0.0);
+    var diffuse_color = textureSampleLevel(texture, linear_sampler, input.texture_coordinates, 0.0);
 
     if (diffuse_color.a == 0.0) {
         discard;

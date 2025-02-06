@@ -28,7 +28,7 @@ impl Color {
         Self { red, green, blue, alpha }
     }
 
-    pub fn rgb_u8(red: u8, green: u8, blue: u8) -> Self {
+    pub const fn rgb_u8(red: u8, green: u8, blue: u8) -> Self {
         let red = (red as f32) / 255.0;
         let green = (green as f32) / 255.0;
         let blue = (blue as f32) / 255.0;
@@ -41,7 +41,7 @@ impl Color {
         }
     }
 
-    pub fn rgba_u8(red: u8, green: u8, blue: u8, alpha: u8) -> Self {
+    pub const fn rgba_u8(red: u8, green: u8, blue: u8, alpha: u8) -> Self {
         let red = (red as f32) / 255.0;
         let green = (green as f32) / 255.0;
         let blue = (blue as f32) / 255.0;
@@ -93,12 +93,12 @@ impl Color {
     }
 
     #[cfg(feature = "debug")]
-    pub fn multiply_alpha(mut self, alpha: f32) -> Self {
+    pub const fn multiply_alpha(mut self, alpha: f32) -> Self {
         self.alpha *= alpha;
         self
     }
 
-    pub fn invert(&self) -> Self {
+    pub const fn invert(&self) -> Self {
         Self::rgba(1.0 - self.red, 1.0 - self.blue, 1.0 - self.green, self.alpha)
     }
 

@@ -5,7 +5,8 @@ use crate::graphics::orthographic_reverse_lh;
 
 const FAR_PLANE: f32 = 500.0;
 const NEAR_PLANE: f32 = -500.0;
-const MAX_BOUNDS: f32 = 300.0;
+const MAX_BOUNDS: f32 = 200.0;
+const FOCUS_POINT_OFFSET: f32 = 50.0;
 const ORIGIN: Point3<f32> = Point3::new(0.0, 0.0, 0.0);
 const LOOK_UP: Vector3<f32> = Vector3::new(0.0, 1.0, 0.0);
 
@@ -32,8 +33,10 @@ impl DirectionalShadowCamera {
         }
     }
 
-    pub fn set_focus_point(&mut self, focus_point: Point3<f32>) {
-        self.focus_point = focus_point;
+    /// Offsets the focus point to account for the angled view.
+    pub fn set_focus_point(&mut self, focus_point: Point3<f32>, view_direction: Vector3<f32>) {
+        let planar_direction = Vector3::new(view_direction.x, 0.0, view_direction.z).normalize();
+        self.focus_point = focus_point + planar_direction * FOCUS_POINT_OFFSET;
     }
 
     pub fn update(&mut self, direction_to_light: Vector3<f32>, main_camera_view_direction: Vector3<f32>, shadow_map_size: u32) {

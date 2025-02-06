@@ -1,8 +1,10 @@
+mod lighting;
+
 #[cfg(feature = "debug")]
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use cgmath::{Array, Deg, Matrix3, Matrix4, Point3, SquareMatrix, Vector2, Vector3};
+use cgmath::{Matrix4, Point3, SquareMatrix, Vector2, Vector3};
 use derive_new::new;
 use korangar_audio::AudioEngine;
 #[cfg(feature = "debug")]
@@ -17,11 +19,12 @@ use option_ext::OptionExt;
 use ragnarok_formats::map::EffectSource;
 #[cfg(feature = "debug")]
 use ragnarok_formats::map::MapData;
-use ragnarok_formats::map::{LightSettings, LightSource, SoundSource, Tile, TileFlags, WaterSettings};
+use ragnarok_formats::map::{LightSource, SoundSource, Tile, TileFlags, WaterSettings};
 #[cfg(feature = "debug")]
 use ragnarok_formats::transform::Transform;
 use ragnarok_packets::ClientTick;
 
+pub use self::lighting::Lighting;
 use super::{Camera, Entity, Object, PointLightId, PointLightManager, ResourceSet, ResourceSetBuffer};
 #[cfg(feature = "debug")]
 use super::{LightSourceExt, Model, PointLightSet};
@@ -43,62 +46,6 @@ use crate::{Buffer, Color, GameFileLoader, ModelVertex, TileVertex, MAP_TILE_SIZ
 
 create_simple_key!(ObjectKey, "Key to an object inside the map");
 create_simple_key!(LightSourceKey, "Key to an light source inside the map");
-
-fn average_tile_height(tile: &Tile) -> f32 {
-    (tile.upper_left_height + tile.upper_right_height + tile.lower_left_height + tile.lower_right_height) / 4.0
-}
-
-// MOVE
-fn get_value(day_timer: f32, offset: f32, p: f32) -> f32 {
-    let sin = (day_timer + offset).sin();
-    sin.abs().powf(2.0 - p) / sin
-}
-
-fn get_channels(day_timer: f32, offset: f32, ps: [f32; 3]) -> Vector3<f32> {
-    let red = get_value(day_timer, offset, ps[0]);
-    let green = get_value(day_timer, offset, ps[1]);
-    let blue = get_value(day_timer, offset, ps[2]);
-    Vector3::new(red, green, blue)
-}
-
-fn color_from_channel(base_color: Color, channels: Vector3<f32>) -> Color {
-    Color::rgb_u8(
-        (base_color.red * channels.x) as u8,
-        (base_color.green * channels.y) as u8,
-        (base_color.blue * channels.z) as u8,
-    )
-}
-
-fn get_directional_light_color_intensity(directional_color: Color, intensity: f32, day_timer: f32) -> (Color, f32) {
-    let sun_offset = 0.0;
-    let moon_offset = std::f32::consts::PI;
-
-    let directional_channels = get_channels(day_timer, sun_offset, [0.8, 0.0, 0.25]) * 255.0;
-
-    if directional_channels.x.is_sign_positive() {
-        let directional_color = color_from_channel(directional_color, directional_channels);
-        return (directional_color, f32::min(intensity * 1.5, 1.0));
-    }
-
-    let directional_channels = get_channels(day_timer, moon_offset, [0.3; 3]) * 255.0;
-    let directional_color = color_from_channel(Color::rgb_u8(150, 150, 255), directional_channels);
-
-    (directional_color, f32::min(intensity * 1.5, 1.0))
-}
-
-pub fn get_light_direction(day_timer: f32) -> Vector3<f32> {
-    const STEP_SIZE: f32 = 0.005;
-    let truncated_time = (day_timer / STEP_SIZE).floor() * STEP_SIZE;
-
-    let sun_offset = -std::f32::consts::FRAC_PI_2;
-    let c = (truncated_time + sun_offset).cos();
-    let s = (truncated_time + sun_offset).sin();
-
-    match c.is_sign_positive() {
-        true => Vector3::new(s, c, -0.5),
-        false => Vector3::new(s, -c, -0.5),
-    }
-}
 
 #[cfg(feature = "debug")]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -122,9 +69,9 @@ pub struct Map {
     resource_file: String,
     width: usize,
     height: usize,
+    lighting: Lighting,
     water_settings: Option<WaterSettings>,
     water_bounds: Rectangle<f32>,
-    light_settings: LightSettings,
     tiles: Vec<Tile>,
     ground_vertex_offset: usize,
     ground_vertex_count: usize,
@@ -155,8 +102,12 @@ impl Map {
         &self.resource_file
     }
 
+    fn average_tile_height(tile: &Tile) -> f32 {
+        (tile.upper_left_height + tile.upper_right_height + tile.lower_left_height + tile.lower_right_height) / 4.0
+    }
+
     pub fn get_world_position(&self, position: Vector2<usize>) -> Point3<f32> {
-        let height = average_tile_height(self.get_tile(position));
+        let height = Self::average_tile_height(self.get_tile(position));
         Point3::new(position.x as f32 * 5.0 + 2.5, height, position.y as f32 * 5.0 + 2.5)
     }
 
@@ -397,60 +348,13 @@ impl Map {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn get_ambient_light_color(&self, lighting_mode: LightingMode, day_timer: f32) -> Color {
-        match lighting_mode {
-            LightingMode::Classic => self.light_settings.ambient_color.to_owned().unwrap().into(),
-            LightingMode::Enhanced => {
-                let sun_offset = 0.0;
-                let ambient_channels = (get_channels(day_timer, sun_offset, [0.3, 0.2, 0.2]) * 0.55 + Vector3::from_value(0.65)) * 255.0;
-                color_from_channel(self.light_settings.ambient_color.to_owned().unwrap().into(), ambient_channels)
-            }
-        }
+    pub fn ambient_light_color(&self, lighting_mode: LightingMode, day_timer: f32) -> Color {
+        self.lighting.ambient_light_color(lighting_mode, day_timer)
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn get_directional_light(&self, lighting_mode: LightingMode, day_timer: f32) -> (Vector3<f32>, Color) {
-        match lighting_mode {
-            LightingMode::Classic => {
-                let diffuse_color = self.light_settings.diffuse_color.to_owned().unwrap();
-                let light_latitude = self.light_settings.light_latitude.unwrap();
-                let light_longitude = self.light_settings.light_longitude.unwrap();
-                let light_direction = Self::compute_classic_directional_light_direction(light_latitude, light_longitude);
-                let color = Color::rgb(diffuse_color.red, diffuse_color.green, diffuse_color.blue);
-
-                (light_direction, color)
-            }
-            LightingMode::Enhanced => {
-                // TODO: NHA The final field in the light settings seems to be the
-                //       "shadow_map_alpha", as per RDW research. It's definitely not the
-                //       intensity of the directional light, because that would result in
-                //       improper lighting in classic mode.
-                let light_direction = get_light_direction(day_timer);
-                let (directional_color, intensity) = get_directional_light_color_intensity(
-                    self.light_settings.diffuse_color.to_owned().unwrap().into(),
-                    self.light_settings.shadow_map_alpha.unwrap(),
-                    day_timer,
-                );
-                let color = Color::rgb(
-                    directional_color.red * intensity,
-                    directional_color.green * intensity,
-                    directional_color.blue * intensity,
-                );
-                (light_direction, color)
-            }
-        }
-    }
-
-    fn compute_classic_directional_light_direction(latitude_degrees: i32, longitude_degrees: i32) -> Vector3<f32> {
-        let mut sun_ray_direction = Vector3::new(0.0, 1.0, 0.0);
-
-        let rotation_around_x = Matrix3::from_angle_x(Deg(-latitude_degrees as f32));
-        let rotation_around_y = Matrix3::from_angle_y(Deg(longitude_degrees as f32));
-
-        sun_ray_direction = rotation_around_x * sun_ray_direction;
-        sun_ray_direction = rotation_around_y * sun_ray_direction;
-
-        sun_ray_direction
+    pub fn directional_light(&self, lighting_mode: LightingMode, day_timer: f32) -> (Vector3<f32>, Color) {
+        self.lighting.directional_light(lighting_mode, day_timer)
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]

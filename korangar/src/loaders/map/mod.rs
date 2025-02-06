@@ -1,3 +1,4 @@
+pub mod smoothing;
 mod vertices;
 
 use std::sync::Arc;
@@ -23,7 +24,7 @@ use self::vertices::{generate_tile_vertices, ground_vertices};
 use super::error::LoadError;
 use crate::graphics::{Buffer, ModelVertex, NativeModelVertex, Texture, TextureCompression};
 use crate::loaders::{GameFileLoader, ImageType, ModelLoader, TextureAtlasFactory, TextureLoader};
-use crate::world::{LightSourceKey, Model};
+use crate::world::{LightSourceKey, Lighting, Model};
 use crate::{EffectSourceExt, LightSourceExt, Map, Object, ObjectKey, SoundSourceExt};
 
 const MAP_OFFSET: f32 = 5.0;
@@ -187,6 +188,8 @@ impl MapLoader {
         let (texture, vertex_buffer) =
             self.generate_vertex_buffer_and_atlas_texture(&resource_file, texture_atlas_factory, deferred_vertex_generation, vertex_offset);
 
+        let lighting = Lighting::new(map_data.light_settings);
+
         let mut light_sources = SimpleSlab::with_capacity(map_data.resources.light_sources.len() as u32);
         let light_source_spheres: Vec<(LightSourceKey, Sphere)> = map_data
             .resources
@@ -211,9 +214,9 @@ impl MapLoader {
             resource_file,
             gat_data.map_width as usize,
             gat_data.map_height as usize,
+            lighting,
             water_settings,
             water_bounds,
-            map_data.light_settings,
             gat_data.tiles,
             ground_vertex_offset,
             ground_vertex_count,

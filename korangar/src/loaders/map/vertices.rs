@@ -6,6 +6,7 @@ use korangar_util::texture_atlas::AtlasAllocation;
 use korangar_util::Rectangle;
 use ragnarok_formats::map::{GatData, GroundData, GroundTile, SurfaceType};
 
+use super::smoothing::smooth_ground_normals;
 #[cfg(feature = "debug")]
 use crate::graphics::Color;
 use crate::graphics::{ModelVertex, NativeModelVertex, PickerTarget, TileVertex};
@@ -179,6 +180,8 @@ pub fn ground_vertices(ground_data: &GroundData, water_level: f32) -> (Vec<Nativ
     }
 
     let water_bounds = Rectangle::new(water_bound_min, water_bound_max);
+
+    smooth_ground_normals(&mut native_ground_vertices);
 
     (native_ground_vertices, water_bounds)
 }

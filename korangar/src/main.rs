@@ -40,7 +40,7 @@ use std::net::{SocketAddr, ToSocketAddrs};
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
-use cgmath::{Vector2, Vector3};
+use cgmath::{Point3, Vector2, Vector3};
 #[cfg(feature = "debug")]
 use graphics::RenderSettings;
 use image::{EncodableLayout, ImageFormat, ImageReader};
@@ -108,6 +108,7 @@ use crate::world::*;
 const CLIENT_NAME: &str = "Korangar";
 const ROLLING_CUTTER_ID: SkillId = SkillId(2036);
 const DEFAULT_MAP: &str = "geffen";
+const START_CAMERA_FOCUS_POINT: Point3<f32> = Point3::new(600.0, 0.0, 240.0);
 const DEFAULT_BACKGROUND_MUSIC: Option<&str> = Some("bgm\\01.mp3");
 const MAIN_MENU_CLICK_SOUND_EFFECT: &str = "버튼소리.wav";
 // TODO: The number of point lights that can cast shadows should be configurable
@@ -483,8 +484,8 @@ impl Client {
             let mut directional_shadow_camera = DirectionalShadowCamera::new();
             let point_shadow_camera = PointShadowCamera::new();
 
-            start_camera.set_focus_point(cgmath::Point3::new(600.0, 0.0, 240.0));
-            directional_shadow_camera.set_focus_point(cgmath::Point3::new(600.0, 0.0, 240.0));
+            start_camera.set_focus_point(START_CAMERA_FOCUS_POINT);
+            directional_shadow_camera.set_focus_point(start_camera.focus_point(), start_camera.view_direction());
         });
 
         time_phase!("initialize networking", {
@@ -1242,7 +1243,7 @@ impl Client {
                     self.effect_holder.add_effect(Box::new(EffectWithLight::new(
                         effect,
                         frame_timer,
-                        EffectCenter::Entity(entity_id, cgmath::Point3::new(0.0, 0.0, 0.0)),
+                        EffectCenter::Entity(entity_id, Point3::new(0.0, 0.0, 0.0)),
                         Vector3::new(0.0, 9.0, 0.0),
                         // FIX: The point light ID needs to be unique.
                         // The point light manager uses the ID to decide which point light
@@ -1788,13 +1789,13 @@ impl Client {
                 #[cfg(feature = "debug")]
                 UserEvent::OpenTimeWindow => self.interface.open_window(&self.application, &mut self.focus_state, &TimeWindow),
                 #[cfg(feature = "debug")]
-                UserEvent::SetDawn => self.game_timer.set_day_timer(0.0),
+                UserEvent::SetDawn => self.game_timer.set_day_timer(5.0 * 3600.0),
                 #[cfg(feature = "debug")]
-                UserEvent::SetNoon => self.game_timer.set_day_timer(std::f32::consts::FRAC_PI_2),
+                UserEvent::SetNoon => self.game_timer.set_day_timer(12.0 * 3600.0),
                 #[cfg(feature = "debug")]
-                UserEvent::SetDusk => self.game_timer.set_day_timer(std::f32::consts::PI),
+                UserEvent::SetDusk => self.game_timer.set_day_timer(17.0 * 3600.0),
                 #[cfg(feature = "debug")]
-                UserEvent::SetMidnight => self.game_timer.set_day_timer(-std::f32::consts::FRAC_PI_2),
+                UserEvent::SetMidnight => self.game_timer.set_day_timer(24.0 * 3600.0),
                 #[cfg(feature = "debug")]
                 UserEvent::OpenThemeViewerWindow => {
                     self.interface
@@ -1876,9 +1877,9 @@ impl Client {
                         self.interface
                             .open_window(&self.application, &mut self.focus_state, &character_selection_window);
 
-                        self.start_camera.set_focus_point(cgmath::Point3::new(600.0, 0.0, 240.0));
+                        self.start_camera.set_focus_point(START_CAMERA_FOCUS_POINT);
                         self.directional_shadow_camera
-                            .set_focus_point(cgmath::Point3::new(600.0, 0.0, 240.0));
+                            .set_focus_point(self.start_camera.focus_point(), self.start_camera.view_direction());
                     }
                     false => {
                         // Normal map switch
@@ -1944,10 +1945,17 @@ impl Client {
                     .for_each(|entity| entity.update(&self.audio_engine, map, current_camera, client_tick));
             }
 
-            if !self.entities.is_empty() {
-                let player_position = self.entities[0].get_position();
-                self.player_camera.set_smoothed_focus_point(player_position);
-                self.directional_shadow_camera.set_focus_point(self.player_camera.focus_point());
+            match self.entities.is_empty() {
+                true => {
+                    self.directional_shadow_camera
+                        .set_focus_point(self.start_camera.focus_point(), self.start_camera.view_direction());
+                }
+                false => {
+                    let player_position = self.entities[0].get_position();
+                    self.player_camera.set_smoothed_focus_point(player_position);
+                    self.directional_shadow_camera
+                        .set_focus_point(self.player_camera.focus_point(), self.player_camera.view_direction());
+                }
             }
 
             let current_camera: &(dyn Camera + Send + Sync) = match self.entities.is_empty() {
@@ -1970,8 +1978,9 @@ impl Client {
             let shadow_detail = *self.shadow_detail.get();
             let shadow_quality = *self.shadow_quality.get();
             let shadow_map_size = shadow_detail.directional_shadow_resolution();
-            let ambient_light_color = map.get_ambient_light_color(lighting_mode, day_timer);
-            let (directional_light_direction, directional_light_color) = map.get_directional_light(lighting_mode, day_timer);
+            let ambient_light_color = map.ambient_light_color(lighting_mode, day_timer);
+
+            let (directional_light_direction, directional_light_color) = map.directional_light(lighting_mode, day_timer);
 
             self.directional_shadow_camera
                 .update(directional_light_direction, current_camera.view_direction(), shadow_map_size);

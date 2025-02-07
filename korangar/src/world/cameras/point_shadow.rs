@@ -35,7 +35,7 @@ impl PointShadowCamera {
             0 => (Vector3::unit_x(), Vector3::unit_y()),
             1 => (-Vector3::unit_x(), Vector3::unit_y()),
             2 => (Vector3::unit_y(), Vector3::unit_z()),
-            3 => (-Vector3::unit_y(), -Vector3::unit_z()),
+            3 => (-Vector3::unit_y(), Vector3::unit_z()),
             4 => (Vector3::unit_z(), Vector3::unit_y()),
             5 => (-Vector3::unit_z(), Vector3::unit_y()),
             _ => panic!(),

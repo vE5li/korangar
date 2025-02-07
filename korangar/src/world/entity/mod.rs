@@ -807,6 +807,7 @@ impl Player {
             StatusType::SpellPoints(value) => self.spell_points = value as usize,
             StatusType::ActivityPoints(value) => self.activity_points = value as usize,
             StatusType::MaximumActivityPoints(value) => self.maximum_activity_points = value as usize,
+            StatusType::MovementSpeed(value) => self.common.movement_speed = value as usize,
             _ => {}
         }
     }

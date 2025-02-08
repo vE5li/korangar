@@ -11,7 +11,7 @@ image = { workspace = true }
 korangar_interface = { workspace = true, optional = true }
 
 [dev-dependencies]
-rand = { workspace = true }
+rand_aes = { workspace = true }
 
 [features]
 interface = ["korangar_interface"]

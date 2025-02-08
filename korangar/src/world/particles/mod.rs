@@ -5,7 +5,7 @@ use cgmath::{Point3, Vector2, Vector3};
 use derive_new::new;
 use korangar_interface::application::{ClipTraitExt, FontSizeTrait, ScalingTrait};
 use ragnarok_packets::{EntityId, QuestColor, QuestEffectPacket};
-use rand::{thread_rng, Rng};
+use rand_aes::tls::rand_f32;
 
 use crate::graphics::{Color, Texture};
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
@@ -20,15 +20,19 @@ pub trait Particle {
     fn render(&self, renderer: &GameInterfaceRenderer, camera: &dyn Camera, window_size: ScreenSize);
 }
 
+fn random_velocity() -> f32 {
+    rand_f32() * 40.0 - 20.0
+}
+
 #[derive(new)]
 pub struct DamageNumber {
     position: Point3<f32>,
     damage_amount: String,
     #[new(value = "50.0")]
     velocity_y: f32,
-    #[new(value = "thread_rng().gen_range(-20.0..20.0)")]
+    #[new(value = "random_velocity()")]
     velocity_x: f32,
-    #[new(value = "thread_rng().gen_range(-20.0..20.0)")]
+    #[new(value = "random_velocity()")]
     velocity_z: f32,
     #[new(value = "0.6")]
     timer: f32,

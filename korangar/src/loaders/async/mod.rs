@@ -12,6 +12,7 @@ use ragnarok_packets::{EntityId, ItemId, TilePosition};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
 use crate::graphics::{Texture, TextureCompression};
+use crate::init_tls_rand;
 use crate::loaders::error::LoadError;
 use crate::loaders::{ActionLoader, AnimationLoader, ImageType, MapLoader, ModelLoader, SpriteLoader, TextureLoader};
 #[cfg(feature = "debug")]
@@ -76,8 +77,9 @@ impl AsyncLoader {
         texture_loader: Arc<TextureLoader>,
     ) -> Self {
         let thread_pool = ThreadPoolBuilder::new()
-            .num_threads(1)
             .thread_name(|number| format!("light task thread pool {number}"))
+            .num_threads(1)
+            .start_handler(|_| init_tls_rand())
             .build()
             .unwrap();
 

@@ -30,8 +30,7 @@ quick-xml = { workspace = true, features = ["serde", "serialize"] }
 ragnarok_bytes = { workspace = true, features = ["derive", "cgmath"] }
 ragnarok_formats = { workspace = true, features = ["interface"] }
 ragnarok_packets = { workspace = true, features = ["derive", "interface", "packet-to-prototype-element"] }
-rand = { workspace = true }
-random_color = { workspace = true, optional = true }
+rand_aes = { workspace = true, features = ["tls", "tls_aes128_ctr128"] }
 rayon = { workspace = true }
 ron = { workspace = true }
 serde = { workspace = true }
@@ -42,7 +41,7 @@ wgpu = { workspace = true, features = ["static-dxc"] }
 winit = { workspace = true }
 
 [features]
-debug = ["korangar_debug", "korangar_audio/debug", "ragnarok_packets/debug", "random_color"]
+debug = ["korangar_debug", "korangar_audio/debug", "ragnarok_packets/debug"]
 patched_as_folder = []
 plain = ["korangar_debug/plain"]
 unicode = ["korangar_debug/unicode"]

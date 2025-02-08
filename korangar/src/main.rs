@@ -7,6 +7,7 @@
 #![feature(let_chains)]
 #![feature(negative_impls)]
 #![feature(proc_macro_hygiene)]
+#![feature(random)]
 #![feature(type_changing_struct_update)]
 #![feature(unsized_const_params)]
 #![feature(variant_count)]
@@ -132,13 +133,28 @@ korangar_debug::create_profiler_threads!(threads, {
     Loader,
 });
 
+pub fn init_tls_rand() {
+    use std::random::*;
+    let mut seed = [0; 32];
+    DefaultRandomSource.fill_bytes(&mut seed);
+    rand_aes::tls::rand_seed(seed.into());
+}
+
 fn main() {
     // We start a frame so that functions trying to start a measurement don't panic.
     #[cfg(feature = "debug")]
     let _measurement = threads::Main::start_frame();
 
     time_phase!("create global thread pool", {
-        rayon::ThreadPoolBuilder::new().num_threads(4).build_global().unwrap();
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(4)
+            .start_handler(|_| init_tls_rand())
+            .build_global()
+            .unwrap();
+    });
+
+    time_phase!("seed main random instance", {
+        init_tls_rand();
     });
 
     let mut client = Client::init();

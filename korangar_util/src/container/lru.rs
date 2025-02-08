@@ -211,6 +211,8 @@ impl<I: GenerationalKey + Copy, V> Lru<I, V> {
 mod tests {
     use std::num::NonZeroU32;
 
+    use rand_aes::{Aes128Ctr128, Random};
+
     use super::Lru;
     use crate::container::GenerationalSlab;
 
@@ -308,7 +310,7 @@ mod tests {
 
     #[test]
     fn test_random_remove() {
-        use rand::prelude::*;
+        use rand_aes::Random;
 
         let mut slab = GenerationalSlab::default();
 
@@ -322,8 +324,9 @@ mod tests {
             })
             .collect();
 
-        let mut rng = StdRng::from_entropy();
-        keys.shuffle(&mut rng);
+        // Fixed seed to make this test deterministic.
+        let mut rng = Aes128Ctr128::from_seed([42; 32].into());
+        rng.shuffle(&mut keys);
 
         keys.drain(..).for_each(|key| {
             cache.remove(key);

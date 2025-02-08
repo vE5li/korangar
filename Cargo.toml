@@ -38,8 +38,7 @@ ragnarok_bytes = { path = "ragnarok_bytes" }
 ragnarok_formats = { path = "ragnarok_formats" }
 ragnarok_packets = { path = "ragnarok_packets" }
 ragnarok_procedural = { path = "ragnarok_procedural" }
-rand = "0.8"
-random_color = "1.0"
+rand_aes = { version = "0.5", default-features = false }
 rayon = "1.10"
 reqwest = "0.12"
 ron = "0.8"

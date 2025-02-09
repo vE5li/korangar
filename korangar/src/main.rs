@@ -283,6 +283,9 @@ struct Client {
     #[cfg(not(feature = "debug"))]
     networking_system: NetworkingSystem<NoPacketCallback>,
     audio_engine: Arc<AudioEngine<GameFileLoader>>,
+    // HACK: Workaround for audio artifacts on Linux when Korangar starts.
+    // Hopefully this can be removed in the future.
+    ambient_sound_sources_initialized: bool,
     graphics_engine: GraphicsEngine,
     #[cfg(feature = "debug")]
     queue: Arc<Queue>,
@@ -602,7 +605,6 @@ impl Client {
                 )
                 .expect("failed to load initial map");
 
-            map.set_ambient_sound_sources(&audio_engine);
             audio_engine.play_background_music_track(DEFAULT_BACKGROUND_MUSIC);
         });
 
@@ -711,6 +713,7 @@ impl Client {
             packet_history_callback,
             networking_system,
             audio_engine,
+            ambient_sound_sources_initialized: false,
             graphics_engine,
             #[cfg(feature = "debug")]
             queue,
@@ -2584,6 +2587,15 @@ impl ApplicationHandler for Client {
                 let mute_on_focus_loss = *self.mute_on_focus_loss.get();
                 if mute_on_focus_loss {
                     self.audio_engine.mute(!focused);
+                }
+
+                // HACK: Workaround for audio artifacts on Wayland when Korangar starts.
+                // Hopefully this can be removed in the future.
+                if let Some(map) = &self.map
+                    && !self.ambient_sound_sources_initialized
+                {
+                    map.set_ambient_sound_sources(&self.audio_engine);
+                    self.ambient_sound_sources_initialized = true;
                 }
             }
             WindowEvent::CursorLeft { .. } => self.mouse_cursor.hide(),

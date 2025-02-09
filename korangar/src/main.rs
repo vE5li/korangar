@@ -602,7 +602,6 @@ impl Client {
                 )
                 .expect("failed to load initial map");
 
-            map.set_ambient_sound_sources(&audio_engine);
             audio_engine.play_background_music_track(DEFAULT_BACKGROUND_MUSIC);
         });
 
@@ -2584,6 +2583,10 @@ impl ApplicationHandler for Client {
                 let mute_on_focus_loss = *self.mute_on_focus_loss.get();
                 if mute_on_focus_loss {
                     self.audio_engine.mute(!focused);
+                }
+
+                if let Some(map) = &self.map {
+                    map.set_ambient_sound_sources(&self.audio_engine);
                 }
             }
             WindowEvent::CursorLeft { .. } => self.mouse_cursor.hide(),

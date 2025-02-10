@@ -25,25 +25,25 @@ pub enum TextureSamplerType {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ShadowDetail {
-    Low,
-    Medium,
-    High,
+    Normal,
+    Ultra,
+    Insane,
 }
 
 impl ShadowDetail {
     pub fn directional_shadow_resolution(self) -> u32 {
         match self {
-            ShadowDetail::Low => 2048,
-            ShadowDetail::Medium => 4096,
-            ShadowDetail::High => 8192,
+            ShadowDetail::Normal => 2048,
+            ShadowDetail::Ultra => 4096,
+            ShadowDetail::Insane => 8192,
         }
     }
 
     pub fn point_shadow_resolution(self) -> u32 {
         match self {
-            ShadowDetail::Low => 128,
-            ShadowDetail::Medium => 256,
-            ShadowDetail::High => 512,
+            ShadowDetail::Normal => 128,
+            ShadowDetail::Ultra => 256,
+            ShadowDetail::Insane => 512,
         }
     }
 }
@@ -51,14 +51,16 @@ impl ShadowDetail {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ShadowQuality {
     Hard,
-    Soft,
+    SoftPCF,
+    SoftPCSS,
 }
 
 impl From<ShadowQuality> for u32 {
     fn from(value: ShadowQuality) -> Self {
         match value {
             ShadowQuality::Hard => 0,
-            ShadowQuality::Soft => 1,
+            ShadowQuality::SoftPCF => 1,
+            ShadowQuality::SoftPCSS => 2,
         }
     }
 }

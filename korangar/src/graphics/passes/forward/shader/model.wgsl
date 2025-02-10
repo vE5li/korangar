@@ -148,7 +148,10 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     switch (global_uniforms.shadow_quality) {
         case 1u: {
             let shadow_map_dimensions = textureDimensions(shadow_map);
-            visibility = get_soft_shadow(shadow_coords, shadow_map_dimensions);
+            visibility = get_pcf_shadow(shadow_coords, shadow_map_dimensions);
+        }
+        case 2u: {
+            visibility = get_pcf_pcss_shadow(shadow_coords, shadow_position.z);
         }
         default: {
             visibility = textureSampleCompare(
@@ -237,7 +240,7 @@ fn calculate_mip_level(texture_coordinate: vec2<f32>) -> f32 {
     return max(0.0, 0.5 * log2(delta_max_squared));
 }
 
-fn get_soft_shadow(shadow_coords: vec3<f32>, shadow_map_dimensions: vec2<u32>) -> f32 {
+fn get_pcf_shadow(shadow_coords: vec3<f32>, shadow_map_dimensions: vec2<u32>) -> f32 {
     var gaussian_offset: i32;
     switch (shadow_map_dimensions.x) {
         case 8192u: {
@@ -281,6 +284,96 @@ fn get_soft_shadow(shadow_coords: vec3<f32>, shadow_map_dimensions: vec2<u32>) -
     }
 
     return shadow / total_weight;
+}
+
+const NUM_BLOCKER_SAMPLES: u32 = 16u;
+const NUM_FILTER_SAMPLES: u32 = 16u;
+const FRUSTUM_SIZE: f32 = 400.0;
+const LIGHT_WORLD_SIZE: f32 = 5.0;
+const LIGHT_SIZE_UV: f32 = LIGHT_WORLD_SIZE / FRUSTUM_SIZE;
+
+const POISSON_DISK_16: array<vec2<f32>, 16> = array<vec2<f32>, 16>(
+    vec2<f32>(-0.94201624, -0.39906216),
+    vec2<f32>(0.94558609, -0.76890725),
+    vec2<f32>(-0.094184101, -0.92938870),
+    vec2<f32>(0.34495938, 0.29387760),
+    vec2<f32>(-0.91588581, 0.45771432),
+    vec2<f32>(-0.81544232, -0.87912464),
+    vec2<f32>(-0.38277543, 0.27676845),
+    vec2<f32>(0.97484398, 0.75648379),
+    vec2<f32>(0.44323325, -0.97511554),
+    vec2<f32>(0.53742981, -0.47373420),
+    vec2<f32>(-0.26496911, -0.41893023),
+    vec2<f32>(0.79197514, 0.19090188),
+    vec2<f32>(-0.24188840, 0.99706507),
+    vec2<f32>(-0.81409955, 0.91437590),
+    vec2<f32>(0.19984126, 0.78641367),
+    vec2<f32>(0.14383161, -0.14100790)
+);
+
+fn get_pcf_pcss_shadow(
+    shadow_coords: vec3<f32>,
+    pos_from_light: f32
+) -> f32 {
+    let average_blocker_depth = find_blocker(shadow_coords.xy, shadow_coords.z, pos_from_light);
+
+    if(average_blocker_depth < 0.001) {
+        return 1.0;
+    }
+
+    let penumbra = ((average_blocker_depth - shadow_coords.z) * LIGHT_SIZE_UV) / average_blocker_depth;
+
+    return pcf_filter(shadow_coords, penumbra);
+}
+
+fn find_blocker(
+    uv: vec2<f32>,
+    receiver_depth: f32,
+    position_from_light: f32
+) -> f32 {
+    var blocker_sum = 0.0;
+    var blocker_count = 0u;
+
+    let search_radius = LIGHT_SIZE_UV * position_from_light / position_from_light;
+
+    for(var i = 0u; i < NUM_BLOCKER_SAMPLES; i++) {
+        let offset = POISSON_DISK_16[i] * search_radius;
+        let shadow_depth = textureSample(
+            shadow_map,
+            linear_sampler,
+            uv + offset,
+        );
+
+        if(receiver_depth < shadow_depth) {
+            blocker_sum += shadow_depth;
+            blocker_count++;
+        }
+    }
+
+    if(blocker_count == 0u) {
+        return -1.0;
+    }
+
+    return blocker_sum / f32(blocker_count);
+}
+
+fn pcf_filter(
+    shadow_coords: vec3<f32>,
+    filter_radius_uv: f32
+) -> f32 {
+    var visibility = 0.0;
+
+    for(var i = 0u; i < NUM_FILTER_SAMPLES; i++) {
+        let offset = POISSON_DISK_16[i] * filter_radius_uv;
+        visibility += textureSampleCompare(
+            shadow_map,
+            shadow_map_sampler,
+            shadow_coords.xy + offset,
+            shadow_coords.z
+        );
+    }
+
+    return visibility / f32(NUM_FILTER_SAMPLES);
 }
 
 fn linearToNonLinear(linear_depth: f32) -> f32 {

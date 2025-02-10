@@ -117,7 +117,7 @@ impl Default for Uniforms {
             day_timer: 0.0,
             ambient_light_color: Color::default(),
             enhanced_lighting: false,
-            shadow_quality: ShadowQuality::Soft,
+            shadow_quality: ShadowQuality::Hard,
         }
     }
 }

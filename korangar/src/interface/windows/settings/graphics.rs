@@ -259,21 +259,28 @@ where
                 .with_event(Box::new(Vec::new))
                 .with_width(dimension_bound!(!))
                 .wrap(),
-            Text::default().with_text("Shadow detail").with_width(dimension_bound!(50%)).wrap(),
+            Text::default().with_text("Shadow quality").with_width(dimension_bound!(50%)).wrap(),
             PickList::default()
                 .with_options(vec![
-                    ("Low", ShadowDetail::Low),
-                    ("Medium", ShadowDetail::Medium),
-                    ("High", ShadowDetail::High),
+                    ("Hard", ShadowQuality::Hard),
+                    ("Soft (PCF)", ShadowQuality::SoftPCF),
+                    ("Soft (PCSS x8)", ShadowQuality::SoftPCSSx8),
+                    ("Soft (PCSS x16)", ShadowQuality::SoftPCSSx16),
+                    ("Soft (PCSS x32)", ShadowQuality::SoftPCSSx32),
+                    ("Soft (PCSS x64)", ShadowQuality::SoftPCSSx64),
                 ])
-                .with_selected(self.shadow_detail.clone())
+                .with_selected(self.shadow_quality.clone())
                 .with_event(Box::new(Vec::new))
                 .with_width(dimension_bound!(!))
                 .wrap(),
-            Text::default().with_text("Shadow quality").with_width(dimension_bound!(50%)).wrap(),
+            Text::default().with_text("Shadow detail").with_width(dimension_bound!(50%)).wrap(),
             PickList::default()
-                .with_options(vec![("Hard", ShadowQuality::Hard), ("Soft", ShadowQuality::Soft)])
-                .with_selected(self.shadow_quality.clone())
+                .with_options(vec![
+                    ("Normal", ShadowDetail::Normal),
+                    ("Ultra", ShadowDetail::Ultra),
+                    ("Insane", ShadowDetail::Insane),
+                ])
+                .with_selected(self.shadow_detail.clone())
                 .with_event(Box::new(Vec::new))
                 .with_width(dimension_bound!(!))
                 .wrap(),

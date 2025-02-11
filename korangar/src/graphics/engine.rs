@@ -643,7 +643,7 @@ impl GraphicsEngine {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn render_next_frame(&mut self, frame: SurfaceTexture, mut instruction: RenderInstruction) {
+    pub fn render_next_frame(&mut self, window: &Window, frame: SurfaceTexture, mut instruction: RenderInstruction) {
         assert!(instruction.point_light_shadow_caster.len() <= NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS);
 
         self.sort_instructions(&mut instruction);
@@ -681,6 +681,7 @@ impl GraphicsEngine {
         );
 
         // Schedule the presentation of the frame.
+        window.pre_present_notify();
         frame.present();
 
         self.frame_pacer.end_frame_stage(self.cpu_stage, Instant::now());

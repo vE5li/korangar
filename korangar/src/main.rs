@@ -1921,6 +1921,8 @@ impl Client {
         #[cfg(feature = "debug")]
         loads_measurement.stop();
 
+        let window = self.window.as_ref().expect("window missing");
+
         // Main map update and render loop
         if let Some(map) = self.map.as_ref() {
             #[cfg(feature = "debug")]
@@ -2414,7 +2416,7 @@ impl Client {
                 marker: self.debug_marker_renderer.get_instructions(),
             };
 
-            self.graphics_engine.render_next_frame(frame, render_instruction);
+            self.graphics_engine.render_next_frame(window, frame, render_instruction);
 
             #[cfg(feature = "debug")]
             render_frame_measurement.stop();
@@ -2422,7 +2424,7 @@ impl Client {
             #[cfg(feature = "debug")]
             let render_frame_measurement = Profiler::start_measurement("render next frame");
 
-            self.graphics_engine.render_next_frame(frame, RenderInstruction::default());
+            self.graphics_engine.render_next_frame(window, frame, RenderInstruction::default());
 
             #[cfg(feature = "debug")]
             render_frame_measurement.stop();

@@ -34,8 +34,8 @@ impl Default for GraphicsSettings {
             msaa: Msaa::X4,
             ssaa: Ssaa::Off,
             screen_space_anti_aliasing: ScreenSpaceAntiAliasing::Off,
-            shadow_detail: ShadowDetail::Medium,
-            shadow_quality: ShadowQuality::Soft,
+            shadow_detail: ShadowDetail::Normal,
+            shadow_quality: ShadowQuality::SoftPCSSx16,
             high_quality_interface: true,
             texture_compression: TextureCompression::Off,
         }

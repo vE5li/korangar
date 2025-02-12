@@ -24,8 +24,17 @@ pub struct Lighting {
 
 impl Lighting {
     pub fn new(settings: LightSettings) -> Self {
+        let mut ambient_color: Color = settings.ambient_color.unwrap().into();
+
+        // Workaround for map files with broken ambient color, where the ambient light
+        // outshines shadows (for example "yuno").
+        if ambient_color == Color::WHITE {
+            // Ambient color values of "prontera".
+            ambient_color = Color::rgb(0.55, 0.5, 0.5);
+        }
+
         Self {
-            ambient_color: settings.ambient_color.unwrap().into(),
+            ambient_color,
             diffuse_color: settings.diffuse_color.unwrap().into(),
             light_latitude: settings.light_latitude.unwrap() as f32,
             light_longitude: settings.light_longitude.unwrap() as f32,

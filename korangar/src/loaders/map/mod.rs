@@ -1,4 +1,3 @@
-pub mod smoothing;
 mod vertices;
 
 use std::sync::Arc;

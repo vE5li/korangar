@@ -10,6 +10,7 @@ mod gamefile;
 mod map;
 mod model;
 mod server;
+mod smoothing;
 mod sprite;
 mod texture;
 
@@ -22,6 +23,7 @@ pub use self::map::{MapLoader, MAP_TILE_SIZE};
 pub use self::model::*;
 pub use self::r#async::*;
 pub use self::server::{load_client_info, ClientInfo, ServiceId};
+pub use self::smoothing::{smooth_ground_normals, smooth_model_normals};
 pub use self::sprite::*;
 pub use self::texture::{ImageType, TextureAtlasFactory, TextureLoader};
 

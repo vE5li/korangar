@@ -12,9 +12,22 @@ pub struct NativeModelVertex {
     pub texture_index: i32,
     pub color: Color,
     pub wind_affinity: f32,
+    pub smoothing_groups: [i32; 3],
 }
 
 impl NativeModelVertex {
+    pub const fn zeroed() -> NativeModelVertex {
+        NativeModelVertex {
+            position: Point3::new(0.0, 0.0, 0.0),
+            normal: Vector3::new(0.0, 0.0, 0.0),
+            texture_coordinates: Vector2::new(0.0, 0.0),
+            texture_index: 0,
+            color: Color::rgba(0.0, 0.0, 0.0, 0.0),
+            wind_affinity: 0.0,
+            smoothing_groups: [0; 3],
+        }
+    }
+
     fn convert_to_vertex(self, texture_mapping: &[AtlasAllocation]) -> ModelVertex {
         let allocation = texture_mapping[self.texture_index as usize];
 

@@ -14,7 +14,7 @@ use ragnarok_formats::model::{ModelData, NodeData};
 use ragnarok_formats::version::InternalVersion;
 
 use super::error::LoadError;
-use super::FALLBACK_MODEL_FILE;
+use super::{smooth_model_normals, FALLBACK_MODEL_FILE};
 use crate::graphics::{Color, NativeModelVertex};
 use crate::loaders::map::DeferredVertexGeneration;
 use crate::loaders::texture::TextureAtlasEntry;
@@ -28,10 +28,11 @@ pub struct ModelLoader {
 
 impl ModelLoader {
     fn add_vertices(
-        native_vertices: &mut Vec<NativeModelVertex>,
+        vertices: &mut [NativeModelVertex],
         vertex_positions: &[Point3<f32>],
         texture_coordinates: &[Vector2<f32>],
-        texture_index: u16,
+        smoothing_groups: &[i32; 3],
+        texture_index: i32,
         reverse_vertices: bool,
         reverse_normal: bool,
     ) {
@@ -41,33 +42,54 @@ impl ModelLoader {
         };
 
         if reverse_vertices {
-            for (vertex_position, texture_coordinates) in vertex_positions.iter().copied().zip(texture_coordinates).rev() {
-                native_vertices.push(NativeModelVertex::new(
-                    vertex_position,
+            for ((vertex_position, texture_coordinates), target) in vertex_positions
+                .iter()
+                .zip(texture_coordinates.iter())
+                .rev()
+                .zip(vertices.iter_mut())
+            {
+                *target = NativeModelVertex::new(
+                    *vertex_position,
                     normal,
                     *texture_coordinates,
-                    texture_index as i32,
+                    texture_index,
                     Color::WHITE,
                     0.0, // TODO: actually add wind affinity
-                ));
+                    *smoothing_groups,
+                );
             }
         } else {
-            for (vertex_position, texture_coordinates) in vertex_positions.iter().copied().zip(texture_coordinates) {
-                native_vertices.push(NativeModelVertex::new(
-                    vertex_position,
+            for ((vertex_position, texture_coordinates), target) in
+                vertex_positions.iter().zip(texture_coordinates.iter()).zip(vertices.iter_mut())
+            {
+                *target = NativeModelVertex::new(
+                    *vertex_position,
                     normal,
                     *texture_coordinates,
-                    texture_index as i32,
+                    texture_index,
                     Color::WHITE,
                     0.0, // TODO: actually add wind affinity
-                ));
+                    *smoothing_groups,
+                );
             }
         }
     }
 
-    fn make_vertices(node: &NodeData, main_matrix: &Matrix4<f32>, reverse_order: bool, texture_transparency: Vec<bool>) -> Vec<SubMesh> {
-        let capacity = node.faces.iter().map(|face| if face.two_sided != 0 { 6 } else { 3 }).sum();
-        let mut native_vertices = Vec::with_capacity(capacity);
+    fn make_vertices(
+        node: &NodeData,
+        main_matrix: &Matrix4<f32>,
+        reverse_order: bool,
+        smooth_normals: bool,
+        texture_transparency: Vec<bool>,
+    ) -> Vec<SubMesh> {
+        let face_count = node.faces.len();
+        let face_vertex_count = face_count * 3;
+        let two_sided_face_count = node.faces.iter().filter(|face| face.two_sided != 0).count();
+        let total_vertices = (face_count + two_sided_face_count) * 3;
+
+        let mut native_vertices = vec![NativeModelVertex::zeroed(); total_vertices];
+        let mut face_index = 0;
+        let mut back_face_index = face_vertex_count;
 
         let array: [f32; 3] = node.scale.unwrap().into();
         let reverse_node_order = array.into_iter().fold(1.0, |a, b| a * b).is_sign_negative();
@@ -88,25 +110,42 @@ impl ModelLoader {
                 node.texture_coordinates[coordinate_index as usize].coordinates
             });
 
+            let smoothing_groups = match face.smooth_group_extra.as_ref() {
+                None => [face.smooth_group, -1, -1],
+                Some(extras) if extras.len() == 1 => [face.smooth_group, extras[0], -1],
+                Some(extras) if extras.len() == 2 => [face.smooth_group, extras[0], extras[1]],
+                _ => panic!("more than three smoothing groups found"),
+            };
+
             Self::add_vertices(
-                &mut native_vertices,
+                &mut native_vertices[face_index..face_index + 3],
                 &vertex_positions,
                 &texture_coordinates,
-                face.texture_index,
+                &smoothing_groups,
+                face.texture_index as i32,
                 reverse_order,
                 false,
             );
+            face_index += 3;
 
             if face.two_sided != 0 {
                 Self::add_vertices(
-                    &mut native_vertices,
+                    &mut native_vertices[back_face_index..back_face_index + 3],
                     &vertex_positions,
                     &texture_coordinates,
-                    face.texture_index,
+                    &smoothing_groups,
+                    face.texture_index as i32,
                     !reverse_order,
                     true,
                 );
+                back_face_index += 3;
             }
+        }
+
+        if smooth_normals {
+            let (face_vertices, back_face_vertices) = native_vertices.split_at_mut(face_vertex_count);
+            smooth_model_normals(face_vertices);
+            smooth_model_normals(back_face_vertices);
         }
 
         if texture_transparency.iter().any(|&t| t) {
@@ -248,6 +287,7 @@ impl ModelLoader {
         parent_matrix: &Matrix4<f32>,
         main_bounding_box: &mut AABB,
         reverse_order: bool,
+        smooth_normals: bool,
     ) -> Vec<Node> {
         let (main_matrix, transform_matrix, box_transform_matrix) = Self::calculate_matrices(current_node, parent_matrix);
 
@@ -282,6 +322,7 @@ impl ModelLoader {
                     &box_transform_matrix,
                     main_bounding_box,
                     reverse_order,
+                    smooth_normals,
                 )
             })
             .collect();
@@ -296,7 +337,7 @@ impl ModelLoader {
             })
             .unzip();
 
-        let mut sub_meshes = Self::make_vertices(current_node, &main_matrix, reverse_order, texture_transparency);
+        let mut sub_meshes = Self::make_vertices(current_node, &main_matrix, reverse_order, smooth_normals, texture_transparency);
 
         let mut sub_nodes: Vec<Node> = sub_meshes
             .iter_mut()
@@ -441,6 +482,7 @@ impl ModelLoader {
             &Matrix4::identity(),
             &mut bounding_box,
             reverse_order,
+            model_data.shade_type == 2,
         );
 
         for root_node in root_nodes.iter_mut() {

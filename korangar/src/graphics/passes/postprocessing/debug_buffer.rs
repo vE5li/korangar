@@ -12,23 +12,23 @@ use crate::graphics::passes::{
 use crate::graphics::settings::RenderSettings;
 use crate::graphics::{Capabilities, GlobalContext, Prepare, RenderInstruction, Texture};
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/buffer.wgsl");
-const DRAWER_NAME: &str = "post processing buffer";
+const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/debug_buffer.wgsl");
+const DRAWER_NAME: &str = "debug buffer";
 
-pub(crate) struct PostProcessingBufferDrawData<'a> {
+pub(crate) struct DebugBufferDrawData<'a> {
     pub(crate) render_settings: &'a RenderSettings,
     pub(crate) debug_bind_group: &'a BindGroup,
 }
 
-pub(crate) struct PostProcessingBufferDrawer {
+pub(crate) struct DebugBufferDrawer {
     bind_group_layout: BindGroupLayout,
     bind_group: BindGroup,
     pipeline: RenderPipeline,
 }
 
-impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttachmentCount::None }> for PostProcessingBufferDrawer {
+impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttachmentCount::None }> for DebugBufferDrawer {
     type Context = PostProcessingRenderPassContext;
-    type DrawData<'data> = PostProcessingBufferDrawData<'data>;
+    type DrawData<'data> = DebugBufferDrawData<'data>;
 
     fn new(
         _capabilities: &Capabilities,
@@ -112,7 +112,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
     }
 }
 
-impl Prepare for PostProcessingBufferDrawer {
+impl Prepare for DebugBufferDrawer {
     fn prepare(&mut self, device: &Device, instructions: &RenderInstruction) {
         if let Some(font_map_texture) = instructions.font_map_texture {
             self.bind_group = Self::create_bind_group(device, &self.bind_group_layout, font_map_texture);
@@ -124,7 +124,7 @@ impl Prepare for PostProcessingBufferDrawer {
     }
 }
 
-impl PostProcessingBufferDrawer {
+impl DebugBufferDrawer {
     fn create_bind_group(device: &Device, bind_group_layout: &BindGroupLayout, font_map_texture: &Texture) -> BindGroup {
         device.create_bind_group(&BindGroupDescriptor {
             label: Some(DRAWER_NAME),

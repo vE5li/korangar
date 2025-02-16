@@ -38,6 +38,8 @@ pub(crate) enum BindGroupCount {
 pub(crate) enum ColorAttachmentCount {
     None = 0,
     One = 1,
+    Two = 2,
+    Three = 3,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, ConstParamTy)]

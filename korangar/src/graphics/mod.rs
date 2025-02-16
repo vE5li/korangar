@@ -137,6 +137,8 @@ pub(crate) struct GlobalContext {
     pub(crate) picker_buffer_texture: AttachmentTexture,
     pub(crate) picker_depth_texture: AttachmentTexture,
     pub(crate) forward_color_texture: AttachmentTexture,
+    pub(crate) forward_accumulation_texture: AttachmentTexture,
+    pub(crate) forward_revealage_texture: AttachmentTexture,
     pub(crate) resolved_color_texture: Option<AttachmentTexture>,
     pub(crate) supersampled_color_texture: Option<AttachmentTexture>,
     pub(crate) interface_buffer_texture: AttachmentTexture,
@@ -150,7 +152,7 @@ pub(crate) struct GlobalContext {
     pub(crate) debug_uniforms_buffer: Buffer<DebugUniforms>,
     pub(crate) picker_value_buffer: Buffer<u64>,
     pub(crate) tile_light_indices_buffer: Buffer<TileLightIndices>,
-    pub(crate) anti_aliasing_resources: AntiAliasingResource,
+    pub(crate) anti_aliasing_resources: AntiAliasingResources,
     pub(crate) nearest_sampler: Sampler,
     pub(crate) linear_sampler: Sampler,
     pub(crate) texture_sampler: Sampler,
@@ -479,6 +481,8 @@ impl GlobalContext {
             picker_buffer_texture: picker_textures.picker_buffer_texture,
             picker_depth_texture: picker_textures.picker_depth_texture,
             forward_color_texture: forward_textures.forward_color_texture,
+            forward_accumulation_texture: forward_textures.forward_accumulation_texture,
+            forward_revealage_texture: forward_textures.forward_revealage_texture,
             resolved_color_texture,
             supersampled_color_texture,
             interface_buffer_texture,
@@ -533,13 +537,25 @@ impl GlobalContext {
             AttachmentTextureType::ColorAttachment,
         );
         let forward_depth_texture = factory.new_attachment("forward depth", RENDER_TO_TEXTURE_DEPTH_FORMAT, AttachmentTextureType::Depth);
-        let (tile_x, tile_y) = calculate_light_tile_count(forward_size);
+        let forward_accumulation_texture = factory.new_attachment(
+            "forward accumulation",
+            TextureFormat::Rgba16Float,
+            AttachmentTextureType::ColorAttachment,
+        );
+        let forward_revealage_texture = factory.new_attachment(
+            "forward revealage",
+            TextureFormat::R8Unorm,
+            AttachmentTextureType::ColorAttachment,
+        );
 
+        let (tile_x, tile_y) = calculate_light_tile_count(forward_size);
         let tile_light_count_texture = StorageTexture::new(device, "tile light count texture", tile_x, tile_y, TextureFormat::R32Uint);
 
         ForwardTextures {
             forward_depth_texture,
             forward_color_texture,
+            forward_accumulation_texture,
+            forward_revealage_texture,
             tile_light_count_texture,
         }
     }
@@ -641,9 +657,9 @@ impl GlobalContext {
         device: &Device,
         screen_space_anti_aliasing: ScreenSpaceAntiAliasing,
         screen_size: ScreenSize,
-    ) -> AntiAliasingResource {
+    ) -> AntiAliasingResources {
         match screen_space_anti_aliasing {
-            ScreenSpaceAntiAliasing::Off => AntiAliasingResource::None,
+            ScreenSpaceAntiAliasing::Off => AntiAliasingResources::None,
             ScreenSpaceAntiAliasing::Fxaa => {
                 let factory = AttachmentTextureFactory::new(device, screen_size, 1, None);
                 let color_with_luma_texture = factory.new_attachment(
@@ -652,7 +668,7 @@ impl GlobalContext {
                     AttachmentTextureType::ColorAttachment,
                 );
                 let resources = FxaaResources { color_with_luma_texture };
-                AntiAliasingResource::Fxaa(Box::new(resources))
+                AntiAliasingResources::Fxaa(Box::new(resources))
             }
         }
     }
@@ -669,6 +685,8 @@ impl GlobalContext {
         let ForwardTextures {
             forward_color_texture,
             forward_depth_texture,
+            forward_accumulation_texture,
+            forward_revealage_texture,
             tile_light_count_texture,
         } = Self::create_forward_textures(device, self.forward_size, self.msaa);
 
@@ -683,6 +701,8 @@ impl GlobalContext {
 
         self.forward_color_texture = forward_color_texture;
         self.forward_depth_texture = forward_depth_texture;
+        self.forward_accumulation_texture = forward_accumulation_texture;
+        self.forward_revealage_texture = forward_revealage_texture;
         self.picker_buffer_texture = picker_buffer_texture;
         self.picker_depth_texture = picker_depth_texture;
         self.resolved_color_texture = resolved_color_texture;
@@ -777,11 +797,15 @@ impl GlobalContext {
         let ForwardTextures {
             forward_color_texture,
             forward_depth_texture,
+            forward_accumulation_texture,
+            forward_revealage_texture,
             tile_light_count_texture,
         } = Self::create_forward_textures(device, self.screen_size, self.msaa);
 
         self.forward_color_texture = forward_color_texture;
         self.forward_depth_texture = forward_depth_texture;
+        self.forward_accumulation_texture = forward_accumulation_texture;
+        self.forward_revealage_texture = forward_revealage_texture;
         self.tile_light_count_texture = tile_light_count_texture;
         self.resolved_color_texture = Self::create_resolved_color_texture(device, self.forward_size, self.msaa);
     }
@@ -1182,10 +1206,12 @@ struct PickerTextures {
 struct ForwardTextures {
     forward_color_texture: AttachmentTexture,
     forward_depth_texture: AttachmentTexture,
+    forward_accumulation_texture: AttachmentTexture,
+    forward_revealage_texture: AttachmentTexture,
     tile_light_count_texture: StorageTexture,
 }
 
-pub(crate) enum AntiAliasingResource {
+pub(crate) enum AntiAliasingResources {
     None,
     Fxaa(Box<FxaaResources>),
 }

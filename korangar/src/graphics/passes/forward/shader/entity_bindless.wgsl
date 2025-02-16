@@ -68,11 +68,24 @@ struct VertexOutput {
 }
 
 struct FragmentOutput {
-    @location(0) fragment_color: vec4<f32>,
-    @builtin(frag_depth) frag_depth: f32,
+    @location(0) color: vec4<f32>,
+    @builtin(frag_depth) depth: f32,
 }
 
+struct WboitOutput {
+    @location(1) accumulation: vec4<f32>,
+    @location(2) revealage: f32,
+    @builtin(frag_depth) depth: f32,
+}
+
+override PASS_MODE: u32;
 const TILE_SIZE: u32 = 16;
+// This value is important, since we don't want to have "opaque"
+// pixels in our WBOIT textures, or else they would dominate the
+// transparent pixels.
+const OPAGUE_EPSILON: f32 = 0.2;
+const DEPTH_EPSILON: f32 = 1.0e-7;
+const NEAR_PLANE = 0.1;
 
 @group(0) @binding(0) var<uniform> global_uniforms: GlobalUniforms;
 @group(0) @binding(2) var linear_sampler: sampler;
@@ -130,7 +143,25 @@ fn vs_main(
 }
 
 @fragment
-fn fs_main(input: VertexOutput) -> FragmentOutput {
+fn opaque_main(input: VertexOutput) -> FragmentOutput {
+    return fragment(input);
+}
+
+@fragment
+fn transparent_main(input: VertexOutput) -> WboitOutput {
+    let fragment = fragment(input);
+
+    // Equation from https://casual-effects.blogspot.com/2015/03/implemented-weighted-blended-order.html
+    let weight = clamp(pow(min(1.0, fragment.color.a * 10.0) + 0.01, 3.0) * 1e8 * pow(fragment.depth * 0.9, 3.0), 1e-2, 3e3);
+
+    var output = WboitOutput();
+    output.accumulation = fragment.color * weight;
+    output.revealage = fragment.color.a;
+    output.depth = fragment.depth;
+    return output;
+}
+
+fn fragment(input: VertexOutput) -> FragmentOutput {
     let texture_dimensions = vec2<f32>(textureDimensions(textures[input.texture_index]));
     let inverse_texture_dimensions = vec2<f32>(1.0) / texture_dimensions;
 
@@ -151,110 +182,116 @@ fn fs_main(input: VertexOutput) -> FragmentOutput {
     var alpha_channel = diffuse_color.a;
     alpha_channel *= input.color.a;
 
-    if (alpha_channel == 0.0) {
-        discard;
-    }
-
-    // Calculate which tile this fragment belongs to
-    let pixel_position = vec2<u32>(floor(input.position.xy));
-    let tile_x = pixel_position.x / TILE_SIZE;
-    let tile_y = pixel_position.y / TILE_SIZE;
-    let tile_count_x = (global_uniforms.forward_size.x + TILE_SIZE - 1u) / TILE_SIZE;
-    let tile_index = tile_y * tile_count_x + tile_x;
-
-    // Get the number of lights affecting this tile
-    let light_count = textureLoad(light_count_texture, vec2<u32>(tile_x, tile_y), 0).r;
-
-    let normal = normalize(input.normal);
-
-    // Adjust the sprite as if it was standing upright
-    let depth_offset = input.depth_offset * input.original_depth_offset;
-    let curvature_offset = (0.5 - pow(input.curvature, 2.0)) * input.original_curvature;
-    let view_position = global_uniforms.view * input.world_position;
-    let adjusted_view_position = view_position - vec4<f32>(0.0, 0.0, depth_offset + curvature_offset, 0.0);
-    let adjusted_world_position = global_uniforms.inverse_view * adjusted_view_position;
-    let clip_position = global_uniforms.view_projection * adjusted_world_position;
-    let depth = saturate(clip_position.z / clip_position.w);
-
-    // Ambient light
-    var ambient_light_contribution = global_uniforms.ambient_color.rgb;
-
-    // Directional light
-    let light_direction = normalize(-directional_light.direction.xyz);
-    var light_percent = 1.0;
-
-    if (global_uniforms.enhanced_lighting != 0) {
-        light_percent = max(dot(light_direction, normal), 0.0);
-    }
-
-    // Shadow calculation
-    let shadow_position = directional_light.view_projection * adjusted_world_position;
-    var shadow_coords = shadow_position.xyz / shadow_position.w;
-    let bias = 0.011;
-    shadow_coords = vec3<f32>(clip_to_screen_space(shadow_coords.xy), shadow_coords.z + bias);
-
-    var visibility: f32;
-
-    switch (global_uniforms.shadow_quality) {
-        case 0u: {
-            visibility = textureSampleCompare(
-                      shadow_map,
-                      shadow_map_sampler,
-                      shadow_coords.xy,
-                      shadow_coords.z
-            );
-        }
-        case 1u: {
-            let shadow_map_dimensions = textureDimensions(shadow_map);
-            visibility = get_pcf_shadow(shadow_coords, shadow_map_dimensions);
-        }
-        default: {
-            visibility = get_pcf_pcss_shadow(shadow_coords, shadow_position.z);
-        }
-    }
-
-    let directional_light_contribution = directional_light.color.rgb * light_percent * visibility;
-
-    // Point lights
-    var point_light_contribution = vec3<f32>(0.0);
-    for (var index = 0u; index < light_count; index++) {
-        let light_index = tile_light_indices[tile_index].indices[index];
-        let light = point_lights[light_index];
-        let light_direction = normalize(adjusted_world_position.xyz - light.position.xyz);
-        let light_percent = max(dot(light_direction, input.normal), 0.0);
-        let light_distance = length(light.position.xyz - adjusted_world_position.xyz);
-        var visibility = 1.0;
-
-        if (light.texture_index != 0) {
-            let bias = 1.2;
-            let distance_to_light = linearToNonLinear(light_distance - bias);
-
-            let closest_distance = textureSample(
-                point_shadow_maps,
-                linear_sampler,
-                light_direction,
-                light.texture_index - 1
-            );
-
-            visibility = f32(distance_to_light > closest_distance);
-        }
-
-        let intensity = 10.0;
-        let attenuation = calculate_attenuation(light_distance, light.range);
-        point_light_contribution += (light.color.rgb * intensity) * light_percent * attenuation * visibility;
-    }
-
-    let base_color = diffuse_color * input.color;
-    let light_contributions = saturate(ambient_light_contribution + directional_light_contribution + point_light_contribution);
-    var color = base_color.rgb * light_contributions;
-
-    if (global_uniforms.enhanced_lighting == 0) {
-        color = color_balance(color, -0.01, 0.0, 0.0);
-    }
-
     var output: FragmentOutput;
-    output.fragment_color = vec4<f32>(color, alpha_channel);
-    output.frag_depth = depth;
+
+    if (PASS_MODE == 0 && (alpha_channel == 0.0 || alpha_channel <= (1.0 - OPAGUE_EPSILON))) {
+        // Opaque pass can early exit if invivisble or transparent pixel was found.
+        discard;
+    } else if (PASS_MODE == 1 && (alpha_channel == 0.0 || alpha_channel > (1.0 - OPAGUE_EPSILON))) {
+        // Transparent pass can early exit if invivisble or opague pixel was found.
+        discard;
+    } else {
+        // Calculate which tile this fragment belongs to
+        let pixel_position = vec2<u32>(floor(input.position.xy));
+        let tile_x = pixel_position.x / TILE_SIZE;
+        let tile_y = pixel_position.y / TILE_SIZE;
+        let tile_count_x = (global_uniforms.forward_size.x + TILE_SIZE - 1u) / TILE_SIZE;
+        let tile_index = tile_y * tile_count_x + tile_x;
+
+        // Get the number of lights affecting this tile
+        let light_count = textureLoad(light_count_texture, vec2<u32>(tile_x, tile_y), 0).r;
+
+        let normal = normalize(input.normal);
+
+        // Adjust the sprite as if it was standing upright
+        let depth_offset = input.depth_offset * input.original_depth_offset;
+        let curvature_offset = (0.5 - pow(input.curvature, 2.0)) * input.original_curvature;
+        let view_position = global_uniforms.view * input.world_position;
+        let adjusted_view_position = view_position - vec4<f32>(0.0, 0.0, depth_offset + curvature_offset, 0.0);
+        let adjusted_world_position = global_uniforms.inverse_view * adjusted_view_position;
+        let clip_position = global_uniforms.view_projection * adjusted_world_position;
+        let depth = saturate(clip_position.z / clip_position.w);
+
+        // Ambient light
+        var ambient_light_contribution = global_uniforms.ambient_color.rgb;
+
+        // Directional light
+        let light_direction = normalize(-directional_light.direction.xyz);
+        var light_percent = 1.0;
+
+        if (global_uniforms.enhanced_lighting != 0) {
+            light_percent = max(dot(light_direction, normal), 0.0);
+        }
+
+        // Shadow calculation
+        let shadow_position = directional_light.view_projection * adjusted_world_position;
+        var shadow_coords = shadow_position.xyz / shadow_position.w;
+        let bias = 0.011;
+        shadow_coords = vec3<f32>(clip_to_screen_space(shadow_coords.xy), shadow_coords.z + bias);
+
+        var visibility: f32;
+
+        switch (global_uniforms.shadow_quality) {
+            case 0u: {
+                visibility = textureSampleCompare(
+                          shadow_map,
+                          shadow_map_sampler,
+                          shadow_coords.xy,
+                          shadow_coords.z
+                );
+            }
+            case 1u: {
+                let shadow_map_dimensions = textureDimensions(shadow_map);
+                visibility = get_pcf_shadow(shadow_coords, shadow_map_dimensions);
+            }
+            default: {
+                visibility = get_pcf_pcss_shadow(shadow_coords, shadow_position.z);
+            }
+        }
+
+        let directional_light_contribution = directional_light.color.rgb * light_percent * visibility;
+
+        // Point lights
+        var point_light_contribution = vec3<f32>(0.0);
+        for (var index = 0u; index < light_count; index++) {
+            let light_index = tile_light_indices[tile_index].indices[index];
+            let light = point_lights[light_index];
+            let light_direction = normalize(adjusted_world_position.xyz - light.position.xyz);
+            let light_percent = max(dot(light_direction, input.normal), 0.0);
+            let light_distance = length(light.position.xyz - adjusted_world_position.xyz);
+            var visibility = 1.0;
+
+            if (light.texture_index != 0) {
+                let bias = 1.2;
+                let distance_to_light = linearToNonLinear(light_distance - bias);
+
+                let closest_distance = textureSample(
+                    point_shadow_maps,
+                    linear_sampler,
+                    light_direction,
+                    light.texture_index - 1
+                );
+
+                visibility = f32(distance_to_light > closest_distance);
+            }
+
+            let intensity = 10.0;
+            let attenuation = calculate_attenuation(light_distance, light.range);
+            point_light_contribution += (light.color.rgb * intensity) * light_percent * attenuation * visibility;
+        }
+
+        let base_color = diffuse_color * input.color;
+        let light_contributions = saturate(ambient_light_contribution + directional_light_contribution + point_light_contribution);
+        var color = base_color.rgb * light_contributions;
+
+        if (global_uniforms.enhanced_lighting == 0) {
+            color = color_balance(color, -0.01, 0.0, 0.0);
+        }
+
+        output.color = vec4<f32>(color, alpha_channel);
+        output.depth = depth;
+    }
+
     return output;
 }
 
@@ -649,8 +686,7 @@ fn pcf_filter(
 }
 
 fn linearToNonLinear(linear_depth: f32) -> f32 {
-    const NEAR_PLANE = 0.1;
-    return NEAR_PLANE / (linear_depth + 1e-7);
+    return NEAR_PLANE / (linear_depth + DEPTH_EPSILON);
 }
 
 // Bandlimited pixel filter based on TheMaister.

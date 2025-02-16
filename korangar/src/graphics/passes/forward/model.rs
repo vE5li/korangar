@@ -5,11 +5,11 @@ use cgmath::{Matrix, Matrix4, SquareMatrix, Transform};
 use wgpu::util::StagingBelt;
 use wgpu::{
     include_wgsl, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-    BindingType, BlendState, BufferAddress, BufferBindingType, BufferUsages, ColorTargetState, ColorWrites, CommandEncoder,
-    CompareFunction, DepthBiasState, DepthStencilState, Device, Face, FragmentState, FrontFace, MultisampleState,
-    PipelineCompilationOptions, PipelineLayout, PipelineLayoutDescriptor, PolygonMode, PrimitiveState, Queue, RenderPass, RenderPipeline,
-    RenderPipelineDescriptor, ShaderModule, ShaderModuleDescriptor, ShaderStages, StencilState, VertexAttribute, VertexBufferLayout,
-    VertexFormat, VertexState, VertexStepMode,
+    BindingType, BlendComponent, BlendFactor, BlendOperation, BlendState, BufferAddress, BufferBindingType, BufferUsages, ColorTargetState,
+    ColorWrites, CommandEncoder, CompareFunction, DepthBiasState, DepthStencilState, Device, Face, FragmentState, FrontFace,
+    MultisampleState, PipelineCompilationOptions, PipelineLayout, PipelineLayoutDescriptor, PolygonMode, PrimitiveState, Queue, RenderPass,
+    RenderPipeline, RenderPipelineDescriptor, ShaderModule, ShaderModuleDescriptor, ShaderStages, StencilState, TextureFormat,
+    VertexAttribute, VertexBufferLayout, VertexFormat, VertexState, VertexStepMode,
 };
 
 use crate::graphics::passes::forward::ForwardRenderPassContext;
@@ -31,9 +31,19 @@ struct InstanceData {
     inv_world: [[f32; 4]; 4],
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub(crate) enum ModelPassMode {
+    /// Draws all opaque parts of models that have no transparent textures.
+    Opaque = 0,
+    /// Draws all opaque parts of models that have transparent textures.
+    SemiOpaque = 1,
+    /// Draws all transparent parts of models that have transparent textures.
+    Transparent = 2,
+}
+
 pub(crate) struct ForwardModelDrawData<'a> {
     pub(crate) batch_data: &'a ModelBatchDrawData<'a>,
-    pub(crate) draw_transparent: bool,
+    pub(crate) pass_mode: ModelPassMode,
 }
 
 pub(crate) struct ForwardModelDrawer {
@@ -44,6 +54,7 @@ pub(crate) struct ForwardModelDrawer {
     bind_group_layout: BindGroupLayout,
     bind_group: BindGroup,
     opaque_pipeline: RenderPipeline,
+    semi_transparent_pipeline: RenderPipeline,
     transparent_pipeline: RenderPipeline,
     #[cfg(feature = "debug")]
     wireframe_pipeline: RenderPipeline,
@@ -54,7 +65,7 @@ pub(crate) struct ForwardModelDrawer {
     transparent_batches: Vec<ModelBatch>,
 }
 
-impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttachmentCount::One }> for ForwardModelDrawer {
+impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAttachmentCount::One }> for ForwardModelDrawer {
     type Context = ForwardRenderPassContext;
     type DrawData<'data> = ForwardModelDrawData<'data>;
 
@@ -130,6 +141,8 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
             push_constant_ranges: &[],
         });
 
+        let color_attachment_formats = render_pass_context.color_attachment_formats();
+
         #[cfg(feature = "debug")]
         let wireframe_pipeline = if capabilities.supports_polygon_mode_line() {
             Self::create_pipeline(
@@ -140,7 +153,8 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
                 instance_index_buffer_layout.clone(),
                 &pipeline_layout,
                 PolygonMode::Line,
-                false,
+                &color_attachment_formats,
+                ModelPassMode::Opaque,
             )
         } else {
             Self::create_pipeline(
@@ -151,7 +165,8 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
                 instance_index_buffer_layout.clone(),
                 &pipeline_layout,
                 PolygonMode::Fill,
-                false,
+                &color_attachment_formats,
+                ModelPassMode::Opaque,
             )
         };
 
@@ -163,7 +178,20 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
             instance_index_buffer_layout.clone(),
             &pipeline_layout,
             PolygonMode::Fill,
-            false,
+            &color_attachment_formats,
+            ModelPassMode::Opaque,
+        );
+
+        let semi_transparent_pipeline = Self::create_pipeline(
+            device,
+            render_pass_context,
+            global_context.msaa,
+            &shader_module,
+            instance_index_buffer_layout.clone(),
+            &pipeline_layout,
+            PolygonMode::Fill,
+            &color_attachment_formats,
+            ModelPassMode::SemiOpaque,
         );
 
         let transparent_pipeline = Self::create_pipeline(
@@ -174,7 +202,8 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
             instance_index_buffer_layout,
             &pipeline_layout,
             PolygonMode::Fill,
-            true,
+            &color_attachment_formats,
+            ModelPassMode::Transparent,
         );
 
         Self {
@@ -185,6 +214,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
             bind_group_layout,
             bind_group,
             opaque_pipeline,
+            semi_transparent_pipeline,
             transparent_pipeline,
             #[cfg(feature = "debug")]
             wireframe_pipeline,
@@ -197,8 +227,8 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
     }
 
     fn draw(&mut self, pass: &mut RenderPass<'_>, draw_data: Self::DrawData<'_>) {
-        if (!draw_data.draw_transparent && self.opaque_batches.is_empty())
-            || (draw_data.draw_transparent && self.transparent_batches.is_empty())
+        if (draw_data.pass_mode == ModelPassMode::Opaque && self.opaque_batches.is_empty())
+            || (draw_data.pass_mode != ModelPassMode::Opaque && self.transparent_batches.is_empty())
         {
             return;
         }
@@ -216,22 +246,23 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
                 pass.set_vertex_buffer(0, batch.vertex_buffer.slice(..));
                 pass.set_vertex_buffer(1, instance_index_vertex_buffer.slice(..));
 
-                if multi_draw_indirect_support {
-                    pass.multi_draw_indirect(
+                match multi_draw_indirect_support {
+                    true => pass.multi_draw_indirect(
                         command_buffer.get_buffer(),
                         (batch.offset * size_of::<DrawIndirectArgs>()) as BufferAddress,
                         batch.count as u32,
-                    );
-                } else {
-                    let start = batch.offset;
-                    let end = start + batch.count;
+                    ),
+                    false => {
+                        let start = batch.offset;
+                        let end = start + batch.count;
 
-                    for (index, instruction) in draw_data.instructions[start..end].iter().enumerate() {
-                        let vertex_start = instruction.vertex_offset as u32;
-                        let vertex_end = vertex_start + instruction.vertex_count as u32;
-                        let index = (start + index) as u32;
+                        for (index, instruction) in draw_data.instructions[start..end].iter().enumerate() {
+                            let vertex_start = instruction.vertex_offset as u32;
+                            let vertex_end = vertex_start + instruction.vertex_count as u32;
+                            let index = (start + index) as u32;
 
-                        pass.draw(vertex_start..vertex_end, index..index + 1);
+                            pass.draw(vertex_start..vertex_end, index..index + 1);
+                        }
                     }
                 }
             }
@@ -239,8 +270,8 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
 
         pass.set_bind_group(2, &self.bind_group, &[]);
 
-        match draw_data.draw_transparent {
-            false => {
+        match draw_data.pass_mode {
+            ModelPassMode::Opaque => {
                 #[cfg(feature = "debug")]
                 let opaque_pipeline = if draw_data.batch_data.show_wireframe {
                     &self.wireframe_pipeline
@@ -255,28 +286,45 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
                 process_batches(
                     pass,
                     &self.opaque_batches,
-                    &draw_data.batch_data,
+                    draw_data.batch_data,
                     &self.instance_index_vertex_buffer,
                     &self.command_buffer,
                     self.multi_draw_indirect_support,
                 );
             }
-            true => {
+            ModelPassMode::SemiOpaque => {
                 #[cfg(feature = "debug")]
-                let transparent_pipeline = if draw_data.batch_data.show_wireframe {
+                let semi_transparent_pipeline = if draw_data.batch_data.show_wireframe {
                     &self.wireframe_pipeline
                 } else {
-                    &self.transparent_pipeline
+                    &self.semi_transparent_pipeline
                 };
                 #[cfg(not(feature = "debug"))]
-                let transparent_pipeline = &self.transparent_pipeline;
+                let semi_transparent_pipeline = &self.semi_transparent_pipeline;
 
-                pass.set_pipeline(transparent_pipeline);
+                pass.set_pipeline(semi_transparent_pipeline);
 
                 process_batches(
                     pass,
                     &self.transparent_batches,
-                    &draw_data.batch_data,
+                    draw_data.batch_data,
+                    &self.instance_index_vertex_buffer,
+                    &self.command_buffer,
+                    self.multi_draw_indirect_support,
+                );
+            }
+            ModelPassMode::Transparent => {
+                #[cfg(feature = "debug")]
+                if draw_data.batch_data.show_wireframe {
+                    return;
+                }
+
+                pass.set_pipeline(&self.transparent_pipeline);
+
+                process_batches(
+                    pass,
+                    &self.transparent_batches,
+                    draw_data.batch_data,
                     &self.instance_index_vertex_buffer,
                     &self.command_buffer,
                     self.multi_draw_indirect_support,
@@ -395,44 +443,104 @@ impl ForwardModelDrawer {
         instance_index_buffer_layout: VertexBufferLayout,
         pipeline_layout: &PipelineLayout,
         polygon_mode: PolygonMode,
-        transparent: bool,
+        color_attachment_formats: &[TextureFormat; 3],
+        pass_mode: ModelPassMode,
     ) -> RenderPipeline {
-        let alpha_to_coverage_activated = msaa.multisampling_activated() && !transparent;
+        let targets = match pass_mode {
+            ModelPassMode::Opaque | ModelPassMode::SemiOpaque => [
+                Some(ColorTargetState {
+                    format: color_attachment_formats[0],
+                    blend: Some(BlendState::PREMULTIPLIED_ALPHA_BLENDING),
+                    write_mask: ColorWrites::ALL,
+                }),
+                Some(ColorTargetState {
+                    format: color_attachment_formats[1],
+                    blend: Some(BlendState {
+                        color: BlendComponent::default(),
+                        alpha: BlendComponent::default(),
+                    }),
+                    write_mask: ColorWrites::empty(),
+                }),
+                Some(ColorTargetState {
+                    format: color_attachment_formats[2],
+                    blend: Some(BlendState {
+                        color: BlendComponent::default(),
+                        alpha: BlendComponent::default(),
+                    }),
+                    write_mask: ColorWrites::empty(),
+                }),
+            ],
+            ModelPassMode::Transparent => [
+                Some(ColorTargetState {
+                    format: color_attachment_formats[0],
+                    blend: Some(BlendState::PREMULTIPLIED_ALPHA_BLENDING),
+                    write_mask: ColorWrites::empty(),
+                }),
+                Some(ColorTargetState {
+                    format: color_attachment_formats[1],
+                    blend: Some(BlendState {
+                        color: BlendComponent {
+                            src_factor: BlendFactor::One,
+                            dst_factor: BlendFactor::One,
+                            operation: BlendOperation::Add,
+                        },
+                        alpha: BlendComponent {
+                            src_factor: BlendFactor::One,
+                            dst_factor: BlendFactor::One,
+                            operation: BlendOperation::Add,
+                        },
+                    }),
+                    write_mask: ColorWrites::ALL,
+                }),
+                Some(ColorTargetState {
+                    format: color_attachment_formats[2],
+                    blend: Some(BlendState {
+                        color: BlendComponent {
+                            src_factor: BlendFactor::Zero,
+                            dst_factor: BlendFactor::OneMinusSrc,
+                            operation: BlendOperation::Add,
+                        },
+                        alpha: BlendComponent::default(),
+                    }),
+                    write_mask: ColorWrites::RED,
+                }),
+            ],
+        };
+
+        let opaque = pass_mode != ModelPassMode::Transparent;
+        let alpha_to_coverage_activated = msaa.multisampling_activated() && opaque;
 
         let mut constants = std::collections::HashMap::new();
         constants.insert(
             "ALPHA_TO_COVERAGE_ACTIVATED".to_string(),
             f64::from(u32::from(alpha_to_coverage_activated)),
         );
+        constants.insert("PASS_MODE".to_string(), f64::from(pass_mode as u32));
 
         device.create_render_pipeline(&RenderPipelineDescriptor {
-            label: Some(&format!("{DRAWER_NAME} transparent: {transparent}")),
+            label: Some(&format!("{DRAWER_NAME} {pass_mode:?}")),
             layout: Some(pipeline_layout),
             vertex: VertexState {
                 module: shader_module,
                 entry_point: Some("vs_main"),
                 compilation_options: PipelineCompilationOptions {
                     constants: &constants,
-                    ..Default::default()
+                    zero_initialize_workgroup_memory: false,
                 },
                 buffers: &[ModelVertex::buffer_layout(), instance_index_buffer_layout],
             },
             fragment: Some(FragmentState {
                 module: shader_module,
-                entry_point: Some("fs_main"),
+                entry_point: if opaque { Some("opaque_main") } else { Some("transparent_main") },
                 compilation_options: PipelineCompilationOptions {
                     constants: &constants,
-                    ..Default::default()
+                    zero_initialize_workgroup_memory: false,
                 },
-                targets: &[Some(ColorTargetState {
-                    format: render_pass_context.color_attachment_formats()[0],
-                    blend: Some(BlendState::PREMULTIPLIED_ALPHA_BLENDING),
-                    write_mask: ColorWrites::default(),
-                })],
+                targets: &targets,
             }),
             multiview: None,
             primitive: PrimitiveState {
-                cull_mode: Some(Face::Back),
+                cull_mode: if opaque { Some(Face::Back) } else { None },
                 front_face: FrontFace::Ccw,
                 polygon_mode,
                 ..Default::default()
@@ -448,7 +556,7 @@ impl ForwardModelDrawer {
             },
             depth_stencil: Some(DepthStencilState {
                 format: render_pass_context.depth_attachment_output_format()[0],
-                depth_write_enabled: !transparent,
+                depth_write_enabled: opaque,
                 depth_compare: CompareFunction::Greater,
                 stencil: StencilState::default(),
                 bias: DepthBiasState::default(),

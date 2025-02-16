@@ -1,16 +1,30 @@
 mod blitter;
 #[cfg(feature = "debug")]
-mod buffer;
+mod debug_aabb;
+#[cfg(feature = "debug")]
+mod debug_buffer;
+#[cfg(feature = "debug")]
+mod debug_circle;
+#[cfg(feature = "debug")]
+mod debug_rectangle;
 mod effect;
 mod fxaa;
 mod rectangle;
+mod wboit_resolve;
 
 pub(crate) use blitter::{PostProcessingBlitterDrawData, PostProcessingBlitterDrawer};
 #[cfg(feature = "debug")]
-pub(crate) use buffer::{PostProcessingBufferDrawData, PostProcessingBufferDrawer};
+pub(crate) use debug_aabb::DebugAabbDrawer;
+#[cfg(feature = "debug")]
+pub(crate) use debug_buffer::{DebugBufferDrawData, DebugBufferDrawer};
+#[cfg(feature = "debug")]
+pub(crate) use debug_circle::DebugCircleDrawer;
+#[cfg(feature = "debug")]
+pub(crate) use debug_rectangle::DebugRectangleDrawer;
 pub(crate) use effect::PostProcessingEffectDrawer;
 pub(crate) use fxaa::PostProcessingFxaaDrawer;
 pub(crate) use rectangle::{PostProcessingRectangleDrawData, PostProcessingRectangleDrawer, PostProcessingRectangleLayer};
+pub(crate) use wboit_resolve::{PostProcessingWboitResolveDrawData, PostProcessingWboitResolveDrawer};
 use wgpu::{
     BindGroupLayout, CommandEncoder, Device, LoadOp, Operations, Queue, RenderPass, RenderPassColorAttachment, RenderPassDescriptor,
     StoreOp, TextureFormat,

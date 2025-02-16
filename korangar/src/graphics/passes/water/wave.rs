@@ -4,9 +4,10 @@ use bytemuck::{Pod, Zeroable};
 use wgpu::util::StagingBelt;
 use wgpu::{
     include_wgsl, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-    BindingResource, BindingType, BlendState, BufferBindingType, BufferUsages, ColorTargetState, ColorWrites, CommandEncoder, Device,
-    FragmentState, MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass,
-    RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderStages, TextureSampleType, TextureViewDimension, VertexState,
+    BindingResource, BindingType, BlendComponent, BlendFactor, BlendOperation, BlendState, BufferBindingType, BufferUsages,
+    ColorTargetState, ColorWrites, CommandEncoder, Device, FragmentState, MultisampleState, PipelineCompilationOptions,
+    PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor,
+    ShaderStages, TextureSampleType, TextureViewDimension, VertexState,
 };
 
 use crate::graphics::passes::water::WaterRenderPassContext;
@@ -38,7 +39,7 @@ pub(crate) struct WaterWaveDrawer {
     pipeline: RenderPipeline,
 }
 
-impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttachmentCount::None }> for WaterWaveDrawer {
+impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Two }, { DepthAttachmentCount::None }> for WaterWaveDrawer {
     type Context = WaterRenderPassContext;
     type DrawData<'data> = &'data AttachmentTexture;
 
@@ -122,11 +123,36 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
                 module: &shader_module,
                 entry_point: Some("fs_main"),
                 compilation_options: PipelineCompilationOptions::default(),
-                targets: &[Some(ColorTargetState {
-                    format: render_pass_context.color_attachment_formats()[0],
-                    blend: Some(BlendState::PREMULTIPLIED_ALPHA_BLENDING),
-                    write_mask: ColorWrites::default(),
-                })],
+                targets: &[
+                    Some(ColorTargetState {
+                        format: render_pass_context.color_attachment_formats()[0],
+                        blend: Some(BlendState {
+                            color: BlendComponent {
+                                src_factor: BlendFactor::One,
+                                dst_factor: BlendFactor::One,
+                                operation: BlendOperation::Add,
+                            },
+                            alpha: BlendComponent {
+                                src_factor: BlendFactor::One,
+                                dst_factor: BlendFactor::One,
+                                operation: BlendOperation::Add,
+                            },
+                        }),
+                        write_mask: ColorWrites::ALL,
+                    }),
+                    Some(ColorTargetState {
+                        format: render_pass_context.color_attachment_formats()[1],
+                        blend: Some(BlendState {
+                            color: BlendComponent {
+                                src_factor: BlendFactor::Zero,
+                                dst_factor: BlendFactor::OneMinusSrc,
+                                operation: BlendOperation::Add,
+                            },
+                            alpha: BlendComponent::default(),
+                        }),
+                        write_mask: ColorWrites::RED,
+                    }),
+                ],
             }),
             multiview: None,
             primitive: PrimitiveState::default(),

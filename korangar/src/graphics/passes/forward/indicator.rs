@@ -1,8 +1,9 @@
 use wgpu::{
     include_wgsl, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource,
-    BindingType, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Device, Face, FragmentState, FrontFace,
-    MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline,
-    RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderStages, StencilState, TextureSampleType, TextureViewDimension, VertexState,
+    BindingType, BlendComponent, BlendFactor, BlendOperation, BlendState, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState,
+    DepthStencilState, Device, Face, FragmentState, FrontFace, MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor,
+    PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderStages, StencilState,
+    TextureSampleType, TextureViewDimension, VertexState,
 };
 
 use crate::graphics::passes::{
@@ -18,7 +19,7 @@ pub(crate) struct ForwardIndicatorDrawer {
     pipeline: RenderPipeline,
 }
 
-impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttachmentCount::One }> for ForwardIndicatorDrawer {
+impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAttachmentCount::One }> for ForwardIndicatorDrawer {
     type Context = ForwardRenderPassContext;
     type DrawData<'data> = Option<&'data IndicatorInstruction>;
 
@@ -77,11 +78,45 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
                 module: &shader_module,
                 entry_point: Some("fs_main"),
                 compilation_options: PipelineCompilationOptions::default(),
-                targets: &[Some(ColorTargetState {
-                    format: render_pass_context.color_attachment_formats()[0],
-                    blend: None,
-                    write_mask: ColorWrites::default(),
-                })],
+                targets: &[
+                    Some(ColorTargetState {
+                        format: render_pass_context.color_attachment_formats()[0],
+                        blend: None,
+                        write_mask: ColorWrites::default(),
+                    }),
+                    Some(ColorTargetState {
+                        format: render_pass_context.color_attachment_formats()[1],
+                        blend: Some(BlendState {
+                            color: BlendComponent {
+                                src_factor: BlendFactor::One,
+                                dst_factor: BlendFactor::One,
+                                operation: BlendOperation::Add,
+                            },
+                            alpha: BlendComponent {
+                                src_factor: BlendFactor::One,
+                                dst_factor: BlendFactor::One,
+                                operation: BlendOperation::Add,
+                            },
+                        }),
+                        write_mask: ColorWrites::empty(),
+                    }),
+                    Some(ColorTargetState {
+                        format: render_pass_context.color_attachment_formats()[2],
+                        blend: Some(BlendState {
+                            color: BlendComponent {
+                                src_factor: BlendFactor::Zero,
+                                dst_factor: BlendFactor::OneMinusSrcAlpha,
+                                operation: BlendOperation::Add,
+                            },
+                            alpha: BlendComponent {
+                                src_factor: BlendFactor::Zero,
+                                dst_factor: BlendFactor::OneMinusSrcAlpha,
+                                operation: BlendOperation::Add,
+                            },
+                        }),
+                        write_mask: ColorWrites::empty(),
+                    }),
+                ],
             }),
             multiview: None,
             primitive: PrimitiveState {

@@ -1,22 +1,10 @@
-#[cfg(feature = "debug")]
-mod aabb;
-#[cfg(feature = "debug")]
-mod circle;
 mod entity;
 mod indicator;
 mod model;
-#[cfg(feature = "debug")]
-mod rectangle;
 
-#[cfg(feature = "debug")]
-pub(crate) use aabb::ForwardAabbDrawer;
-#[cfg(feature = "debug")]
-pub(crate) use circle::ForwardCircleDrawer;
-pub(crate) use entity::ForwardEntityDrawer;
+pub(crate) use entity::{EntityPassMode, ForwardEntityDrawData, ForwardEntityDrawer};
 pub(crate) use indicator::ForwardIndicatorDrawer;
-pub(crate) use model::{ForwardModelDrawData, ForwardModelDrawer};
-#[cfg(feature = "debug")]
-pub(crate) use rectangle::ForwardRectangleDrawer;
+pub(crate) use model::{ForwardModelDrawData, ForwardModelDrawer, ModelPassMode};
 use wgpu::{
     BindGroupLayout, Color, CommandEncoder, Device, LoadOp, Operations, Queue, RenderPass, RenderPassColorAttachment,
     RenderPassDepthStencilAttachment, RenderPassDescriptor, StoreOp, TextureFormat,
@@ -29,18 +17,26 @@ const PASS_NAME: &str = "forward render pass";
 
 pub(crate) struct ForwardRenderPassContext {
     color_texture_format: TextureFormat,
+    accumulation_texture_format: TextureFormat,
+    revealage_texture_format: TextureFormat,
     depth_texture_format: TextureFormat,
 }
 
-impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttachmentCount::One }> for ForwardRenderPassContext {
+impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAttachmentCount::One }>
+    for ForwardRenderPassContext
+{
     type PassData<'data> = Option<()>;
 
     fn new(_device: &Device, _queue: &Queue, _texture_loader: &TextureLoader, global_context: &GlobalContext) -> Self {
         let color_texture_format = global_context.forward_color_texture.get_format();
+        let accumulation_texture_format = global_context.forward_accumulation_texture.get_format();
+        let revealage_texture_format = global_context.forward_revealage_texture.get_format();
         let depth_texture_format = global_context.forward_depth_texture.get_format();
 
         Self {
             color_texture_format,
+            accumulation_texture_format,
+            revealage_texture_format,
             depth_texture_format,
         }
     }
@@ -53,17 +49,35 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, {
     ) -> RenderPass<'encoder> {
         let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
             label: Some(PASS_NAME),
-            color_attachments: &[Some(RenderPassColorAttachment {
-                view: global_context.forward_color_texture.get_texture_view(),
-                resolve_target: global_context
-                    .resolved_color_texture
-                    .as_ref()
-                    .map(|texture| texture.get_texture_view()),
-                ops: Operations {
-                    load: LoadOp::Clear(Color::BLACK),
-                    store: StoreOp::Store,
-                },
-            })],
+            color_attachments: &[
+                Some(RenderPassColorAttachment {
+                    view: global_context.forward_color_texture.get_texture_view(),
+                    resolve_target: global_context
+                        .resolved_color_texture
+                        .as_ref()
+                        .map(|texture| texture.get_texture_view()),
+                    ops: Operations {
+                        load: LoadOp::Clear(Color::BLACK),
+                        store: StoreOp::Store,
+                    },
+                }),
+                Some(RenderPassColorAttachment {
+                    view: global_context.forward_accumulation_texture.get_texture_view(),
+                    resolve_target: None,
+                    ops: Operations {
+                        load: LoadOp::Clear(Color::TRANSPARENT),
+                        store: StoreOp::Store,
+                    },
+                }),
+                Some(RenderPassColorAttachment {
+                    view: global_context.forward_revealage_texture.get_texture_view(),
+                    resolve_target: None,
+                    ops: Operations {
+                        load: LoadOp::Clear(Color::WHITE),
+                        store: StoreOp::Store,
+                    },
+                }),
+            ],
             depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
                 view: global_context.forward_depth_texture.get_texture_view(),
                 depth_ops: Some(Operations {
@@ -89,8 +103,12 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, {
         ]
     }
 
-    fn color_attachment_formats(&self) -> [TextureFormat; 1] {
-        [self.color_texture_format]
+    fn color_attachment_formats(&self) -> [TextureFormat; 3] {
+        [
+            self.color_texture_format,
+            self.accumulation_texture_format,
+            self.revealage_texture_format,
+        ]
     }
 
     fn depth_attachment_output_format(&self) -> [TextureFormat; 1] {

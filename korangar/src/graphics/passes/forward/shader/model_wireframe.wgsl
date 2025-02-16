@@ -62,7 +62,7 @@ fn vs_main(
 }
 
 @fragment
-fn fs_main(input: VertexOutput) -> FragmentOutput {
+fn opaque_main(input: VertexOutput) -> FragmentOutput {
     var output: FragmentOutput;
     output.fragment_color = vec4<f32>(1.0);
     output.fragment_normal = input.normal;

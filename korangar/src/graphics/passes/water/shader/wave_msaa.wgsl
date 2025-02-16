@@ -39,6 +39,11 @@ struct VertexOutput {
     @location(0) uv: vec2<f32>,
 }
 
+struct WboitOutput {
+    @location(0) accumulation: vec4<f32>,
+    @location(1) revealage: f32,
+}
+
 @group(0) @binding(0) var<uniform> global_uniforms: GlobalUniforms;
 @group(0) @binding(2) var linear_sampler: sampler;
 @group(0) @binding(3) var texture_sampler: sampler;
@@ -59,6 +64,8 @@ const GRAVITY: f32 = 9.8;
 const TAU: f32 = 6.28318548;
 // Pre-normalized direction vector (-1/√2, -1/√2)
 const NORMALIZED_WAVE_DIRECTION: vec2<f32> = vec2<f32>(-0.707107, -0.707107);
+const DEPTH_EPSILON: f32 = 1.0e-7;
+const NEAR_PLANE = 0.1;
 
 @vertex
 fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
@@ -74,13 +81,13 @@ var<private> wave_frequency: f32;
 var<private> wave_phase_speed: f32;
 
 @fragment
-fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
+fn fs_main(input: VertexOutput) -> WboitOutput {
     let uv = input.uv;
     let depth_coordinate = vec2<u32>(vec2<f32>(global_uniforms.forward_size) * uv);
     let scene_depth = textureLoad(depth_texture, depth_coordinate, 0);
     let scene_position = reconstruct_world_position(input.uv, scene_depth);
 
-    var color = vec4<f32>(0.0);
+    var output = WboitOutput();
 
     // A early exit if the depth of the scene is above the water (with a little bit of headroom).
     // This will only work correctly for a top down view.
@@ -117,11 +124,18 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
         ) {
             discard;
         } else {
-            color = calculate_wave_color(hit_position);
+            let color = calculate_wave_color(hit_position);
+
+            // Equation from https://casual-effects.blogspot.com/2015/03/implemented-weighted-blended-order.html
+            let depth = linearToNonLinear(distance);
+            let weight = clamp(pow(min(1.0, color.a * 10.0) + 0.01, 3.0) * 1e8 * pow(depth * 0.9, 3.0), 1e-2, 3e3);
+
+            output.accumulation = vec4<f32>(color.rgb, color.a) * weight;
+            output.revealage = color.a;
         }
     }
 
-    return color;
+    return output;
 }
 
 /// Finds the intersection point between a ray and a wave surface using the Secant method.
@@ -282,4 +296,8 @@ fn screen_to_clip_space(screen_coords: vec2<f32>) -> vec2<f32> {
     let x = (screen_coords.x * 2.0) - 1.0;
     let y = -(screen_coords.y * 2.0) + 1.0;
     return vec2<f32>(x, y);
+}
+
+fn linearToNonLinear(linear_depth: f32) -> f32 {
+    return NEAR_PLANE / (linear_depth + DEPTH_EPSILON);
 }

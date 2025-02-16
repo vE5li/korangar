@@ -16,7 +16,7 @@ use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
 use super::{
-    AntiAliasingResource, Capabilities, FramePacer, FrameStage, GlobalContext, LimitFramerate, Msaa, Prepare, PresentModeInfo,
+    AntiAliasingResources, Capabilities, FramePacer, FrameStage, GlobalContext, LimitFramerate, Msaa, Prepare, PresentModeInfo,
     ScreenSpaceAntiAliasing, ShadowDetail, Ssaa, Surface, TextureCompression, TextureSamplerType, RENDER_TO_TEXTURE_FORMAT,
 };
 use crate::graphics::instruction::RenderInstruction;
@@ -96,15 +96,16 @@ struct EngineContext {
     post_processing_fxaa_drawer: PostProcessingFxaaDrawer,
     post_processing_blitter_drawer: PostProcessingBlitterDrawer,
     post_processing_rectangle_drawer: PostProcessingRectangleDrawer,
+    post_processing_wboit_resolve_drawer: PostProcessingWboitResolveDrawer,
     screen_blit_blitter_drawer: ScreenBlitBlitterDrawer,
     #[cfg(feature = "debug")]
-    forward_aabb_drawer: ForwardAabbDrawer,
+    debug_aabb_drawer: DebugAabbDrawer,
     #[cfg(feature = "debug")]
-    forward_circle_drawer: ForwardCircleDrawer,
+    debug_buffer_drawer: DebugBufferDrawer,
     #[cfg(feature = "debug")]
-    forward_rectangle_drawer: ForwardRectangleDrawer,
+    debug_circle_drawer: DebugCircleDrawer,
     #[cfg(feature = "debug")]
-    post_processing_buffer_drawer: PostProcessingBufferDrawer,
+    debug_rectangle_drawer: DebugRectangleDrawer,
     #[cfg(feature = "debug")]
     picker_marker_drawer: PickerMarkerDrawer,
 }
@@ -283,13 +284,6 @@ impl GraphicsEngine {
                             forward_entity_drawer,
                             forward_indicator_drawer,
                             forward_model_drawer,
-
-                            #[cfg(feature = "debug")]
-                            forward_aabb_drawer,
-                            #[cfg(feature = "debug")]
-                            forward_circle_drawer,
-                            #[cfg(feature = "debug")]
-                            forward_rectangle_drawer,
                         } = ForwardResources::create(
                             &self.capabilities,
                             &self.device,
@@ -309,8 +303,15 @@ impl GraphicsEngine {
                             post_processing_fxaa_drawer,
                             post_processing_blitter_drawer,
                             post_processing_rectangle_drawer,
+                            post_processing_wboit_resolve_drawer,
                             #[cfg(feature = "debug")]
-                            post_processing_buffer_drawer,
+                            debug_buffer_drawer,
+                            #[cfg(feature = "debug")]
+                            debug_aabb_drawer,
+                            #[cfg(feature = "debug")]
+                            debug_circle_drawer,
+                            #[cfg(feature = "debug")]
+                            debug_rectangle_drawer,
                         } = PostProcessingResources::create(
                             &self.capabilities,
                             &self.device,
@@ -364,15 +365,16 @@ impl GraphicsEngine {
                         post_processing_fxaa_drawer,
                         post_processing_blitter_drawer,
                         post_processing_rectangle_drawer,
+                        post_processing_wboit_resolve_drawer,
                         screen_blit_blitter_drawer,
                         #[cfg(feature = "debug")]
-                        forward_aabb_drawer,
+                        debug_aabb_drawer,
                         #[cfg(feature = "debug")]
-                        forward_circle_drawer,
+                        debug_buffer_drawer,
                         #[cfg(feature = "debug")]
-                        forward_rectangle_drawer,
+                        debug_circle_drawer,
                         #[cfg(feature = "debug")]
-                        post_processing_buffer_drawer,
+                        debug_rectangle_drawer,
                         #[cfg(feature = "debug")]
                         picker_marker_drawer,
                     })
@@ -493,12 +495,6 @@ impl GraphicsEngine {
                 forward_entity_drawer,
                 forward_indicator_drawer,
                 forward_model_drawer,
-                #[cfg(feature = "debug")]
-                forward_aabb_drawer,
-                #[cfg(feature = "debug")]
-                forward_circle_drawer,
-                #[cfg(feature = "debug")]
-                forward_rectangle_drawer,
             } = ForwardResources::create(
                 &self.capabilities,
                 &self.device,
@@ -512,8 +508,15 @@ impl GraphicsEngine {
                 post_processing_fxaa_drawer,
                 post_processing_blitter_drawer,
                 post_processing_rectangle_drawer,
+                post_processing_wboit_resolve_drawer,
                 #[cfg(feature = "debug")]
-                post_processing_buffer_drawer,
+                debug_aabb_drawer,
+                #[cfg(feature = "debug")]
+                debug_buffer_drawer,
+                #[cfg(feature = "debug")]
+                debug_circle_drawer,
+                #[cfg(feature = "debug")]
+                debug_rectangle_drawer,
             } = PostProcessingResources::create(
                 &self.capabilities,
                 &self.device,
@@ -529,6 +532,7 @@ impl GraphicsEngine {
             engine_context.post_processing_fxaa_drawer = post_processing_fxaa_drawer;
             engine_context.post_processing_blitter_drawer = post_processing_blitter_drawer;
             engine_context.post_processing_rectangle_drawer = post_processing_rectangle_drawer;
+            engine_context.post_processing_wboit_resolve_drawer = post_processing_wboit_resolve_drawer;
 
             engine_context.water_wave_drawer = WaterWaveDrawer::new(
                 &self.capabilities,
@@ -540,10 +544,10 @@ impl GraphicsEngine {
 
             #[cfg(feature = "debug")]
             {
-                engine_context.forward_aabb_drawer = forward_aabb_drawer;
-                engine_context.forward_circle_drawer = forward_circle_drawer;
-                engine_context.forward_rectangle_drawer = forward_rectangle_drawer;
-                engine_context.post_processing_buffer_drawer = post_processing_buffer_drawer;
+                engine_context.debug_aabb_drawer = debug_aabb_drawer;
+                engine_context.debug_buffer_drawer = debug_buffer_drawer;
+                engine_context.debug_circle_drawer = debug_circle_drawer;
+                engine_context.debug_rectangle_drawer = debug_rectangle_drawer;
             }
         }
     }
@@ -696,8 +700,8 @@ impl GraphicsEngine {
     // shouldn't be distracting, since it's very rare.
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     fn sort_instructions(&mut self, instructions: &mut RenderInstruction) {
-        // Back to front for entities.
-        instructions.entities.sort_unstable_by(|a, b| b.distance.total_cmp(&a.distance));
+        // Front to back for entities.
+        instructions.entities.sort_unstable_by(|a, b| a.distance.total_cmp(&b.distance));
 
         for batch in instructions.model_batches {
             let start = batch.offset;
@@ -785,13 +789,13 @@ impl GraphicsEngine {
             #[cfg(feature = "debug")]
             scope.spawn(|_| {
                 context.picker_marker_drawer.prepare(&self.device, instruction);
-                context.forward_aabb_drawer.prepare(&self.device, instruction);
+                context.debug_aabb_drawer.prepare(&self.device, instruction);
             });
             #[cfg(feature = "debug")]
             scope.spawn(|_| {
-                context.post_processing_buffer_drawer.prepare(&self.device, instruction);
-                context.forward_circle_drawer.prepare(&self.device, instruction);
-                context.forward_rectangle_drawer.prepare(&self.device, instruction);
+                context.debug_rectangle_drawer.prepare(&self.device, instruction);
+                context.debug_buffer_drawer.prepare(&self.device, instruction);
+                context.debug_circle_drawer.prepare(&self.device, instruction);
             });
 
             context.global_context.prepare(&self.device, instruction);
@@ -825,10 +829,10 @@ impl GraphicsEngine {
 
         #[cfg(feature = "debug")]
         {
-            visitor.upload(&mut context.forward_aabb_drawer);
-            visitor.upload(&mut context.post_processing_buffer_drawer);
-            visitor.upload(&mut context.forward_circle_drawer);
-            visitor.upload(&mut context.forward_rectangle_drawer);
+            visitor.upload(&mut context.debug_aabb_drawer);
+            visitor.upload(&mut context.debug_rectangle_drawer);
+            visitor.upload(&mut context.debug_buffer_drawer);
+            visitor.upload(&mut context.debug_circle_drawer);
             visitor.upload(&mut context.picker_marker_drawer);
         }
 
@@ -1008,28 +1012,36 @@ impl GraphicsEngine {
                     show_wireframe: instruction.render_settings.show_wireframe,
                 };
 
+                // Opaque
                 engine_context.forward_model_drawer.draw(&mut render_pass, ForwardModelDrawData {
                     batch_data,
-                    draw_transparent: false,
+                    pass_mode: ModelPassMode::Opaque,
                 });
 
-                engine_context.forward_entity_drawer.draw(&mut render_pass, instruction.entities);
+                engine_context.forward_model_drawer.draw(&mut render_pass, ForwardModelDrawData {
+                    batch_data,
+                    pass_mode: ModelPassMode::SemiOpaque,
+                });
 
                 engine_context
                     .forward_indicator_drawer
                     .draw(&mut render_pass, instruction.indicator.as_ref());
 
-                engine_context.forward_model_drawer.draw(&mut render_pass, ForwardModelDrawData {
-                    batch_data,
-                    draw_transparent: true,
+                engine_context.forward_entity_drawer.draw(&mut render_pass, ForwardEntityDrawData {
+                    entities: instruction.entities,
+                    pass_mode: EntityPassMode::Opaque,
                 });
 
-                #[cfg(feature = "debug")]
-                {
-                    engine_context.forward_aabb_drawer.draw(&mut render_pass, None);
-                    engine_context.forward_circle_drawer.draw(&mut render_pass, None);
-                    engine_context.forward_rectangle_drawer.draw(&mut render_pass, None);
-                }
+                // Transparent
+                engine_context.forward_entity_drawer.draw(&mut render_pass, ForwardEntityDrawData {
+                    entities: instruction.entities,
+                    pass_mode: EntityPassMode::Transparent,
+                });
+
+                engine_context.forward_model_drawer.draw(&mut render_pass, ForwardModelDrawData {
+                    batch_data,
+                    pass_mode: ModelPassMode::Transparent,
+                });
 
                 if instruction.water.is_some() {
                     drop(render_pass);
@@ -1045,30 +1057,48 @@ impl GraphicsEngine {
                 }
             });
 
-            // Post Processing Pass
-            let render_pass = if let Some(supersampled_color_texture) = engine_context.global_context.supersampled_color_texture.as_ref() {
+            // Post Processing Passes
+            {
                 let mut render_pass = engine_context.post_processing_pass_context.create_pass(
                     &mut post_processing_encoder,
                     &engine_context.global_context,
-                    supersampled_color_texture,
+                    engine_context.global_context.get_forward_texture(),
                 );
 
-                let blitter_data = PostProcessingBlitterDrawData {
-                    target_texture_format: RENDER_TO_TEXTURE_FORMAT,
-                    source_texture: engine_context.global_context.get_forward_texture(),
-                    luma_in_alpha: false,
-                    alpha_blending: false,
+                let blitter_data = PostProcessingWboitResolveDrawData {
+                    accumulation_texture: &engine_context.global_context.forward_accumulation_texture,
+                    revealage_texture: &engine_context.global_context.forward_revealage_texture,
                 };
 
-                engine_context.post_processing_blitter_drawer.draw(&mut render_pass, blitter_data);
+                engine_context
+                    .post_processing_wboit_resolve_drawer
+                    .draw(&mut render_pass, blitter_data);
+            }
 
-                render_pass
-            } else {
-                engine_context.post_processing_pass_context.create_pass(
+            let render_pass = match engine_context.global_context.supersampled_color_texture.as_ref() {
+                Some(supersampled_color_texture) => {
+                    let mut render_pass = engine_context.post_processing_pass_context.create_pass(
+                        &mut post_processing_encoder,
+                        &engine_context.global_context,
+                        supersampled_color_texture,
+                    );
+
+                    let blitter_data = PostProcessingBlitterDrawData {
+                        target_texture_format: RENDER_TO_TEXTURE_FORMAT,
+                        source_texture: engine_context.global_context.get_forward_texture(),
+                        luma_in_alpha: false,
+                        alpha_blending: false,
+                    };
+
+                    engine_context.post_processing_blitter_drawer.draw(&mut render_pass, blitter_data);
+
+                    render_pass
+                }
+                None => engine_context.post_processing_pass_context.create_pass(
                     &mut post_processing_encoder,
                     &engine_context.global_context,
                     engine_context.global_context.get_forward_texture(),
-                )
+                ),
             };
 
             let mut render_pass = match &engine_context.global_context.screen_space_anti_aliasing {
@@ -1076,7 +1106,7 @@ impl GraphicsEngine {
                 ScreenSpaceAntiAliasing::Fxaa => {
                     drop(render_pass);
 
-                    let AntiAliasingResource::Fxaa(fxaa_resources) = &engine_context.global_context.anti_aliasing_resources else {
+                    let AntiAliasingResources::Fxaa(fxaa_resources) = &engine_context.global_context.anti_aliasing_resources else {
                         panic!("fxaa resources not set")
                     };
 
@@ -1111,6 +1141,13 @@ impl GraphicsEngine {
                 }
             };
 
+            #[cfg(feature = "debug")]
+            {
+                engine_context.debug_aabb_drawer.draw(&mut render_pass, None);
+                engine_context.debug_rectangle_drawer.draw(&mut render_pass, None);
+                engine_context.debug_circle_drawer.draw(&mut render_pass, None);
+            }
+
             let rectangle_data = PostProcessingRectangleDrawData {
                 layer: PostProcessingRectangleLayer::Bottom,
                 instructions: instruction.bottom_layer_rectangles,
@@ -1133,12 +1170,12 @@ impl GraphicsEngine {
 
             #[cfg(feature = "debug")]
             {
-                let buffer_data = PostProcessingBufferDrawData {
+                let buffer_data = DebugBufferDrawData {
                     render_settings: &instruction.render_settings,
                     debug_bind_group: &engine_context.global_context.debug_bind_group,
                 };
 
-                engine_context.post_processing_buffer_drawer.draw(&mut render_pass, buffer_data);
+                engine_context.debug_buffer_drawer.draw(&mut render_pass, buffer_data);
             }
 
             if instruction.show_interface {
@@ -1201,13 +1238,6 @@ struct ForwardResources {
     forward_entity_drawer: ForwardEntityDrawer,
     forward_indicator_drawer: ForwardIndicatorDrawer,
     forward_model_drawer: ForwardModelDrawer,
-
-    #[cfg(feature = "debug")]
-    forward_aabb_drawer: ForwardAabbDrawer,
-    #[cfg(feature = "debug")]
-    forward_circle_drawer: ForwardCircleDrawer,
-    #[cfg(feature = "debug")]
-    forward_rectangle_drawer: ForwardRectangleDrawer,
 }
 
 impl ForwardResources {
@@ -1221,23 +1251,11 @@ impl ForwardResources {
         let forward_entity_drawer = ForwardEntityDrawer::new(capabilities, device, queue, global_context, forward_pass_context);
         let forward_indicator_drawer = ForwardIndicatorDrawer::new(capabilities, device, queue, global_context, forward_pass_context);
         let forward_model_drawer = ForwardModelDrawer::new(capabilities, device, queue, global_context, forward_pass_context);
-        #[cfg(feature = "debug")]
-        let forward_aabb_drawer = ForwardAabbDrawer::new(capabilities, device, queue, global_context, forward_pass_context);
-        #[cfg(feature = "debug")]
-        let forward_circle_drawer = ForwardCircleDrawer::new(capabilities, device, queue, global_context, forward_pass_context);
-        #[cfg(feature = "debug")]
-        let forward_rectangle_drawer = ForwardRectangleDrawer::new(capabilities, device, queue, global_context, forward_pass_context);
 
         Self {
             forward_entity_drawer,
             forward_indicator_drawer,
             forward_model_drawer,
-            #[cfg(feature = "debug")]
-            forward_aabb_drawer,
-            #[cfg(feature = "debug")]
-            forward_circle_drawer,
-            #[cfg(feature = "debug")]
-            forward_rectangle_drawer,
         }
     }
 }
@@ -1247,8 +1265,15 @@ struct PostProcessingResources {
     post_processing_fxaa_drawer: PostProcessingFxaaDrawer,
     post_processing_blitter_drawer: PostProcessingBlitterDrawer,
     post_processing_rectangle_drawer: PostProcessingRectangleDrawer,
+    post_processing_wboit_resolve_drawer: PostProcessingWboitResolveDrawer,
     #[cfg(feature = "debug")]
-    post_processing_buffer_drawer: PostProcessingBufferDrawer,
+    debug_buffer_drawer: DebugBufferDrawer,
+    #[cfg(feature = "debug")]
+    debug_aabb_drawer: DebugAabbDrawer,
+    #[cfg(feature = "debug")]
+    debug_circle_drawer: DebugCircleDrawer,
+    #[cfg(feature = "debug")]
+    debug_rectangle_drawer: DebugRectangleDrawer,
 }
 
 impl PostProcessingResources {
@@ -1267,17 +1292,31 @@ impl PostProcessingResources {
             PostProcessingBlitterDrawer::new(capabilities, device, queue, global_context, post_processing_pass_context);
         let post_processing_rectangle_drawer =
             PostProcessingRectangleDrawer::new(capabilities, device, queue, global_context, post_processing_pass_context);
+        let post_processing_wboit_resolve_drawer =
+            PostProcessingWboitResolveDrawer::new(capabilities, device, queue, global_context, post_processing_pass_context);
         #[cfg(feature = "debug")]
-        let post_processing_buffer_drawer =
-            PostProcessingBufferDrawer::new(capabilities, device, queue, global_context, post_processing_pass_context);
+        let debug_aabb_drawer = DebugAabbDrawer::new(capabilities, device, queue, global_context, post_processing_pass_context);
+        #[cfg(feature = "debug")]
+        let debug_buffer_drawer = DebugBufferDrawer::new(capabilities, device, queue, global_context, post_processing_pass_context);
+        #[cfg(feature = "debug")]
+        let debug_circle_drawer = DebugCircleDrawer::new(capabilities, device, queue, global_context, post_processing_pass_context);
+        #[cfg(feature = "debug")]
+        let debug_rectangle_drawer = DebugRectangleDrawer::new(capabilities, device, queue, global_context, post_processing_pass_context);
 
         Self {
             post_processing_effect_drawer,
             post_processing_fxaa_drawer,
             post_processing_blitter_drawer,
             post_processing_rectangle_drawer,
+            post_processing_wboit_resolve_drawer,
             #[cfg(feature = "debug")]
-            post_processing_buffer_drawer,
+            debug_aabb_drawer,
+            #[cfg(feature = "debug")]
+            debug_buffer_drawer,
+            #[cfg(feature = "debug")]
+            debug_circle_drawer,
+            #[cfg(feature = "debug")]
+            debug_rectangle_drawer,
         }
     }
 }

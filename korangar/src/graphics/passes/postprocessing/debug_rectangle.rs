@@ -1,33 +1,36 @@
 use std::num::NonZeroU64;
 
 use bytemuck::{Pod, Zeroable};
+use cgmath::Point3;
 use wgpu::util::StagingBelt;
 use wgpu::{
     include_wgsl, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-    BindingType, BlendState, BufferBindingType, BufferUsages, ColorTargetState, ColorWrites, CommandEncoder, CompareFunction,
-    DepthBiasState, DepthStencilState, Device, FragmentState, MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor,
-    Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderStages, StencilState, VertexState,
+    BindingType, BufferBindingType, BufferUsages, ColorTargetState, ColorWrites, CommandEncoder, Device, FragmentState, IndexFormat,
+    MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, PrimitiveTopology, Queue, RenderPass,
+    RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderStages, VertexState,
 };
 
 use crate::graphics::passes::{
-    BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, ForwardRenderPassContext, RenderPassContext,
+    BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, PostProcessingRenderPassContext, RenderPassContext,
 };
-use crate::graphics::{Buffer, Capabilities, GlobalContext, Prepare, RenderInstruction};
+use crate::graphics::{Capabilities, GlobalContext, Prepare, RenderInstruction, SimpleVertex};
+use crate::Buffer;
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/circle.wgsl");
-const DRAWER_NAME: &str = "screen circle";
+const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/debug_rectangle.wgsl");
+const DRAWER_NAME: &str = "debug rectangle";
 const INITIAL_INSTRUCTION_SIZE: usize = 256;
+const INDEX_COUNT: usize = 8;
 
 #[derive(Copy, Clone, Pod, Zeroable)]
 #[repr(C)]
 struct InstanceData {
-    position: [f32; 4],
+    world: [[f32; 4]; 4],
     color: [f32; 4],
-    screen_position: [f32; 2],
-    screen_size: [f32; 2],
 }
 
-pub(crate) struct ForwardCircleDrawer {
+pub(crate) struct DebugRectangleDrawer {
+    vertex_buffer: Buffer<SimpleVertex>,
+    index_buffer: Buffer<u16>,
     instance_data_buffer: Buffer<InstanceData>,
     bind_group_layout: BindGroupLayout,
     bind_group: BindGroup,
@@ -36,18 +39,44 @@ pub(crate) struct ForwardCircleDrawer {
     instance_data: Vec<InstanceData>,
 }
 
-impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttachmentCount::One }> for ForwardCircleDrawer {
-    type Context = ForwardRenderPassContext;
+impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttachmentCount::None }> for DebugRectangleDrawer {
+    type Context = PostProcessingRenderPassContext;
     type DrawData<'data> = Option<()>;
 
     fn new(
         _capabilities: &Capabilities,
         device: &Device,
-        _queue: &Queue,
-        global_context: &GlobalContext,
+        queue: &Queue,
+        _global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {
         let shader_module = device.create_shader_module(SHADER);
+
+        // Vertices are defined in world coordinates (Same as WGPU's NDC).
+        let vertex_data = [
+            SimpleVertex::new(Point3::new(-1.0, 0.0, 1.0)),
+            SimpleVertex::new(Point3::new(-1.0, 2.0, 1.0)),
+            SimpleVertex::new(Point3::new(1.0, 0.0, 1.0)),
+            SimpleVertex::new(Point3::new(1.0, 2.0, 1.0)),
+        ];
+
+        let index_data: [u16; INDEX_COUNT] = [0, 1, 2, 3, 1, 3, 0, 2];
+
+        let vertex_buffer = Buffer::with_data(
+            device,
+            queue,
+            format!("{DRAWER_NAME} box vertex"),
+            BufferUsages::VERTEX | BufferUsages::COPY_DST,
+            &vertex_data,
+        );
+
+        let index_buffer = Buffer::with_data(
+            device,
+            queue,
+            format!("{DRAWER_NAME} box index"),
+            BufferUsages::INDEX | BufferUsages::COPY_DST,
+            &index_data,
+        );
 
         let instance_data_buffer = Buffer::with_capacity(
             device,
@@ -76,7 +105,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
 
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some(DRAWER_NAME),
-            bind_group_layouts: &[bind_group_layouts[0], bind_group_layouts[1], &bind_group_layout],
+            bind_group_layouts: &[bind_group_layouts[0], &bind_group_layout],
             push_constant_ranges: &[],
         });
 
@@ -87,7 +116,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
                 module: &shader_module,
                 entry_point: Some("vs_main"),
                 compilation_options: PipelineCompilationOptions::default(),
-                buffers: &[],
+                buffers: &[SimpleVertex::buffer_layout()],
             },
             fragment: Some(FragmentState {
                 module: &shader_module,
@@ -95,27 +124,23 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
                 compilation_options: PipelineCompilationOptions::default(),
                 targets: &[Some(ColorTargetState {
                     format: render_pass_context.color_attachment_formats()[0],
-                    blend: Some(BlendState::PREMULTIPLIED_ALPHA_BLENDING),
+                    blend: None,
                     write_mask: ColorWrites::default(),
                 })],
             }),
-            primitive: Default::default(),
-            depth_stencil: Some(DepthStencilState {
-                format: render_pass_context.depth_attachment_output_format()[0],
-                depth_write_enabled: false,
-                depth_compare: CompareFunction::Always,
-                stencil: StencilState::default(),
-                bias: DepthBiasState::default(),
-            }),
-            multisample: MultisampleState {
-                count: global_context.msaa.sample_count(),
+            multiview: None,
+            primitive: PrimitiveState {
+                topology: PrimitiveTopology::LineList,
                 ..Default::default()
             },
-            multiview: None,
+            depth_stencil: None,
+            multisample: MultisampleState::default(),
             cache: None,
         });
 
         Self {
+            vertex_buffer,
+            index_buffer,
             instance_data_buffer,
             bind_group_layout,
             bind_group,
@@ -131,14 +156,16 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
         }
 
         pass.set_pipeline(&self.pipeline);
-        pass.set_bind_group(2, &self.bind_group, &[]);
-        pass.draw(0..6, 0..self.draw_count as u32);
+        pass.set_bind_group(1, &self.bind_group, &[]);
+        pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        pass.set_index_buffer(self.index_buffer.slice(..), IndexFormat::Uint16);
+        pass.draw_indexed(0..INDEX_COUNT as u32, 0, 0..self.draw_count as u32);
     }
 }
 
-impl Prepare for ForwardCircleDrawer {
+impl Prepare for DebugRectangleDrawer {
     fn prepare(&mut self, _device: &Device, instructions: &RenderInstruction) {
-        self.draw_count = instructions.circles.len();
+        self.draw_count = instructions.rectangles.len();
 
         if self.draw_count == 0 {
             return;
@@ -146,12 +173,10 @@ impl Prepare for ForwardCircleDrawer {
 
         self.instance_data.clear();
 
-        for instruction in instructions.circles.iter() {
+        for instruction in instructions.rectangles.iter() {
             self.instance_data.push(InstanceData {
-                position: instruction.position.to_homogeneous().into(),
+                world: instruction.world.into(),
                 color: instruction.color.components_linear(),
-                screen_position: instruction.screen_position.into(),
-                screen_size: instruction.screen_size.into(),
             });
         }
     }
@@ -167,7 +192,7 @@ impl Prepare for ForwardCircleDrawer {
     }
 }
 
-impl ForwardCircleDrawer {
+impl DebugRectangleDrawer {
     fn create_bind_group(device: &Device, bind_group_layout: &BindGroupLayout, instance_data_buffer: &Buffer<InstanceData>) -> BindGroup {
         device.create_bind_group(&BindGroupDescriptor {
             label: Some(DRAWER_NAME),

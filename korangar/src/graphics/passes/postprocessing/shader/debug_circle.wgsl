@@ -11,7 +11,7 @@ struct VertexOutput {
     @location(1) instance_index: u32,
 }
 
-@group(2) @binding(0) var<storage, read> instance_data: array<InstanceData>;
+@group(1) @binding(0) var<storage, read> instance_data: array<InstanceData>;
 
 @vertex
 fn vs_main(

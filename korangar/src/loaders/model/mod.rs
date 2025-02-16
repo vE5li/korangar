@@ -1,11 +1,10 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
-use cgmath::{EuclideanSpace, InnerSpace, Matrix4, Point3, Rad, SquareMatrix, Vector2, Vector3};
+use cgmath::{EuclideanSpace, Matrix4, Point3, Rad, SquareMatrix, Vector2, Vector3};
 use derive_new::new;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize, Timer};
-use korangar_util::collision::{KDTree, AABB};
+use korangar_util::collision::AABB;
 use korangar_util::math::multiply_matrix4_and_point3;
 use korangar_util::texture_atlas::AllocationId;
 use korangar_util::FileLoader;
@@ -75,13 +74,7 @@ impl ModelLoader {
         }
     }
 
-    fn make_vertices(
-        node: &NodeData,
-        main_matrix: &Matrix4<f32>,
-        reverse_order: bool,
-        smooth_normals: bool,
-        texture_transparency: Vec<bool>,
-    ) -> Vec<SubMesh> {
+    fn make_vertices(node: &NodeData, main_matrix: &Matrix4<f32>, reverse_order: bool, smooth_normals: bool) -> Vec<NativeModelVertex> {
         let face_count = node.faces.len();
         let face_vertex_count = face_count * 3;
         let two_sided_face_count = node.faces.iter().filter(|face| face.two_sided != 0).count();
@@ -148,14 +141,7 @@ impl ModelLoader {
             smooth_model_normals(back_face_vertices);
         }
 
-        if texture_transparency.iter().any(|&t| t) {
-            Self::split_disconnected_meshes(&native_vertices, texture_transparency)
-        } else {
-            vec![SubMesh {
-                transparent: false,
-                native_vertices,
-            }]
-        }
+        native_vertices
     }
 
     fn calculate_matrices(node: &NodeData, parent_matrix: &Matrix4<f32>) -> (Matrix4<f32>, Matrix4<f32>, Matrix4<f32>) {
@@ -173,101 +159,6 @@ impl ModelLoader {
         let box_transform = parent_matrix * translation_matrix * rotation_matrix * scale_matrix;
 
         (main, transform, box_transform)
-    }
-
-    // For nodes with that are transparent, we will split all disconnected meshes,
-    // so that we can properly depth sort them to be able to render transparent
-    // models correctly.
-    fn split_disconnected_meshes(vertices: &[NativeModelVertex], texture_transparency: Vec<bool>) -> Vec<SubMesh> {
-        // Step 1: Split opaque and transparent vertices.
-        let (transparent_vertices, opaque_vertices): (Vec<NativeModelVertex>, Vec<NativeModelVertex>) = vertices
-            .iter()
-            .partition(|vertex| texture_transparency[vertex.texture_index as usize]);
-
-        let mut submeshes: Vec<SubMesh> = vec![SubMesh {
-            transparent: false,
-            native_vertices: opaque_vertices,
-        }];
-
-        if transparent_vertices.is_empty() {
-            return submeshes;
-        }
-
-        // Step 2: Create face AABBs and store them in a KD-tree.
-        let face_aabbs: Vec<(u32, AABB)> = transparent_vertices
-            .chunks_exact(3)
-            .enumerate()
-            .map(|(face_idx, face)| {
-                let aabb = Self::calculate_face_aabb(face);
-                (face_idx as u32, aabb)
-            })
-            .collect();
-        let kdtree = KDTree::from_objects(&face_aabbs);
-
-        // Step 3: For each face, query nearby faces and connect if touching. We use a
-        // KD-tree here, so that we don't need to compare each face against each other
-        // face, which would result in a quadratic time complexity.
-        let face_count = face_aabbs.len();
-        let mut disjoint_union_set = DisjointSetUnion::new(face_count);
-        let mut nearby_faces = Vec::new();
-
-        for (face_idx, face_aabb) in face_aabbs {
-            // Query slightly expanded AABB to catch touching faces.
-            const EPSILON: f32 = 0.1;
-            let query_aabb = face_aabb.expanded(EPSILON);
-
-            kdtree.query(&query_aabb, &mut nearby_faces);
-
-            for other_idx in nearby_faces.drain(..) {
-                if other_idx <= face_idx {
-                    // Skip faces we've already checked.
-                    continue;
-                }
-
-                let face_idx = face_idx as usize;
-                let other_idx = other_idx as usize;
-                let face = &transparent_vertices[face_idx * 3..(face_idx + 1) * 3];
-                let other_face = &transparent_vertices[other_idx * 3..(other_idx + 1) * 3];
-                if Self::faces_are_connected(face, other_face) {
-                    disjoint_union_set.union(face_idx, other_idx);
-                }
-            }
-        }
-
-        // Step 4: Group vertices by their connected faces.
-        let mut groups: HashMap<usize, Vec<NativeModelVertex>> = HashMap::new();
-
-        for index in 0..face_count {
-            let root = disjoint_union_set.find(index);
-            groups
-                .entry(root)
-                .or_default()
-                .extend_from_slice(&transparent_vertices[index * 3..(index + 1) * 3]);
-        }
-
-        submeshes.extend(groups.into_values().map(|vertices| SubMesh {
-            transparent: true,
-            native_vertices: vertices,
-        }));
-
-        submeshes
-    }
-
-    fn calculate_face_aabb(face: &[NativeModelVertex]) -> AABB {
-        AABB::from_vertices(face.iter().map(|vertex| vertex.position))
-    }
-
-    fn faces_are_connected(face1: &[NativeModelVertex], face2: &[NativeModelVertex]) -> bool {
-        const CONNECTION_EPSILON: f32 = 0.01;
-        for vertex1 in face1 {
-            for vertex2 in face2 {
-                let distance = (vertex1.position - vertex2.position).magnitude();
-                if distance < CONNECTION_EPSILON {
-                    return true;
-                }
-            }
-        }
-        false
     }
 
     fn calculate_centroid(vertices: &[NativeModelVertex]) -> Point3<f32> {
@@ -288,7 +179,7 @@ impl ModelLoader {
         main_bounding_box: &mut AABB,
         reverse_order: bool,
         smooth_normals: bool,
-    ) -> Vec<Node> {
+    ) -> Node {
         let (main_matrix, transform_matrix, box_transform_matrix) = Self::calculate_matrices(current_node, parent_matrix);
 
         let box_matrix = box_transform_matrix * main_matrix;
@@ -311,7 +202,7 @@ impl ModelLoader {
 
         let child_nodes: Vec<Node> = child_indices
             .iter()
-            .flat_map(|&index| {
+            .map(|&index| {
                 Self::process_node_mesh(
                     &nodes[index],
                     nodes,
@@ -337,38 +228,30 @@ impl ModelLoader {
             })
             .unzip();
 
-        let mut sub_meshes = Self::make_vertices(current_node, &main_matrix, reverse_order, smooth_normals, texture_transparency);
+        let has_transparent_parts = texture_transparency.iter().any(|x| *x);
 
-        let mut sub_nodes: Vec<Node> = sub_meshes
+        let mut node_native_vertices = Self::make_vertices(current_node, &main_matrix, reverse_order, smooth_normals);
+        let centroid = Self::calculate_centroid(&node_native_vertices);
+
+        node_native_vertices
             .iter_mut()
-            .map(|mesh| {
-                mesh.native_vertices
-                    .iter_mut()
-                    .for_each(|vertice| vertice.texture_index = node_texture_mapping[vertice.texture_index as usize]);
+            .for_each(|vertice| vertice.texture_index = node_texture_mapping[vertice.texture_index as usize]);
 
-                // Remember the vertex offset/count and gather node vertices.
-                let node_vertex_offset = *vertex_offset;
-                let node_vertex_count = mesh.native_vertices.len();
-                *vertex_offset += node_vertex_count;
-                native_vertices.extend(mesh.native_vertices.iter());
+        // Remember the vertex offset/count and gather node vertices.
+        let node_vertex_offset = *vertex_offset;
+        let node_vertex_count = node_native_vertices.len();
+        *vertex_offset += node_vertex_count;
+        native_vertices.extend(node_native_vertices.iter());
 
-                let centroid = Self::calculate_centroid(&mesh.native_vertices);
-
-                Node::new(
-                    transform_matrix,
-                    centroid,
-                    mesh.transparent,
-                    node_vertex_offset,
-                    node_vertex_count,
-                    vec![],
-                    current_node.rotation_keyframes.clone(),
-                )
-            })
-            .collect();
-
-        sub_nodes[0].child_nodes = child_nodes;
-
-        sub_nodes
+        Node::new(
+            transform_matrix,
+            centroid,
+            has_transparent_parts,
+            node_vertex_offset,
+            node_vertex_count,
+            child_nodes,
+            current_node.rotation_keyframes.clone(),
+        )
     }
 
     pub fn calculate_transformation_matrix(node: &mut Node, is_root: bool, bounding_box: AABB, parent_matrix: Matrix4<f32>) {
@@ -472,7 +355,7 @@ impl ModelLoader {
         let mut native_model_vertices = Vec::<NativeModelVertex>::new();
 
         let mut bounding_box = AABB::uninitialized();
-        let mut root_nodes = Self::process_node_mesh(
+        let root_node = Self::process_node_mesh(
             root_node,
             &model_data.nodes,
             &mut processed_node_indices,
@@ -484,6 +367,7 @@ impl ModelLoader {
             reverse_order,
             model_data.shade_type == 2,
         );
+        let mut root_nodes = vec![root_node];
 
         for root_node in root_nodes.iter_mut() {
             Self::calculate_transformation_matrix(root_node, true, bounding_box, Matrix4::identity());
@@ -514,46 +398,4 @@ impl ModelLoader {
 struct ModelTexture {
     index: i32,
     transparent: bool,
-}
-
-struct SubMesh {
-    transparent: bool,
-    native_vertices: Vec<NativeModelVertex>,
-}
-
-struct DisjointSetUnion {
-    parent: Vec<usize>,
-    rank: Vec<usize>,
-}
-
-impl DisjointSetUnion {
-    fn new(size: usize) -> Self {
-        Self {
-            parent: (0..size).collect(),
-            rank: vec![0; size],
-        }
-    }
-
-    fn find(&mut self, index: usize) -> usize {
-        if self.parent[index] != index {
-            self.parent[index] = self.find(self.parent[index]);
-        }
-        self.parent[index]
-    }
-
-    fn union(&mut self, index_a: usize, index_b: usize) {
-        let root_a = self.find(index_a);
-        let root_b = self.find(index_b);
-
-        if root_a != root_b {
-            match self.rank[root_a].cmp(&self.rank[root_b]) {
-                std::cmp::Ordering::Less => self.parent[root_a] = root_b,
-                std::cmp::Ordering::Greater => self.parent[root_b] = root_a,
-                std::cmp::Ordering::Equal => {
-                    self.parent[root_b] = root_a;
-                    self.rank[root_a] += 1;
-                }
-            }
-        }
-    }
 }

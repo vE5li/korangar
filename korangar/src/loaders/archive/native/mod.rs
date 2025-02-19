@@ -5,12 +5,14 @@ mod mixcrypt;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
+use std::ops::Deref;
 use std::path::Path;
 use std::sync::Mutex;
 
+use blake3::Hasher;
 use flate2::bufread::ZlibDecoder;
 #[cfg(feature = "debug")]
-use korangar_debug::logging::{Colorize, Timer};
+use korangar_debug::logging::{print_debug, Colorize, Timer};
 use ragnarok_bytes::{ByteReader, FixedByteSize, FromBytes};
 use ragnarok_formats::archive::{AssetTable, FileTableRow, Header};
 
@@ -110,5 +112,13 @@ impl Archive for NativeArchive {
             .map(|(file_name, _)| file_name.clone());
 
         files.extend(found_files);
+    }
+
+    fn hash(&self, hasher: &mut Hasher) {
+        let file = self.file_handle.lock().unwrap();
+        if let Err(_err) = hasher.update_reader(file.deref()) {
+            #[cfg(feature = "debug")]
+            print_debug!("Can't hash native archive: {:?}", _err);
+        }
     }
 }

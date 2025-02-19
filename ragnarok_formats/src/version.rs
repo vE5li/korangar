@@ -16,6 +16,16 @@ pub struct Version<T> {
     phantom_data: PhantomData<T>,
 }
 
+impl<T> Version<T> {
+    pub fn new(major: u8, minor: u8) -> Self {
+        Self {
+            major,
+            minor,
+            phantom_data: PhantomData,
+        }
+    }
+}
+
 impl FromBytes for Version<MajorFirst> {
     fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
         let major = byte_reader.byte::<Self>()?;

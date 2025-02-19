@@ -1,7 +1,7 @@
 pub mod folder;
 pub mod native;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub trait Archive: Send + Sync {
     fn from_path(path: &Path) -> Self
@@ -13,6 +13,9 @@ pub trait Archive: Send + Sync {
 
     /// Get a list of all files with a given extension.
     fn get_files_with_extension(&self, files: &mut Vec<String>, extension: &str);
+
+    /// Hashes the archive with the given hasher.
+    fn hash(&self, hasher: &mut blake3::Hasher);
 }
 
 pub enum ArchiveType {
@@ -22,7 +25,14 @@ pub enum ArchiveType {
 
 /// A common trait to all writable archives.
 pub trait Writable {
-    fn add_file(&mut self, path: &str, asset: Vec<u8>);
+    fn add_file(&mut self, path: &str, asset: Vec<u8>, compress: bool);
+    fn finish(&mut self) -> Result<(), std::io::Error>;
+}
 
-    fn save(&self) {}
+/// Converts a RO internal path to the OS specific path.
+pub fn os_specific_path(path: &str) -> PathBuf {
+    match cfg!(target_os = "windows") {
+        true => PathBuf::from(path),
+        false => PathBuf::from(path.replace('\\', "/")),
+    }
 }

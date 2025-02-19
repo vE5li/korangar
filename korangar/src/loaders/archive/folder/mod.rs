@@ -1,11 +1,18 @@
 //! An OS folder containing game assets.
 use std::collections::HashMap;
 use std::fs;
+use std::fs::File;
+use std::io::{Error, Read};
 use std::path::{Path, PathBuf};
 
+use blake3::Hasher;
+use flate2::bufread::{GzDecoder, GzEncoder};
+use flate2::Compression;
+#[cfg(feature = "debug")]
+use korangar_debug::logging::print_debug;
 use walkdir::WalkDir;
 
-use super::{Archive, Writable};
+use super::{os_specific_path, Archive, Writable};
 
 pub struct FolderArchive {
     folder_path: PathBuf,
@@ -21,13 +28,6 @@ pub struct FolderArchive {
 }
 
 impl FolderArchive {
-    fn os_specific_path(path: &str) -> PathBuf {
-        match cfg!(target_os = "windows") {
-            true => PathBuf::from(path),
-            false => PathBuf::from(path.replace('\\', "/")),
-        }
-    }
-
     /// Load the file mapping of a given directory.
     fn load_mapping(directory: &PathBuf) -> HashMap<String, PathBuf> {
         WalkDir::new(directory)
@@ -35,7 +35,7 @@ impl FolderArchive {
             .filter_map(|entry| entry.ok())
             .filter(|entry| entry.file_type().is_file())
             .map(|file| {
-                let asset_path = file
+                let mut asset_path = file
                     .path()
                     .strip_prefix(directory)
                     .unwrap()
@@ -44,9 +44,18 @@ impl FolderArchive {
                     .replace('/', "\\")
                     .to_lowercase();
 
+                if asset_path.ends_with(".gz") {
+                    asset_path = asset_path.strip_suffix(".gz").unwrap().to_string();
+                }
+
                 (asset_path, file.into_path())
             })
             .collect()
+    }
+
+    pub fn remove_file(&mut self, asset_path: &str) {
+        let file_path = os_specific_path(asset_path);
+        let _ = fs::remove_file(file_path);
     }
 }
 
@@ -59,20 +68,49 @@ impl Archive for FolderArchive {
     }
 
     fn get_file_by_path(&self, asset_path: &str) -> Option<Vec<u8>> {
-        self.file_mapping.get(asset_path).and_then(|file_path| fs::read(file_path).ok())
+        self.file_mapping.get(asset_path).and_then(|file_path| {
+            fs::read(file_path)
+                .map(|file_data| {
+                    if file_path.extension().unwrap_or_default() == "gz" {
+                        let mut decoder = GzDecoder::new(file_data.as_slice());
+                        let mut decompressed = Vec::new();
+                        decoder.read_to_end(&mut decompressed).unwrap();
+                        decompressed
+                    } else {
+                        file_data
+                    }
+                })
+                .ok()
+        })
     }
 
     fn get_files_with_extension(&self, files: &mut Vec<String>, extension: &str) {
         let found_files = self.file_mapping.keys().filter(|file_name| file_name.ends_with(extension)).cloned();
-
         files.extend(found_files);
+    }
+
+    fn hash(&self, hasher: &mut Hasher) {
+        let mut files: Vec<PathBuf> = self.file_mapping.values().cloned().collect();
+        files.sort();
+        files.iter().for_each(|file_path| match File::open(file_path) {
+            Ok(file) => {
+                if let Err(_err) = hasher.update_reader(&file) {
+                    #[cfg(feature = "debug")]
+                    print_debug!("Can't hash archive file `{:?}`: {:?}", file_path, _err);
+                }
+            }
+            Err(_err) => {
+                #[cfg(feature = "debug")]
+                print_debug!("Can't open archive file `{:?}`: {:?}", file_path, _err);
+            }
+        });
     }
 }
 
 impl Writable for FolderArchive {
-    fn add_file(&mut self, file_path: &str, file_data: Vec<u8>) {
-        let normalized_asset_path = Self::os_specific_path(file_path);
-        let full_path = self.folder_path.join(normalized_asset_path);
+    fn add_file(&mut self, file_path: &str, file_data: Vec<u8>, compress: bool) {
+        let normalized_asset_path = os_specific_path(file_path);
+        let mut full_path = self.folder_path.join(normalized_asset_path);
 
         // Create parent directories if needed
         if let Some(parent) = full_path.parent() {
@@ -83,7 +121,28 @@ impl Writable for FolderArchive {
             }
         }
 
-        // Write file contents to the file
-        fs::write(&full_path, file_data).unwrap_or_else(|_| panic!("error writing to file {}", full_path.display()));
+        let (path, data) = match compress {
+            true => {
+                let mut encoder = GzEncoder::new(file_data.as_slice(), Compression::fast());
+                let mut compressed = Vec::default();
+                encoder.read_to_end(&mut compressed).unwrap();
+
+                let extension = full_path.extension().unwrap_or_default().to_string_lossy().into_owned();
+
+                let compressed_extension = format!("{}.gz", extension);
+                full_path.set_extension(compressed_extension);
+
+                (full_path, compressed)
+            }
+            false => (full_path, file_data),
+        };
+
+        fs::write(&path, data).unwrap_or_else(|_| panic!("error writing to file {}", path.display()));
+
+        self.file_mapping.insert(file_path.to_string(), path);
+    }
+
+    fn finish(&mut self) -> Result<(), Error> {
+        Ok(())
     }
 }

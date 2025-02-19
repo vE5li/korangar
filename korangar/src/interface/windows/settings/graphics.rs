@@ -4,8 +4,7 @@ use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_interface::{dimension_bound, size_bound};
 
 use crate::graphics::{
-    LimitFramerate, Msaa, PresentModeInfo, ScreenSpaceAntiAliasing, ShadowDetail, ShadowQuality, Ssaa, TextureCompression,
-    TextureSamplerType,
+    LimitFramerate, Msaa, PresentModeInfo, ScreenSpaceAntiAliasing, ShadowDetail, ShadowQuality, Ssaa, TextureSamplerType,
 };
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
@@ -24,7 +23,6 @@ pub struct GraphicsSettingsWindow<
     ShadowResolution,
     ShadowMode,
     HighQualityInterface,
-    Compression,
 > where
     LightingRenderMode: TrackedState<LightingMode> + 'static,
     Vsync: TrackedStateBinary<bool>,
@@ -37,7 +35,6 @@ pub struct GraphicsSettingsWindow<
     ShadowResolution: TrackedState<ShadowDetail> + 'static,
     ShadowMode: TrackedState<ShadowQuality> + 'static,
     HighQualityInterface: TrackedStateBinary<bool>,
-    Compression: TrackedState<TextureCompression> + 'static,
 {
     present_mode_info: PresentModeInfo,
     supported_msaa: Vec<(String, Msaa)>,
@@ -52,7 +49,6 @@ pub struct GraphicsSettingsWindow<
     shadow_detail: ShadowResolution,
     shadow_quality: ShadowMode,
     high_quality_interface: HighQualityInterface,
-    texture_compression: Compression,
 }
 
 impl<
@@ -67,7 +63,6 @@ impl<
         ShadowResolution,
         ShadowMode,
         HighQualityInterface,
-        Compression,
     >
     GraphicsSettingsWindow<
         LightingRenderMode,
@@ -81,7 +76,6 @@ impl<
         ShadowResolution,
         ShadowMode,
         HighQualityInterface,
-        Compression,
     >
 where
     LightingRenderMode: TrackedState<LightingMode> + 'static,
@@ -95,7 +89,6 @@ where
     ShadowResolution: TrackedState<ShadowDetail> + 'static,
     ShadowMode: TrackedState<ShadowQuality> + 'static,
     HighQualityInterface: TrackedStateBinary<bool>,
-    Compression: TrackedState<TextureCompression> + 'static,
 {
     pub const WINDOW_CLASS: &'static str = "graphics_settings";
 
@@ -113,7 +106,6 @@ where
         shadow_detail: ShadowResolution,
         shadow_quality: ShadowMode,
         high_quality_interface: HighQualityInterface,
-        texture_compression: Compression,
     ) -> Self {
         Self {
             present_mode_info,
@@ -129,7 +121,6 @@ where
             shadow_detail,
             shadow_quality,
             high_quality_interface,
-            texture_compression,
         }
     }
 }
@@ -146,7 +137,6 @@ impl<
         ShadowResolution,
         ShadowMode,
         HighQualityInterface,
-        Compression,
     > PrototypeWindow<InterfaceSettings>
     for GraphicsSettingsWindow<
         LightingRenderMode,
@@ -160,7 +150,6 @@ impl<
         ShadowResolution,
         ShadowMode,
         HighQualityInterface,
-        Compression,
     >
 where
     LightingRenderMode: TrackedState<LightingMode> + 'static,
@@ -174,7 +163,6 @@ where
     ShadowResolution: TrackedState<ShadowDetail> + 'static,
     ShadowMode: TrackedState<ShadowQuality> + 'static,
     HighQualityInterface: TrackedStateBinary<bool>,
-    Compression: TrackedState<TextureCompression> + 'static,
 {
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
@@ -213,22 +201,6 @@ where
                     ("Anisotropic x16", TextureSamplerType::Anisotropic(16)),
                 ])
                 .with_selected(self.texture_filtering.clone())
-                .with_event(Box::new(Vec::new))
-                .with_width(dimension_bound!(!))
-                .wrap(),
-            Text::default()
-                .with_text("Texture compression")
-                .with_width(dimension_bound!(50%))
-                .wrap(),
-            PickList::default()
-                .with_options(vec![
-                    ("Off", TextureCompression::Off),
-                    ("Ultra Fast", TextureCompression::UltraFast),
-                    ("Very Fast", TextureCompression::VeryFast),
-                    ("Fast", TextureCompression::Fast),
-                    ("Normal", TextureCompression::Normal),
-                ])
-                .with_selected(self.texture_compression.clone())
                 .with_event(Box::new(Vec::new))
                 .with_width(dimension_bound!(!))
                 .wrap(),

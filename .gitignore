@@ -4,6 +4,7 @@ target/
 # Korangar
 korangar/archive/data/font/*
 korangar/client/
+korangar/cache/
 korangar/data.grf
 korangar/rdata.grf
 korangar/lua_files/

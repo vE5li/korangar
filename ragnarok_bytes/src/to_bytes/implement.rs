@@ -1,5 +1,5 @@
 #[cfg(feature = "cgmath")]
-use cgmath::{Matrix3, Point3, Quaternion, Vector2, Vector3, Vector4};
+use cgmath::{Matrix3, Point2, Point3, Quaternion, Vector2, Vector3, Vector4};
 
 use crate::{ConversionResult, ConversionResultExt, ToBytes};
 
@@ -117,6 +117,16 @@ impl<T: ToBytes> ToBytes for Vector4<T> {
         bytes.append(&mut self.y.to_bytes().trace::<Self>()?);
         bytes.append(&mut self.z.to_bytes().trace::<Self>()?);
         bytes.append(&mut self.w.to_bytes().trace::<Self>()?);
+        Ok(bytes)
+    }
+}
+
+#[cfg(feature = "cgmath")]
+impl<T: ToBytes> ToBytes for Point2<T> {
+    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
+        let mut bytes = self.x.to_bytes().trace::<Self>()?;
+        bytes.append(&mut self.y.to_bytes().trace::<Self>()?);
+
         Ok(bytes)
     }
 }

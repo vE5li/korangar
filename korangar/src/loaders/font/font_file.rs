@@ -1,9 +1,8 @@
-use std::io::{Cursor, Read};
+use std::io::Cursor;
 use std::sync::Arc;
 
 use cosmic_text::fontdb::{Source, ID};
 use cosmic_text::FontSystem;
-use flate2::bufread::GzDecoder;
 use hashbrown::HashMap;
 use image::{ImageFormat, ImageReader, RgbaImage};
 #[cfg(feature = "debug")]
@@ -30,7 +29,7 @@ impl FontFile {
         let font_base_path = format!("{}\\{}", FONT_FOLDER_PATH, name);
         let ttf_file_path = format!("{}.ttf", font_base_path);
         let map_file_path = format!("{}.png", font_base_path);
-        let map_description_file_path = format!("{}.csv.gz", font_base_path);
+        let map_description_file_path = format!("{}.csv", font_base_path);
 
         let Ok(font_data) = game_file_loader.get(&ttf_file_path) else {
             #[cfg(feature = "debug")]
@@ -58,7 +57,7 @@ impl FontFile {
         let font_map_width = font_map_rgba_image.width();
         let font_map_height = font_map_rgba_image.height();
 
-        let Ok(mut font_description_data) = game_file_loader.get(&map_description_file_path) else {
+        let Ok(font_description_data) = game_file_loader.get(&map_description_file_path) else {
             #[cfg(feature = "debug")]
             print_debug!(
                 "[{}] failed to load font map description file '{}'",
@@ -67,22 +66,6 @@ impl FontFile {
             );
             return None;
         };
-
-        let mut decoder = GzDecoder::new(&font_description_data[..]);
-        let mut data = Vec::with_capacity(font_description_data.len() * 2);
-
-        if let Err(_err) = decoder.read_to_end(&mut data) {
-            #[cfg(feature = "debug")]
-            print_debug!(
-                "[{}] failed to decompress font map description file '{}': {:?}",
-                "error".red(),
-                map_description_file_path.magenta(),
-                _err
-            );
-            return None;
-        }
-
-        font_description_data = data;
 
         let Ok(font_description_content) = String::from_utf8(font_description_data) else {
             #[cfg(feature = "debug")]

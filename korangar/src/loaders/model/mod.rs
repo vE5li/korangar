@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use cgmath::{EuclideanSpace, Matrix4, Point3, Rad, SquareMatrix, Vector2, Vector3};
 use derive_new::new;
+use hashbrown::HashSet;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize, Timer};
 use korangar_util::collision::AABB;
@@ -16,8 +17,7 @@ use super::error::LoadError;
 use super::{smooth_model_normals, FALLBACK_MODEL_FILE};
 use crate::graphics::{Color, NativeModelVertex};
 use crate::loaders::map::DeferredVertexGeneration;
-use crate::loaders::texture::TextureAtlasEntry;
-use crate::loaders::{GameFileLoader, TextureAtlasFactory};
+use crate::loaders::{GameFileLoader, TextureAtlas, TextureAtlasEntry};
 use crate::world::{Model, Node};
 
 #[derive(new)]
@@ -273,9 +273,24 @@ impl ModelLoader {
             .for_each(|child_node| Self::calculate_transformation_matrix(child_node, false, bounding_box, node.transform_matrix));
     }
 
+    pub fn collect_model_textures(&self, textures: &mut HashSet<String>, model_file: &str) {
+        let Ok(bytes) = self.game_file_loader.get(&format!("data\\model\\{model_file}")) else {
+            return;
+        };
+        let mut byte_reader: ByteReader<Option<InternalVersion>> = ByteReader::with_default_metadata(&bytes);
+
+        let Ok(model_data) = ModelData::from_bytes(&mut byte_reader) else {
+            return;
+        };
+
+        model_data.texture_names.iter().for_each(|texture_name| {
+            let _ = textures.insert(texture_name.inner.clone());
+        });
+    }
+
     pub fn load(
         &self,
-        texture_atlas_factory: &mut TextureAtlasFactory,
+        texture_atlas: &mut dyn TextureAtlas,
         vertex_offset: &mut usize,
         model_file: &str,
         reverse_order: bool,
@@ -292,7 +307,7 @@ impl ModelLoader {
                     print_debug!("Replacing with fallback");
                 }
 
-                return self.load(texture_atlas_factory, vertex_offset, FALLBACK_MODEL_FILE, reverse_order);
+                return self.load(texture_atlas, vertex_offset, FALLBACK_MODEL_FILE, reverse_order);
             }
         };
         let mut byte_reader: ByteReader<Option<InternalVersion>> = ByteReader::with_default_metadata(&bytes);
@@ -306,7 +321,7 @@ impl ModelLoader {
                     print_debug!("Replacing with fallback");
                 }
 
-                return self.load(texture_atlas_factory, vertex_offset, FALLBACK_MODEL_FILE, reverse_order);
+                return self.load(texture_atlas, vertex_offset, FALLBACK_MODEL_FILE, reverse_order);
             }
         };
 
@@ -322,13 +337,13 @@ impl ModelLoader {
                 print_debug!("Replacing with fallback");
             }
 
-            return self.load(texture_atlas_factory, vertex_offset, FALLBACK_MODEL_FILE, reverse_order);
+            return self.load(texture_atlas, vertex_offset, FALLBACK_MODEL_FILE, reverse_order);
         }
 
         let texture_allocation: Vec<TextureAtlasEntry> = model_data
             .texture_names
             .iter()
-            .map(|texture_name| texture_atlas_factory.register(texture_name.as_ref()))
+            .map(|texture_name| texture_atlas.register(texture_name.as_ref()))
             .collect();
 
         let texture_mapping: Vec<ModelTexture> = texture_allocation

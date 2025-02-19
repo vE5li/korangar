@@ -3,6 +3,7 @@ mod animation;
 mod archive;
 
 mod r#async;
+mod cache;
 mod effect;
 pub mod error;
 mod font;
@@ -16,6 +17,7 @@ mod texture;
 
 pub use self::action::*;
 pub use self::animation::*;
+pub use self::cache::{Cache, CachedTextureAtlas};
 pub use self::effect::EffectLoader;
 pub use self::font::{FontLoader, FontSize, GlyphInstruction, Scaling};
 pub use self::gamefile::*;
@@ -25,7 +27,7 @@ pub use self::r#async::*;
 pub use self::server::{load_client_info, ClientInfo, ServiceId};
 pub use self::smoothing::{smooth_ground_normals, smooth_model_normals};
 pub use self::sprite::*;
-pub use self::texture::{ImageType, TextureAtlasFactory, TextureLoader};
+pub use self::texture::{ImageType, TextureAtlas, TextureAtlasEntry, TextureLoader, UncompressedTextureAtlas};
 
 pub const FALLBACK_BMP_FILE: &str = "missing.bmp";
 pub const FALLBACK_JPEG_FILE: &str = "missing.jpg";

@@ -209,9 +209,20 @@ impl<'a, I: SimpleKey, T> Drop for DrainIter<'a, I, T> {
 
 /// A secondary slab with generational slots. Re-uses the key from another
 /// [`SimpleSlab`].
+#[derive(Clone)]
 pub struct SecondarySimpleSlab<I, V> {
     entries: Vec<Option<V>>,
     _marker: PhantomData<I>,
+}
+
+impl<I, V> SecondarySimpleSlab<I, V> {
+    /// Creates a new [`SecondarySimpleSlab`] with the given capacity.
+    pub fn with_capacity(capacity: u32) -> Self {
+        Self {
+            entries: Vec::with_capacity(capacity as usize),
+            _marker: PhantomData,
+        }
+    }
 }
 
 impl<I: SimpleKey, V> Default for SecondarySimpleSlab<I, V> {
@@ -270,6 +281,16 @@ impl<I: SimpleKey, V> SecondarySimpleSlab<I, V> {
     pub fn clear(&mut self) {
         self.entries.clear();
     }
+
+    /// Iterates over all non-empty entries.
+    #[must_use]
+    pub fn iter(&self) -> SecondarySimpleIterator<I, V> {
+        SecondarySimpleIterator {
+            entries: self.entries.iter().enumerate(),
+            size: self.entries.len(),
+            _marker: PhantomData,
+        }
+    }
 }
 
 /// Iterator over all non-empty entry slots.
@@ -286,6 +307,31 @@ impl<'a, I: SimpleKey, T> Iterator for SimpleIterator<'a, I, T> {
         loop {
             match self.entries.next() {
                 Some((index, Slot::Occupied(value))) => return Some((I::new(index as u32), value)),
+                Some(_) => continue,
+                None => return None,
+            }
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, Some(self.size))
+    }
+}
+
+/// Iterator over all non-empty entry slots.
+pub struct SecondarySimpleIterator<'a, I, T: 'a> {
+    entries: Enumerate<Iter<'a, Option<T>>>,
+    size: usize,
+    _marker: PhantomData<I>,
+}
+
+impl<'a, I: SimpleKey, T> Iterator for SecondarySimpleIterator<'a, I, T> {
+    type Item = (I, &'a T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            match self.entries.next() {
+                Some((index, Some(value))) => return Some((I::new(index as u32), value)),
                 Some(_) => continue,
                 None => return None,
             }

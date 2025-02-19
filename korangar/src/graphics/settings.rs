@@ -2,11 +2,9 @@ use std::fmt::{Display, Formatter};
 #[cfg(feature = "debug")]
 use std::num::NonZeroU32;
 
-use block_compression::{BC7Settings, CompressionVariant};
 #[cfg(feature = "debug")]
 use derive_new::new;
 use serde::{Deserialize, Serialize};
-use wgpu::TextureFormat;
 
 use crate::interface::layout::ScreenSize;
 
@@ -166,46 +164,6 @@ impl Display for ScreenSpaceAntiAliasing {
         match self {
             ScreenSpaceAntiAliasing::Off => "Off".fmt(f),
             ScreenSpaceAntiAliasing::Fxaa => "FXAA".fmt(f),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub enum TextureCompression {
-    Off,
-    UltraFast,
-    VeryFast,
-    Fast,
-    Normal,
-}
-
-impl TextureCompression {
-    pub fn is_uncompressed(&self) -> bool {
-        *self == TextureCompression::Off
-    }
-}
-
-impl From<TextureCompression> for TextureFormat {
-    fn from(value: TextureCompression) -> Self {
-        match value {
-            TextureCompression::Off => TextureFormat::Rgba8UnormSrgb,
-            TextureCompression::UltraFast | TextureCompression::VeryFast | TextureCompression::Fast | TextureCompression::Normal => {
-                TextureFormat::Bc7RgbaUnormSrgb
-            }
-        }
-    }
-}
-
-impl TryFrom<TextureCompression> for CompressionVariant {
-    type Error = ();
-
-    fn try_from(value: TextureCompression) -> Result<Self, Self::Error> {
-        match value {
-            TextureCompression::Off => Err(()),
-            TextureCompression::UltraFast => Ok(CompressionVariant::BC7(BC7Settings::alpha_ultrafast())),
-            TextureCompression::VeryFast => Ok(CompressionVariant::BC7(BC7Settings::alpha_very_fast())),
-            TextureCompression::Fast => Ok(CompressionVariant::BC7(BC7Settings::alpha_fast())),
-            TextureCompression::Normal => Ok(CompressionVariant::BC7(BC7Settings::alpha_basic())),
         }
     }
 }

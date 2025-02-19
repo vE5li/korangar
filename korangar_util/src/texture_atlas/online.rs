@@ -1,5 +1,4 @@
 //! A simple texture atlas for online generation.
-
 use cgmath::{Point2, Vector2};
 
 use super::AtlasAllocation;

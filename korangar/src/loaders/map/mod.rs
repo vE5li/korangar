@@ -5,7 +5,7 @@ use std::sync::Arc;
 use bytemuck::Pod;
 use cgmath::{Array, Point2, Vector3};
 use derive_new::new;
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use korangar_audio::AudioEngine;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::Timer;
@@ -21,8 +21,8 @@ use wgpu::{BufferUsages, Device, Queue};
 pub use self::vertices::MAP_TILE_SIZE;
 use self::vertices::{generate_tile_vertices, ground_vertices};
 use super::error::LoadError;
-use crate::graphics::{Buffer, ModelVertex, NativeModelVertex, Texture, TextureCompression};
-use crate::loaders::{GameFileLoader, ImageType, ModelLoader, TextureAtlasFactory, TextureLoader};
+use crate::graphics::{Buffer, ModelVertex, NativeModelVertex, Texture};
+use crate::loaders::{GameFileLoader, ImageType, ModelLoader, TextureAtlas, TextureLoader, FALLBACK_MODEL_FILE};
 use crate::world::{LightSourceKey, Lighting, Model};
 use crate::{EffectSourceExt, LightSourceExt, Map, Object, ObjectKey, SoundSourceExt};
 
@@ -55,9 +55,30 @@ pub struct MapLoader {
 }
 
 impl MapLoader {
+    pub fn collect_map_textures(&self, model_loader: &ModelLoader, resource_file: &str) -> Result<HashSet<String>, LoadError> {
+        let mut textures = HashSet::new();
+        let map_file_name = format!("data\\{}.rsw", resource_file);
+        let map_data: MapData = parse_generic_data(&map_file_name, &self.game_file_loader)?;
+
+        let ground_file = format!("data\\{}", map_data.ground_file);
+        let ground_data: GroundData = parse_generic_data(&ground_file, &self.game_file_loader)?;
+
+        ground_data.textures.iter().for_each(|texture_name| {
+            textures.insert(texture_name.clone());
+        });
+
+        model_loader.collect_model_textures(&mut textures, FALLBACK_MODEL_FILE);
+
+        map_data.resources.objects.iter().for_each(|object_data| {
+            model_loader.collect_model_textures(&mut textures, object_data.model_name.as_str());
+        });
+
+        Ok(textures)
+    }
+
     pub fn load(
         &self,
-        texture_compression: TextureCompression,
+        texture_atlas: &mut dyn TextureAtlas,
         resource_file: String,
         model_loader: &ModelLoader,
         texture_loader: Arc<TextureLoader>,
@@ -66,7 +87,6 @@ impl MapLoader {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load map from {}", &resource_file));
 
-        let mut texture_atlas_factory = TextureAtlasFactory::new(texture_loader.clone(), "map", true, true, texture_compression);
         let mut deferred_vertex_generation: Vec<DeferredVertexGeneration> = Vec::new();
 
         let map_file_name = format!("data\\{}.rsw", resource_file);
@@ -102,7 +122,7 @@ impl MapLoader {
             .textures
             .iter()
             .map(|texture_name| {
-                let entry = texture_atlas_factory.register(texture_name);
+                let entry = texture_atlas.register(texture_name);
                 debug_assert!(!entry.transparent, "found transparent ground texture");
                 entry.allocation_id
             })
@@ -158,7 +178,7 @@ impl MapLoader {
                     .or_insert_with(|| {
                         let (model, deferred) = model_loader
                             .load(
-                                &mut texture_atlas_factory,
+                                &mut (*texture_atlas),
                                 &mut vertex_offset,
                                 object_data.model_name.as_str(),
                                 reverse_order,
@@ -184,8 +204,13 @@ impl MapLoader {
             .collect();
         let object_kdtree = KDTree::from_objects(&object_bounding_boxes);
 
-        let (texture, vertex_buffer) =
-            self.generate_vertex_buffer_and_atlas_texture(&resource_file, texture_atlas_factory, deferred_vertex_generation, vertex_offset);
+        let (texture, vertex_buffer) = self.generate_vertex_buffer_and_atlas_texture(
+            &resource_file,
+            &texture_loader,
+            texture_atlas,
+            deferred_vertex_generation,
+            vertex_offset,
+        );
 
         let lighting = Lighting::new(map_data.light_settings);
 
@@ -210,7 +235,6 @@ impl MapLoader {
             .filter(|_| !(water_bounds.min == Point2::from_value(f32::MAX) && water_bounds.max == Point2::from_value(f32::MIN)));
 
         let map = Map::new(
-            resource_file,
             gat_data.map_width as usize,
             gat_data.map_height as usize,
             lighting,
@@ -246,26 +270,27 @@ impl MapLoader {
     fn generate_vertex_buffer_and_atlas_texture(
         &self,
         resource_file: &str,
-        mut texture_atlas_factory: TextureAtlasFactory,
+        texture_loader: &TextureLoader,
+        texture_atlas: &mut dyn TextureAtlas,
         mut deferred_vertex_generation: Vec<DeferredVertexGeneration>,
         vertex_offset: usize,
     ) -> (Arc<Texture>, Arc<Buffer<ModelVertex>>) {
         // We can now generate the final texture atlas. Then we can map the final model
         // vertices texture coordinates.
-        texture_atlas_factory.build_atlas();
+        texture_atlas.build_atlas();
 
         let mut vertices = Vec::with_capacity(vertex_offset);
         for mut deferred in deferred_vertex_generation.drain(..) {
             let texture_mapping: Vec<AtlasAllocation> = deferred
                 .texture_allocation
                 .drain(..)
-                .map(|allocation_id| texture_atlas_factory.get_allocation(allocation_id).unwrap())
+                .map(|allocation_id| texture_atlas.get_allocation(allocation_id).unwrap())
                 .collect();
             let model_vertices = NativeModelVertex::to_vertices(deferred.native_model_vertices, &texture_mapping);
             vertices.extend(model_vertices);
         }
 
-        let texture = texture_atlas_factory.upload_texture_atlas_texture();
+        let texture = texture_atlas.create_texture(texture_loader);
         let vertex_buffer = Arc::new(self.create_vertex_buffer(resource_file, "map vertices", &vertices));
 
         (texture, vertex_buffer)

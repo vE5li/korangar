@@ -66,7 +66,6 @@ impl MarkerIdentifier {
 
 #[derive(new)]
 pub struct Map {
-    resource_file: String,
     width: usize,
     height: usize,
     lighting: Lighting,
@@ -96,10 +95,6 @@ pub struct Map {
 impl Map {
     pub fn water_bounds(&self) -> Rectangle<f32> {
         self.water_bounds
-    }
-
-    pub fn get_resource_file(&self) -> &str {
-        &self.resource_file
     }
 
     fn average_tile_height(tile: &Tile) -> f32 {

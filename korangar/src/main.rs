@@ -157,7 +157,12 @@ fn main() {
         init_tls_rand();
     });
 
-    let mut client = Client::init();
+    let args: Vec<String> = std::env::args().collect();
+    let sync_cache = args.len() > 1 && &args[1] == "sync-cache";
+
+    let Some(mut client) = Client::init(sync_cache) else {
+        return;
+    };
 
     let event_loop = EventLoop::new().unwrap();
     event_loop.set_control_flow(ControlFlow::Poll);
@@ -210,7 +215,6 @@ struct Client {
     ssaa: MappedRemote<GraphicsSettings, Ssaa>,
     screen_space_anti_aliasing: MappedRemote<GraphicsSettings, ScreenSpaceAntiAliasing>,
     high_quality_interface: MappedRemote<GraphicsSettings, bool>,
-    texture_compression: MappedRemote<GraphicsSettings, TextureCompression>,
     #[cfg(feature = "debug")]
     render_settings: PlainTrackedState<RenderSettings>,
     mute_on_focus_loss: MappedRemote<AudioSettings, bool>,
@@ -295,7 +299,7 @@ struct Client {
 }
 
 impl Client {
-    fn init() -> Self {
+    fn init(sync_cache: bool) -> Option<Self> {
         time_phase!("load settings", {
             let picker_value = Arc::new(AtomicU64::new(0));
             let input_system = InputSystem::new(picker_value.clone());
@@ -315,7 +319,6 @@ impl Client {
                 .mapped(|settings| &settings.screen_space_anti_aliasing)
                 .new_remote();
             let high_quality_interface = graphics_settings.mapped(|settings| &settings.high_quality_interface).new_remote();
-            let texture_compression = graphics_settings.mapped(|settings| &settings.texture_compression).new_remote();
 
             #[cfg(feature = "debug")]
             let render_settings = PlainTrackedState::new(RenderSettings::new());
@@ -381,6 +384,12 @@ impl Client {
             game_file_loader.load_patched_lua_files();
         });
 
+        time_phase!("calculate game file hash", {
+            let game_file_hash = game_file_loader.calculate_hash();
+            #[cfg(feature = "debug")]
+            print_debug!("game file hash: {}", game_file_hash);
+        });
+
         time_phase!("create audio engine", {
             let audio_settings = PlainTrackedState::new(AudioSettings::new());
             let mute_on_focus_loss = audio_settings.mapped(|settings| &settings.mute_on_focus_loss).new_remote();
@@ -424,7 +433,22 @@ impl Client {
                 Library::new(&game_file_loader).unwrap()
             });
 
+            let cache = Arc::new(Cache::new(
+                &game_file_loader,
+                texture_loader.clone(),
+                &map_loader,
+                &model_loader,
+                game_file_hash,
+                capabilities.supports_texture_compression(),
+                sync_cache,
+            ));
+
+            if sync_cache {
+                return None;
+            }
+
             let async_loader = Arc::new(AsyncLoader::new(
+                cache.clone(),
                 action_loader.clone(),
                 animation_loader.clone(),
                 map_loader.clone(),
@@ -552,20 +576,16 @@ impl Client {
             let bounding_box_object_set_buffer = ResourceSetBuffer::default();
 
             #[cfg(feature = "debug")]
-            let (pathing_texture_mapping, pathing_texture) = TextureAtlasFactory::create_from_group(
-                texture_loader.clone(),
-                "pathing",
-                false,
-                &["pathing_goal.png", "pathing_straight.png", "pathing_diagonal.png"],
-                graphics_engine.check_texture_compression_requirements(*texture_compression.get()),
-            );
+            let (pathing_texture_mapping, pathing_texture) =
+                UncompressedTextureAtlas::create_from_group(texture_loader.clone(), "pathing", false, &[
+                    "pathing_goal.png",
+                    "pathing_straight.png",
+                    "pathing_diagonal.png",
+                ]);
 
             #[cfg(feature = "debug")]
-            let (tile_texture_mapping, tile_texture) = TextureAtlasFactory::create_from_group(
-                texture_loader.clone(),
-                "tile",
-                false,
-                &[
+            let (tile_texture_mapping, tile_texture) =
+                UncompressedTextureAtlas::create_from_group(texture_loader.clone(), "tile", false, &[
                     "tile_0.png",
                     "tile_1.png",
                     "tile_2.png",
@@ -573,9 +593,7 @@ impl Client {
                     "tile_4.png",
                     "tile_5.png",
                     "tile_6.png",
-                ],
-                graphics_engine.check_texture_compression_requirements(*texture_compression.get()),
-            );
+                ]);
             #[cfg(feature = "debug")]
             let tile_texture_mapping = Arc::new(tile_texture_mapping);
 
@@ -592,11 +610,20 @@ impl Client {
         });
 
         time_phase!("load default map", {
-            let compression = graphics_engine.check_texture_compression_requirements(*texture_compression.get());
+            let mut texture_atlas: Box<dyn TextureAtlas> = match cache.load_texture_atlas(DEFAULT_MAP) {
+                Some(texture_atlas) => Box::new(texture_atlas),
+                None => Box::new(UncompressedTextureAtlas::new(
+                    texture_loader.clone(),
+                    DEFAULT_MAP.to_string(),
+                    true,
+                    true,
+                    false,
+                )),
+            };
 
             let map = map_loader
                 .load(
-                    compression,
+                    &mut (*texture_atlas),
                     DEFAULT_MAP.to_string(),
                     &model_loader,
                     texture_loader.clone(),
@@ -608,7 +635,7 @@ impl Client {
             audio_engine.play_background_music_track(DEFAULT_BACKGROUND_MUSIC);
         });
 
-        Self {
+        Some(Self {
             action_loader,
             async_loader,
             effect_loader,
@@ -652,7 +679,6 @@ impl Client {
             ssaa,
             screen_space_anti_aliasing,
             high_quality_interface,
-            texture_compression,
             #[cfg(feature = "debug")]
             render_settings,
             mute_on_focus_loss,
@@ -720,7 +746,7 @@ impl Client {
             #[cfg(feature = "debug")]
             device,
             window: None,
-        }
+        })
     }
 
     fn render_frame(&mut self, event_loop: &ActiveEventLoop) {
@@ -900,8 +926,6 @@ impl Client {
                     self.interface.close_all_windows_except(&mut self.focus_state);
 
                     self.async_loader.request_map_load(
-                        self.graphics_engine
-                            .check_texture_compression_requirements(*self.texture_compression.get()),
                         DEFAULT_MAP.to_string(),
                         Some(TilePosition::new(0, 0)),
                         #[cfg(feature = "debug")]
@@ -1109,8 +1133,6 @@ impl Client {
                     self.entities.truncate(1);
 
                     self.async_loader.request_map_load(
-                        self.graphics_engine
-                            .check_texture_compression_requirements(*self.texture_compression.get()),
                         map_name,
                         Some(player_position),
                         #[cfg(feature = "debug")]
@@ -1553,7 +1575,6 @@ impl Client {
                         self.shadow_detail.clone_state(),
                         self.shadow_quality.clone_state(),
                         self.high_quality_interface.clone_state(),
-                        self.texture_compression.clone_state(),
                     ),
                 ),
                 UserEvent::OpenAudioSettingsWindow => self.interface.open_window(
@@ -2483,19 +2504,6 @@ impl Client {
             self.interface_renderer.update_high_quality_interface(high_quality_interface);
             self.graphics_engine.set_high_quality_interface(high_quality_interface);
             update_interface = true;
-        }
-
-        if self.texture_compression.consume_changed() {
-            if let Some(map) = self.map.as_ref() {
-                self.async_loader.request_map_load(
-                    self.graphics_engine
-                        .check_texture_compression_requirements(*self.texture_compression.get()),
-                    map.get_resource_file().to_string(),
-                    None,
-                    #[cfg(feature = "debug")]
-                    self.tile_texture_mapping.clone(),
-                );
-            }
         }
 
         if update_interface {

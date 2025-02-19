@@ -17,7 +17,7 @@ use winit::window::Window;
 
 use super::{
     AntiAliasingResources, Capabilities, FramePacer, FrameStage, GlobalContext, LimitFramerate, Msaa, Prepare, PresentModeInfo,
-    ScreenSpaceAntiAliasing, ShadowDetail, Ssaa, Surface, TextureCompression, TextureSamplerType, RENDER_TO_TEXTURE_FORMAT,
+    ScreenSpaceAntiAliasing, ShadowDetail, Ssaa, Surface, TextureSamplerType, RENDER_TO_TEXTURE_FORMAT,
 };
 use crate::graphics::instruction::RenderInstruction;
 use crate::graphics::passes::*;
@@ -424,14 +424,6 @@ impl GraphicsEngine {
         }
 
         ssaa
-    }
-
-    pub fn check_texture_compression_requirements(&self, texture_compression: TextureCompression) -> TextureCompression {
-        if self.capabilities.supports_texture_compression() {
-            texture_compression
-        } else {
-            TextureCompression::Off
-        }
     }
 
     pub fn on_suspended(&mut self) {

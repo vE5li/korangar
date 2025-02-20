@@ -1,6 +1,6 @@
 use cgmath::{Matrix, Matrix4, Point3, Vector4};
 
-use super::{IntersectionClassification, Plane, Sphere, AABB};
+use super::{AABB, IntersectionClassification, Plane, Sphere};
 use crate::collision::Query;
 
 /// The frustum used for frustum culling.
@@ -108,7 +108,7 @@ mod tests {
     use cgmath::{Angle, Deg, Matrix4, Point3, Rad, Vector3, Vector4};
 
     use super::Frustum;
-    use crate::collision::{Sphere, AABB};
+    use crate::collision::{AABB, Sphere};
 
     fn perspective_lh_zo(fovy: Rad<f32>, aspect: f32, near: f32, far: f32) -> Matrix4<f32> {
         let tan_half_fovy = (fovy / 2.0).tan();

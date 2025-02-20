@@ -2,11 +2,11 @@ use std::marker::PhantomData;
 use std::rc::Rc;
 
 use super::{Anchor, Window};
+use crate::ColorSelector;
 use crate::application::{Application, PartialSizeTraitExt, WindowCache};
 use crate::builder::{Set, Unset};
 use crate::elements::{CloseButtonBuilder, Container, DragButtonBuilder, ElementCell, ElementWrap};
 use crate::layout::{Dimension, DimensionBound, SizeBound};
-use crate::ColorSelector;
 
 /// Type state [`Window`] builder. This builder utilizes the type system to
 /// prevent calling the same method multiple times, calling

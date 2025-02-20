@@ -129,7 +129,7 @@ async fn main() {
                     let character_slot = characters
                         .iter()
                         .find(|character| character.name == CHARACTER_NAME)
-                        .expect(&format!("Character with name \"{}\" not found for this user", CHARACTER_NAME))
+                        .unwrap_or_else(|| panic!("Character with name \"{}\" not found for this user", CHARACTER_NAME))
                         .character_number as usize;
 
                     println!("[{}] Using character in slot: {}", "Setup".green(), character_slot.green());

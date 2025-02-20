@@ -1,5 +1,5 @@
-use super::bound::ParentLimits;
 use super::SizeBound;
+use super::bound::ParentLimits;
 use crate::application::{
     Application, FontLoaderTrait, FontSizeTraitExt, PartialSizeTrait, PositionTrait, PositionTraitExt, ScalingTrait, SizeTrait,
     SizeTraitExt,

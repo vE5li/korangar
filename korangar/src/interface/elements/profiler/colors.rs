@@ -1,4 +1,4 @@
-use std::collections::{btree_map, BTreeMap};
+use std::collections::{BTreeMap, btree_map};
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use crate::graphics::Color;

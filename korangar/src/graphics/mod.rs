@@ -24,9 +24,9 @@ use image::RgbaImage;
 use wgpu::util::StagingBelt;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource,
-    BindingType, BufferBindingType, BufferUsages, CommandEncoder, Device, Extent3d, Queue, Sampler, SamplerBindingType, ShaderStages,
-    StorageTextureAccess, TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType, TextureUsages, TextureViewDimension,
-    COPY_BYTES_PER_ROW_ALIGNMENT,
+    BindingType, BufferBindingType, BufferUsages, COPY_BYTES_PER_ROW_ALIGNMENT, CommandEncoder, Device, Extent3d, Queue, Sampler,
+    SamplerBindingType, ShaderStages, StorageTextureAccess, TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType,
+    TextureUsages, TextureViewDimension,
 };
 
 pub use self::buffer::Buffer;
@@ -44,10 +44,10 @@ pub use self::settings::*;
 pub use self::surface::*;
 pub use self::texture::*;
 pub use self::vertices::*;
-use crate::graphics::sampler::{create_new_sampler, SamplerType};
+use crate::NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS;
+use crate::graphics::sampler::{SamplerType, create_new_sampler};
 use crate::interface::layout::ScreenSize;
 use crate::loaders::{ImageType, TextureLoader};
-use crate::NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS;
 
 /// The size of a tile in pixel of the tile based light culling.
 const LIGHT_TILE_SIZE: u32 = 16;

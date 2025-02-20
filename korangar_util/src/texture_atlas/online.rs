@@ -2,7 +2,7 @@
 use cgmath::{Point2, Vector2};
 
 use super::AtlasAllocation;
-use crate::{create_simple_key, Rectangle};
+use crate::{Rectangle, create_simple_key};
 
 create_simple_key!(NodeId, "A key for a node in the texture atlas");
 

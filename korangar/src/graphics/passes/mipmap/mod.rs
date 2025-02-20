@@ -27,7 +27,7 @@ impl MipMapRenderPassContext {
         let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
             label: Some(PASS_NAME),
             color_attachments: &[Some(RenderPassColorAttachment {
-                view: &destination_texture_view,
+                view: destination_texture_view,
                 resolve_target: None,
                 ops: Operations {
                     load: LoadOp::Clear(Color {

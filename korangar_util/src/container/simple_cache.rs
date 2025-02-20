@@ -1,8 +1,8 @@
 use std::borrow::Borrow;
 use std::hash::Hash;
 use std::num::{NonZeroU32, NonZeroUsize};
-use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
 
 use hashbrown::HashMap;
 

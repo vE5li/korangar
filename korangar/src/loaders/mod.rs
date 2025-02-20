@@ -17,14 +17,14 @@ mod texture;
 
 pub use self::action::*;
 pub use self::animation::*;
+pub use self::r#async::*;
 pub use self::cache::{Cache, CachedTextureAtlas};
 pub use self::effect::EffectLoader;
 pub use self::font::{FontLoader, FontSize, GlyphInstruction, Scaling};
 pub use self::gamefile::*;
-pub use self::map::{MapLoader, MAP_TILE_SIZE};
+pub use self::map::{MAP_TILE_SIZE, MapLoader};
 pub use self::model::*;
-pub use self::r#async::*;
-pub use self::server::{load_client_info, ClientInfo, ServiceId};
+pub use self::server::{ClientInfo, ServiceId, load_client_info};
 pub use self::smoothing::{smooth_ground_normals, smooth_model_normals};
 pub use self::sprite::*;
 pub use self::texture::{ImageType, TextureAtlas, TextureAtlasEntry, TextureLoader, UncompressedTextureAtlas};

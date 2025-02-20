@@ -145,9 +145,9 @@ impl<'a, T> Iterator for RingBufferIterator<'a, T> {
     type Item = &'a T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(item) = self.front.take_first() {
+        if let Some(item) = self.front.split_off_first() {
             item.as_ref()
-        } else if let Some(item) = self.back.take_first() {
+        } else if let Some(item) = self.back.split_off_first() {
             item.as_ref()
         } else {
             None
@@ -185,8 +185,8 @@ const fn bounded_add<const M: usize>(x: usize, y: usize) -> usize {
 
 #[cfg(test)]
 mod test {
-    use crate::profiling::ring_buffer::bounded_add;
     use crate::profiling::RingBuffer;
+    use crate::profiling::ring_buffer::bounded_add;
 
     #[test]
     fn bounded_add_edge_cases() {

@@ -4,17 +4,17 @@ use cgmath::{EuclideanSpace, Matrix4, Point3, Rad, SquareMatrix, Vector2, Vector
 use derive_new::new;
 use hashbrown::HashSet;
 #[cfg(feature = "debug")]
-use korangar_debug::logging::{print_debug, Colorize, Timer};
+use korangar_debug::logging::{Colorize, Timer, print_debug};
+use korangar_util::FileLoader;
 use korangar_util::collision::AABB;
 use korangar_util::math::multiply_matrix4_and_point3;
 use korangar_util::texture_atlas::AllocationId;
-use korangar_util::FileLoader;
 use ragnarok_bytes::{ByteReader, FromBytes};
 use ragnarok_formats::model::{ModelData, NodeData};
 use ragnarok_formats::version::InternalVersion;
 
 use super::error::LoadError;
-use super::{smooth_model_normals, FALLBACK_MODEL_FILE};
+use super::{FALLBACK_MODEL_FILE, smooth_model_normals};
 use crate::graphics::{Color, NativeModelVertex};
 use crate::loaders::map::DeferredVertexGeneration;
 use crate::loaders::{GameFileLoader, TextureAtlas, TextureAtlasEntry};

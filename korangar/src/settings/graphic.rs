@@ -1,5 +1,5 @@
 #[cfg(feature = "debug")]
-use korangar_debug::logging::{print_debug, Colorize};
+use korangar_debug::logging::{Colorize, print_debug};
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 

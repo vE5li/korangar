@@ -2,10 +2,10 @@ use bumpalo::Bump;
 use bytemuck::{Pod, Zeroable};
 use hashbrown::HashMap;
 use wgpu::{
-    include_wgsl, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource,
-    BindingType, CompareFunction, DepthBiasState, DepthStencilState, Device, FragmentState, MultisampleState, PipelineCompilationOptions,
+    BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType,
+    CompareFunction, DepthBiasState, DepthStencilState, Device, FragmentState, MultisampleState, PipelineCompilationOptions,
     PipelineLayoutDescriptor, PrimitiveState, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderStages,
-    StencilState, TextureSampleType, TextureView, TextureViewDimension, VertexState,
+    StencilState, TextureSampleType, TextureView, TextureViewDimension, VertexState, include_wgsl,
 };
 
 use crate::graphics::passes::{

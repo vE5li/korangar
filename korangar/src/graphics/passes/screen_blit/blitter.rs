@@ -1,7 +1,7 @@
 use wgpu::{
-    include_wgsl, ColorTargetState, ColorWrites, Device, FragmentState, MultisampleState, PipelineCompilationOptions,
-    PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor,
-    TextureSampleType, VertexState,
+    ColorTargetState, ColorWrites, Device, FragmentState, MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor,
+    PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, TextureSampleType, VertexState,
+    include_wgsl,
 };
 
 use crate::graphics::passes::screen_blit::ScreenBlitRenderPassContext;

@@ -16,3 +16,6 @@ korangar/[Bb][Gg][Mm]/
 
 # macos
 .DS_Store
+
+# Idea
+.idea/

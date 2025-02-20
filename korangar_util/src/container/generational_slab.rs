@@ -202,10 +202,9 @@ impl<I: GenerationalKey, V> SecondaryGenerationalSlab<I, V> {
     /// Returns true if the slot of the key is occupied.
     #[must_use]
     pub fn contains_key(&self, key: I) -> bool {
-        if let Some(Some(slot)) = self.entries.get(key.key() as usize) {
-            key.generation() == slot.generation
-        } else {
-            false
+        match self.entries.get(key.key() as usize) {
+            Some(Some(slot)) => key.generation() == slot.generation,
+            _ => false,
         }
     }
 

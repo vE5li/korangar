@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use derive_new::new;
 #[cfg(feature = "debug")]
-use korangar_debug::logging::{print_debug, Colorize};
+use korangar_debug::logging::{Colorize, print_debug};
 use korangar_interface::windows::Anchor;
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};

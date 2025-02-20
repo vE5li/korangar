@@ -52,18 +52,18 @@ pub struct GraphicsSettingsWindow<
 }
 
 impl<
-        LightingRenderMode,
-        Vsync,
-        FramerateLimit,
-        TripleBuffering,
-        TextureFiltering,
-        Multisampling,
-        Supersampling,
-        ScreenAntiAliasing,
-        ShadowResolution,
-        ShadowMode,
-        HighQualityInterface,
-    >
+    LightingRenderMode,
+    Vsync,
+    FramerateLimit,
+    TripleBuffering,
+    TextureFiltering,
+    Multisampling,
+    Supersampling,
+    ScreenAntiAliasing,
+    ShadowResolution,
+    ShadowMode,
+    HighQualityInterface,
+>
     GraphicsSettingsWindow<
         LightingRenderMode,
         Vsync,
@@ -126,18 +126,18 @@ where
 }
 
 impl<
-        LightingRenderMode,
-        Vsync,
-        FramerateLimit,
-        TripleBuffering,
-        TextureFiltering,
-        Multisampling,
-        Supersampling,
-        ScreenAntiAliasing,
-        ShadowResolution,
-        ShadowMode,
-        HighQualityInterface,
-    > PrototypeWindow<InterfaceSettings>
+    LightingRenderMode,
+    Vsync,
+    FramerateLimit,
+    TripleBuffering,
+    TextureFiltering,
+    Multisampling,
+    Supersampling,
+    ScreenAntiAliasing,
+    ShadowResolution,
+    ShadowMode,
+    HighQualityInterface,
+> PrototypeWindow<InterfaceSettings>
     for GraphicsSettingsWindow<
         LightingRenderMode,
         Vsync,

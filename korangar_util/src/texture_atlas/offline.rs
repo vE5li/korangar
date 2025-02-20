@@ -3,11 +3,11 @@
 use std::num::NonZeroU32;
 
 use cgmath::{EuclideanSpace, Point2, Vector2};
-use image::{imageops, Rgba, RgbaImage};
+use image::{Rgba, RgbaImage, imageops};
 
 use super::AtlasAllocation;
 use crate::container::{SecondarySimpleSlab, SimpleSlab};
-use crate::{create_simple_key, Rectangle};
+use crate::{Rectangle, create_simple_key};
 
 create_simple_key!(AllocationId, "A key for an allocation");
 
@@ -56,11 +56,7 @@ impl OfflineTextureAtlas {
     pub fn new(add_padding: bool, mip_level_count: Option<NonZeroU32>) -> Self {
         let mip_level_count = mip_level_count.map(|count| count.get()).unwrap_or(1);
         let padding = if add_padding {
-            if mip_level_count > 1 {
-                2 << (mip_level_count - 1)
-            } else {
-                2
-            }
+            if mip_level_count > 1 { 2 << (mip_level_count - 1) } else { 2 }
         } else {
             0
         };

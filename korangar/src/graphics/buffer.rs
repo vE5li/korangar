@@ -3,12 +3,12 @@ use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::num::NonZeroU64;
 use std::ops::RangeBounds;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
-use bytemuck::{bytes_of, cast_slice, Pod, Zeroable};
+use bytemuck::{Pod, Zeroable, bytes_of, cast_slice};
 #[cfg(feature = "debug")]
-use korangar_debug::logging::{print_debug, Colorize};
+use korangar_debug::logging::{Colorize, print_debug};
 use wgpu::util::StagingBelt;
 use wgpu::{BindingResource, BindingType, BufferBindingType, BufferDescriptor, BufferSlice, BufferUsages, CommandEncoder, Device, Queue};
 

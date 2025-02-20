@@ -16,7 +16,7 @@ pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
 
 #[cfg(test)]
 mod tests {
-    use cgmath::{assert_relative_eq, EuclideanSpace, Matrix4, Point3};
+    use cgmath::{EuclideanSpace, Matrix4, Point3, assert_relative_eq};
 
     use crate::math::multiply_matrix4_and_point3;
 

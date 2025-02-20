@@ -173,7 +173,7 @@ fn direction(vector: Vector2<f32>) -> usize {
 
 #[cfg(test)]
 mod conversion {
-    use cgmath::{assert_relative_eq, Vector4};
+    use cgmath::{Vector4, assert_relative_eq};
 
     use crate::world::{Camera, PlayerCamera};
 

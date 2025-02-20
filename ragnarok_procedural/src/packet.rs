@@ -3,7 +3,7 @@ use quote::quote;
 use syn::{Attribute, DataStruct, Generics, Ident};
 
 use super::helper::byte_convertable_helper;
-use crate::utils::{get_unique_attribute, PacketSignature};
+use crate::utils::{PacketSignature, get_unique_attribute};
 
 pub fn derive_packet_struct(
     data_struct: DataStruct,

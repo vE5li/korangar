@@ -2,7 +2,7 @@ use std::marker::ConstParamTy;
 use std::sync::Arc;
 
 #[cfg(feature = "debug")]
-use korangar_debug::logging::{print_debug, Colorize};
+use korangar_debug::logging::{Colorize, print_debug};
 use korangar_interface::application::{Application, ScalingTrait};
 use korangar_interface::dimension_bound;
 use korangar_interface::elements::{Container, ElementCell, ElementWrap, PickList, PrototypeElement, Text};

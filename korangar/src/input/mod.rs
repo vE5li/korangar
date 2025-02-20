@@ -3,16 +3,16 @@ mod key;
 mod mode;
 
 use std::mem::variant_count;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use cgmath::Vector2;
+use korangar_interface::Interface;
 use korangar_interface::application::FocusState;
 use korangar_interface::elements::{ElementCell, Focus};
 use korangar_interface::event::ClickAction;
 #[cfg(feature = "debug")]
 use korangar_interface::state::{PlainTrackedState, TrackedState};
-use korangar_interface::Interface;
 use ragnarok_packets::{ClientTick, HotbarSlot};
 use winit::dpi::PhysicalPosition;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta};
@@ -270,48 +270,55 @@ impl InputSystem {
         }
 
         if self.left_mouse_button.released() {
-            if let MouseInputMode::MoveInterface(identifier) = self.mouse_input_mode {
-                // We want to re-render to get rid of the anchor overlays.
-                interface.schedule_render();
+            match self.mouse_input_mode {
+                MouseInputMode::MoveInterface(identifier) => {
+                    // We want to re-render to get rid of the anchor overlays.
+                    interface.schedule_render();
 
-                match self.right_mouse_button.down() && !self.right_mouse_button.released() {
-                    true => self.mouse_input_mode = MouseInputMode::ResizeInterface(identifier),
-                    false => self.mouse_input_mode = MouseInputMode::None,
+                    match self.right_mouse_button.down() && !self.right_mouse_button.released() {
+                        true => self.mouse_input_mode = MouseInputMode::ResizeInterface(identifier),
+                        false => self.mouse_input_mode = MouseInputMode::None,
+                    }
                 }
-            } else {
-                let mouse_input_mode = std::mem::take(&mut self.mouse_input_mode);
-                // Needs to re-render because some elements will render differently
-                // based on the mouse input mode.
-                interface.schedule_render();
+                _ => {
+                    let mouse_input_mode = std::mem::take(&mut self.mouse_input_mode);
+                    // Needs to re-render because some elements will render differently
+                    // based on the mouse input mode.
+                    interface.schedule_render();
 
-                match mouse_input_mode {
-                    MouseInputMode::MoveItem(source, item) => {
-                        if let Some(hovered_element) = &hovered_element {
-                            if let Some(resource_move) = hovered_element.borrow_mut().drop_resource(PartialMove::Item { source, item }) {
-                                events.push(UserEvent::MoveResource(resource_move));
+                    match mouse_input_mode {
+                        MouseInputMode::MoveItem(source, item) => {
+                            if let Some(hovered_element) = &hovered_element {
+                                if let Some(resource_move) = hovered_element.borrow_mut().drop_resource(PartialMove::Item { source, item })
+                                {
+                                    events.push(UserEvent::MoveResource(resource_move));
+                                }
                             }
                         }
-                    }
-                    MouseInputMode::MoveSkill(source, skill) => {
-                        if let Some(hovered_element) = &hovered_element {
-                            if let Some(resource_move) = hovered_element.borrow_mut().drop_resource(PartialMove::Skill { source, skill }) {
-                                events.push(UserEvent::MoveResource(resource_move));
+                        MouseInputMode::MoveSkill(source, skill) => {
+                            if let Some(hovered_element) = &hovered_element {
+                                if let Some(resource_move) =
+                                    hovered_element.borrow_mut().drop_resource(PartialMove::Skill { source, skill })
+                                {
+                                    events.push(UserEvent::MoveResource(resource_move));
+                                }
                             }
                         }
+                        _ => {}
                     }
-                    _ => {}
                 }
             }
         }
 
         if self.right_mouse_button.released() {
-            if let MouseInputMode::ResizeInterface(identifier) = self.mouse_input_mode {
-                match self.left_mouse_button.down() && !self.left_mouse_button.released() {
+            match self.mouse_input_mode {
+                MouseInputMode::ResizeInterface(identifier) => match self.left_mouse_button.down() && !self.left_mouse_button.released() {
                     true => self.mouse_input_mode = MouseInputMode::MoveInterface(identifier),
                     false => self.mouse_input_mode = MouseInputMode::None,
+                },
+                _ => {
+                    self.mouse_input_mode = MouseInputMode::None;
                 }
-            } else {
-                self.mouse_input_mode = MouseInputMode::None;
             }
         }
 

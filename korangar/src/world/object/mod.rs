@@ -10,6 +10,7 @@ use ragnarok_packets::ClientTick;
 #[cfg(feature = "debug")]
 use super::MarkerIdentifier;
 use super::Model;
+use crate::Camera;
 #[cfg(feature = "debug")]
 use crate::graphics::Color;
 #[cfg(feature = "debug")]
@@ -17,7 +18,6 @@ use crate::graphics::DebugAabbInstruction;
 use crate::graphics::ModelInstruction;
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
-use crate::Camera;
 
 #[derive(PrototypeElement, PrototypeWindow, new)]
 pub struct Object {

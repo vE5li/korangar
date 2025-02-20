@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use cgmath::Vector2;
 #[cfg(feature = "debug")]
-use korangar_debug::logging::{print_debug, Colorize};
+use korangar_debug::logging::{Colorize, print_debug};
 use wgpu::{Adapter, Device, PresentMode, SurfaceConfiguration, SurfaceTexture, TextureFormat};
 
 use crate::interface::layout::ScreenSize;

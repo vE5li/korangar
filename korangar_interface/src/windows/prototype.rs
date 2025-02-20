@@ -1,7 +1,7 @@
 pub use interface_procedural::PrototypeWindow;
 
-use crate::application::Application;
 use crate::Window;
+use crate::application::Application;
 
 pub trait PrototypeWindow<App>
 where

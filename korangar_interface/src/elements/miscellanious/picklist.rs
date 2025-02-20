@@ -1,13 +1,13 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::ElementEvent;
 use crate::application::{Application, MouseInputModeTrait, PositionTraitExt, SizeTraitExt};
 use crate::elements::{ButtonBuilder, Element, ElementState, ElementWrap, ScrollView};
 use crate::event::{ClickAction, HoverInformation};
 use crate::layout::{Dimension, DimensionBound, PlacementResolver, SizeBound};
 use crate::state::{TrackedState, TrackedStateClone};
 use crate::theme::{ButtonTheme, InterfaceTheme};
-use crate::ElementEvent;
 
 pub struct PickList<App, Key, Value, State, Event>
 where

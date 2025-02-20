@@ -9,10 +9,10 @@ use derive_new::new;
 use korangar_audio::AudioEngine;
 #[cfg(feature = "debug")]
 use korangar_interface::windows::PrototypeWindow;
-use korangar_util::collision::{Frustum, KDTree, Sphere, AABB};
+use korangar_util::collision::{AABB, Frustum, KDTree, Sphere};
 use korangar_util::container::{SimpleKey, SimpleSlab};
 use korangar_util::pathing::Traversable;
-use korangar_util::{create_simple_key, Rectangle};
+use korangar_util::{Rectangle, create_simple_key};
 #[cfg(feature = "debug")]
 use option_ext::OptionExt;
 #[cfg(feature = "debug")]
@@ -42,7 +42,7 @@ use crate::interface::layout::{ScreenPosition, ScreenSize};
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
 use crate::settings::LightingMode;
-use crate::{Buffer, Color, GameFileLoader, ModelVertex, TileVertex, MAP_TILE_SIZE};
+use crate::{Buffer, Color, GameFileLoader, MAP_TILE_SIZE, ModelVertex, TileVertex};
 
 create_simple_key!(ObjectKey, "Key to an object inside the map");
 create_simple_key!(LightSourceKey, "Key to an light source inside the map");

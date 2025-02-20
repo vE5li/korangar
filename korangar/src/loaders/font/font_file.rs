@@ -1,17 +1,17 @@
 use std::io::Cursor;
 use std::sync::Arc;
 
-use cosmic_text::fontdb::{Source, ID};
 use cosmic_text::FontSystem;
+use cosmic_text::fontdb::{ID, Source};
 use hashbrown::HashMap;
 use image::{ImageFormat, ImageReader, RgbaImage};
 #[cfg(feature = "debug")]
-use korangar_debug::logging::{print_debug, Colorize, Timer};
+use korangar_debug::logging::{Colorize, Timer, print_debug};
 use korangar_util::FileLoader;
 
-use crate::loaders::font::font_map_descriptor::parse_glyphs;
-use crate::loaders::font::GlyphCoordinate;
 use crate::loaders::GameFileLoader;
+use crate::loaders::font::GlyphCoordinate;
+use crate::loaders::font::font_map_descriptor::parse_glyphs;
 
 const FONT_FOLDER_PATH: &str = "data\\font";
 

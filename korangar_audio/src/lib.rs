@@ -9,7 +9,7 @@ use std::mem::swap;
 use std::num::{NonZeroU32, NonZeroUsize};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -23,10 +23,10 @@ use kira::sound::{FromFileError, PlaybackState};
 use kira::track::{MainTrackBuilder, SpatialTrackBuilder, SpatialTrackDistances, SpatialTrackHandle, TrackBuilder, TrackHandle};
 use kira::{AudioManager, AudioManagerSettings, Capacities, Decibels, Easing, Frame, Tween};
 #[cfg(feature = "debug")]
-use korangar_debug::logging::{print_debug, Colorize};
+use korangar_debug::logging::{Colorize, print_debug};
 use korangar_util::collision::{KDTree, Sphere};
 use korangar_util::container::{Cacheable, GenerationalSlab, SimpleCache, SimpleSlab};
-use korangar_util::{create_generational_key, create_simple_key, FileLoader};
+use korangar_util::{FileLoader, create_generational_key, create_simple_key};
 use rayon::spawn;
 
 create_generational_key!(SoundEffectKey, "The key for a cached sound effect");
@@ -521,38 +521,41 @@ impl<F: FileLoader> EngineContext<F> {
                 };
 
             let sound_effect_key = sound_config.sound_effect_key;
-            if let Some(data) = self
+            match self
                 .cache
                 .get(&sound_effect_key)
                 .map(|cached_sound_effect| cached_sound_effect.0.clone())
             {
-                let data = data.volume(sound_config.volume);
-                match spatial_track_handle.play(data.clone()) {
-                    Ok(handle) => {
-                        if let Some(cycle) = sound_config.cycle {
-                            self.cycling_ambient.insert(ambient_key, PlayingAmbient {
-                                key: ambient_key,
-                                data,
-                                handle,
-                                cycle,
-                                last_start: Instant::now(),
-                            });
+                Some(data) => {
+                    let data = data.volume(sound_config.volume);
+                    match spatial_track_handle.play(data.clone()) {
+                        Ok(handle) => {
+                            if let Some(cycle) = sound_config.cycle {
+                                self.cycling_ambient.insert(ambient_key, PlayingAmbient {
+                                    key: ambient_key,
+                                    data,
+                                    handle,
+                                    cycle,
+                                    last_start: Instant::now(),
+                                });
+                            }
+                        }
+                        Err(_error) => {
+                            #[cfg(feature = "debug")]
+                            print_debug!("[{}] can't ambient sound effect: {:?}", "error".red(), _error);
                         }
                     }
-                    Err(_error) => {
-                        #[cfg(feature = "debug")]
-                        print_debug!("[{}] can't ambient sound effect: {:?}", "error".red(), _error);
-                    }
                 }
-            } else {
-                queue_sound_effect_playback(
-                    self.game_file_loader.clone(),
-                    self.async_response_sender.clone(),
-                    &self.sound_effect_paths,
-                    &mut self.queued_sound_effect,
-                    sound_effect_key,
-                    QueuedSoundEffectType::AmbientSound { ambient_key },
-                );
+                _ => {
+                    queue_sound_effect_playback(
+                        self.game_file_loader.clone(),
+                        self.async_response_sender.clone(),
+                        &self.sound_effect_paths,
+                        &mut self.queued_sound_effect,
+                        sound_effect_key,
+                        QueuedSoundEffectType::AmbientSound { ambient_key },
+                    );
+                }
             }
 
             self.active_spatial_tracks.insert(ambient_key, spatial_track_handle);

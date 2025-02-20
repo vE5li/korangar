@@ -8,16 +8,16 @@ use cgmath::Vector2;
 use encoding_rs::UTF_8;
 use hashbrown::{HashMap, HashSet};
 #[cfg(feature = "debug")]
-use korangar_debug::logging::{print_debug, Colorize, Timer};
+use korangar_debug::logging::{Colorize, Timer, print_debug};
+use korangar_util::Rectangle;
 use korangar_util::container::{SecondarySimpleSlab, SimpleKey};
 use korangar_util::texture_atlas::{AllocationId, AtlasAllocation};
-use korangar_util::Rectangle;
 use ragnarok_bytes::{ByteReader, ConversionResult, ConversionResultExt, FromBytes, ToBytes};
 use ragnarok_formats::signature::Signature;
 use ragnarok_formats::version::{InternalVersion, MajorFirst, Version};
 
 use crate::loaders::archive::folder::FolderArchive;
-use crate::loaders::archive::{os_specific_path, Archive, Writable};
+use crate::loaders::archive::{Archive, Writable, os_specific_path};
 use crate::loaders::cache::format::{AllocationEntry, LookupEntry, TextureAtlasData};
 use crate::loaders::{GameFileLoader, MapLoader, ModelLoader, TextureAtlas, TextureAtlasEntry, TextureLoader, UncompressedTextureAtlas};
 

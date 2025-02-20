@@ -72,10 +72,9 @@ impl<I: SimpleKey, T> SimpleSlab<I, T> {
     pub fn get(&self, key: I) -> Option<&T> {
         let key = key.key() as usize;
 
-        if let Slot::Occupied(value) = self.entries.get(key)? {
-            Some(value)
-        } else {
-            None
+        match self.entries.get(key)? {
+            Slot::Occupied(value) => Some(value),
+            _ => None,
         }
     }
 
@@ -84,10 +83,9 @@ impl<I: SimpleKey, T> SimpleSlab<I, T> {
     pub fn get_mut(&mut self, key: I) -> Option<&mut T> {
         let key = key.key() as usize;
 
-        if let Slot::Occupied(value) = self.entries.get_mut(key)? {
-            Some(value)
-        } else {
-            None
+        match self.entries.get_mut(key)? {
+            Slot::Occupied(value) => Some(value),
+            _ => None,
         }
     }
 

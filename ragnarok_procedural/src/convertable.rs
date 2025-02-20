@@ -48,8 +48,11 @@ fn derive_for_struct(
             impl #impl_generics ragnarok_bytes::ToBytes for #name #type_generics #where_clause {
                 // Temporary until serialization is always possible
                 #[allow(unreachable_code)]
-                fn to_bytes(&self) -> ragnarok_bytes::ConversionResult<Vec<u8>> {
-                    Ok([#(#to_bytes_implementations),*].concat())
+                fn to_bytes(&self, byte_writer: &mut ragnarok_bytes::ByteWriter) -> ragnarok_bytes::ConversionResult<usize> {
+                    byte_writer.write_counted(|writer| {
+                        #(#to_bytes_implementations)*
+                        Ok(())
+                    })
                 }
             }
         }
@@ -113,9 +116,9 @@ fn derive_for_enum(
             impl #impl_generics ragnarok_bytes::ToBytes for #name #type_generics #where_clause {
                 // Temporary until serialization is always possible
                 #[allow(unreachable_code)]
-                fn to_bytes(&self) -> ragnarok_bytes::ConversionResult<Vec<u8>> {
+                fn to_bytes(&self, byte_writer: &mut ragnarok_bytes::ByteWriter) -> ragnarok_bytes::ConversionResult<usize> {
                     match self {
-                        #( #name::#values => ragnarok_bytes::ConversionResultExt::trace::<Self>((#indices as #numeric_type).to_bytes()), )*
+                        #( #name::#values => ragnarok_bytes::ConversionResultExt::trace::<Self>((#indices as #numeric_type).to_bytes(byte_writer)), )*
                     }
                 }
             }

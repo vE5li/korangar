@@ -55,10 +55,10 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (TokenStream, Vec<Tok
 
         let to_length = match length {
             Some(length) if syn::parse::<syn::Ident>(length.clone().into()).is_ok() => {
-                quote!(ragnarok_bytes::ToBytesExt::to_n_bytes(&self.#field_identifier, self.#length as usize))
+                quote!(ragnarok_bytes::ToBytesExt::to_n_bytes(&self.#field_identifier, writer, self.#length as usize))
             }
-            Some(length) => quote!(ragnarok_bytes::ToBytesExt::to_n_bytes(&self.#field_identifier, #length as usize)),
-            None => quote!(ragnarok_bytes::ToBytes::to_bytes(&self.#field_identifier)),
+            Some(length) => quote!(ragnarok_bytes::ToBytesExt::to_n_bytes(&self.#field_identifier, writer, #length as usize)),
+            None => quote!(ragnarok_bytes::ToBytes::to_bytes(&self.#field_identifier, writer)),
         };
 
         let mut repeating: Option<(syn::Ident, bool)> = None;
@@ -186,13 +186,8 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (TokenStream, Vec<Tok
 
         // base to byte implementation
         let to_implementation = match version_restricted {
-            true => quote!({
-                panic!("version restricted fields can't be serialized at the moment");
-                [0u8].as_slice()
-            }),
-            false => {
-                quote!(ragnarok_bytes::ConversionResultExt::trace::<Self>(#to_length)?.as_slice())
-            }
+            true => quote!(panic!("version restricted fields can't be serialized at the moment");),
+            false => quote!(ragnarok_bytes::ConversionResultExt::trace::<Self>(#to_length)?;),
         };
         to_bytes_implementations.push(to_implementation);
 

@@ -36,21 +36,31 @@ pub fn derive_packet_struct(
 
     let final_to_bytes = match is_variable_length {
         _ if to_bytes_implementations.is_empty() => quote! {
-            Ok(Vec::new())
+            Ok(0)
         },
         true => {
             quote! {
-                let following_bytes = [#(#to_bytes_implementations),*].concat();
-                let packet_length = following_bytes.len() as u16 + 4;
+                let start_position = byte_writer.len();
+                let dummy_packet_length = 0u16;
 
-                let mut final_bytes = packet_length.to_bytes()?;
-                final_bytes.extend(following_bytes);
+                let written = byte_writer.write_counted(|writer| {
+                    dummy_packet_length.to_bytes(writer)?;
+                    #(#to_bytes_implementations)*
+                    Ok(())
+                })?;
 
-                Ok(final_bytes)
+                // We add 2 for the header bytes
+                let packet_length = (written + 2) as u16;
+                byte_writer.overwrite_at(start_position, packet_length.to_le_bytes())?;
+
+                Ok(written)
             }
         }
         false => quote! {
-            Ok([#(#to_bytes_implementations),*].concat())
+            byte_writer.write_counted(|writer| {
+                #(#to_bytes_implementations)*
+                Ok(())
+            })
         },
     };
 
@@ -72,7 +82,7 @@ pub fn derive_packet_struct(
                 Ok(packet)
             }
 
-            fn payload_to_bytes(&self) -> ragnarok_bytes::ConversionResult<Vec<u8>> {
+            fn payload_to_bytes(&self, byte_writer: &mut ragnarok_bytes::ByteWriter) -> ragnarok_bytes::ConversionResult<usize> {
                 #final_to_bytes
             }
 

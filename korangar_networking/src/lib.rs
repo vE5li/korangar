@@ -18,7 +18,7 @@ use event::{
     NoNetworkEvents,
 };
 use ragnarok_bytes::encoding::UTF_8;
-use ragnarok_bytes::{ByteReader, FromBytes};
+use ragnarok_bytes::{ByteReader, ByteWriter, FromBytes};
 use ragnarok_packets::handler::{DuplicateHandlerError, HandlerResult, NoPacketCallback, PacketCallback, PacketHandler};
 use ragnarok_packets::*;
 use server::{ServerConnectCommand, ServerConnection};
@@ -294,6 +294,7 @@ where
         let mut buffer = [0u8; 8192];
         let mut cut_off_buffer_base = 0;
         let mut events = Vec::new();
+        let mut byte_writer = ByteWriter::with_encoding(UTF_8);
 
         loop {
             tokio::select! {
@@ -371,8 +372,9 @@ where
                 }
                 // Send a keep-alive packet to the server.
                 _ = interval.tick() => {
-                    let packet_bytes = ping_factory(&time_synchronization).packet_to_bytes().unwrap();
-                    stream.write_all(&packet_bytes).await.map_err(|_| NetworkTaskError::ConnectionClosed)?;
+                    ping_factory(&time_synchronization).packet_to_bytes(&mut byte_writer).unwrap();
+                    stream.write_all(byte_writer.as_slice()).await.map_err(|_| NetworkTaskError::ConnectionClosed)?;
+                    byte_writer.clear();
                 }
             }
         }
@@ -398,8 +400,10 @@ where
 
         self.packet_callback.outgoing_packet(&login_packet);
 
+        let mut byte_writer = ByteWriter::with_encoding(UTF_8);
+        login_packet.packet_to_bytes(&mut byte_writer).unwrap();
         action_sender
-            .send(login_packet.packet_to_bytes().unwrap())
+            .send(byte_writer.into_inner())
             .expect("action receiver instantly dropped");
 
         self.login_server_connection = ServerConnection::Connected {
@@ -435,8 +439,10 @@ where
 
         self.packet_callback.outgoing_packet(&login_packet);
 
+        let mut byte_writer = ByteWriter::with_encoding(UTF_8);
+        login_packet.packet_to_bytes(&mut byte_writer).unwrap();
         action_sender
-            .send(login_packet.packet_to_bytes().unwrap())
+            .send(byte_writer.into_inner())
             .expect("action receiver instantly dropped");
 
         self.character_server_connection = ServerConnection::Connected {
@@ -479,8 +485,10 @@ where
 
         self.packet_callback.outgoing_packet(&login_packet);
 
+        let mut byte_writer = ByteWriter::with_encoding(UTF_8);
+        login_packet.packet_to_bytes(&mut byte_writer).unwrap();
         action_sender
-            .send(login_packet.packet_to_bytes().unwrap())
+            .send(byte_writer.into_inner())
             .expect("action receiver instantly dropped");
 
         self.map_server_connection = ServerConnection::Connected {
@@ -507,7 +515,9 @@ where
                 self.packet_callback.outgoing_packet(packet);
 
                 // FIX: Don't unwrap.
-                action_sender.send(packet.packet_to_bytes().unwrap()).map_err(|_| NotConnectedError)
+                let mut byte_writer = ByteWriter::with_encoding(UTF_8);
+                packet.packet_to_bytes(&mut byte_writer).unwrap();
+                action_sender.send(byte_writer.into_inner()).map_err(|_| NotConnectedError)
             }
             _ => Err(NotConnectedError),
         }
@@ -519,7 +529,9 @@ where
                 self.packet_callback.outgoing_packet(packet);
 
                 // FIX: Don't unwrap.
-                action_sender.send(packet.packet_to_bytes().unwrap()).map_err(|_| NotConnectedError)
+                let mut byte_writer = ByteWriter::with_encoding(UTF_8);
+                packet.packet_to_bytes(&mut byte_writer).unwrap();
+                action_sender.send(byte_writer.into_inner()).map_err(|_| NotConnectedError)
             }
             _ => Err(NotConnectedError),
         }
@@ -531,7 +543,9 @@ where
                 self.packet_callback.outgoing_packet(packet);
 
                 // FIX: Don't unwrap.
-                action_sender.send(packet.packet_to_bytes().unwrap()).map_err(|_| NotConnectedError)
+                let mut byte_writer = ByteWriter::with_encoding(UTF_8);
+                packet.packet_to_bytes(&mut byte_writer).unwrap();
+                action_sender.send(byte_writer.into_inner()).map_err(|_| NotConnectedError)
             }
             _ => Err(NotConnectedError),
         }

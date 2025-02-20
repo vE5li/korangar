@@ -1,8 +1,7 @@
 use std::collections::VecDeque;
 
 use cgmath::{Point3, Vector3};
-use korangar_interface::elements::PrototypeElement;
-use ragnarok_bytes::{ByteConvertable, ByteReader, ConversionError, ConversionResult, ConversionResultExt, FromBytes, ToBytes};
+use ragnarok_bytes::{ByteConvertable, ByteReader, ByteWriter, ConversionError, ConversionResult, ConversionResultExt, FromBytes, ToBytes};
 
 use crate::color::{ColorBGRA, ColorRGB};
 use crate::signature::Signature;
@@ -49,7 +48,8 @@ pub struct MapData {
     pub quadtree: Option<QuadTreeData>,
 }
 
-#[derive(Clone, PrototypeElement)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[derive(Clone)]
 pub struct QuadTreeData {
     pub max: [f32; 3],
     pub min: [f32; 3],
@@ -174,9 +174,9 @@ impl TryInto<<Self as bitflags::Flags>::Bits> for TileFlags {
 }
 
 impl ToBytes for TileFlags {
-    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
+    fn to_bytes(&self, byte_writer: &mut ByteWriter) -> ConversionResult<usize> {
         TryInto::<<Self as bitflags::Flags>::Bits>::try_into(*self)?
-            .to_bytes()
+            .to_bytes(byte_writer)
             .trace::<Self>()
     }
 }
@@ -288,7 +288,7 @@ impl FromBytes for GroundTile {
 }
 
 impl ToBytes for GroundTile {
-    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
+    fn to_bytes(&self, _byte_writer: &mut ByteWriter) -> ConversionResult<usize> {
         panic!("GroundTile can not be serialized currently because it depends on a version requirement");
     }
 }
@@ -443,28 +443,28 @@ impl FromBytes for MapResources {
 }
 
 impl ToBytes for MapResources {
-    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
-        let mut data = Vec::new();
+    fn to_bytes(&self, byte_writer: &mut ByteWriter) -> ConversionResult<usize> {
+        byte_writer.write_counted(|write| {
+            self.resources_amount.to_bytes(write)?;
 
-        data.extend(self.resources_amount.to_bytes()?);
+            for object in &self.objects {
+                object.to_bytes(write)?;
+            }
 
-        for object in &self.objects {
-            data.extend(object.to_bytes()?);
-        }
+            for light_source in &self.light_sources {
+                light_source.to_bytes(write)?;
+            }
 
-        for light_source in &self.light_sources {
-            data.extend(light_source.to_bytes()?);
-        }
+            for sound_source in &self.sound_sources {
+                sound_source.to_bytes(write)?;
+            }
 
-        for sound_source in &self.sound_sources {
-            data.extend(sound_source.to_bytes()?);
-        }
+            for effect_source in &self.effect_sources {
+                effect_source.to_bytes(write)?;
+            }
 
-        for effect_source in &self.effect_sources {
-            data.extend(effect_source.to_bytes()?);
-        }
-
-        Ok(data)
+            Ok(())
+        })
     }
 }
 
@@ -559,7 +559,7 @@ mod conversion {
     // When adding new permutations `ENCODED_TILE_COUNT` needs to be adjusted.
     mod tile_flags {
         use bitflags::Flags;
-        use ragnarok_bytes::{ByteReader, FromBytes, ToBytes};
+        use ragnarok_bytes::{ByteReader, ByteWriter, FromBytes, ToBytes};
 
         use crate::map::TileFlags;
 
@@ -599,7 +599,10 @@ mod conversion {
             let mut hit_counter = HitCounter::default();
 
             let mut test = |flags: TileFlags| {
-                if let Ok(bytes) = flags.to_bytes() {
+                let mut byte_writer = ByteWriter::new();
+
+                if let Ok(_) = flags.to_bytes(&mut byte_writer) {
+                    let bytes = byte_writer.into_inner();
                     let mut byte_reader = ByteReader::without_metadata(&bytes);
                     let index = EncodedType::from_bytes(&mut byte_reader).unwrap();
                     hit_counter.register(index);
@@ -629,7 +632,11 @@ mod conversion {
             let mut hit_counter = HitCounter::default();
 
             for input in 0..EncodedType::MAX {
-                let bytes = input.to_bytes().unwrap();
+                let mut byte_writer = ByteWriter::new();
+
+                input.to_bytes(&mut byte_writer).unwrap();
+                let bytes = byte_writer.into_inner();
+
                 let mut byte_reader = ByteReader::without_metadata(&bytes);
 
                 if TileFlags::from_bytes(&mut byte_reader).is_ok() {
@@ -644,11 +651,19 @@ mod conversion {
         #[test]
         fn decode_encode() {
             for input in 0..EncodedType::MAX {
-                let bytes = input.to_bytes().unwrap();
+                let mut byte_writer = ByteWriter::new();
+
+                input.to_bytes(&mut byte_writer).unwrap();
+                let bytes = byte_writer.into_inner();
+
                 let mut byte_reader = ByteReader::without_metadata(&bytes);
 
                 if let Ok(decoded) = TileFlags::from_bytes(&mut byte_reader) {
-                    let encoded = decoded.to_bytes().unwrap();
+                    let mut byte_writer = ByteWriter::new();
+
+                    decoded.to_bytes(&mut byte_writer).unwrap();
+                    let encoded = byte_writer.into_inner();
+
                     assert_eq!(encoded.as_slice(), bytes);
                 }
             }

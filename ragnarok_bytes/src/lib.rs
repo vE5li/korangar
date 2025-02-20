@@ -6,6 +6,7 @@ mod fixed;
 mod from_bytes;
 mod reader;
 mod to_bytes;
+mod writer;
 
 pub use encoding_rs as encoding;
 #[cfg(feature = "derive")]
@@ -16,18 +17,22 @@ pub use self::fixed::{FixedByteSize, FixedByteSizeCollection};
 pub use self::from_bytes::{FromBytes, FromBytesExt};
 pub use self::reader::ByteReader;
 pub use self::to_bytes::{ToBytes, ToBytesExt};
+pub use self::writer::ByteWriter;
 
 #[cfg(test)]
 mod conversion {
-    use crate::{ByteReader, FromBytes, ToBytes};
+    use crate::{ByteReader, ByteWriter, FromBytes, ToBytes};
 
     fn encode_decode<T: FromBytes + ToBytes>(input: &[u8]) {
         let mut byte_reader = ByteReader::without_metadata(input);
 
         let data = T::from_bytes(&mut byte_reader).unwrap();
-        let output = data.to_bytes().unwrap();
 
-        assert_eq!(input, output.as_slice());
+        let mut byte_writer = ByteWriter::new();
+        data.to_bytes(&mut byte_writer).unwrap();
+        let bytes = byte_writer.into_inner();
+
+        assert_eq!(input, bytes.as_slice());
     }
 
     #[test]

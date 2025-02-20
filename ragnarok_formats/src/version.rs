@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::marker::PhantomData;
 
-use ragnarok_bytes::{ByteReader, ConversionResult, FromBytes, ToBytes};
+use ragnarok_bytes::{ByteReader, ByteWriter, ConversionResult, FromBytes, ToBytes};
 
 #[derive(Copy, Clone, Debug)]
 pub struct MajorFirst;
@@ -53,14 +53,24 @@ impl FromBytes for Version<MinorFirst> {
 }
 
 impl ToBytes for Version<MajorFirst> {
-    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
-        Ok(vec![self.major, self.minor])
+    fn to_bytes(&self, byte_writer: &mut ByteWriter) -> ConversionResult<usize> {
+        byte_writer.write_counted(|write| {
+            write.push(self.major);
+            write.push(self.minor);
+
+            Ok(())
+        })
     }
 }
 
 impl ToBytes for Version<MinorFirst> {
-    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
-        Ok(vec![self.minor, self.major])
+    fn to_bytes(&self, byte_writer: &mut ByteWriter) -> ConversionResult<usize> {
+        byte_writer.write_counted(|write| {
+            write.push(self.minor);
+            write.push(self.major);
+
+            Ok(())
+        })
     }
 }
 
@@ -101,7 +111,7 @@ impl Display for InternalVersion {
 
 #[cfg(test)]
 mod conversion {
-    use ragnarok_bytes::{ByteReader, FromBytes, ToBytes};
+    use ragnarok_bytes::{ByteReader, ByteWriter, FromBytes, ToBytes};
 
     use super::{MajorFirst, Version};
     use crate::version::MinorFirst;
@@ -112,9 +122,11 @@ mod conversion {
         let mut byte_reader = ByteReader::without_metadata(input);
 
         let version = Version::<MajorFirst>::from_bytes(&mut byte_reader).unwrap();
-        let output = version.to_bytes().unwrap();
 
-        assert_eq!(input, output.as_slice());
+        let mut byte_writer = ByteWriter::new();
+        version.to_bytes(&mut byte_writer).unwrap();
+
+        assert_eq!(input, byte_writer.into_inner().as_slice());
     }
 
     #[test]
@@ -123,8 +135,10 @@ mod conversion {
         let mut byte_reader = ByteReader::without_metadata(input);
 
         let version = Version::<MinorFirst>::from_bytes(&mut byte_reader).unwrap();
-        let output = version.to_bytes().unwrap();
 
-        assert_eq!(input, output.as_slice());
+        let mut byte_writer = ByteWriter::new();
+        version.to_bytes(&mut byte_writer).unwrap();
+
+        assert_eq!(input, byte_writer.into_inner().as_slice());
     }
 }

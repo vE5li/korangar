@@ -13,7 +13,7 @@ use korangar_debug::logging::{Colorize, Timer, print_debug};
 use korangar_util::Rectangle;
 use korangar_util::container::{SecondarySimpleSlab, SimpleKey};
 use korangar_util::texture_atlas::{AllocationId, AtlasAllocation};
-use ragnarok_bytes::{ByteReader, ConversionResult, ConversionResultExt, FromBytes, ToBytes};
+use ragnarok_bytes::{ByteReader, ByteWriter, ConversionResult, ConversionResultExt, FromBytes, ToBytes};
 use ragnarok_formats::signature::Signature;
 use ragnarok_formats::version::{InternalVersion, MajorFirst, Version};
 use rayon::ThreadPoolBuilder;
@@ -191,10 +191,11 @@ impl Cache {
             match map_loader.collect_map_textures(model_loader, map_name) {
                 Ok(textures) => {
                     let texture_atlas = Self::create_texture_atlas(texture_loader.clone(), map_name, textures);
+                    let mut byte_writer = ByteWriter::with_encoding(UTF_8);
 
-                    if let Ok(data) = texture_atlas.to_cached_texture_atlas().to_bytes() {
+                    if texture_atlas.to_cached_texture_atlas().to_bytes(&mut byte_writer).is_ok() {
                         let atlas_path = Self::get_texture_atlas_cache_base_path(map_name);
-                        folder_archive.add_file(&atlas_path, data, true);
+                        folder_archive.add_file(&atlas_path, byte_writer.into_inner(), true);
 
                         match outdated_map_names.contains(map_name) {
                             true => updated_count += 1,
@@ -314,36 +315,38 @@ impl FromBytes for CachedTextureAtlas {
 }
 
 impl ToBytes for CachedTextureAtlas {
-    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
-        let lookup = Vec::from_iter(self.lookup.iter().map(|(name, atlas_entry)| LookupEntry {
-            name: name.clone(),
-            allocation_id: atlas_entry.allocation_id.key(),
-            transparent: u32::from(atlas_entry.transparent),
-        }));
-        let allocations = Vec::from_iter(self.allocations.iter().map(|(id, atlas_allocation)| AllocationEntry {
-            id: id.key(),
-            min: atlas_allocation.rectangle.min,
-            max: atlas_allocation.rectangle.max,
-        }));
-        let atlas_data = TextureAtlasData {
-            signature: Signature::<b"kta">,
-            version: Version::<MajorFirst>::new(1, 0),
-            name: self.name.clone(),
-            format: 0,
-            width: self.width,
-            height: self.height,
-            mipmaps_count: self.mipmaps_count,
-            hash: *self.hash.as_bytes(),
-            lookup_count: u32::try_from(lookup.len()).expect("lookup_count bigger than u32::MAX"),
-            lookup,
-            allocations_count: u32::try_from(allocations.len()).expect("allocations_count bigger than u32::MAX"),
-            allocations,
-            compressed_data_size: u32::try_from(self.compressed_data.len()).expect("compressed_data_size bigger than u32::MAX"),
-        };
+    fn to_bytes(&self, byte_writer: &mut ByteWriter) -> ConversionResult<usize> {
+        byte_writer.write_counted(|writer| {
+            let lookup = Vec::from_iter(self.lookup.iter().map(|(name, atlas_entry)| LookupEntry {
+                name: name.clone(),
+                allocation_id: atlas_entry.allocation_id.key(),
+                transparent: u32::from(atlas_entry.transparent),
+            }));
+            let allocations = Vec::from_iter(self.allocations.iter().map(|(id, atlas_allocation)| AllocationEntry {
+                id: id.key(),
+                min: atlas_allocation.rectangle.min,
+                max: atlas_allocation.rectangle.max,
+            }));
+            let atlas_data = TextureAtlasData {
+                signature: Signature::<b"kta">,
+                version: Version::<MajorFirst>::new(1, 0),
+                name: self.name.clone(),
+                format: 0,
+                width: self.width,
+                height: self.height,
+                mipmaps_count: self.mipmaps_count,
+                hash: *self.hash.as_bytes(),
+                lookup_count: u32::try_from(lookup.len()).expect("lookup_count bigger than u32::MAX"),
+                lookup,
+                allocations_count: u32::try_from(allocations.len()).expect("allocations_count bigger than u32::MAX"),
+                allocations,
+                compressed_data_size: u32::try_from(self.compressed_data.len()).expect("compressed_data_size bigger than u32::MAX"),
+            };
 
-        let mut bytes = atlas_data.to_bytes().trace::<Self>()?;
-        bytes.extend(&self.compressed_data);
+            atlas_data.to_bytes(writer).trace::<Self>()?;
+            writer.extend_from_slice(&self.compressed_data);
 
-        Ok(bytes)
+            Ok(())
+        })
     }
 }

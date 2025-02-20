@@ -3,15 +3,15 @@ use std::sync::{Arc, Mutex};
 
 use korangar_audio::AudioEngine;
 #[cfg(feature = "debug")]
-use korangar_debug::logging::{print_debug, Colorize, Timer};
-use korangar_util::container::SimpleCache;
+use korangar_debug::logging::{Colorize, Timer, print_debug};
 use korangar_util::FileLoader;
+use korangar_util::container::SimpleCache;
 use ragnarok_bytes::{ByteReader, FromBytes};
 use ragnarok_formats::action::ActionsData;
 use ragnarok_formats::version::InternalVersion;
 
 use super::error::LoadError;
-use crate::loaders::{GameFileLoader, FALLBACK_ACTIONS_FILE};
+use crate::loaders::{FALLBACK_ACTIONS_FILE, GameFileLoader};
 use crate::world::{ActionEvent, Actions};
 
 const MAX_CACHE_COUNT: u32 = 256;
@@ -108,14 +108,10 @@ impl ActionLoader {
     }
 
     pub fn get_or_load(&self, path: &str) -> Result<Arc<Actions>, LoadError> {
-        let mut lock = self.cache.lock().unwrap();
-        match lock.get(path) {
-            Some(sprite) => Ok(sprite.clone()),
-            None => {
-                // We need to drop to avoid a deadlock here.
-                drop(lock);
-                self.load(path)
-            }
-        }
+        let Some(action) = self.cache.lock().unwrap().get(path).cloned() else {
+            return self.load(path);
+        };
+
+        Ok(action)
     }
 }

@@ -1,8 +1,8 @@
 use super::ChangeEvent;
+use crate::Tracker;
 use crate::application::Application;
 use crate::elements::{ElementCell, FocusMode};
 use crate::windows::PrototypeWindow;
-use crate::Tracker;
 
 pub enum ClickAction<App>
 where

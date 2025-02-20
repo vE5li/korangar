@@ -1,9 +1,9 @@
 use std::cell::Cell;
-use std::sync::atomic::AtomicBool;
 use std::sync::Mutex;
+use std::sync::atomic::AtomicBool;
 
 use super::{ActiveMeasurement, RingBuffer};
-use crate::logging::{print_debug, Colorize};
+use crate::logging::{Colorize, print_debug};
 use crate::profiling::frame_measurement::FrameMeasurement;
 
 #[thread_local]

@@ -6,13 +6,13 @@ use std::sync::{Arc, Mutex};
 
 use cgmath::{Point2, Vector2};
 use cosmic_text::fontdb::ID;
-use cosmic_text::{fontdb, Attrs, Buffer, Family, FontSystem, Metrics, Shaping};
+use cosmic_text::{Attrs, Buffer, Family, FontSystem, Metrics, Shaping, fontdb};
 use hashbrown::HashMap;
-use image::{imageops, ImageBuffer, Rgba, RgbaImage};
-#[cfg(feature = "debug")]
-use korangar_debug::logging::print_debug;
+use image::{ImageBuffer, Rgba, RgbaImage, imageops};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::Colorize;
+#[cfg(feature = "debug")]
+use korangar_debug::logging::print_debug;
 use korangar_interface::application::FontSizeTrait;
 use korangar_interface::elements::ElementDisplay;
 use korangar_util::Rectangle;
@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 
 use self::color_span_iterator::ColorSpanIterator;
 use super::{GameFileLoader, TextureLoader};
-use crate::graphics::{Color, Texture, MAX_TEXTURE_SIZE};
+use crate::graphics::{Color, MAX_TEXTURE_SIZE, Texture};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ArrayType, ScreenSize};
 use crate::loaders::font::font_file::FontFile;
@@ -337,6 +337,6 @@ impl FontLoader {
 
 impl korangar_interface::application::FontLoaderTrait<InterfaceSettings> for Arc<FontLoader> {
     fn get_text_dimensions(&self, text: &str, font_size: FontSize, available_width: f32) -> ScreenSize {
-        FontLoader::get_text_dimensions(&self, text, font_size, 1.0, available_width)
+        FontLoader::get_text_dimensions(self, text, font_size, 1.0, available_width)
     }
 }

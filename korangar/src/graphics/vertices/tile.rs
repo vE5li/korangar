@@ -1,6 +1,6 @@
 use bytemuck::{Pod, Zeroable};
 use cgmath::Point3;
-use wgpu::{vertex_attr_array, VertexAttribute, VertexBufferLayout, VertexStepMode};
+use wgpu::{VertexAttribute, VertexBufferLayout, VertexStepMode, vertex_attr_array};
 
 #[repr(C)]
 #[derive(Default, Debug, Clone, Copy, Zeroable, Pod)]

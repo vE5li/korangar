@@ -1,6 +1,6 @@
 //! Implements a sized Lru cache.
 
-use std::alloc::{alloc, dealloc, Layout};
+use std::alloc::{Layout, alloc, dealloc};
 use std::boxed::Box;
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
@@ -8,8 +8,8 @@ use std::ops::Drop;
 use std::ptr;
 use std::ptr::NonNull;
 
-use super::generational_slab::SecondaryGenerationalSlab;
 use super::GenerationalKey;
+use super::generational_slab::SecondaryGenerationalSlab;
 
 struct Entry<I, V> {
     key: Option<I>,
@@ -325,7 +325,7 @@ mod tests {
             .collect();
 
         // Fixed seed to make this test deterministic.
-        let mut rng = Aes128Ctr128::from_seed([42; 32].into());
+        let rng = Aes128Ctr128::from_seed([42; 32].into());
         rng.shuffle(&mut keys);
 
         keys.drain(..).for_each(|key| {

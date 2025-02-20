@@ -59,8 +59,8 @@ mod simple_cache;
 mod simple_slab;
 
 use std::num::{NonZeroU32, NonZeroUsize};
-use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
 
 pub use generational_slab::{GenerationalIter, GenerationalKey, GenerationalSlab, SecondaryGenerationalSlab};
 pub(crate) use lru::Lru;

@@ -2,8 +2,8 @@ use std::hash::Hash;
 
 use hashbrown::HashMap;
 
-use crate::collision::aligned_plane::{AlignedPlane, Axis};
 use crate::collision::AABB;
+use crate::collision::aligned_plane::{AlignedPlane, Axis};
 use crate::container::{SecondarySimpleSlab, SimpleKey};
 
 /// Cost of traversing a kd-tree node.
@@ -530,7 +530,7 @@ impl<K: Copy> Eq for Event<K> {}
 mod tests {
     use cgmath::Point3;
 
-    use crate::collision::{KDTree, AABB};
+    use crate::collision::{AABB, KDTree};
     use crate::create_simple_key;
 
     create_simple_key!(TestKey);

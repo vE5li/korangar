@@ -1,13 +1,13 @@
 mod builder;
 
 pub use self::builder::StateButtonBuilder;
+use crate::ElementEvent;
 use crate::application::{Application, MouseInputModeTrait};
 use crate::elements::{Element, ElementState};
 use crate::event::{ChangeEvent, ClickAction, HoverInformation};
 use crate::layout::{DimensionBound, PlacementResolver};
 use crate::state::{Remote, RemoteClone};
 use crate::theme::{ButtonTheme, InterfaceTheme};
-use crate::ElementEvent;
 
 // FIX: State button won't redraw just because the state changes
 pub struct StateButton<App, Text, Event, State>

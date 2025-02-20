@@ -1,7 +1,7 @@
 use proc_macro::TokenStream as InterfaceTokenStream;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{parse, ItemFn, LitStr, Stmt};
+use syn::{ItemFn, LitStr, Stmt, parse};
 
 #[proc_macro_attribute]
 pub fn debug_condition(condition: InterfaceTokenStream, conditional: InterfaceTokenStream) -> InterfaceTokenStream {

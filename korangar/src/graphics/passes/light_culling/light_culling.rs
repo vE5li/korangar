@@ -1,11 +1,11 @@
 use wgpu::{
-    include_wgsl, ComputePass, ComputePipeline, ComputePipelineDescriptor, Device, PipelineCompilationOptions, PipelineLayoutDescriptor,
-    Queue, ShaderModuleDescriptor,
+    ComputePass, ComputePipeline, ComputePipelineDescriptor, Device, PipelineCompilationOptions, PipelineLayoutDescriptor, Queue,
+    ShaderModuleDescriptor, include_wgsl,
 };
 
 use crate::graphics::passes::light_culling::LightCullingPassContext;
 use crate::graphics::passes::{BindGroupCount, ComputePassContext, Dispatch};
-use crate::graphics::{calculate_light_tile_count, Capabilities, GlobalContext};
+use crate::graphics::{Capabilities, GlobalContext, calculate_light_tile_count};
 use crate::interface::layout::ScreenSize;
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/light_culling.wgsl");
@@ -62,8 +62,8 @@ fn calculate_dispatch_size(forward_size: ScreenSize) -> (u32, u32) {
     let (tiles_x, tiles_y) = calculate_light_tile_count(forward_size);
 
     // Round up division by workgroup size (8)
-    let dispatch_x = (tiles_x + 7) / 8;
-    let dispatch_y = (tiles_y + 7) / 8;
+    let dispatch_x = tiles_x.div_ceil(8);
+    let dispatch_y = tiles_y.div_ceil(8);
 
     (dispatch_x, dispatch_y)
 }

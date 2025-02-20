@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 #[cfg(feature = "debug")]
-use korangar_debug::logging::{print_debug, Colorize};
+use korangar_debug::logging::{Colorize, print_debug};
 use ron::ser::PrettyConfig;
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize, Serializer};

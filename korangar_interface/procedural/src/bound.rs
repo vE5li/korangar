@@ -1,7 +1,7 @@
 use proc_macro2::{Punct, TokenStream};
 use quote::quote;
-use syn::parse::ParseStream;
 use syn::Lit;
+use syn::parse::ParseStream;
 
 #[derive(Debug)]
 struct Dimension {

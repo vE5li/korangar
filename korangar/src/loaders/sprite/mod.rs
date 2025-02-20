@@ -3,19 +3,19 @@ use std::sync::{Arc, Mutex};
 
 use image::RgbaImage;
 #[cfg(feature = "debug")]
-use korangar_debug::logging::{print_debug, Colorize, Timer};
+use korangar_debug::logging::{Colorize, Timer, print_debug};
 use korangar_interface::elements::PrototypeElement;
+use korangar_util::FileLoader;
 use korangar_util::color::premultiply_alpha;
 use korangar_util::container::{Cacheable, SimpleCache};
-use korangar_util::FileLoader;
 use ragnarok_bytes::{ByteReader, FromBytes};
 use ragnarok_formats::sprite::{PaletteColor, RgbaImageData, SpriteData};
 use ragnarok_formats::version::InternalVersion;
 
-use super::{TextureLoader, FALLBACK_SPRITE_FILE};
+use super::{FALLBACK_SPRITE_FILE, TextureLoader};
 use crate::graphics::Texture;
-use crate::loaders::error::LoadError;
 use crate::loaders::GameFileLoader;
+use crate::loaders::error::LoadError;
 
 const MAX_CACHE_COUNT: u32 = 512;
 const MAX_CACHE_SIZE: usize = 512 * 1024 * 1024;
@@ -171,14 +171,10 @@ impl SpriteLoader {
     }
 
     pub fn get_or_load(&self, path: &str) -> Result<Arc<Sprite>, LoadError> {
-        let mut lock = self.cache.lock().unwrap();
-        match lock.get(path) {
-            Some(sprite) => Ok(sprite.clone()),
-            None => {
-                // We need to drop to avoid a deadlock here.
-                drop(lock);
-                self.load(path)
-            }
-        }
+        let Some(sprite) = self.cache.lock().unwrap().get(path).cloned() else {
+            return self.load(path);
+        };
+
+        Ok(sprite)
     }
 }

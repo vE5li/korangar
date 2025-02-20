@@ -1,9 +1,9 @@
 #[cfg(feature = "debug")]
 use cgmath::EuclideanSpace;
 use cgmath::{Array, Point2, Point3, Vector2};
+use korangar_util::Rectangle;
 #[cfg(feature = "debug")]
 use korangar_util::texture_atlas::AtlasAllocation;
-use korangar_util::Rectangle;
 use ragnarok_formats::map::{GatData, GroundData, GroundTile, SurfaceType};
 
 #[cfg(feature = "debug")]

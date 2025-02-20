@@ -9,7 +9,7 @@ mod utils;
 
 use proc_macro::TokenStream as InterfaceTokenStream;
 use quote::quote;
-use syn::{parse, Data, DeriveInput};
+use syn::{Data, DeriveInput, parse};
 
 use self::convertable::*;
 use self::fixed_size::{derive_fixed_byte_size_enum, derive_fixed_byte_size_struct};

@@ -8,7 +8,7 @@ use korangar_audio::{AudioEngine, SoundEffectKey};
 use korangar_interface::elements::PrototypeElement;
 use korangar_interface::windows::{PrototypeWindow, Window};
 use korangar_networking::EntityData;
-use korangar_util::pathing::{PathFinder, MAX_WALK_PATH_SIZE};
+use korangar_util::pathing::{MAX_WALK_PATH_SIZE, PathFinder};
 #[cfg(feature = "debug")]
 use korangar_util::texture_atlas::AtlasAllocation;
 use ragnarok_packets::{AccountId, CharacterInformation, ClientTick, Direction, EntityId, Sex, StatusType, WorldPosition};
@@ -599,7 +599,7 @@ impl Common {
 
     #[cfg(feature = "debug")]
     pub fn generate_pathing_mesh(&mut self, device: &Device, queue: &Queue, map: &Map, pathing_mapping: &[AtlasAllocation]) {
-        use crate::{Color, NativeModelVertex, MAP_TILE_SIZE};
+        use crate::{Color, MAP_TILE_SIZE, NativeModelVertex};
 
         const HALF_TILE_SIZE: f32 = MAP_TILE_SIZE / 2.0;
         const PATHING_MESH_OFFSET: f32 = 0.95;

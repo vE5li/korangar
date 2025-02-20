@@ -2,12 +2,12 @@ use std::cell::RefCell;
 use std::rc::Weak;
 
 use super::ContainerState;
+use crate::ColorSelector;
 use crate::application::{Application, MouseInputModeTrait, PositionTrait, PositionTraitExt, SizeTrait, SizeTraitExt};
 use crate::elements::{Element, ElementCell, ElementState, Focus};
 use crate::event::{ChangeEvent, HoverInformation};
 use crate::layout::{PlacementResolver, SizeBound};
 use crate::theme::{ButtonTheme, InterfaceTheme};
-use crate::ColorSelector;
 
 const SCROLL_SPEED: f32 = 0.8;
 

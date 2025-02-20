@@ -37,10 +37,12 @@ impl CharacterPreview {
                 false => "Switch",
             };
 
-            return vec![Text::default()
-                .with_text(text.to_owned())
-                .with_foreground_color(|_| Color::rgb_u8(200, 140, 180))
-                .wrap()];
+            return vec![
+                Text::default()
+                    .with_text(text.to_owned())
+                    .with_foreground_color(|_| Color::rgb_u8(200, 140, 180))
+                    .wrap(),
+            ];
         }
 
         let characters = characters.get();
@@ -71,10 +73,12 @@ impl CharacterPreview {
             ];
         }
 
-        vec![Text::default()
-            .with_text("New character")
-            .with_foreground_color(|_| Color::rgb_u8(200, 140, 180))
-            .wrap()]
+        vec![
+            Text::default()
+                .with_text("New character")
+                .with_foreground_color(|_| Color::rgb_u8(200, 140, 180))
+                .wrap(),
+        ]
     }
 
     pub fn new(characters: PlainRemote<Vec<CharacterInformation>>, move_request: PlainRemote<Option<usize>>, slot: usize) -> Self {

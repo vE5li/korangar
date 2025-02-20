@@ -9,7 +9,7 @@ use std::sync::RwLock;
 
 use blake3::Hash;
 #[cfg(feature = "debug")]
-use korangar_debug::logging::{print_debug, Colorize, Timer};
+use korangar_debug::logging::{Colorize, Timer, print_debug};
 use korangar_util::{FileLoader, FileNotFoundError};
 
 use self::list::GameArchiveList;
@@ -137,7 +137,7 @@ impl GameFileLoader {
     }
 
     fn patch_lua_files(&self) {
-        use lunify::{unify, Format, Settings};
+        use lunify::{Format, Settings, unify};
 
         const LUA_BYTECODE_EXTENSION: &str = ".lub";
         let lua_files = self.get_files_with_extension(LUA_BYTECODE_EXTENSION);

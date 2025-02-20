@@ -1,4 +1,4 @@
-use korangar_debug::logging::{print_debug, Colorize};
+use korangar_debug::logging::{Colorize, print_debug};
 use wgpu::Error;
 
 pub fn error_handler(error: Error) {

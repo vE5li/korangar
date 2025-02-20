@@ -3,9 +3,9 @@ use std::sync::{Arc, Mutex};
 
 use cgmath::Deg;
 #[cfg(feature = "debug")]
-use korangar_debug::logging::{print_debug, Colorize, Timer};
-use korangar_util::container::SimpleCache;
+use korangar_debug::logging::{Colorize, Timer, print_debug};
 use korangar_util::FileLoader;
+use korangar_util::container::SimpleCache;
 use ragnarok_bytes::{ByteReader, FromBytes};
 use ragnarok_formats::effect::EffectData;
 use ragnarok_formats::version::InternalVersion;
@@ -157,15 +157,11 @@ impl EffectLoader {
     }
 
     pub fn get_or_load(&self, path: &str, texture_loader: &TextureLoader) -> Result<Arc<Effect>, LoadError> {
-        let mut lock = self.cache.lock().unwrap();
-        match lock.get(path) {
-            Some(effect) => Ok(effect.clone()),
-            None => {
-                // We need to drop to avoid a deadlock here.
-                drop(lock);
-                self.load(path, texture_loader)
-            }
-        }
+        let Some(effect) = self.cache.lock().unwrap().get(path).cloned() else {
+            return self.load(path, texture_loader);
+        };
+
+        Ok(effect)
     }
 }
 

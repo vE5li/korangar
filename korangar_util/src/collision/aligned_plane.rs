@@ -48,7 +48,7 @@ impl AlignedPlane {
 mod tests {
     use cgmath::Point3;
 
-    use crate::collision::{AlignedPlane, Axis, AABB};
+    use crate::collision::{AABB, AlignedPlane, Axis};
 
     #[test]
     fn test_aligned_plane_creation() {

@@ -8,11 +8,11 @@ use hashbrown::HashMap;
 use image::codecs::tga::TgaEncoder;
 use image::{GrayImage, ImageBuffer, ImageFormat, ImageReader, Rgba, RgbaImage};
 #[cfg(feature = "debug")]
-use korangar_debug::logging::{print_debug, Colorize, Timer};
+use korangar_debug::logging::{Colorize, Timer, print_debug};
+use korangar_util::FileLoader;
 use korangar_util::color::contains_transparent_pixel;
 use korangar_util::container::SimpleCache;
 use korangar_util::texture_atlas::{AllocationId, AtlasAllocation, OfflineTextureAtlas};
-use korangar_util::FileLoader;
 use wgpu::{
     Buffer, BufferDescriptor, BufferUsages, CommandEncoderDescriptor, ComputePassDescriptor, Device, Extent3d, Maintain, MapMode, Queue,
     TexelCopyBufferLayout, TextureAspect, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, TextureViewDescriptor,
@@ -559,15 +559,11 @@ impl TextureLoader {
     }
 
     pub fn get_or_load(&self, path: &str, image_type: ImageType) -> Result<Arc<Texture>, LoadError> {
-        let mut lock = self.cache.lock().unwrap();
-        match lock.get(&(path.into(), image_type)) {
-            Some(texture) => Ok(texture.clone()),
-            None => {
-                // We need to drop to avoid a deadlock here.
-                drop(lock);
-                self.load(path, image_type)
-            }
-        }
+        let Some(texture) = self.cache.lock().unwrap().get(&(path.into(), image_type)).cloned() else {
+            return self.load(path, image_type);
+        };
+
+        Ok(texture)
     }
 }
 

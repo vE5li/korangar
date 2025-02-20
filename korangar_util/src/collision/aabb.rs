@@ -197,7 +197,7 @@ impl Query<AABB> for AABB {
 mod tests {
     use cgmath::{Matrix4, Point3, Vector3};
 
-    use crate::collision::{AlignedPlane, Axis, Sphere, AABB};
+    use crate::collision::{AABB, AlignedPlane, Axis, Sphere};
 
     #[test]
     fn test_new() {

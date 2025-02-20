@@ -3,8 +3,8 @@ use std::ops::Div;
 use std::time::Duration;
 
 use super::measurement::Measurement;
-use crate::profiling::frame_measurement::FrameMeasurement;
 use crate::profiling::LockThreadProfiler;
+use crate::profiling::frame_measurement::FrameMeasurement;
 
 #[derive(Default, Debug)]
 struct MeasurementTiming {

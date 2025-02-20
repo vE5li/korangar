@@ -8,7 +8,7 @@ mod window;
 
 use bound::{DimensionBound, SizeBound};
 use proc_macro::TokenStream as InterfaceTokenStream;
-use syn::{parse, Data, DeriveInput};
+use syn::{Data, DeriveInput, parse};
 
 use self::element::*;
 use self::window::*;

@@ -40,12 +40,14 @@ where
         application: &InterfaceSettings,
         available_space: ScreenSize,
     ) -> Window<InterfaceSettings> {
-        let elements = vec![StateButtonBuilder::new()
-            .with_text("Mute audio on focus loss")
-            .with_event(self.mute_on_focus_loss.toggle_action())
-            .with_remote(self.mute_on_focus_loss.new_remote())
-            .build()
-            .wrap()];
+        let elements = vec![
+            StateButtonBuilder::new()
+                .with_text("Mute audio on focus loss")
+                .with_event(self.mute_on_focus_loss.toggle_action())
+                .with_remote(self.mute_on_focus_loss.new_remote())
+                .build()
+                .wrap(),
+        ];
 
         WindowBuilder::new()
             .with_title("Audio Settings".to_string())

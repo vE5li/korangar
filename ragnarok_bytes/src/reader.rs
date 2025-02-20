@@ -1,6 +1,6 @@
 use std::any::TypeId;
 
-use encoding_rs::{Encoding, EUC_KR};
+use encoding_rs::{EUC_KR, Encoding};
 
 use crate::{ConversionError, ConversionErrorType, ConversionResult};
 
@@ -238,8 +238,8 @@ mod save_point {
 
 #[cfg(test)]
 mod temporary_limit {
-    use crate::reader::TemporaryLimit;
     use crate::ByteReader;
+    use crate::reader::TemporaryLimit;
 
     const TEST_BASE_OFFSET: usize = 1;
     const TEST_BYTE_SIZE: usize = 10;

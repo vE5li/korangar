@@ -4,7 +4,7 @@ use super::stack::{get_message_count, increment_stack, stack_size};
 use crate::logging::print::print_debug_prefix;
 use crate::logging::stack::decrement_stack;
 use crate::logging::symbols::ARROW;
-use crate::logging::{print_debug, Colorize};
+use crate::logging::{Colorize, print_debug};
 
 pub struct Timer {
     start_time: SystemTime,

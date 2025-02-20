@@ -1,7 +1,7 @@
 use std::cmp::PartialOrd;
 
 use num::traits::NumOps;
-use num::{clamp, NumCast, Zero};
+use num::{NumCast, Zero, clamp};
 
 use crate::application::{
     Application, CornerRadiusTraitExt, MouseInputModeTrait, PositionTrait, PositionTraitExt, ScalingTrait, SizeTrait, SizeTraitExt,

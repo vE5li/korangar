@@ -12,13 +12,13 @@ use std::sync::Mutex;
 use blake3::Hasher;
 use flate2::bufread::ZlibDecoder;
 #[cfg(feature = "debug")]
-use korangar_debug::logging::{print_debug, Colorize, Timer};
+use korangar_debug::logging::{Colorize, Timer, print_debug};
 use ragnarok_bytes::{ByteReader, FixedByteSize, FromBytes};
 use ragnarok_formats::archive::{AssetTable, FileTableRow, Header};
 
 pub use self::builder::NativeArchiveBuilder;
-use crate::loaders::archive::native::mixcrypt::decrypt_file;
 use crate::loaders::archive::Archive;
+use crate::loaders::archive::native::mixcrypt::decrypt_file;
 
 /// Represents a GRF file. GRF Files are an archive to store game assets.
 /// Each GRF contains a [`Header`] with metadata (number of files, size,

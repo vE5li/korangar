@@ -4,7 +4,7 @@ use proc_macro2::{Delimiter, TokenStream};
 use quote::{format_ident, quote};
 use syn::{DataStruct, Field};
 
-use crate::utils::{get_unique_attribute, Version};
+use crate::utils::{Version, get_unique_attribute};
 
 pub fn byte_convertable_helper(data_struct: DataStruct) -> (TokenStream, Vec<TokenStream>, Vec<TokenStream>, Vec<TokenStream>, Delimiter) {
     let mut from_bytes_implementations = vec![];
@@ -225,70 +225,84 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (TokenStream, Vec<Tok
 
         let field_type = field.ty;
 
-        if let Some(field_identifier) = &field.ident {
-            if is_new_derive {
-                let (collection, is_option) = deriveable_map.get(&field_variable).expect("can't derive field without repeat");
+        match &field.ident {
+            Some(field_identifier) => {
+                if is_new_derive {
+                    let (collection, is_option) = deriveable_map.get(&field_variable).expect("can't derive field without repeat");
 
-                match is_option {
-                    true => {
-                        new_implementations.push(quote! {
-                            #field_identifier: Some(#collection.len() as _)
-                        });
+                    match is_option {
+                        true => {
+                            new_implementations.push(quote! {
+                                #field_identifier: Some(#collection.len() as _)
+                            });
+                        }
+                        false => {
+                            new_implementations.push(quote! {
+                                #field_identifier: #collection.len() as _
+                            });
+                        }
                     }
-                    false => {
-                        new_implementations.push(quote! {
-                            #field_identifier: #collection.len() as _
-                        });
+                } else if is_new_default {
+                    new_implementations.push(quote! {
+                        #field_identifier: Default::default()
+                    });
+                } else {
+                    match new_value {
+                        Some(new_value) => {
+                            new_implementations.push(quote! {
+                                #field_identifier: #new_value
+                            });
+                        }
+                        _ => {
+                            new_arguments.push(quote! {
+                                #field_variable: #field_type
+                            });
+                            new_implementations.push(quote! {
+                                #field_identifier: #field_variable
+                            });
+                        }
                     }
                 }
-            } else if is_new_default {
-                new_implementations.push(quote! {
-                    #field_identifier: Default::default()
-                });
-            } else if let Some(new_value) = new_value {
-                new_implementations.push(quote! {
-                    #field_identifier: #new_value
-                });
-            } else {
-                new_arguments.push(quote! {
-                    #field_variable: #field_type
-                });
-                new_implementations.push(quote! {
-                    #field_identifier: #field_variable
-                });
             }
-        } else {
-            #[allow(clippy::collapsible_else_if)]
-            if is_new_derive {
-                let (collection, is_option) = deriveable_map.get(&field_variable).expect("can't derive field without repeat");
+            _ =>
+            {
+                #[allow(clippy::collapsible_else_if)]
+                if is_new_derive {
+                    let (collection, is_option) = deriveable_map.get(&field_variable).expect("can't derive field without repeat");
 
-                match is_option {
-                    true => {
-                        new_implementations.push(quote! {
-                            Some(#collection.len() as _)
-                        });
+                    match is_option {
+                        true => {
+                            new_implementations.push(quote! {
+                                Some(#collection.len() as _)
+                            });
+                        }
+                        false => {
+                            new_implementations.push(quote! {
+                                #collection.len() as _
+                            });
+                        }
                     }
-                    false => {
-                        new_implementations.push(quote! {
-                            #collection.len() as _
-                        });
+                } else if is_new_default {
+                    new_implementations.push(quote! {
+                        Default::default()
+                    });
+                } else {
+                    match new_value {
+                        Some(new_value) => {
+                            new_implementations.push(quote! {
+                                #new_value
+                            });
+                        }
+                        _ => {
+                            new_arguments.push(quote! {
+                                #field_variable: #field_type
+                            });
+                            new_implementations.push(quote! {
+                                #field_variable
+                            });
+                        }
                     }
                 }
-            } else if is_new_default {
-                new_implementations.push(quote! {
-                    Default::default()
-                });
-            } else if let Some(new_value) = new_value {
-                new_implementations.push(quote! {
-                    #new_value
-                });
-            } else {
-                new_arguments.push(quote! {
-                    #field_variable: #field_type
-                });
-                new_implementations.push(quote! {
-                    #field_variable
-                });
             }
         }
     }

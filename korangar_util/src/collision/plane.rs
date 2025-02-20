@@ -1,6 +1,6 @@
 use cgmath::{EuclideanSpace, InnerSpace, Point3, Vector3, Vector4};
 
-use super::{Sphere, AABB};
+use super::{AABB, Sphere};
 
 /// Represents a plane in 3D space using the equation `Ax + By + Cz + D = 0`.
 #[derive(Debug, Clone, Copy)]
@@ -128,9 +128,9 @@ pub enum IntersectionClassification {
 
 #[cfg(test)]
 mod tests {
-    use cgmath::{assert_relative_eq, EuclideanSpace, InnerSpace, Point3, Vector3, Vector4};
+    use cgmath::{EuclideanSpace, InnerSpace, Point3, Vector3, Vector4, assert_relative_eq};
 
-    use crate::collision::{IntersectionClassification, Plane, Sphere, AABB};
+    use crate::collision::{AABB, IntersectionClassification, Plane, Sphere};
 
     #[test]
     fn test_plane_new() {

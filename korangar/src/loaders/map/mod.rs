@@ -9,10 +9,10 @@ use hashbrown::{HashMap, HashSet};
 use korangar_audio::AudioEngine;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::Timer;
-use korangar_util::collision::{KDTree, Sphere, AABB};
+use korangar_util::FileLoader;
+use korangar_util::collision::{AABB, KDTree, Sphere};
 use korangar_util::container::SimpleSlab;
 use korangar_util::texture_atlas::{AllocationId, AtlasAllocation};
-use korangar_util::FileLoader;
 use ragnarok_bytes::{ByteReader, FromBytes};
 use ragnarok_formats::map::{GatData, GroundData, MapData, MapResources};
 use ragnarok_formats::version::InternalVersion;
@@ -22,7 +22,7 @@ pub use self::vertices::MAP_TILE_SIZE;
 use self::vertices::{generate_tile_vertices, ground_vertices};
 use super::error::LoadError;
 use crate::graphics::{Buffer, ModelVertex, NativeModelVertex, Texture};
-use crate::loaders::{GameFileLoader, ImageType, ModelLoader, TextureAtlas, TextureLoader, FALLBACK_MODEL_FILE};
+use crate::loaders::{FALLBACK_MODEL_FILE, GameFileLoader, ImageType, ModelLoader, TextureAtlas, TextureLoader};
 use crate::world::{LightSourceKey, Lighting, Model};
 use crate::{EffectSourceExt, LightSourceExt, Map, Object, ObjectKey, SoundSourceExt};
 
@@ -30,7 +30,7 @@ const MAP_OFFSET: f32 = 5.0;
 
 #[cfg(feature = "debug")]
 fn assert_byte_reader_empty<Meta>(mut byte_reader: ByteReader<Meta>, file_name: &str) {
-    use korangar_debug::logging::{print_debug, Colorize};
+    use korangar_debug::logging::{Colorize, print_debug};
 
     if !byte_reader.is_empty() {
         print_debug!(

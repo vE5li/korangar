@@ -1,14 +1,14 @@
 use hashbrown::HashMap;
 use wgpu::{
-    include_wgsl, BlendState, ColorTargetState, ColorWrites, Device, FragmentState, MultisampleState, PipelineCompilationOptions,
+    BlendState, ColorTargetState, ColorWrites, Device, FragmentState, MultisampleState, PipelineCompilationOptions,
     PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModule,
-    ShaderModuleDescriptor, TextureFormat, TextureSampleType, VertexState,
+    ShaderModuleDescriptor, TextureFormat, TextureSampleType, VertexState, include_wgsl,
 };
 
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, PostProcessingRenderPassContext, RenderPassContext,
 };
-use crate::graphics::{AttachmentTexture, Capabilities, GlobalContext, FXAA_COLOR_LUMA_TEXTURE_FORMAT};
+use crate::graphics::{AttachmentTexture, Capabilities, FXAA_COLOR_LUMA_TEXTURE_FORMAT, GlobalContext};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/blitter.wgsl");
 const DRAWER_NAME: &str = "post processing blitter";

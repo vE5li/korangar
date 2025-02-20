@@ -8,12 +8,12 @@ use korangar_interface::event::{ChangeEvent, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;
 
+use crate::FontSize;
 use crate::input::MouseInputMode;
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
 use crate::interface::theme::InterfaceTheme;
 use crate::renderer::InterfaceRenderer;
-use crate::FontSize;
 
 const VISIBILITY_THRESHHOLD: f32 = 0.01;
 

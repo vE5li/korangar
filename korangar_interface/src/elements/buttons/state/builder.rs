@@ -1,11 +1,11 @@
 use std::marker::PhantomData;
 
 use super::StateButton;
+use crate::ElementEvent;
 use crate::application::Application;
 use crate::builder::{Set, Unset};
 use crate::layout::DimensionBound;
 use crate::state::Remote;
-use crate::ElementEvent;
 
 /// Type state [`StateButton`] builder. This builder utilizes the type system to
 /// prevent calling the same method multiple times and calling

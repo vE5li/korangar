@@ -128,11 +128,7 @@ impl Lighting {
     }
 
     fn calculate_mixing_factors(sun_intensity: f32, moon_intensity: f32) -> (f32, f32) {
-        if sun_intensity > moon_intensity {
-            (1.0, 0.0)
-        } else {
-            (0.0, 1.0)
-        }
+        if sun_intensity > moon_intensity { (1.0, 0.0) } else { (0.0, 1.0) }
     }
 
     fn get_ambient_light_factor(day_timer: f32, phase: f32) -> f32 {

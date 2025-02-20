@@ -9,8 +9,8 @@ use std::fs::File;
 use std::io::{BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
-use flate2::bufread::ZlibEncoder;
 use flate2::Compression;
+use flate2::bufread::ZlibEncoder;
 use ragnarok_bytes::{FixedByteSize, ToBytes};
 use ragnarok_formats::archive::{AssetTable, FileTableRow, Header};
 

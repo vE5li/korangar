@@ -4,9 +4,9 @@ use encoding_rs::Encoding;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::Timer;
 use korangar_util::FileLoader;
+use quick_xml::Reader;
 use quick_xml::de::from_str;
 use quick_xml::events::Event;
-use quick_xml::Reader;
 use serde::{Deserialize, Serialize};
 
 pub use self::client_info::ClientInfo;

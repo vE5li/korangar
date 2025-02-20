@@ -1,7 +1,7 @@
 use std::num::NonZeroU32;
 
 #[cfg(feature = "debug")]
-use korangar_debug::logging::{print_debug, Colorize};
+use korangar_debug::logging::{Colorize, print_debug};
 use wgpu::{Adapter, Features, Limits, TextureFormat, TextureFormatFeatureFlags};
 
 use crate::graphics::{Msaa, RENDER_TO_TEXTURE_DEPTH_FORMAT, RENDER_TO_TEXTURE_FORMAT};

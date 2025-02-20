@@ -6,13 +6,13 @@ use std::io::{Error, Read};
 use std::path::{Path, PathBuf};
 
 use blake3::Hasher;
-use flate2::bufread::{GzDecoder, GzEncoder};
 use flate2::Compression;
+use flate2::bufread::{GzDecoder, GzEncoder};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::print_debug;
 use walkdir::WalkDir;
 
-use super::{os_specific_path, Archive, Writable};
+use super::{Archive, Writable, os_specific_path};
 
 pub struct FolderArchive {
     folder_path: PathBuf,

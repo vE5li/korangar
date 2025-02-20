@@ -1,10 +1,10 @@
-use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
+use std::sync::atomic::AtomicU64;
 use std::time::Instant;
 
 use cgmath::Vector2;
 #[cfg(feature = "debug")]
-use korangar_debug::logging::{print_debug, Colorize};
+use korangar_debug::logging::{Colorize, print_debug};
 #[cfg(feature = "debug")]
 use korangar_debug::profile_block;
 use wgpu::util::StagingBelt;
@@ -17,13 +17,13 @@ use winit::window::Window;
 
 use super::{
     AntiAliasingResources, Capabilities, FramePacer, FrameStage, GlobalContext, LimitFramerate, Msaa, Prepare, PresentModeInfo,
-    ScreenSpaceAntiAliasing, ShadowDetail, Ssaa, Surface, TextureSamplerType, RENDER_TO_TEXTURE_FORMAT,
+    RENDER_TO_TEXTURE_FORMAT, ScreenSpaceAntiAliasing, ShadowDetail, Ssaa, Surface, TextureSamplerType,
 };
+use crate::NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS;
 use crate::graphics::instruction::RenderInstruction;
 use crate::graphics::passes::*;
 use crate::interface::layout::ScreenSize;
 use crate::loaders::TextureLoader;
-use crate::NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS;
 
 pub struct GraphicsEngineDescriptor {
     pub capabilities: Capabilities,

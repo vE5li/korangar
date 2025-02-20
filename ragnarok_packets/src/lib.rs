@@ -4,7 +4,7 @@ mod position;
 use std::net::Ipv4Addr;
 
 use ragnarok_bytes::{
-    ByteConvertable, ByteReader, ConversionError, ConversionResult, ConversionResultExt, FixedByteSize, FromBytes, ToBytes,
+    ByteConvertable, ByteReader, ByteWriter, ConversionError, ConversionResult, ConversionResultExt, FixedByteSize, FromBytes, ToBytes,
 };
 #[cfg(feature = "derive")]
 pub use ragnarok_procedural::{CharacterServer, ClientPacket, LoginServer, MapServer, Packet, ServerPacket};
@@ -39,7 +39,7 @@ pub trait Packet: std::fmt::Debug + Clone {
 
     /// Write packet **without the header**. To write the packet with the
     /// header, use [`PacketExt::packet_to_bytes`].
-    fn payload_to_bytes(&self) -> ConversionResult<Vec<u8>>;
+    fn payload_to_bytes(&self, byte_writer: &mut ByteWriter) -> ConversionResult<usize>;
 
     /// Implementation detail of Korangar. Can be used to convert a packet to an
     /// UI element in the packet viewer.
@@ -57,7 +57,7 @@ pub trait PacketExt: Packet {
 
     /// Write packet **with the header**. To write the packet without the
     /// header, use [`Packet::payload_to_bytes`].
-    fn packet_to_bytes(&self) -> ConversionResult<Vec<u8>>;
+    fn packet_to_bytes(&self, byte_writer: &mut ByteWriter) -> ConversionResult<usize>;
 }
 
 impl<T> PacketExt for T
@@ -74,12 +74,10 @@ where
         Self::payload_from_bytes(byte_reader)
     }
 
-    fn packet_to_bytes(&self) -> ConversionResult<Vec<u8>> {
-        let mut bytes = Self::HEADER.to_bytes()?;
-
-        bytes.extend(self.payload_to_bytes()?);
-
-        Ok(bytes)
+    fn packet_to_bytes(&self, byte_writer: &mut ByteWriter) -> ConversionResult<usize> {
+        let mut written = Self::HEADER.to_bytes(byte_writer)?;
+        written += self.payload_to_bytes(byte_writer)?;
+        Ok(written)
     }
 }
 
@@ -204,8 +202,8 @@ impl FromBytes for InventoryIndex {
 }
 
 impl ToBytes for InventoryIndex {
-    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
-        u16::to_bytes(&(self.0 + 2))
+    fn to_bytes(&self, byte_writer: &mut ByteWriter) -> ConversionResult<usize> {
+        u16::to_bytes(&(self.0 + 2), byte_writer)
     }
 }
 
@@ -907,8 +905,8 @@ impl FromBytes for RegularItemFlags {
 }
 
 impl ToBytes for RegularItemFlags {
-    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
-        self.bits().to_bytes()
+    fn to_bytes(&self, byte_writer: &mut ByteWriter) -> ConversionResult<usize> {
+        self.bits().to_bytes(byte_writer)
     }
 }
 
@@ -958,8 +956,8 @@ impl FromBytes for EquippableItemFlags {
 }
 
 impl ToBytes for EquippableItemFlags {
-    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
-        self.bits().to_bytes()
+    fn to_bytes(&self, byte_writer: &mut ByteWriter) -> ConversionResult<usize> {
+        self.bits().to_bytes(byte_writer)
     }
 }
 
@@ -1229,7 +1227,7 @@ impl FromBytes for StatusType {
 }
 
 impl ToBytes for StatusType {
-    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
+    fn to_bytes(&self, _byte_writer: &mut ByteWriter) -> ConversionResult<usize> {
         panic!("this should be derived");
     }
 }
@@ -2257,8 +2255,8 @@ impl FromBytes for EquipPosition {
 }
 
 impl ToBytes for EquipPosition {
-    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
-        self.bits().to_bytes()
+    fn to_bytes(&self, byte_writer: &mut ByteWriter) -> ConversionResult<usize> {
+        self.bits().to_bytes(byte_writer)
     }
 }
 

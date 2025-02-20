@@ -10,7 +10,7 @@ use korangar_interface::event::{ChangeEvent, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;
 use korangar_interface::state::{PlainRemote, Remote, RemoteClone};
-use ragnarok_bytes::{ByteReader, ConversionError, ConversionResult, FromBytes};
+use ragnarok_bytes::{ByteReader, ByteWriter, ConversionError, ConversionResult, FromBytes};
 use ragnarok_packets::handler::PacketCallback;
 use ragnarok_packets::{Packet, PacketHeader};
 
@@ -35,7 +35,7 @@ impl Packet for UnknownPacket {
         unimplemented!()
     }
 
-    fn payload_to_bytes(&self) -> ConversionResult<Vec<u8>> {
+    fn payload_to_bytes(&self, _byte_writer: &mut ByteWriter) -> ConversionResult<usize> {
         unimplemented!()
     }
 
@@ -80,7 +80,7 @@ impl Packet for ErrorPacket {
         unimplemented!()
     }
 
-    fn payload_to_bytes(&self) -> ConversionResult<Vec<u8>> {
+    fn payload_to_bytes(&self, _byte_writer: &mut ByteWriter) -> ConversionResult<usize> {
         unimplemented!()
     }
 

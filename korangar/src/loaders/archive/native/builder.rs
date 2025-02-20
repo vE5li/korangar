@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 
 use flate2::Compression;
 use flate2::bufread::ZlibEncoder;
-use ragnarok_bytes::{FixedByteSize, ToBytes};
+use ragnarok_bytes::{ByteWriter, FixedByteSize, ToBytes};
 use ragnarok_formats::archive::{AssetTable, FileTableRow, Header};
 
 use super::FileTable;
@@ -67,32 +67,38 @@ impl Writable for NativeArchiveBuilder {
             );
         }
 
-        let mut file_table_data = Vec::new();
+        let mut byte_writer = ByteWriter::new();
 
         for file_information in file_table.values() {
-            file_table_data.extend(file_information.to_bytes().unwrap());
+            file_information.to_bytes(&mut byte_writer).unwrap();
         }
 
-        let mut encoder = ZlibEncoder::new(file_table_data.as_slice(), Compression::fast());
+        let mut encoder = ZlibEncoder::new(byte_writer.as_slice(), Compression::fast());
         let mut compressed = Vec::default();
         encoder.read_to_end(&mut compressed)?;
 
         let asset_table = AssetTable {
             compressed_size: compressed.len() as u32,
-            uncompressed_size: file_table_data.len() as u32,
+            uncompressed_size: byte_writer.len() as u32,
         };
 
-        let file_table_bytes = asset_table.to_bytes().unwrap();
-        file_writer.write_all(&file_table_bytes)?;
+        byte_writer.clear();
+        asset_table.to_bytes(&mut byte_writer).unwrap();
+
+        file_writer.write_all(byte_writer.as_slice())?;
         file_writer.write_all(&compressed)?;
+
+        byte_writer.clear();
 
         let reserved_files = 0;
         let raw_file_count = file_table.len() as u32 + 7;
         let version = 0x200;
-        let file_header_bytes = Header::new(offset, reserved_files, raw_file_count, version).to_bytes().unwrap();
+        Header::new(offset, reserved_files, raw_file_count, version)
+            .to_bytes(&mut byte_writer)
+            .unwrap();
 
         file_writer.seek(SeekFrom::Start(0))?;
-        file_writer.write_all(&file_header_bytes)?;
+        file_writer.write_all(byte_writer.as_slice())?;
         file_writer.flush()?;
 
         Ok(())

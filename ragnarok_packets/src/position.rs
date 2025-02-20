@@ -1,4 +1,4 @@
-use ragnarok_bytes::{ByteConvertable, ByteReader, ConversionResult, FromBytes, ToBytes};
+use ragnarok_bytes::{ByteConvertable, ByteReader, ByteWriter, ConversionResult, FromBytes, ToBytes};
 
 #[derive(Debug, Copy, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
@@ -93,15 +93,19 @@ impl FromBytes for WorldPosition {
 }
 
 impl ToBytes for WorldPosition {
-    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
-        let mut coordinates = vec![0, 0, 0];
-        let direction = (8 - usize::from(self.direction) + 4) & 7;
+    fn to_bytes(&self, byte_writer: &mut ByteWriter) -> ConversionResult<usize> {
+        byte_writer.write_counted(|write| {
+            let mut coordinates = [0, 0, 0];
+            let direction = (8 - usize::from(self.direction) + 4) & 7;
 
-        coordinates[0] = (self.x >> 2) as u8;
-        coordinates[1] = ((self.x << 6) as u8) | (((self.y >> 4) & 0x3F) as u8);
-        coordinates[2] = (self.y << 4) as u8 | (direction & 0xF) as u8;
+            coordinates[0] = (self.x >> 2) as u8;
+            coordinates[1] = ((self.x << 6) as u8) | (((self.y >> 4) & 0x3F) as u8);
+            coordinates[2] = (self.y << 4) as u8 | (direction & 0xF) as u8;
 
-        Ok(coordinates)
+            write.extend_from_slice(&coordinates);
+
+            Ok(())
+        })
     }
 }
 
@@ -157,23 +161,27 @@ impl FromBytes for WorldPosition2 {
 }
 
 impl ToBytes for WorldPosition2 {
-    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
-        let mut bytes = vec![0; 6];
+    fn to_bytes(&self, byte_writer: &mut ByteWriter) -> ConversionResult<usize> {
+        byte_writer.write_counted(|write| {
+            let mut bytes = [0; 6];
 
-        bytes[0] = (self.x1 >> 2) as u8;
-        bytes[1] = ((self.x1 << 6) as u8) | ((self.y1 >> 4) as u8);
-        bytes[2] = ((self.y1 << 4) as u8) | ((self.x2 >> 6) as u8);
-        bytes[3] = ((self.x2 << 2) as u8) | ((self.y2 >> 8) as u8);
-        bytes[4] = self.y2 as u8;
-        bytes[5] = self.unknown as u8;
+            bytes[0] = (self.x1 >> 2) as u8;
+            bytes[1] = ((self.x1 << 6) as u8) | ((self.y1 >> 4) as u8);
+            bytes[2] = ((self.y1 << 4) as u8) | ((self.x2 >> 6) as u8);
+            bytes[3] = ((self.x2 << 2) as u8) | ((self.y2 >> 8) as u8);
+            bytes[4] = self.y2 as u8;
+            bytes[5] = self.unknown as u8;
 
-        Ok(bytes)
+            write.extend_from_slice(&bytes);
+
+            Ok(())
+        })
     }
 }
 
 #[cfg(test)]
 mod conversion {
-    use ragnarok_bytes::{FromBytes, ToBytes};
+    use ragnarok_bytes::{ByteWriter, FromBytes, ToBytes};
 
     use crate::{WorldPosition, WorldPosition2};
 
@@ -187,9 +195,11 @@ mod conversion {
             let mut byte_reader = ragnarok_bytes::ByteReader::without_metadata(&case);
 
             let position = WorldPosition::from_bytes(&mut byte_reader).unwrap();
-            let output = position.to_bytes().unwrap();
 
-            assert_eq!(case.as_slice(), output.as_slice());
+            let mut byte_writer = ByteWriter::new();
+            position.to_bytes(&mut byte_writer).unwrap();
+
+            assert_eq!(case.as_slice(), byte_writer.into_inner().as_slice());
         }
     }
 
@@ -208,9 +218,11 @@ mod conversion {
             let mut byte_reader = ragnarok_bytes::ByteReader::without_metadata(&case);
 
             let position = WorldPosition2::from_bytes(&mut byte_reader).unwrap();
-            let output = position.to_bytes().unwrap();
 
-            assert_eq!(case.as_slice(), output.as_slice());
+            let mut byte_writer = ByteWriter::new();
+            position.to_bytes(&mut byte_writer).unwrap();
+
+            assert_eq!(case.as_slice(), byte_writer.into_inner().as_slice());
         }
     }
 }

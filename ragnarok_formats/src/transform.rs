@@ -1,7 +1,7 @@
 use std::ops::Add;
 
 use cgmath::{Deg, EuclideanSpace, Point3, Rad, Vector3};
-use ragnarok_bytes::{ByteReader, ConversionResult, ConversionResultExt, FromBytes, ToBytes};
+use ragnarok_bytes::{ByteReader, ByteWriter, ConversionResult, ConversionResultExt, FromBytes, ToBytes};
 
 #[derive(Copy, Clone, Debug)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
@@ -31,16 +31,18 @@ impl FromBytes for Transform {
 }
 
 impl ToBytes for Transform {
-    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
-        let position = Vector3::new(self.position.x, -self.position.y, self.position.z);
-        let rotation = self.rotation.map(|radiants| Deg::from(radiants).0);
-        let scale = self.scale;
+    fn to_bytes(&self, byte_writer: &mut ByteWriter) -> ConversionResult<usize> {
+        byte_writer.write_counted(|write| {
+            let position = Vector3::new(self.position.x, -self.position.y, self.position.z);
+            let rotation = self.rotation.map(|radiants| Deg::from(radiants).0);
+            let scale = self.scale;
 
-        let mut bytes = position.to_bytes().trace::<Self>()?;
-        bytes.extend(rotation.to_bytes().trace::<Self>()?);
-        bytes.extend(scale.to_bytes().trace::<Self>()?);
+            position.to_bytes(write).trace::<Self>()?;
+            rotation.to_bytes(write).trace::<Self>()?;
+            scale.to_bytes(write).trace::<Self>()?;
 
-        Ok(bytes)
+            Ok(())
+        })
     }
 }
 
@@ -81,7 +83,7 @@ impl Add for Transform {
 
 #[cfg(test)]
 mod conversion {
-    use ragnarok_bytes::{ByteReader, FromBytes, ToBytes};
+    use ragnarok_bytes::{ByteReader, ByteWriter, FromBytes, ToBytes};
 
     use super::Transform;
 
@@ -93,8 +95,10 @@ mod conversion {
         let mut byte_reader = ByteReader::without_metadata(input);
 
         let transform = Transform::from_bytes(&mut byte_reader).unwrap();
-        let output = transform.to_bytes().unwrap();
 
-        assert_eq!(input, output.as_slice());
+        let mut byte_writer = ByteWriter::new();
+        transform.to_bytes(&mut byte_writer).unwrap();
+
+        assert_eq!(input, byte_writer.into_inner().as_slice());
     }
 }

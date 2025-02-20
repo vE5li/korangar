@@ -1,5 +1,5 @@
 use ragnarok_bytes::{
-    ByteConvertable, ByteReader, ConversionError, ConversionResult, ConversionResultExt, FromBytes, FromBytesExt, ToBytes,
+    ByteConvertable, ByteReader, ByteWriter, ConversionError, ConversionResult, ConversionResultExt, FromBytes, FromBytesExt, ToBytes,
 };
 
 use crate::signature::Signature;
@@ -76,7 +76,7 @@ impl FromBytes for PaletteImageData {
 }
 
 impl ToBytes for PaletteImageData {
-    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
+    fn to_bytes(&self, _byte_writer: &mut ByteWriter) -> ConversionResult<usize> {
         panic!("PalletteImageData can not be serialized currently because it depends on a version requirement");
     }
 }

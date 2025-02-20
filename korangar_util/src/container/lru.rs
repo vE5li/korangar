@@ -211,7 +211,7 @@ impl<I: GenerationalKey + Copy, V> Lru<I, V> {
 mod tests {
     use std::num::NonZeroU32;
 
-    use rand_aes::{Aes128Ctr128, Random};
+    use rand_aes::Aes128Ctr128;
 
     use super::Lru;
     use crate::container::GenerationalSlab;

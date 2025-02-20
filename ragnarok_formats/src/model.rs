@@ -1,6 +1,6 @@
 use cgmath::{Matrix3, Point3, Quaternion, Vector2, Vector3};
 use ragnarok_bytes::{
-    ByteConvertable, ByteReader, ConversionError, ConversionResult, ConversionResultExt, FromBytes, FromBytesExt, ToBytes,
+    ByteConvertable, ByteReader, ByteWriter, ConversionError, ConversionResult, ConversionResultExt, FromBytes, FromBytesExt, ToBytes,
 };
 
 use crate::signature::Signature;
@@ -34,7 +34,7 @@ impl<const LENGTH: usize> FromBytes for ModelString<LENGTH> {
 }
 
 impl<const LENGTH: usize> ToBytes for ModelString<LENGTH> {
-    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
+    fn to_bytes(&self, _byte_writer: &mut ByteWriter) -> ConversionResult<usize> {
         panic!("ModelString can not be serialized currently because it depends on a version requirement");
     }
 }

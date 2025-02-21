@@ -858,352 +858,355 @@ impl GraphicsEngine {
         let mut forward_encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
         let mut post_processing_encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
 
-        rayon::in_place_scope(|scope| {
-            // Picker Pass
-            scope.spawn(|_| {
-                let mut render_pass =
-                    engine_context
-                        .picker_render_pass_context
-                        .create_pass(&mut picker_encoder, &engine_context.global_context, None);
-
-                if let Some(map_picker_tile_vertex_buffer) = instruction.map_picker_tile_vertex_buffer.as_ref() {
-                    engine_context
-                        .picker_tile_drawer
-                        .draw(&mut render_pass, map_picker_tile_vertex_buffer);
-                }
-
-                engine_context.picker_entity_drawer.draw(&mut render_pass, instruction.entities);
-                #[cfg(feature = "debug")]
-                {
-                    engine_context.picker_marker_drawer.draw(&mut render_pass, None);
-                }
-
-                drop(render_pass);
-
-                // Copy the picker value from the texture into the buffer.
-                let bytes_per_row = engine_context.global_context.picker_buffer_texture.get_bytes_per_row();
-                let unpadded_texture_size = engine_context.global_context.picker_buffer_texture.get_unpadded_size();
-                let x = (unpadded_texture_size.width - 1).min(instruction.picker_position.left as u32);
-                let y = (unpadded_texture_size.height - 1).min(instruction.picker_position.top as u32);
-
-                picker_encoder.copy_texture_to_buffer(
-                    TexelCopyTextureInfo {
-                        texture: engine_context.global_context.picker_buffer_texture.get_texture(),
-                        mip_level: 0,
-                        origin: Origin3d { x, y, z: 0 },
-                        aspect: TextureAspect::All,
-                    },
-                    TexelCopyBufferInfo {
-                        buffer: engine_context.global_context.picker_value_buffer.get_buffer(),
-                        layout: TexelCopyBufferLayout {
-                            offset: 0,
-                            bytes_per_row,
-                            rows_per_image: None,
-                        },
-                    },
-                    Extent3d {
-                        width: 1,
-                        height: 1,
-                        depth_or_array_layers: 1,
-                    },
-                );
-            });
-
-            // Interface Pass
-            scope.spawn(|_| {
-                let mut render_pass = engine_context.interface_render_pass_context.create_pass(
-                    &mut interface_encoder,
-                    &engine_context.global_context,
-                    instruction.clear_interface,
-                );
-
-                engine_context
-                    .interface_rectangle_drawer
-                    .draw(&mut render_pass, instruction.interface);
-            });
-
-            // Directional Shadow Caster Pass
-            scope.spawn(|_| {
-                let mut render_pass = engine_context.directional_shadow_pass_context.create_pass(
-                    &mut directional_shadow_encoder,
-                    &engine_context.global_context,
-                    None,
-                );
-
-                let draw_data = ModelBatchDrawData {
-                    batches: instruction.directional_model_batches,
-                    instructions: instruction.directional_shadow_models,
-                    #[cfg(feature = "debug")]
-                    show_wireframe: false,
-                };
-
-                engine_context.directional_shadow_model_drawer.draw(&mut render_pass, draw_data);
-                engine_context
-                    .directional_shadow_indicator_drawer
-                    .draw(&mut render_pass, instruction.indicator.as_ref());
-                engine_context
-                    .directional_shadow_entity_drawer
-                    .draw(&mut render_pass, instruction.directional_shadow_entities);
-            });
-
-            // Point Shadow Caster Pass
-            scope.spawn(|_| {
-                (0..instruction.point_light_shadow_caster.len()).for_each(|shadow_caster_index| {
-                    (0..6).for_each(|face_index| {
-                        let pass_data = PointShadowData {
-                            shadow_caster_index,
-                            face_index,
-                        };
-                        let model_data = PointShadowModelBatchData {
-                            pass_data,
-                            caster: instruction.point_light_shadow_caster,
-                            instructions: instruction.point_shadow_models,
-                        };
-                        let entity_data = PointShadowEntityBatchData {
-                            pass_data,
-                            caster: instruction.point_light_shadow_caster,
-                            instructions: instruction.point_shadow_entities,
-                        };
-
-                        let mut render_pass = engine_context.point_shadow_pass_context.create_pass(
-                            &mut point_shadow_encoder,
-                            &engine_context.global_context,
-                            pass_data,
-                        );
-
-                        engine_context.point_shadow_model_drawer.draw(&mut render_pass, &model_data);
-                        engine_context.point_shadow_entity_drawer.draw(&mut render_pass, &entity_data);
-                        engine_context
-                            .point_shadow_indicator_drawer
-                            .draw(&mut render_pass, instruction.indicator.as_ref());
-                    });
-                });
-            });
-
-            // Light Culling Pass
-            scope.spawn(|_| {
-                let mut compute_pass =
-                    engine_context
-                        .light_culling_pass_context
-                        .create_pass(&mut light_culling_encoder, &engine_context.global_context, None);
-
-                engine_context
-                    .light_culling_dispatcher
-                    .dispatch(&mut compute_pass, engine_context.global_context.forward_size);
-
-                drop(compute_pass);
-
-                // Forward Pass
-                let mut render_pass =
-                    engine_context
-                        .forward_pass_context
-                        .create_pass(&mut forward_encoder, &engine_context.global_context, None);
-
-                let batch_data = &ModelBatchDrawData {
-                    batches: instruction.model_batches,
-                    instructions: instruction.models,
-                    #[cfg(feature = "debug")]
-                    show_wireframe: instruction.render_settings.show_wireframe,
-                };
-
-                // Opaque
-                engine_context.forward_model_drawer.draw(&mut render_pass, ForwardModelDrawData {
-                    batch_data,
-                    pass_mode: ModelPassMode::Opaque,
-                });
-
-                engine_context.forward_model_drawer.draw(&mut render_pass, ForwardModelDrawData {
-                    batch_data,
-                    pass_mode: ModelPassMode::SemiOpaque,
-                });
-
-                engine_context
-                    .forward_indicator_drawer
-                    .draw(&mut render_pass, instruction.indicator.as_ref());
-
-                engine_context.forward_entity_drawer.draw(&mut render_pass, ForwardEntityDrawData {
-                    entities: instruction.entities,
-                    pass_mode: EntityPassMode::Opaque,
-                });
-
-                // Transparent
-                engine_context.forward_entity_drawer.draw(&mut render_pass, ForwardEntityDrawData {
-                    entities: instruction.entities,
-                    pass_mode: EntityPassMode::Transparent,
-                });
-
-                engine_context.forward_model_drawer.draw(&mut render_pass, ForwardModelDrawData {
-                    batch_data,
-                    pass_mode: ModelPassMode::Transparent,
-                });
-
-                if instruction.water.is_some() {
-                    drop(render_pass);
-
+        rayon::in_place_scope(|scope_master| {
+            rayon::in_place_scope(|scope| {
+                // Picker Pass
+                scope.spawn(|_| {
                     let mut render_pass =
                         engine_context
-                            .water_pass_context
+                            .picker_render_pass_context
+                            .create_pass(&mut picker_encoder, &engine_context.global_context, None);
+
+                    if let Some(map_picker_tile_vertex_buffer) = instruction.map_picker_tile_vertex_buffer.as_ref() {
+                        engine_context
+                            .picker_tile_drawer
+                            .draw(&mut render_pass, map_picker_tile_vertex_buffer);
+                    }
+
+                    engine_context.picker_entity_drawer.draw(&mut render_pass, instruction.entities);
+                    #[cfg(feature = "debug")]
+                    {
+                        engine_context.picker_marker_drawer.draw(&mut render_pass, None);
+                    }
+
+                    drop(render_pass);
+
+                    // Copy the picker value from the texture into the buffer.
+                    let bytes_per_row = engine_context.global_context.picker_buffer_texture.get_bytes_per_row();
+                    let unpadded_texture_size = engine_context.global_context.picker_buffer_texture.get_unpadded_size();
+                    let x = (unpadded_texture_size.width - 1).min(instruction.picker_position.left as u32);
+                    let y = (unpadded_texture_size.height - 1).min(instruction.picker_position.top as u32);
+
+                    picker_encoder.copy_texture_to_buffer(
+                        TexelCopyTextureInfo {
+                            texture: engine_context.global_context.picker_buffer_texture.get_texture(),
+                            mip_level: 0,
+                            origin: Origin3d { x, y, z: 0 },
+                            aspect: TextureAspect::All,
+                        },
+                        TexelCopyBufferInfo {
+                            buffer: engine_context.global_context.picker_value_buffer.get_buffer(),
+                            layout: TexelCopyBufferLayout {
+                                offset: 0,
+                                bytes_per_row,
+                                rows_per_image: None,
+                            },
+                        },
+                        Extent3d {
+                            width: 1,
+                            height: 1,
+                            depth_or_array_layers: 1,
+                        },
+                    );
+                });
+
+                // Interface Pass
+                scope.spawn(|_| {
+                    let mut render_pass = engine_context.interface_render_pass_context.create_pass(
+                        &mut interface_encoder,
+                        &engine_context.global_context,
+                        instruction.clear_interface,
+                    );
+
+                    engine_context
+                        .interface_rectangle_drawer
+                        .draw(&mut render_pass, instruction.interface);
+                });
+
+                // Directional Shadow Caster Pass
+                scope.spawn(|_| {
+                    let mut render_pass = engine_context.directional_shadow_pass_context.create_pass(
+                        &mut directional_shadow_encoder,
+                        &engine_context.global_context,
+                        None,
+                    );
+
+                    let draw_data = ModelBatchDrawData {
+                        batches: instruction.directional_model_batches,
+                        instructions: instruction.directional_shadow_models,
+                        #[cfg(feature = "debug")]
+                        show_wireframe: false,
+                    };
+
+                    engine_context.directional_shadow_model_drawer.draw(&mut render_pass, draw_data);
+                    engine_context
+                        .directional_shadow_indicator_drawer
+                        .draw(&mut render_pass, instruction.indicator.as_ref());
+                    engine_context
+                        .directional_shadow_entity_drawer
+                        .draw(&mut render_pass, instruction.directional_shadow_entities);
+                });
+
+                // Point Shadow Caster Pass
+                scope.spawn(|_| {
+                    (0..instruction.point_light_shadow_caster.len()).for_each(|shadow_caster_index| {
+                        (0..6).for_each(|face_index| {
+                            let pass_data = PointShadowData {
+                                shadow_caster_index,
+                                face_index,
+                            };
+                            let model_data = PointShadowModelBatchData {
+                                pass_data,
+                                caster: instruction.point_light_shadow_caster,
+                                instructions: instruction.point_shadow_models,
+                            };
+                            let entity_data = PointShadowEntityBatchData {
+                                pass_data,
+                                caster: instruction.point_light_shadow_caster,
+                                instructions: instruction.point_shadow_entities,
+                            };
+
+                            let mut render_pass = engine_context.point_shadow_pass_context.create_pass(
+                                &mut point_shadow_encoder,
+                                &engine_context.global_context,
+                                pass_data,
+                            );
+
+                            engine_context.point_shadow_model_drawer.draw(&mut render_pass, &model_data);
+                            engine_context.point_shadow_entity_drawer.draw(&mut render_pass, &entity_data);
+                            engine_context
+                                .point_shadow_indicator_drawer
+                                .draw(&mut render_pass, instruction.indicator.as_ref());
+                        });
+                    });
+                });
+
+                // Light Culling Pass
+                scope.spawn(|_| {
+                    let mut compute_pass = engine_context.light_culling_pass_context.create_pass(
+                        &mut light_culling_encoder,
+                        &engine_context.global_context,
+                        None,
+                    );
+
+                    engine_context
+                        .light_culling_dispatcher
+                        .dispatch(&mut compute_pass, engine_context.global_context.forward_size);
+
+                    drop(compute_pass);
+
+                    // Forward Pass
+                    let mut render_pass =
+                        engine_context
+                            .forward_pass_context
                             .create_pass(&mut forward_encoder, &engine_context.global_context, None);
 
+                    let batch_data = &ModelBatchDrawData {
+                        batches: instruction.model_batches,
+                        instructions: instruction.models,
+                        #[cfg(feature = "debug")]
+                        show_wireframe: instruction.render_settings.show_wireframe,
+                    };
+
+                    // Opaque
+                    engine_context.forward_model_drawer.draw(&mut render_pass, ForwardModelDrawData {
+                        batch_data,
+                        pass_mode: ModelPassMode::Opaque,
+                    });
+
+                    engine_context.forward_model_drawer.draw(&mut render_pass, ForwardModelDrawData {
+                        batch_data,
+                        pass_mode: ModelPassMode::SemiOpaque,
+                    });
+
                     engine_context
-                        .water_wave_drawer
-                        .draw(&mut render_pass, &engine_context.global_context.forward_depth_texture);
-                }
+                        .forward_indicator_drawer
+                        .draw(&mut render_pass, instruction.indicator.as_ref());
+
+                    engine_context.forward_entity_drawer.draw(&mut render_pass, ForwardEntityDrawData {
+                        entities: instruction.entities,
+                        pass_mode: EntityPassMode::Opaque,
+                    });
+
+                    // Transparent
+                    engine_context.forward_entity_drawer.draw(&mut render_pass, ForwardEntityDrawData {
+                        entities: instruction.entities,
+                        pass_mode: EntityPassMode::Transparent,
+                    });
+
+                    engine_context.forward_model_drawer.draw(&mut render_pass, ForwardModelDrawData {
+                        batch_data,
+                        pass_mode: ModelPassMode::Transparent,
+                    });
+
+                    if instruction.water.is_some() {
+                        drop(render_pass);
+
+                        let mut render_pass =
+                            engine_context
+                                .water_pass_context
+                                .create_pass(&mut forward_encoder, &engine_context.global_context, None);
+
+                        engine_context
+                            .water_wave_drawer
+                            .draw(&mut render_pass, &engine_context.global_context.forward_depth_texture);
+                    }
+                });
             });
-
             // Post Processing Passes
-            {
-                let mut render_pass = engine_context.post_processing_pass_context.create_pass(
-                    &mut post_processing_encoder,
-                    &engine_context.global_context,
-                    engine_context.global_context.get_forward_texture(),
-                );
+            scope_master.spawn(|_| {
+                {
+                    let mut render_pass = engine_context.post_processing_pass_context.create_pass(
+                        &mut post_processing_encoder,
+                        &engine_context.global_context,
+                        engine_context.global_context.get_forward_texture(),
+                    );
 
-                let blitter_data = PostProcessingWboitResolveDrawData {
-                    accumulation_texture: &engine_context.global_context.forward_accumulation_texture,
-                    revealage_texture: &engine_context.global_context.forward_revealage_texture,
+                    let blitter_data = PostProcessingWboitResolveDrawData {
+                        accumulation_texture: &engine_context.global_context.forward_accumulation_texture,
+                        revealage_texture: &engine_context.global_context.forward_revealage_texture,
+                    };
+
+                    engine_context
+                        .post_processing_wboit_resolve_drawer
+                        .draw(&mut render_pass, blitter_data);
+                }
+
+                let render_pass = match engine_context.global_context.supersampled_color_texture.as_ref() {
+                    Some(supersampled_color_texture) => {
+                        let mut render_pass = engine_context.post_processing_pass_context.create_pass(
+                            &mut post_processing_encoder,
+                            &engine_context.global_context,
+                            supersampled_color_texture,
+                        );
+
+                        let blitter_data = PostProcessingBlitterDrawData {
+                            target_texture_format: RENDER_TO_TEXTURE_FORMAT,
+                            source_texture: engine_context.global_context.get_forward_texture(),
+                            luma_in_alpha: false,
+                            alpha_blending: false,
+                        };
+
+                        engine_context.post_processing_blitter_drawer.draw(&mut render_pass, blitter_data);
+
+                        render_pass
+                    }
+                    None => engine_context.post_processing_pass_context.create_pass(
+                        &mut post_processing_encoder,
+                        &engine_context.global_context,
+                        engine_context.global_context.get_forward_texture(),
+                    ),
                 };
+
+                let mut render_pass = match &engine_context.global_context.screen_space_anti_aliasing {
+                    ScreenSpaceAntiAliasing::Off => render_pass,
+                    ScreenSpaceAntiAliasing::Fxaa => {
+                        drop(render_pass);
+
+                        let AntiAliasingResources::Fxaa(fxaa_resources) = &engine_context.global_context.anti_aliasing_resources else {
+                            panic!("fxaa resources not set")
+                        };
+
+                        // We blit the forward texture and calculate the luma in the alpha channel.
+                        let mut render_pass = engine_context.post_processing_pass_context.create_pass(
+                            &mut post_processing_encoder,
+                            &engine_context.global_context,
+                            &fxaa_resources.color_with_luma_texture,
+                        );
+
+                        let blitter_data = PostProcessingBlitterDrawData {
+                            target_texture_format: fxaa_resources.color_with_luma_texture.get_format(),
+                            source_texture: engine_context.global_context.get_color_texture(),
+                            luma_in_alpha: true,
+                            alpha_blending: false,
+                        };
+                        engine_context.post_processing_blitter_drawer.draw(&mut render_pass, blitter_data);
+
+                        drop(render_pass);
+
+                        let mut render_pass = engine_context.post_processing_pass_context.create_pass(
+                            &mut post_processing_encoder,
+                            &engine_context.global_context,
+                            engine_context.global_context.get_color_texture(),
+                        );
+
+                        engine_context
+                            .post_processing_fxaa_drawer
+                            .draw(&mut render_pass, &fxaa_resources.color_with_luma_texture);
+
+                        render_pass
+                    }
+                };
+
+                #[cfg(feature = "debug")]
+                {
+                    engine_context.debug_aabb_drawer.draw(&mut render_pass, None);
+                    engine_context.debug_rectangle_drawer.draw(&mut render_pass, None);
+                    engine_context.debug_circle_drawer.draw(&mut render_pass, None);
+                }
+
+                let rectangle_data = PostProcessingRectangleDrawData {
+                    layer: PostProcessingRectangleLayer::Bottom,
+                    instructions: instruction.bottom_layer_rectangles,
+                };
+                engine_context
+                    .post_processing_rectangle_drawer
+                    .draw(&mut render_pass, rectangle_data);
 
                 engine_context
-                    .post_processing_wboit_resolve_drawer
-                    .draw(&mut render_pass, blitter_data);
-            }
+                    .post_processing_effect_drawer
+                    .draw(&mut render_pass, instruction.effects);
 
-            let render_pass = match engine_context.global_context.supersampled_color_texture.as_ref() {
-                Some(supersampled_color_texture) => {
-                    let mut render_pass = engine_context.post_processing_pass_context.create_pass(
-                        &mut post_processing_encoder,
-                        &engine_context.global_context,
-                        supersampled_color_texture,
-                    );
+                let rectangle_data = PostProcessingRectangleDrawData {
+                    layer: PostProcessingRectangleLayer::Middle,
+                    instructions: instruction.middle_layer_rectangles,
+                };
+                engine_context
+                    .post_processing_rectangle_drawer
+                    .draw(&mut render_pass, rectangle_data);
 
+                #[cfg(feature = "debug")]
+                {
+                    let buffer_data = DebugBufferDrawData {
+                        render_settings: &instruction.render_settings,
+                        debug_bind_group: &engine_context.global_context.debug_bind_group,
+                    };
+
+                    engine_context.debug_buffer_drawer.draw(&mut render_pass, buffer_data);
+                }
+
+                if instruction.show_interface {
                     let blitter_data = PostProcessingBlitterDrawData {
                         target_texture_format: RENDER_TO_TEXTURE_FORMAT,
-                        source_texture: engine_context.global_context.get_forward_texture(),
+                        source_texture: &engine_context.global_context.interface_buffer_texture,
                         luma_in_alpha: false,
-                        alpha_blending: false,
+                        alpha_blending: true,
                     };
-
                     engine_context.post_processing_blitter_drawer.draw(&mut render_pass, blitter_data);
-
-                    render_pass
                 }
-                None => engine_context.post_processing_pass_context.create_pass(
+
+                let rectangle_data = PostProcessingRectangleDrawData {
+                    layer: PostProcessingRectangleLayer::Top,
+                    instructions: instruction.top_layer_rectangles,
+                };
+                engine_context
+                    .post_processing_rectangle_drawer
+                    .draw(&mut render_pass, rectangle_data);
+
+                // We can now do the final blit to the surface texture.
+                drop(render_pass);
+
+                let mut render_pass = engine_context.screen_blit_pass_context.create_pass(
                     &mut post_processing_encoder,
                     &engine_context.global_context,
-                    engine_context.global_context.get_forward_texture(),
-                ),
-            };
+                    frame_view,
+                );
 
-            let mut render_pass = match &engine_context.global_context.screen_space_anti_aliasing {
-                ScreenSpaceAntiAliasing::Off => render_pass,
-                ScreenSpaceAntiAliasing::Fxaa => {
-                    drop(render_pass);
+                let color_texture = engine_context.global_context.get_color_texture();
 
-                    let AntiAliasingResources::Fxaa(fxaa_resources) = &engine_context.global_context.anti_aliasing_resources else {
-                        panic!("fxaa resources not set")
-                    };
-
-                    // We blit the forward texture and calculate the luma in the alpha channel.
-                    let mut render_pass = engine_context.post_processing_pass_context.create_pass(
-                        &mut post_processing_encoder,
-                        &engine_context.global_context,
-                        &fxaa_resources.color_with_luma_texture,
-                    );
-
-                    let blitter_data = PostProcessingBlitterDrawData {
-                        target_texture_format: fxaa_resources.color_with_luma_texture.get_format(),
-                        source_texture: engine_context.global_context.get_color_texture(),
-                        luma_in_alpha: true,
-                        alpha_blending: false,
-                    };
-                    engine_context.post_processing_blitter_drawer.draw(&mut render_pass, blitter_data);
-
-                    drop(render_pass);
-
-                    let mut render_pass = engine_context.post_processing_pass_context.create_pass(
-                        &mut post_processing_encoder,
-                        &engine_context.global_context,
-                        engine_context.global_context.get_color_texture(),
-                    );
-
-                    engine_context
-                        .post_processing_fxaa_drawer
-                        .draw(&mut render_pass, &fxaa_resources.color_with_luma_texture);
-
-                    render_pass
-                }
-            };
-
-            #[cfg(feature = "debug")]
-            {
-                engine_context.debug_aabb_drawer.draw(&mut render_pass, None);
-                engine_context.debug_rectangle_drawer.draw(&mut render_pass, None);
-                engine_context.debug_circle_drawer.draw(&mut render_pass, None);
-            }
-
-            let rectangle_data = PostProcessingRectangleDrawData {
-                layer: PostProcessingRectangleLayer::Bottom,
-                instructions: instruction.bottom_layer_rectangles,
-            };
-            engine_context
-                .post_processing_rectangle_drawer
-                .draw(&mut render_pass, rectangle_data);
-
-            engine_context
-                .post_processing_effect_drawer
-                .draw(&mut render_pass, instruction.effects);
-
-            let rectangle_data = PostProcessingRectangleDrawData {
-                layer: PostProcessingRectangleLayer::Middle,
-                instructions: instruction.middle_layer_rectangles,
-            };
-            engine_context
-                .post_processing_rectangle_drawer
-                .draw(&mut render_pass, rectangle_data);
-
-            #[cfg(feature = "debug")]
-            {
-                let buffer_data = DebugBufferDrawData {
-                    render_settings: &instruction.render_settings,
-                    debug_bind_group: &engine_context.global_context.debug_bind_group,
-                };
-
-                engine_context.debug_buffer_drawer.draw(&mut render_pass, buffer_data);
-            }
-
-            if instruction.show_interface {
-                let blitter_data = PostProcessingBlitterDrawData {
-                    target_texture_format: RENDER_TO_TEXTURE_FORMAT,
-                    source_texture: &engine_context.global_context.interface_buffer_texture,
-                    luma_in_alpha: false,
-                    alpha_blending: true,
-                };
-                engine_context.post_processing_blitter_drawer.draw(&mut render_pass, blitter_data);
-            }
-
-            let rectangle_data = PostProcessingRectangleDrawData {
-                layer: PostProcessingRectangleLayer::Top,
-                instructions: instruction.top_layer_rectangles,
-            };
-            engine_context
-                .post_processing_rectangle_drawer
-                .draw(&mut render_pass, rectangle_data);
-
-            // We can now do the final blit to the surface texture.
-            drop(render_pass);
-
-            let mut render_pass = engine_context.screen_blit_pass_context.create_pass(
-                &mut post_processing_encoder,
-                &engine_context.global_context,
-                frame_view,
-            );
-
-            let color_texture = engine_context.global_context.get_color_texture();
-
-            engine_context.screen_blit_blitter_drawer.draw(&mut render_pass, color_texture);
+                engine_context.screen_blit_blitter_drawer.draw(&mut render_pass, color_texture);
+            });
         });
-
         (
             picker_encoder.finish(),
             interface_encoder.finish(),

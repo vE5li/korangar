@@ -289,25 +289,41 @@ impl TextureLoader {
         for level in 0..mips_level {
             let mip_width = width >> level;
             let mip_height = height >> level;
+            let chunk_height = 128;
+            let chunk_count = mip_height.div_ceil(chunk_height);
+            let blocks_per_row = mip_width / 4;
 
-            block_compressor.add_compression_task(
-                variant,
-                &temp_texture.get_texture().create_view(&TextureViewDescriptor {
-                    label: Some(&format!("compression mip {level} view")),
-                    format: Some(TextureFormat::Rgba8Unorm),
-                    base_mip_level: level,
-                    mip_level_count: Some(1),
-                    dimension: Some(TextureViewDimension::D2),
-                    usage: None,
-                    aspect: TextureAspect::All,
-                    base_array_layer: 0,
-                    array_layer_count: Some(1),
-                }),
-                mip_width,
-                mip_height,
-                &output_buffer,
-                Some(offsets[level as usize] as u32),
-            );
+            for chunk_index in 0..chunk_count {
+                let current_chunk_height = if chunk_index == chunk_count - 1 {
+                    mip_height - chunk_index * chunk_height
+                } else {
+                    chunk_height
+                };
+
+                let texture_y_offset = chunk_index * chunk_height;
+
+                let blocks_offset = offsets[level as usize] + (chunk_index * chunk_height / 4 * blocks_per_row * 16) as usize;
+
+                block_compressor.add_compression_task(
+                    variant,
+                    &temp_texture.get_texture().create_view(&TextureViewDescriptor {
+                        label: Some(&format!("compression mip {level} view")),
+                        format: Some(TextureFormat::Rgba8Unorm),
+                        base_mip_level: level,
+                        mip_level_count: Some(1),
+                        dimension: Some(TextureViewDimension::D2),
+                        usage: None,
+                        aspect: TextureAspect::All,
+                        base_array_layer: 0,
+                        array_layer_count: Some(1),
+                    }),
+                    mip_width,
+                    current_chunk_height,
+                    &output_buffer,
+                    Some(texture_y_offset),
+                    Some(blocks_offset as u32),
+                );
+            }
         }
 
         {

@@ -342,9 +342,9 @@ dependencies = [
 
 [[package]]
 name = "block_compression"
-version = "0.2.1"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1d9f9000a3dd84fd9269a5491f282d85e89030536eaa2b2ac5ea19691cca356"
+checksum = "59cb1b21dd2fe18c47d224c2e4f1f26a0852c84ffd2c8978cf94c33fb6dd3fc4"
 dependencies = [
  "bytemuck",
  "wgpu",

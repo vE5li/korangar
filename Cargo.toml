@@ -6,7 +6,7 @@ members = ["korangar", "ragnarok_*", "korangar_*"]
 arrayvec = "0.7"
 bitflags = "2"
 blake3 = { version = "1.5", default-features = true }
-block_compression = { version = "0.2", default-features = false }
+block_compression = { version = "0.3", default-features = false }
 bumpalo = "3"
 bytemuck = "1"
 cgmath = "0.18"

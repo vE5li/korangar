@@ -2,6 +2,7 @@ mod format;
 
 use std::path::Path;
 use std::sync::Arc;
+use std::thread::available_parallelism;
 
 use blake3::Hash;
 use cgmath::Vector2;
@@ -15,6 +16,8 @@ use korangar_util::texture_atlas::{AllocationId, AtlasAllocation};
 use ragnarok_bytes::{ByteReader, ConversionResult, ConversionResultExt, FromBytes, ToBytes};
 use ragnarok_formats::signature::Signature;
 use ragnarok_formats::version::{InternalVersion, MajorFirst, Version};
+use rayon::ThreadPoolBuilder;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::loaders::archive::folder::FolderArchive;
 use crate::loaders::archive::{Archive, Writable, os_specific_path};
@@ -93,6 +96,7 @@ impl Cache {
         let folder_path = Path::new(CACHE_PATH_NAME);
 
         let mut folder_archive = Box::new(FolderArchive::from_path(folder_path));
+        folder_archive.add_file(HASH_FILE_PATH, game_file_hash.to_hex().as_bytes().to_vec(), false);
 
         let mut cached_texture_atlas_paths = Vec::new();
         folder_archive.get_files_with_extension(&mut cached_texture_atlas_paths, ATLAS_FILE_EXTENSION);
@@ -102,7 +106,7 @@ impl Cache {
             os_path.file_stem().unwrap().to_string_lossy().to_string()
         }));
 
-        let mut game_file_map_names: Vec<String> = game_file_loader
+        let game_file_map_names: Vec<String> = game_file_loader
             .get_files_with_extension(MAP_FILE_EXTENSION)
             .iter()
             .map(|map_file_path| {
@@ -110,42 +114,61 @@ impl Cache {
                 os_path.file_stem().unwrap().to_string_lossy().to_string()
             })
             .collect();
-        game_file_map_names.sort();
 
         let unused_map_atlas_names: HashSet<String> = cached_texture_atlas_paths
             .difference(&HashSet::from_iter(game_file_map_names.iter().cloned()))
             .cloned()
             .collect();
 
-        let mut outdated_map_names = HashSet::new();
-        let mut new_map_names = HashSet::new();
+        let thread_pool = ThreadPoolBuilder::new()
+            .num_threads(available_parallelism().unwrap().get())
+            .build()
+            .unwrap();
 
-        for map_name in game_file_map_names.iter() {
-            let atlas_path = Self::get_texture_atlas_cache_base_path(map_name);
+        println!("Test texture atlas compatibility");
+        let (outdated_map_names, new_map_names): (HashSet<&String>, HashSet<&String>) = thread_pool.install(|| {
+            game_file_map_names
+                .par_iter()
+                .fold(
+                    || (HashSet::new(), HashSet::new()),
+                    |mut accumulator, map_name| {
+                        let atlas_path = Self::get_texture_atlas_cache_base_path(map_name);
 
-            if let Some(atlas_data) = folder_archive.get_file_by_path(&atlas_path) {
-                #[cfg(feature = "debug")]
-                print_debug!("Checking texture atlas for map `{}`", map_name);
+                        if let Some(atlas_data) = folder_archive.get_file_by_path(&atlas_path) {
+                            println!("Checking texture atlas for map `{map_name}`");
 
-                let mut byte_reader: ByteReader<Option<InternalVersion>> = ByteReader::with_default_metadata(&atlas_data);
-                byte_reader.set_encoding(UTF_8);
+                            let mut byte_reader: ByteReader<Option<InternalVersion>> = ByteReader::with_default_metadata(&atlas_data);
+                            byte_reader.set_encoding(UTF_8);
 
-                if let Ok(cached_atlas) = CachedTextureAtlas::from_bytes(&mut byte_reader) {
-                    if let Ok(textures) = map_loader.collect_map_textures(model_loader, map_name) {
-                        let texture_atlas = Self::create_texture_atlas(texture_loader.clone(), map_name, textures);
+                            if let Ok(cached_atlas) = CachedTextureAtlas::from_bytes(&mut byte_reader) {
+                                if let Ok(textures) = map_loader.collect_map_textures(model_loader, map_name) {
+                                    let texture_atlas = Self::create_texture_atlas(texture_loader.clone(), map_name, textures);
 
-                        if texture_atlas.hash() != cached_atlas.hash {
-                            #[cfg(feature = "debug")]
-                            print_debug!("Outdated texture atlas found for map: `{}`", map_name.magenta());
-
-                            outdated_map_names.insert(map_name);
+                                    if texture_atlas.hash() != cached_atlas.hash {
+                                        // Outdated maps
+                                        accumulator.0.insert(map_name);
+                                    }
+                                }
+                            }
+                        } else {
+                            // New maps
+                            accumulator.1.insert(map_name);
                         }
-                    }
-                }
-            } else {
-                new_map_names.insert(map_name);
-            }
-        }
+
+                        accumulator
+                    },
+                )
+                .reduce(
+                    || (HashSet::new(), HashSet::new()),
+                    |mut a, b| {
+                        a.0.extend(b.0);
+                        a.1.extend(b.1);
+                        a
+                    },
+                )
+        });
+
+        drop(thread_pool);
 
         let mut created_count = 0;
         let mut removed_count = 0;
@@ -155,17 +178,15 @@ impl Cache {
         for map_name in unused_map_atlas_names.iter() {
             let atlas_path = Self::get_texture_atlas_cache_base_path(map_name);
 
-            #[cfg(feature = "debug")]
-            print_debug!("Deleting unused texture atlas file `{}`", atlas_path.magenta());
+            println!("Deleting unused texture atlas file `{}`", atlas_path);
 
             folder_archive.remove_file(&atlas_path);
 
             removed_count += 1;
         }
 
-        for map_name in outdated_map_names.union(&new_map_names) {
-            #[cfg(feature = "debug")]
-            print_debug!("Re-creating texture atlas for map `{}`", map_name.magenta());
+        for &map_name in outdated_map_names.union(&new_map_names) {
+            println!("Re-creating texture atlas for map `{}`", map_name);
 
             match map_loader.collect_map_textures(model_loader, map_name) {
                 Ok(textures) => {
@@ -181,20 +202,12 @@ impl Cache {
                         }
                     }
                 }
-                Err(_error) => {
-                    #[cfg(feature = "debug")]
-                    print_debug!(
-                        "[{}] Can't create texture atlas for map `{}`: {:?}",
-                        "error".red(),
-                        map_name.magenta(),
-                        _error
-                    );
+                Err(error) => {
+                    println!("[error] Can't create texture atlas for map `{}`: {:?}", map_name, error);
                     error_count += 1;
                 }
             }
         }
-
-        folder_archive.add_file(HASH_FILE_PATH, game_file_hash.to_hex().as_bytes().to_vec(), false);
 
         println!(
             "Cache sync finished. Created: {} Removed: {} Updated: {} Errors: {}",

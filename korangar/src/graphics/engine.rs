@@ -7,6 +7,7 @@ use cgmath::Vector2;
 use korangar_debug::logging::{Colorize, print_debug};
 #[cfg(feature = "debug")]
 use korangar_debug::profile_block;
+use rayon::ThreadPool;
 use wgpu::util::StagingBelt;
 use wgpu::{
     Adapter, CommandBuffer, CommandEncoder, CommandEncoderDescriptor, Device, Extent3d, Instance, Maintain, Origin3d, Queue,
@@ -19,11 +20,11 @@ use super::{
     AntiAliasingResources, Capabilities, FramePacer, FrameStage, GlobalContext, LimitFramerate, Msaa, Prepare, PresentModeInfo,
     RENDER_TO_TEXTURE_FORMAT, ScreenSpaceAntiAliasing, ShadowDetail, Ssaa, Surface, TextureSamplerType,
 };
-use crate::NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS;
 use crate::graphics::instruction::RenderInstruction;
 use crate::graphics::passes::*;
 use crate::interface::layout::ScreenSize;
 use crate::loaders::TextureLoader;
+use crate::{NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS, init_tls_rand};
 
 pub struct GraphicsEngineDescriptor {
     pub capabilities: Capabilities,
@@ -63,6 +64,7 @@ pub struct GraphicsEngine {
     adapter: Arc<Adapter>,
     instance: Instance,
     surface: Option<Surface>,
+    thread_pool: ThreadPool,
 }
 
 struct EngineContext {
@@ -116,6 +118,25 @@ impl GraphicsEngine {
         let mut frame_pacer = FramePacer::new(60.0);
         let cpu_stage = frame_pacer.create_frame_stage(Instant::now());
 
+        // Windows AMD driver have a bug, where we can't properly record command encoder
+        // in parallel without causing glitches in all cases (for example not rendering
+        // the UI in HQ mode).
+        #[cfg(target_os = "windows")]
+        let num_threads = match descriptor.adapter.get_info().vendor {
+            // AMD
+            4098 => 1,
+            _ => 4,
+        };
+
+        #[cfg(not(target_os = "windows"))]
+        let num_threads = 4;
+
+        let thread_pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(num_threads)
+            .start_handler(|_| init_tls_rand())
+            .build()
+            .unwrap();
+
         Self {
             capabilities: descriptor.capabilities,
             frame_pacer,
@@ -131,6 +152,7 @@ impl GraphicsEngine {
             adapter: descriptor.adapter,
             instance: descriptor.instance,
             surface: None,
+            thread_pool,
         }
     }
 
@@ -759,7 +781,7 @@ impl GraphicsEngine {
         let context = self.engine_context.as_mut().unwrap();
 
         // We spawn a task for all the potentially long-running prepare functions.
-        rayon::in_place_scope(|scope| {
+        self.thread_pool.in_place_scope(|scope| {
             scope.spawn(|_| {
                 context.directional_shadow_entity_drawer.prepare(&self.device, instruction);
                 context.directional_shadow_model_drawer.prepare(&self.device, instruction);
@@ -791,11 +813,12 @@ impl GraphicsEngine {
                 context.debug_buffer_drawer.prepare(&self.device, instruction);
                 context.debug_circle_drawer.prepare(&self.device, instruction);
             });
-
-            context.global_context.prepare(&self.device, instruction);
-            context.directional_shadow_pass_context.prepare(&self.device, instruction);
-            context.point_shadow_pass_context.prepare(&self.device, instruction);
-            context.picker_entity_drawer.prepare(&self.device, instruction);
+            scope.spawn(|_| {
+                context.global_context.prepare(&self.device, instruction);
+                context.directional_shadow_pass_context.prepare(&self.device, instruction);
+                context.point_shadow_pass_context.prepare(&self.device, instruction);
+                context.picker_entity_drawer.prepare(&self.device, instruction);
+            });
         });
 
         let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
@@ -858,7 +881,7 @@ impl GraphicsEngine {
         let mut forward_encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
         let mut post_processing_encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
 
-        rayon::in_place_scope(|scope| {
+        self.thread_pool.in_place_scope(|scope| {
             // Picker Pass
             scope.spawn(|_| {
                 let mut render_pass =
@@ -1052,156 +1075,158 @@ impl GraphicsEngine {
             });
 
             // Post Processing Passes
-            {
-                let mut render_pass = engine_context.post_processing_pass_context.create_pass(
-                    &mut post_processing_encoder,
-                    &engine_context.global_context,
-                    engine_context.global_context.get_forward_texture(),
-                );
-
-                let blitter_data = PostProcessingWboitResolveDrawData {
-                    accumulation_texture: &engine_context.global_context.forward_accumulation_texture,
-                    revealage_texture: &engine_context.global_context.forward_revealage_texture,
-                };
-
-                engine_context
-                    .post_processing_wboit_resolve_drawer
-                    .draw(&mut render_pass, blitter_data);
-            }
-
-            let render_pass = match engine_context.global_context.supersampled_color_texture.as_ref() {
-                Some(supersampled_color_texture) => {
+            scope.spawn(|_| {
+                {
                     let mut render_pass = engine_context.post_processing_pass_context.create_pass(
                         &mut post_processing_encoder,
                         &engine_context.global_context,
-                        supersampled_color_texture,
+                        engine_context.global_context.get_forward_texture(),
                     );
 
-                    let blitter_data = PostProcessingBlitterDrawData {
-                        target_texture_format: RENDER_TO_TEXTURE_FORMAT,
-                        source_texture: engine_context.global_context.get_forward_texture(),
-                        luma_in_alpha: false,
-                        alpha_blending: false,
+                    let blitter_data = PostProcessingWboitResolveDrawData {
+                        accumulation_texture: &engine_context.global_context.forward_accumulation_texture,
+                        revealage_texture: &engine_context.global_context.forward_revealage_texture,
                     };
-
-                    engine_context.post_processing_blitter_drawer.draw(&mut render_pass, blitter_data);
-
-                    render_pass
-                }
-                None => engine_context.post_processing_pass_context.create_pass(
-                    &mut post_processing_encoder,
-                    &engine_context.global_context,
-                    engine_context.global_context.get_forward_texture(),
-                ),
-            };
-
-            let mut render_pass = match &engine_context.global_context.screen_space_anti_aliasing {
-                ScreenSpaceAntiAliasing::Off => render_pass,
-                ScreenSpaceAntiAliasing::Fxaa => {
-                    drop(render_pass);
-
-                    let AntiAliasingResources::Fxaa(fxaa_resources) = &engine_context.global_context.anti_aliasing_resources else {
-                        panic!("fxaa resources not set")
-                    };
-
-                    // We blit the forward texture and calculate the luma in the alpha channel.
-                    let mut render_pass = engine_context.post_processing_pass_context.create_pass(
-                        &mut post_processing_encoder,
-                        &engine_context.global_context,
-                        &fxaa_resources.color_with_luma_texture,
-                    );
-
-                    let blitter_data = PostProcessingBlitterDrawData {
-                        target_texture_format: fxaa_resources.color_with_luma_texture.get_format(),
-                        source_texture: engine_context.global_context.get_color_texture(),
-                        luma_in_alpha: true,
-                        alpha_blending: false,
-                    };
-                    engine_context.post_processing_blitter_drawer.draw(&mut render_pass, blitter_data);
-
-                    drop(render_pass);
-
-                    let mut render_pass = engine_context.post_processing_pass_context.create_pass(
-                        &mut post_processing_encoder,
-                        &engine_context.global_context,
-                        engine_context.global_context.get_color_texture(),
-                    );
 
                     engine_context
-                        .post_processing_fxaa_drawer
-                        .draw(&mut render_pass, &fxaa_resources.color_with_luma_texture);
-
-                    render_pass
+                        .post_processing_wboit_resolve_drawer
+                        .draw(&mut render_pass, blitter_data);
                 }
-            };
 
-            #[cfg(feature = "debug")]
-            {
-                engine_context.debug_aabb_drawer.draw(&mut render_pass, None);
-                engine_context.debug_rectangle_drawer.draw(&mut render_pass, None);
-                engine_context.debug_circle_drawer.draw(&mut render_pass, None);
-            }
+                let render_pass = match engine_context.global_context.supersampled_color_texture.as_ref() {
+                    Some(supersampled_color_texture) => {
+                        let mut render_pass = engine_context.post_processing_pass_context.create_pass(
+                            &mut post_processing_encoder,
+                            &engine_context.global_context,
+                            supersampled_color_texture,
+                        );
 
-            let rectangle_data = PostProcessingRectangleDrawData {
-                layer: PostProcessingRectangleLayer::Bottom,
-                instructions: instruction.bottom_layer_rectangles,
-            };
-            engine_context
-                .post_processing_rectangle_drawer
-                .draw(&mut render_pass, rectangle_data);
+                        let blitter_data = PostProcessingBlitterDrawData {
+                            target_texture_format: RENDER_TO_TEXTURE_FORMAT,
+                            source_texture: engine_context.global_context.get_forward_texture(),
+                            luma_in_alpha: false,
+                            alpha_blending: false,
+                        };
 
-            engine_context
-                .post_processing_effect_drawer
-                .draw(&mut render_pass, instruction.effects);
+                        engine_context.post_processing_blitter_drawer.draw(&mut render_pass, blitter_data);
 
-            let rectangle_data = PostProcessingRectangleDrawData {
-                layer: PostProcessingRectangleLayer::Middle,
-                instructions: instruction.middle_layer_rectangles,
-            };
-            engine_context
-                .post_processing_rectangle_drawer
-                .draw(&mut render_pass, rectangle_data);
-
-            #[cfg(feature = "debug")]
-            {
-                let buffer_data = DebugBufferDrawData {
-                    render_settings: &instruction.render_settings,
-                    debug_bind_group: &engine_context.global_context.debug_bind_group,
+                        render_pass
+                    }
+                    None => engine_context.post_processing_pass_context.create_pass(
+                        &mut post_processing_encoder,
+                        &engine_context.global_context,
+                        engine_context.global_context.get_forward_texture(),
+                    ),
                 };
 
-                engine_context.debug_buffer_drawer.draw(&mut render_pass, buffer_data);
-            }
+                let mut render_pass = match &engine_context.global_context.screen_space_anti_aliasing {
+                    ScreenSpaceAntiAliasing::Off => render_pass,
+                    ScreenSpaceAntiAliasing::Fxaa => {
+                        drop(render_pass);
 
-            if instruction.show_interface {
-                let blitter_data = PostProcessingBlitterDrawData {
-                    target_texture_format: RENDER_TO_TEXTURE_FORMAT,
-                    source_texture: &engine_context.global_context.interface_buffer_texture,
-                    luma_in_alpha: false,
-                    alpha_blending: true,
+                        let AntiAliasingResources::Fxaa(fxaa_resources) = &engine_context.global_context.anti_aliasing_resources else {
+                            panic!("fxaa resources not set")
+                        };
+
+                        // We blit the forward texture and calculate the luma in the alpha channel.
+                        let mut render_pass = engine_context.post_processing_pass_context.create_pass(
+                            &mut post_processing_encoder,
+                            &engine_context.global_context,
+                            &fxaa_resources.color_with_luma_texture,
+                        );
+
+                        let blitter_data = PostProcessingBlitterDrawData {
+                            target_texture_format: fxaa_resources.color_with_luma_texture.get_format(),
+                            source_texture: engine_context.global_context.get_color_texture(),
+                            luma_in_alpha: true,
+                            alpha_blending: false,
+                        };
+                        engine_context.post_processing_blitter_drawer.draw(&mut render_pass, blitter_data);
+
+                        drop(render_pass);
+
+                        let mut render_pass = engine_context.post_processing_pass_context.create_pass(
+                            &mut post_processing_encoder,
+                            &engine_context.global_context,
+                            engine_context.global_context.get_color_texture(),
+                        );
+
+                        engine_context
+                            .post_processing_fxaa_drawer
+                            .draw(&mut render_pass, &fxaa_resources.color_with_luma_texture);
+
+                        render_pass
+                    }
                 };
-                engine_context.post_processing_blitter_drawer.draw(&mut render_pass, blitter_data);
-            }
 
-            let rectangle_data = PostProcessingRectangleDrawData {
-                layer: PostProcessingRectangleLayer::Top,
-                instructions: instruction.top_layer_rectangles,
-            };
-            engine_context
-                .post_processing_rectangle_drawer
-                .draw(&mut render_pass, rectangle_data);
+                #[cfg(feature = "debug")]
+                {
+                    engine_context.debug_aabb_drawer.draw(&mut render_pass, None);
+                    engine_context.debug_rectangle_drawer.draw(&mut render_pass, None);
+                    engine_context.debug_circle_drawer.draw(&mut render_pass, None);
+                }
 
-            // We can now do the final blit to the surface texture.
-            drop(render_pass);
+                let rectangle_data = PostProcessingRectangleDrawData {
+                    layer: PostProcessingRectangleLayer::Bottom,
+                    instructions: instruction.bottom_layer_rectangles,
+                };
+                engine_context
+                    .post_processing_rectangle_drawer
+                    .draw(&mut render_pass, rectangle_data);
 
-            let mut render_pass = engine_context.screen_blit_pass_context.create_pass(
-                &mut post_processing_encoder,
-                &engine_context.global_context,
-                frame_view,
-            );
+                engine_context
+                    .post_processing_effect_drawer
+                    .draw(&mut render_pass, instruction.effects);
 
-            let color_texture = engine_context.global_context.get_color_texture();
+                let rectangle_data = PostProcessingRectangleDrawData {
+                    layer: PostProcessingRectangleLayer::Middle,
+                    instructions: instruction.middle_layer_rectangles,
+                };
+                engine_context
+                    .post_processing_rectangle_drawer
+                    .draw(&mut render_pass, rectangle_data);
 
-            engine_context.screen_blit_blitter_drawer.draw(&mut render_pass, color_texture);
+                #[cfg(feature = "debug")]
+                {
+                    let buffer_data = DebugBufferDrawData {
+                        render_settings: &instruction.render_settings,
+                        debug_bind_group: &engine_context.global_context.debug_bind_group,
+                    };
+
+                    engine_context.debug_buffer_drawer.draw(&mut render_pass, buffer_data);
+                }
+
+                if instruction.show_interface {
+                    let blitter_data = PostProcessingBlitterDrawData {
+                        target_texture_format: RENDER_TO_TEXTURE_FORMAT,
+                        source_texture: &engine_context.global_context.interface_buffer_texture,
+                        luma_in_alpha: false,
+                        alpha_blending: true,
+                    };
+                    engine_context.post_processing_blitter_drawer.draw(&mut render_pass, blitter_data);
+                }
+
+                let rectangle_data = PostProcessingRectangleDrawData {
+                    layer: PostProcessingRectangleLayer::Top,
+                    instructions: instruction.top_layer_rectangles,
+                };
+                engine_context
+                    .post_processing_rectangle_drawer
+                    .draw(&mut render_pass, rectangle_data);
+
+                // We can now do the final blit to the surface texture.
+                drop(render_pass);
+
+                let mut render_pass = engine_context.screen_blit_pass_context.create_pass(
+                    &mut post_processing_encoder,
+                    &engine_context.global_context,
+                    frame_view,
+                );
+
+                let color_texture = engine_context.global_context.get_color_texture();
+
+                engine_context.screen_blit_blitter_drawer.draw(&mut render_pass, color_texture);
+            });
         });
 
         (

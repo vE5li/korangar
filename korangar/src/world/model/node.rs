@@ -1,8 +1,7 @@
-use cgmath::{EuclideanSpace, Matrix4, Point3, SquareMatrix, Transform as PointTransform};
+use cgmath::{Matrix4, Point3, SquareMatrix, Transform as PointTransform};
 use derive_new::new;
 use korangar_interface::elements::PrototypeElement;
 use ragnarok_formats::model::RotationKeyframeData;
-use ragnarok_formats::transform::Transform;
 use ragnarok_packets::ClientTick;
 
 use crate::graphics::ModelInstruction;
@@ -23,7 +22,7 @@ pub struct Node {
 }
 
 impl Node {
-    fn animaton_matrix(&self, client_tick: ClientTick) -> Matrix4<f32> {
+    fn animation_matrix(&self, client_tick: ClientTick) -> Matrix4<f32> {
         let animation_tick = client_tick.0 % self.animation_length;
 
         let last_keyframe_index = self
@@ -49,41 +48,49 @@ impl Node {
         current_rotation.into()
     }
 
-    pub fn world_matrix(&self, transform: &Transform, client_tick: ClientTick) -> Matrix4<f32> {
-        let animation_rotation_matrix = match self.rotation_keyframes.is_empty() {
-            true => Matrix4::identity(),
-            false => self.animaton_matrix(client_tick),
-        };
+    pub fn world_matrix(&self, client_tick: ClientTick, parent_matrix: &Matrix4<f32>, is_static: bool) -> Matrix4<f32> {
+        match is_static {
+            true => parent_matrix * self.transform_matrix,
+            false => {
+                let animation_rotation_matrix = match self.rotation_keyframes.is_empty() {
+                    true => Matrix4::identity(),
+                    false => self.animation_matrix(client_tick),
+                };
 
-        let rotation_matrix = Matrix4::from_angle_z(-transform.rotation.z)
-            * Matrix4::from_angle_x(-transform.rotation.x)
-            * Matrix4::from_angle_y(transform.rotation.y);
-
-        Matrix4::from_translation(transform.position.to_vec())
-            * rotation_matrix
-            * Matrix4::from_nonuniform_scale(transform.scale.x, -transform.scale.y, transform.scale.z)
-            * self.transform_matrix
-            * animation_rotation_matrix
+                parent_matrix * self.transform_matrix * animation_rotation_matrix
+            }
+        }
     }
 
     pub fn render_geometry(
         &self,
         instructions: &mut Vec<ModelInstruction>,
-        transform: &Transform,
         client_tick: ClientTick,
         camera: &dyn Camera,
         node_index: usize,
+        parent_matrix: &Matrix4<f32>,
+        is_static: bool,
     ) {
         // Some models have multiple nodes with the same position. This can lead so
         // z-fighting, when we sort the model instructions later with an unstable,
         // non-allocating sort. To remove this z-fighting, we add a very small offset to
         // the nodes, so that they always have the same order from the same view
         // perspective.
-        let draw_oder_offset = (node_index as f32) * 1.1920929e-4_f32;
+        let draw_order_offset = (node_index as f32) * 1.1920929e-4_f32;
 
-        let model_matrix = self.world_matrix(transform, client_tick);
+        let model_matrix = self.world_matrix(client_tick, parent_matrix, is_static);
         let position = model_matrix.transform_point(self.centroid);
-        let distance = camera.distance_to(position) + draw_oder_offset;
+        let distance = camera.distance_to(position) + draw_order_offset;
+
+        // When the render_geometry is set as static, the model matrix
+        // is already pre-calculated.
+        // When the render_geometry is set as dynamic, the model matrix
+        // needs to be calculated recursively, because the nodes from the model change
+        // positions due to animation motion.
+        let parent_matrix = match is_static {
+            true => parent_matrix,
+            false => &model_matrix,
+        };
 
         instructions.push(ModelInstruction {
             model_matrix,
@@ -96,6 +103,6 @@ impl Node {
         self.child_nodes
             .iter()
             .enumerate()
-            .for_each(|(node_index, node)| node.render_geometry(instructions, transform, client_tick, camera, node_index));
+            .for_each(|(node_index, node)| node.render_geometry(instructions, client_tick, camera, node_index, parent_matrix, is_static));
     }
 }

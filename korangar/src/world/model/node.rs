@@ -1,8 +1,7 @@
-use cgmath::{EuclideanSpace, Matrix4, Point3, SquareMatrix, Transform as PointTransform};
+use cgmath::{Matrix4, Point3, SquareMatrix, Transform as PointTransform};
 use derive_new::new;
 use korangar_interface::elements::PrototypeElement;
 use ragnarok_formats::model::RotationKeyframeData;
-use ragnarok_formats::transform::Transform;
 use ragnarok_packets::ClientTick;
 
 use crate::graphics::ModelInstruction;
@@ -49,35 +48,18 @@ impl Node {
         current_rotation.into()
     }
 
-    pub fn world_matrix(
-        &self,
-        transform: &Transform,
-        client_tick: ClientTick,
-        parent_matrix: Matrix4<f32>,
-    ) -> (Matrix4<f32>, Matrix4<f32>) {
+    pub fn world_matrix(&self, client_tick: ClientTick, parent_matrix: Matrix4<f32>) -> Matrix4<f32> {
         let animation_rotation_matrix = match self.rotation_keyframes.is_empty() {
             true => Matrix4::identity(),
             false => self.animaton_matrix(client_tick),
         };
 
-        let rotation_matrix = Matrix4::from_angle_z(-transform.rotation.z)
-            * Matrix4::from_angle_x(-transform.rotation.x)
-            * Matrix4::from_angle_y(transform.rotation.y);
-
-        let parent_matrix = parent_matrix * self.transform_matrix * animation_rotation_matrix;
-
-        let model_matrix = Matrix4::from_translation(transform.position.to_vec())
-            * rotation_matrix
-            * Matrix4::from_nonuniform_scale(transform.scale.x, -transform.scale.y, transform.scale.z)
-            * parent_matrix;
-
-        (parent_matrix, model_matrix)
+        parent_matrix * self.transform_matrix * animation_rotation_matrix
     }
 
     pub fn render_geometry(
         &self,
         instructions: &mut Vec<ModelInstruction>,
-        transform: &Transform,
         client_tick: ClientTick,
         camera: &dyn Camera,
         node_index: usize,
@@ -90,7 +72,7 @@ impl Node {
         // perspective.
         let draw_order_offset = (node_index as f32) * 1.1920929e-4_f32;
 
-        let (parent_matrix, model_matrix) = self.world_matrix(transform, client_tick, parent_matrix);
+        let model_matrix = self.world_matrix(client_tick, parent_matrix);
         let position = model_matrix.transform_point(self.centroid);
         let distance = camera.distance_to(position) + draw_order_offset;
 
@@ -105,6 +87,6 @@ impl Node {
         self.child_nodes
             .iter()
             .enumerate()
-            .for_each(|(node_index, node)| node.render_geometry(instructions, transform, client_tick, camera, node_index, parent_matrix));
+            .for_each(|(node_index, node)| node.render_geometry(instructions, client_tick, camera, node_index, model_matrix));
     }
 }

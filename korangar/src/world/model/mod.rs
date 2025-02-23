@@ -2,7 +2,7 @@ mod node;
 
 use std::ops::Mul;
 
-use cgmath::{EuclideanSpace, Matrix4, SquareMatrix, Vector3};
+use cgmath::{EuclideanSpace, Matrix4, Vector3};
 use derive_new::new;
 use korangar_interface::elements::PrototypeElement;
 use korangar_util::collision::AABB;
@@ -36,7 +36,15 @@ impl Model {
         camera: &dyn Camera,
     ) {
         self.root_nodes.iter().enumerate().for_each(|(node_index, node)| {
-            node.render_geometry(instructions, transform, client_tick, camera, node_index, Matrix4::identity())
+            let translation_matrix = Matrix4::from_translation(transform.position.to_vec());
+            let rotation_matrix = Matrix4::from_angle_z(-transform.rotation.z)
+                * Matrix4::from_angle_x(-transform.rotation.x)
+                * Matrix4::from_angle_y(transform.rotation.y);
+            let scale_matrix = Matrix4::from_nonuniform_scale(transform.scale.x, -transform.scale.y, transform.scale.z);
+
+            let default_matrix = translation_matrix * rotation_matrix * scale_matrix;
+
+            node.render_geometry(instructions, client_tick, camera, node_index, default_matrix)
         });
     }
 

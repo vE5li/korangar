@@ -49,7 +49,12 @@ impl Node {
         current_rotation.into()
     }
 
-    pub fn world_matrix(&self, transform: &Transform, client_tick: ClientTick) -> Matrix4<f32> {
+    pub fn world_matrix(
+        &self,
+        transform: &Transform,
+        client_tick: ClientTick,
+        parent_matrix: Matrix4<f32>,
+    ) -> (Matrix4<f32>, Matrix4<f32>) {
         let animation_rotation_matrix = match self.rotation_keyframes.is_empty() {
             true => Matrix4::identity(),
             false => self.animaton_matrix(client_tick),
@@ -59,11 +64,14 @@ impl Node {
             * Matrix4::from_angle_x(-transform.rotation.x)
             * Matrix4::from_angle_y(transform.rotation.y);
 
-        Matrix4::from_translation(transform.position.to_vec())
+        let parent_matrix = parent_matrix * self.transform_matrix * animation_rotation_matrix;
+
+        let model_matrix = Matrix4::from_translation(transform.position.to_vec())
             * rotation_matrix
             * Matrix4::from_nonuniform_scale(transform.scale.x, -transform.scale.y, transform.scale.z)
-            * self.transform_matrix
-            * animation_rotation_matrix
+            * parent_matrix;
+
+        (parent_matrix, model_matrix)
     }
 
     pub fn render_geometry(
@@ -73,17 +81,18 @@ impl Node {
         client_tick: ClientTick,
         camera: &dyn Camera,
         node_index: usize,
+        parent_matrix: Matrix4<f32>,
     ) {
         // Some models have multiple nodes with the same position. This can lead so
         // z-fighting, when we sort the model instructions later with an unstable,
         // non-allocating sort. To remove this z-fighting, we add a very small offset to
         // the nodes, so that they always have the same order from the same view
         // perspective.
-        let draw_oder_offset = (node_index as f32) * 1.1920929e-4_f32;
+        let draw_order_offset = (node_index as f32) * 1.1920929e-4_f32;
 
-        let model_matrix = self.world_matrix(transform, client_tick);
+        let (parent_matrix, model_matrix) = self.world_matrix(transform, client_tick, parent_matrix);
         let position = model_matrix.transform_point(self.centroid);
-        let distance = camera.distance_to(position) + draw_oder_offset;
+        let distance = camera.distance_to(position) + draw_order_offset;
 
         instructions.push(ModelInstruction {
             model_matrix,
@@ -96,6 +105,6 @@ impl Node {
         self.child_nodes
             .iter()
             .enumerate()
-            .for_each(|(node_index, node)| node.render_geometry(instructions, transform, client_tick, camera, node_index));
+            .for_each(|(node_index, node)| node.render_geometry(instructions, transform, client_tick, camera, node_index, parent_matrix));
     }
 }

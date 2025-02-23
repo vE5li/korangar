@@ -23,6 +23,8 @@ use crate::world::Camera;
 pub struct Model {
     pub root_nodes: Vec<Node>,
     pub bounding_box: AABB,
+    #[hidden_element]
+    pub is_static: bool,
     #[cfg(feature = "debug")]
     pub model_data: ModelData,
 }
@@ -43,8 +45,7 @@ impl Model {
             let scale_matrix = Matrix4::from_nonuniform_scale(transform.scale.x, -transform.scale.y, transform.scale.z);
 
             let default_matrix = translation_matrix * rotation_matrix * scale_matrix;
-
-            node.render_geometry(instructions, client_tick, camera, node_index, default_matrix)
+            node.render_geometry(instructions, client_tick, camera, node_index, default_matrix, self.is_static)
         });
     }
 

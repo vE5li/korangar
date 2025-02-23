@@ -13,6 +13,8 @@ pub struct Node {
     pub transform_matrix: Matrix4<f32>,
     #[hidden_element]
     pub centroid: Point3<f32>,
+    #[hidden_element]
+    pub static_node_matrix: Matrix4<f32>,
     pub transparent: bool,
     pub vertex_offset: usize,
     pub vertex_count: usize,
@@ -48,13 +50,17 @@ impl Node {
         current_rotation.into()
     }
 
-    pub fn world_matrix(&self, client_tick: ClientTick, parent_matrix: Matrix4<f32>) -> Matrix4<f32> {
-        let animation_rotation_matrix = match self.rotation_keyframes.is_empty() {
-            true => Matrix4::identity(),
-            false => self.animaton_matrix(client_tick),
-        };
+    pub fn world_matrix(&self, client_tick: ClientTick, parent_matrix: Matrix4<f32>, is_static: bool) -> Matrix4<f32> {
+        if is_static == true {
+            parent_matrix * self.static_node_matrix
+        } else {
+            let animation_rotation_matrix = match self.rotation_keyframes.is_empty() {
+                true => Matrix4::identity(),
+                false => self.animaton_matrix(client_tick),
+            };
 
-        parent_matrix * self.transform_matrix * animation_rotation_matrix
+            parent_matrix * self.transform_matrix * animation_rotation_matrix
+        }
     }
 
     pub fn render_geometry(
@@ -64,6 +70,7 @@ impl Node {
         camera: &dyn Camera,
         node_index: usize,
         parent_matrix: Matrix4<f32>,
+        is_static: bool,
     ) {
         // Some models have multiple nodes with the same position. This can lead so
         // z-fighting, when we sort the model instructions later with an unstable,
@@ -72,9 +79,16 @@ impl Node {
         // perspective.
         let draw_order_offset = (node_index as f32) * 1.1920929e-4_f32;
 
-        let model_matrix = self.world_matrix(client_tick, parent_matrix);
+        let model_matrix = self.world_matrix(client_tick, parent_matrix, is_static);
         let position = model_matrix.transform_point(self.centroid);
         let distance = camera.distance_to(position) + draw_order_offset;
+
+        // When is static, the parent matrix is only the shift from the object
+        // transform. When is dynamic, the parent matrix is recursive.
+        let parent_matrix = match is_static {
+            true => parent_matrix,
+            false => model_matrix,
+        };
 
         instructions.push(ModelInstruction {
             model_matrix,
@@ -87,6 +101,6 @@ impl Node {
         self.child_nodes
             .iter()
             .enumerate()
-            .for_each(|(node_index, node)| node.render_geometry(instructions, client_tick, camera, node_index, model_matrix));
+            .for_each(|(node_index, node)| node.render_geometry(instructions, client_tick, camera, node_index, parent_matrix, is_static));
     }
 }

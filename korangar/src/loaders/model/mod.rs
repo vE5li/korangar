@@ -257,8 +257,14 @@ impl ModelLoader {
         )
     }
 
-    pub fn calculate_transformation_matrix(node: &mut Node, is_root: bool, bounding_box: AABB, parent_matrix: Matrix4<f32>) {
-        node.transform_matrix = match is_root {
+    pub fn calculate_transformation_matrix(
+        node: &mut Node,
+        is_root: bool,
+        bounding_box: AABB,
+        parent_matrix: Matrix4<f32>,
+        is_static: bool,
+    ) {
+        let transform_matrix = match is_root {
             true => {
                 let translation_matrix = Matrix4::from_translation(-Vector3::new(
                     bounding_box.center().x,
@@ -266,14 +272,24 @@ impl ModelLoader {
                     bounding_box.center().z,
                 ));
 
-                parent_matrix * translation_matrix * node.transform_matrix
+                translation_matrix * node.transform_matrix
             }
-            false => parent_matrix * node.transform_matrix,
+            false => node.transform_matrix,
         };
 
-        node.child_nodes
-            .iter_mut()
-            .for_each(|child_node| Self::calculate_transformation_matrix(child_node, false, bounding_box, node.transform_matrix));
+        node.transform_matrix = match is_static {
+            true => parent_matrix * transform_matrix,
+            false => transform_matrix,
+        };
+
+        node.child_nodes.iter_mut().for_each(|child_node| {
+            Self::calculate_transformation_matrix(child_node, false, bounding_box, node.transform_matrix, is_static);
+        });
+    }
+
+    // A model is static, if it doesn't have any animations.
+    pub fn is_static(node: &Node) -> bool {
+        node.rotation_keyframes.is_empty() && node.child_nodes.iter().all(Self::is_static)
     }
 
     pub fn collect_model_textures(&self, textures: &mut HashSet<String>, model_file: &str) {
@@ -386,15 +402,18 @@ impl ModelLoader {
             model_data.shade_type == 2,
             model_data.animation_length,
         );
+
         let mut root_nodes = vec![root_node];
+        let is_static = root_nodes.iter().all(Self::is_static);
 
         for root_node in root_nodes.iter_mut() {
-            Self::calculate_transformation_matrix(root_node, true, bounding_box, Matrix4::identity());
+            Self::calculate_transformation_matrix(root_node, true, bounding_box, Matrix4::identity(), is_static);
         }
 
         let model = Model::new(
             root_nodes,
             bounding_box,
+            is_static,
             #[cfg(feature = "debug")]
             model_data,
         );

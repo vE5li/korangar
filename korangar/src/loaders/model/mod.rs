@@ -179,6 +179,7 @@ impl ModelLoader {
         main_bounding_box: &mut AABB,
         reverse_order: bool,
         smooth_normals: bool,
+        animation_length: u32,
     ) -> Node {
         let (main_matrix, transform_matrix, box_transform_matrix) = Self::calculate_matrices(current_node, parent_matrix);
 
@@ -214,6 +215,7 @@ impl ModelLoader {
                     main_bounding_box,
                     reverse_order,
                     smooth_normals,
+                    animation_length,
                 )
             })
             .collect();
@@ -250,6 +252,7 @@ impl ModelLoader {
             node_vertex_offset,
             node_vertex_count,
             child_nodes,
+            animation_length,
             current_node.rotation_keyframes.clone(),
         )
     }
@@ -381,6 +384,7 @@ impl ModelLoader {
             &mut bounding_box,
             reverse_order,
             model_data.shade_type == 2,
+            model_data.animation_length,
         );
         let mut root_nodes = vec![root_node];
 

@@ -18,18 +18,24 @@ pub struct Node {
     pub vertex_offset: usize,
     pub vertex_count: usize,
     pub child_nodes: Vec<Node>,
+    pub animation_length: u32,
     pub rotation_keyframes: Vec<RotationKeyframeData>,
 }
 
 impl Node {
     fn animaton_matrix(&self, client_tick: ClientTick) -> Matrix4<f32> {
-        let last_step = self.rotation_keyframes.last().unwrap();
-        let animation_tick = client_tick.0 % last_step.frame;
+        let animation_tick = client_tick.0 % self.animation_length;
 
-        let mut last_keyframe_index = 0;
-        while self.rotation_keyframes[last_keyframe_index + 1].frame < animation_tick {
-            last_keyframe_index += 1;
-        }
+        let last_keyframe_index = self
+            .rotation_keyframes
+            .binary_search_by(|keyframe| keyframe.frame.cmp(&animation_tick))
+            .unwrap_or_else(|keyframe_index| {
+                // Err(i) returns the index where the searched element could be inserted to
+                // retain the sort order. This means, that we haven't reached a
+                // new keyframe yet and need to use the previous keyframe, hence
+                // the saturating sub.
+                keyframe_index.saturating_sub(1)
+            });
 
         let last_step = &self.rotation_keyframes[last_keyframe_index];
         let next_step = &self.rotation_keyframes[(last_keyframe_index + 1) % self.rotation_keyframes.len()];

@@ -12,6 +12,7 @@ bytemuck = { workspace = true, features = ["derive", "extern_crate_std", "min_co
 cgmath = { workspace = true, features = ["mint", "serde"] }
 chrono = { workspace = true }
 cosmic-text = { workspace = true, features = ["std", "fontconfig"] }
+ctrlc = { workspace = true }
 derive-new = { workspace = true }
 encoding_rs = { workspace = true }
 flate2 = { workspace = true, features = ["zlib-rs"] }
@@ -35,6 +36,7 @@ rand_aes = { workspace = true, features = ["tls", "tls_aes128_ctr128"] }
 rayon = { workspace = true }
 ron = { workspace = true }
 serde = { workspace = true }
+sevenz-rust2 = { workspace = true, features = ["compress", "zstd"] }
 spin_sleep = { workspace = true }
 sys-locale = { workspace = true }
 walkdir = { workspace = true }
@@ -43,7 +45,6 @@ winit = { workspace = true }
 
 [features]
 debug = ["korangar_debug", "korangar_audio/debug", "ragnarok_packets/debug"]
-patched_as_folder = []
 plain = ["korangar_debug/plain"]
 unicode = ["korangar_debug/unicode"]
 flac = ["korangar_audio/flac"]

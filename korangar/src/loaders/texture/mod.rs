@@ -1,5 +1,6 @@
 use std::io::Cursor;
 use std::num::{NonZeroU32, NonZeroUsize};
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
 use blake3::{Hash, Hasher};
@@ -14,13 +15,14 @@ use korangar_util::color::contains_transparent_pixel;
 use korangar_util::container::SimpleCache;
 use korangar_util::texture_atlas::{AllocationId, AtlasAllocation, OfflineTextureAtlas};
 use wgpu::{
-    Buffer, BufferDescriptor, BufferUsages, CommandEncoderDescriptor, ComputePassDescriptor, Device, Extent3d, Maintain, MapMode, Queue,
-    TexelCopyBufferLayout, TextureAspect, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, TextureViewDescriptor,
-    TextureViewDimension,
+    Buffer, BufferDescriptor, BufferUsages, CommandEncoderDescriptor, ComputePassDescriptor, Device, Extent3d, Maintain, MaintainResult,
+    MapMode, Queue, TexelCopyBufferLayout, TextureAspect, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
+    TextureViewDescriptor, TextureViewDimension,
 };
 
 use super::error::LoadError;
 use super::{CachedTextureAtlas, FALLBACK_BMP_FILE, FALLBACK_JPEG_FILE, FALLBACK_PNG_FILE, FALLBACK_TGA_FILE, MIP_LEVELS};
+use crate::SHUTDOWN_SIGNAL;
 use crate::graphics::{Lanczos3Drawer, MipMapRenderPassContext, Texture};
 use crate::loaders::GameFileLoader;
 
@@ -367,7 +369,19 @@ impl TextureLoader {
             let (tx, rx) = std::sync::mpsc::channel();
             buffer_slice.map_async(MapMode::Read, move |v| tx.send(v).unwrap());
 
-            self.device.poll(Maintain::Wait);
+            loop {
+                match self.device.poll(Maintain::Poll) {
+                    MaintainResult::SubmissionQueueEmpty => break,
+                    MaintainResult::Ok => {
+                        // Check if shutdown initiated
+                        if SHUTDOWN_SIGNAL.load(Ordering::Relaxed) {
+                            staging_buffer.unmap();
+                            return Vec::new();
+                        }
+                        std::thread::sleep(std::time::Duration::from_millis(100));
+                    }
+                }
+            }
 
             match rx.recv() {
                 Ok(Ok(())) => {

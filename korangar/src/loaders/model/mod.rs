@@ -278,12 +278,12 @@ impl ModelLoader {
         });
     }
 
-    // Check if the model is static, this means the model doesn't have animations
+    // A model is static, if it doesn't have any animations.
     pub fn is_static(node: &mut Node) -> bool {
         let mut is_static = node.rotation_keyframes.is_empty();
         node.child_nodes.iter_mut().for_each(|child_node| {
             let is_static_child = Self::is_static(child_node);
-            is_static = is_static & is_static_child;
+            is_static &= is_static_child;
         });
         is_static
     }
@@ -404,10 +404,10 @@ impl ModelLoader {
             Self::calculate_transformation_and_static_matrix(root_node, true, bounding_box, Matrix4::identity());
         }
 
-        let mut is_static = true;
-        for root_node in root_nodes.iter_mut() {
-            is_static = is_static & Self::is_static(root_node);
-        }
+        let is_static = root_nodes
+            .iter_mut()
+            .fold(true, |is_static, root_node| is_static & Self::is_static(root_node));
+
         let model = Model::new(
             root_nodes,
             bounding_box,

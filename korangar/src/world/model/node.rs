@@ -50,7 +50,7 @@ impl Node {
         current_rotation.into()
     }
 
-    pub fn world_matrix(&self, client_tick: ClientTick, parent_matrix: Matrix4<f32>, is_static: bool) -> Matrix4<f32> {
+    pub fn world_matrix(&self, client_tick: ClientTick, parent_matrix: &Matrix4<f32>, is_static: bool) -> Matrix4<f32> {
         if is_static == true {
             parent_matrix * self.static_node_matrix
         } else {
@@ -69,7 +69,7 @@ impl Node {
         client_tick: ClientTick,
         camera: &dyn Camera,
         node_index: usize,
-        parent_matrix: Matrix4<f32>,
+        parent_matrix: &Matrix4<f32>,
         is_static: bool,
     ) {
         // Some models have multiple nodes with the same position. This can lead so
@@ -83,11 +83,14 @@ impl Node {
         let position = model_matrix.transform_point(self.centroid);
         let distance = camera.distance_to(position) + draw_order_offset;
 
-        // When is static, the parent matrix is only the shift from the object
-        // transform. When is dynamic, the parent matrix is recursive.
+        // When the render_geometry is set as static, the model matrix
+        // is already pre-calculated.
+        // When the render_geometry is set as dynamic, the model matrix
+        // needs to be calculated recursively, because the node from model change
+        // positions from the animation motion.
         let parent_matrix = match is_static {
             true => parent_matrix,
-            false => model_matrix,
+            false => &model_matrix,
         };
 
         instructions.push(ModelInstruction {

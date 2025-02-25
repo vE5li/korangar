@@ -27,7 +27,6 @@ impl GameArchiveList {
         std::fs::read_to_string(Self::FILE_NAME)
             .ok()
             .and_then(|data| ron::from_str(&data).ok())
-            .map(|archives| Self { archives })
             .unwrap_or_else(|| {
                 #[cfg(feature = "debug")]
                 print_debug!(

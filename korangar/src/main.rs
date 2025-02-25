@@ -38,8 +38,8 @@ mod world;
 
 use std::io::Cursor;
 use std::net::{SocketAddr, ToSocketAddrs};
-use std::sync::Arc;
-use std::sync::atomic::AtomicU64;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, LazyLock};
 
 use cgmath::{Point3, Vector2, Vector3};
 #[cfg(feature = "debug")]
@@ -126,6 +126,9 @@ const INITIAL_SCALING_FACTOR: Scaling = Scaling::new(1.0);
 
 static ICON_DATA: &[u8] = include_bytes!("../archive/data/icon.png");
 
+/// CTR+C was sent, and the client is supposed to close.
+pub static SHUTDOWN_SIGNAL: LazyLock<AtomicBool> = LazyLock::new(|| AtomicBool::new(false));
+
 // Create the `threads` module.
 #[cfg(feature = "debug")]
 korangar_debug::create_profiler_threads!(threads, {
@@ -144,6 +147,8 @@ fn main() {
     // We start a frame so that functions trying to start a measurement don't panic.
     #[cfg(feature = "debug")]
     let _measurement = threads::Main::start_frame();
+
+    initialize_shutdown_signal();
 
     time_phase!("create global thread pool", {
         rayon::ThreadPoolBuilder::new()
@@ -167,6 +172,14 @@ fn main() {
     let event_loop = EventLoop::new().unwrap();
     event_loop.set_control_flow(ControlFlow::Poll);
     let _ = event_loop.run_app(&mut client);
+}
+
+fn initialize_shutdown_signal() {
+    ctrlc::set_handler(|| {
+        println!("CTRL-C received. Shutting down");
+        SHUTDOWN_SIGNAL.store(true, Ordering::SeqCst);
+    })
+    .expect("Error setting Ctrl-C handler");
 }
 
 struct Client {
@@ -750,6 +763,11 @@ impl Client {
     }
 
     fn render_frame(&mut self, event_loop: &ActiveEventLoop) {
+        if SHUTDOWN_SIGNAL.load(Ordering::SeqCst) {
+            event_loop.exit();
+            return;
+        }
+
         #[cfg(feature = "debug")]
         let _measurement = threads::Main::start_frame();
 

@@ -1,5 +1,6 @@
 pub mod folder;
 pub mod native;
+pub mod seven_zip;
 
 use std::path::{Path, PathBuf};
 
@@ -21,11 +22,23 @@ pub trait Archive: Send + Sync {
 pub enum ArchiveType {
     Folder,
     Native,
+    SevenZip,
+}
+
+/// Type of compression to apply.
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+pub enum Compression {
+    /// No compression.
+    No,
+    /// Slow compression allowed.
+    Slow,
+    /// Fast compression requested.
+    Fast,
 }
 
 /// A common trait to all writable archives.
 pub trait Writable {
-    fn add_file(&mut self, path: &str, asset: Vec<u8>, compress: bool);
+    fn add_file(&mut self, path: &str, asset: Vec<u8>, compression: Compression);
     fn finish(&mut self) -> Result<(), std::io::Error>;
 }
 

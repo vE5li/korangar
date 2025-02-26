@@ -5,7 +5,7 @@ members = ["korangar", "ragnarok_*", "korangar_*"]
 [workspace.dependencies]
 arrayvec = "0.7"
 bitflags = "2"
-blake3 = { version = "1.5", default-features = true }
+blake3 = { version = "1", default-features = true }
 block_compression = { version = "0.3", default-features = false }
 bumpalo = "3"
 bytemuck = "1"
@@ -13,6 +13,7 @@ cgmath = "0.18"
 chrono = "0.4"
 cosmic-text = { version = "0.12", default-features = false }
 cpal = "0.15"
+ctrlc = "3"
 derive-new = "0.7"
 encoding_rs = "0.8"
 etherparse = "0.17"
@@ -44,6 +45,7 @@ rayon = "1"
 reqwest = "0.12"
 ron = "0.8"
 serde = "1"
+sevenz-rust2 = { version = "0.11", default-features = false }
 spin_sleep = "1"
 syn = "2"
 sys-locale = "0.3"

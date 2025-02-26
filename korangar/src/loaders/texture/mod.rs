@@ -1,5 +1,6 @@
 use std::io::Cursor;
 use std::num::{NonZeroU32, NonZeroUsize};
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
 use blake3::{Hash, Hasher};
@@ -14,13 +15,14 @@ use korangar_util::color::contains_transparent_pixel;
 use korangar_util::container::SimpleCache;
 use korangar_util::texture_atlas::{AllocationId, AtlasAllocation, OfflineTextureAtlas};
 use wgpu::{
-    Buffer, BufferDescriptor, BufferUsages, CommandEncoderDescriptor, ComputePassDescriptor, Device, Extent3d, Maintain, MapMode, Queue,
-    TexelCopyBufferLayout, TextureAspect, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, TextureViewDescriptor,
-    TextureViewDimension,
+    Buffer, BufferDescriptor, BufferUsages, CommandEncoderDescriptor, ComputePassDescriptor, Device, Extent3d, Maintain, MaintainResult,
+    MapMode, Queue, TexelCopyBufferLayout, TextureAspect, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
+    TextureViewDescriptor, TextureViewDimension,
 };
 
 use super::error::LoadError;
 use super::{CachedTextureAtlas, FALLBACK_BMP_FILE, FALLBACK_JPEG_FILE, FALLBACK_PNG_FILE, FALLBACK_TGA_FILE, MIP_LEVELS};
+use crate::SHUTDOWN_SIGNAL;
 use crate::graphics::{Lanczos3Drawer, MipMapRenderPassContext, Texture};
 use crate::loaders::GameFileLoader;
 
@@ -238,10 +240,6 @@ impl TextureLoader {
             },
         );
 
-        let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor {
-            label: Some("compression encoder"),
-        });
-
         let mut mip_views = Vec::with_capacity(mips_level as usize);
         let variant = CompressionVariant::BC7(BC7Settings::alpha_slow());
 
@@ -270,6 +268,10 @@ impl TextureLoader {
             mip_views.push(view);
         }
 
+        let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor {
+            label: Some("compression encoder"),
+        });
+
         for index in 0..(mips_level - 1) as usize {
             let mut pass = self
                 .mip_map_render_context
@@ -277,14 +279,14 @@ impl TextureLoader {
             self.lanczos3_drawer.draw(&mut pass);
         }
 
+        self.queue.submit([encoder.finish()]);
+
         let output_buffer = self.device.create_buffer(&BufferDescriptor {
             label: Some("compressed output buffer"),
             size: total_size as u64,
             usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC,
             mapped_at_creation: false,
         });
-
-        let mut block_compressor = self.block_compressor.lock().unwrap();
 
         for level in 0..mips_level {
             let mip_width = width >> level;
@@ -294,6 +296,8 @@ impl TextureLoader {
             let blocks_per_row = mip_width / 4;
 
             for chunk_index in 0..chunk_count {
+                let mut block_compressor = self.block_compressor.lock().unwrap();
+
                 let current_chunk_height = if chunk_index == chunk_count - 1 {
                     mip_height - chunk_index * chunk_height
                 } else {
@@ -323,20 +327,27 @@ impl TextureLoader {
                     Some(texture_y_offset),
                     Some(blocks_offset as u32),
                 );
+
+                // We could be more efficient by queueing all chunks in one encoder and one
+                // queue submit. But doing this in smaller chunks seems to be more stable and
+                // not tax the system as much.
+                let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor {
+                    label: Some("compression encoder"),
+                });
+
+                let mut pass = encoder.begin_compute_pass(&ComputePassDescriptor {
+                    label: Some("texture compression pass"),
+                    timestamp_writes: None,
+                });
+
+                block_compressor.compress(&mut pass);
+
+                drop(pass);
+                drop(block_compressor);
+
+                self.queue.submit([encoder.finish()]);
             }
         }
-
-        {
-            let mut pass = encoder.begin_compute_pass(&ComputePassDescriptor {
-                label: Some("texture compression pass"),
-                timestamp_writes: None,
-            });
-            block_compressor.compress(&mut pass);
-        }
-
-        drop(block_compressor);
-
-        self.queue.submit([encoder.finish()]);
 
         self.download_blocks_data(output_buffer)
     }
@@ -367,7 +378,19 @@ impl TextureLoader {
             let (tx, rx) = std::sync::mpsc::channel();
             buffer_slice.map_async(MapMode::Read, move |v| tx.send(v).unwrap());
 
-            self.device.poll(Maintain::Wait);
+            loop {
+                match self.device.poll(Maintain::Poll) {
+                    MaintainResult::SubmissionQueueEmpty => break,
+                    MaintainResult::Ok => {
+                        // Check if shutdown initiated
+                        if SHUTDOWN_SIGNAL.load(Ordering::Relaxed) {
+                            staging_buffer.unmap();
+                            return Vec::new();
+                        }
+                        std::thread::sleep(std::time::Duration::from_millis(100));
+                    }
+                }
+            }
 
             match rx.recv() {
                 Ok(Ok(())) => {

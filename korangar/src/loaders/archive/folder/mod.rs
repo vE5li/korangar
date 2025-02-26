@@ -6,13 +6,12 @@ use std::io::{Error, Read};
 use std::path::{Path, PathBuf};
 
 use blake3::Hasher;
-use flate2::Compression;
 use flate2::bufread::{GzDecoder, GzEncoder};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::print_debug;
 use walkdir::WalkDir;
 
-use super::{Archive, Writable, os_specific_path};
+use super::{Archive, Compression, Writable, os_specific_path};
 
 pub struct FolderArchive {
     folder_path: PathBuf,
@@ -53,9 +52,16 @@ impl FolderArchive {
             .collect()
     }
 
-    pub fn remove_file(&mut self, asset_path: &str) {
-        let file_path = os_specific_path(asset_path);
-        let _ = fs::remove_file(file_path);
+    fn compress_gz(mut full_path: PathBuf, encoder: &mut GzEncoder<&[u8]>) -> (PathBuf, Vec<u8>) {
+        let mut compressed = Vec::default();
+        encoder.read_to_end(&mut compressed).unwrap();
+
+        let extension = full_path.extension().unwrap_or_default().to_string_lossy().into_owned();
+
+        let compressed_extension = format!("{}.gz", extension);
+        full_path.set_extension(compressed_extension);
+
+        (full_path, compressed)
     }
 }
 
@@ -108,9 +114,9 @@ impl Archive for FolderArchive {
 }
 
 impl Writable for FolderArchive {
-    fn add_file(&mut self, file_path: &str, file_data: Vec<u8>, compress: bool) {
+    fn add_file(&mut self, file_path: &str, file_data: Vec<u8>, compression: Compression) {
         let normalized_asset_path = os_specific_path(file_path);
-        let mut full_path = self.folder_path.join(normalized_asset_path);
+        let full_path = self.folder_path.join(normalized_asset_path);
 
         // Create parent directories if needed
         if let Some(parent) = full_path.parent() {
@@ -121,20 +127,16 @@ impl Writable for FolderArchive {
             }
         }
 
-        let (path, data) = match compress {
-            true => {
-                let mut encoder = GzEncoder::new(file_data.as_slice(), Compression::fast());
-                let mut compressed = Vec::default();
-                encoder.read_to_end(&mut compressed).unwrap();
-
-                let extension = full_path.extension().unwrap_or_default().to_string_lossy().into_owned();
-
-                let compressed_extension = format!("{}.gz", extension);
-                full_path.set_extension(compressed_extension);
-
-                (full_path, compressed)
+        let (path, data) = match compression {
+            Compression::No => (full_path, file_data),
+            Compression::Slow => {
+                let mut encoder = GzEncoder::new(file_data.as_slice(), flate2::Compression::best());
+                Self::compress_gz(full_path, &mut encoder)
             }
-            false => (full_path, file_data),
+            Compression::Fast => {
+                let mut encoder = GzEncoder::new(file_data.as_slice(), flate2::Compression::fast());
+                Self::compress_gz(full_path, &mut encoder)
+            }
         };
 
         fs::write(&path, data).unwrap_or_else(|_| panic!("error writing to file {}", path.display()));

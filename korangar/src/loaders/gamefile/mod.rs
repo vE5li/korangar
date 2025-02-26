@@ -15,12 +15,10 @@ use korangar_util::{FileLoader, FileNotFoundError};
 use self::list::GameArchiveList;
 use super::archive::folder::FolderArchive;
 use super::archive::native::{NativeArchive, NativeArchiveBuilder};
-use super::archive::{Archive, ArchiveType, Writable};
+use super::archive::{Archive, ArchiveType, Compression, Writable};
+use crate::loaders::archive::seven_zip::{SevenZipArchive, SevenZipArchiveBuilder};
 
-#[cfg(feature = "patched_as_folder")]
-const LUA_GRF_FILE_NAME: &str = "lua_files/";
-#[cfg(not(feature = "patched_as_folder"))]
-const LUA_GRF_FILE_NAME: &str = "lua_files.grf";
+const LUA_ARCHIVE_FILE_NAME: &str = "lua_files.7z";
 
 /// This string is used to derive an initialization vector for the game file
 /// hash calculation. We can use this to trigger a de-sync of the cache files of
@@ -38,6 +36,7 @@ struct LoaderArchive {
 /// [`Archive`]:
 /// - [`NativeArchive`] - Retrieve assets from GRF files.
 /// - [`FolderArchive`] - Retrieve assets from an OS folder.
+/// - [`SevenZipArchive`] - Retrieve assets from ZIP files.
 #[derive(Default)]
 pub struct GameFileLoader {
     archives: RwLock<Vec<LoaderArchive>>,
@@ -67,6 +66,10 @@ impl GameFileLoader {
             && let Some("grf") = extension.to_str()
         {
             ArchiveType::Native
+        } else if let Some(extension) = path.extension()
+            && let Some("7z") = extension.to_str()
+        {
+            ArchiveType::SevenZip
         } else {
             panic!("Provided archive must be a directory or have a .grf extension")
         }
@@ -78,6 +81,7 @@ impl GameFileLoader {
         match GameFileLoader::get_archive_type_by_path(path) {
             ArchiveType::Folder => Box::new(FolderArchive::from_path(path)),
             ArchiveType::Native => Box::new(NativeArchive::from_path(path)),
+            ArchiveType::SevenZip => Box::new(SevenZipArchive::from_path(path)),
         }
     }
 
@@ -108,21 +112,17 @@ impl GameFileLoader {
     }
 
     pub fn remove_patched_lua_files(&self) {
-        if Path::new(LUA_GRF_FILE_NAME).exists() {
-            #[cfg(feature = "patched_as_folder")]
-            std::fs::remove_dir_all(LUA_GRF_FILE_NAME).unwrap();
-
-            #[cfg(not(feature = "patched_as_folder"))]
-            std::fs::remove_file(LUA_GRF_FILE_NAME).unwrap();
+        if Path::new(LUA_ARCHIVE_FILE_NAME).exists() {
+            std::fs::remove_file(LUA_ARCHIVE_FILE_NAME).unwrap();
         }
     }
 
     pub fn load_patched_lua_files(&self) {
-        if !Path::new(LUA_GRF_FILE_NAME).exists() {
+        if !Path::new(LUA_ARCHIVE_FILE_NAME).exists() {
             self.patch_lua_files();
         }
 
-        let lua_archive = Self::load_archive_from_path(LUA_GRF_FILE_NAME);
+        let lua_archive = Self::load_archive_from_path(LUA_ARCHIVE_FILE_NAME);
         self.add_archive(lua_archive, false);
     }
 
@@ -133,6 +133,10 @@ impl GameFileLoader {
             .unwrap()
             .iter()
             .for_each(|archive| archive.archive.get_files_with_extension(&mut files, extension));
+
+        files.sort();
+        files.dedup();
+
         files
     }
 
@@ -142,10 +146,11 @@ impl GameFileLoader {
         const LUA_BYTECODE_EXTENSION: &str = ".lub";
         let lua_files = self.get_files_with_extension(LUA_BYTECODE_EXTENSION);
 
-        let path = Path::new(LUA_GRF_FILE_NAME);
+        let path = Path::new(LUA_ARCHIVE_FILE_NAME);
         let mut lua_archive: Box<dyn Writable> = match GameFileLoader::get_archive_type_by_path(path) {
             ArchiveType::Folder => Box::new(FolderArchive::from_path(path)),
             ArchiveType::Native => Box::new(NativeArchiveBuilder::from_path(path)),
+            ArchiveType::SevenZip => Box::new(SevenZipArchiveBuilder::from_path(path)),
         };
 
         let bytecode_format = Format::default();
@@ -177,7 +182,7 @@ impl GameFileLoader {
 
             // Try to unify all bytecode to Lua 5.1 and possibly 64 bit.
             match unify(&bytes, &bytecode_format, &settings) {
-                Ok(bytes) => lua_archive.add_file(&file_name, bytes, true),
+                Ok(bytes) => lua_archive.add_file(&file_name, bytes, Compression::Slow),
                 // If the operation fails the file with this error, the Lua file is not actually a
                 // pre-compiled binary but rather a source file, so we can safely ignore it.
                 #[cfg(feature = "debug")]

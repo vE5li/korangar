@@ -9,17 +9,16 @@ use std::fs::File;
 use std::io::{BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
-use flate2::Compression;
 use flate2::bufread::ZlibEncoder;
 use ragnarok_bytes::{ByteWriter, FixedByteSize, ToBytes};
 use ragnarok_formats::archive::{AssetTable, FileTableRow, Header};
 
 use super::FileTable;
-use crate::loaders::archive::Writable;
+use crate::loaders::archive::{Compression, Writable};
 
 struct FileTableEntry {
     path: String,
-    compress: bool,
+    compression: Compression,
     asset_data: Vec<u8>,
 }
 
@@ -38,10 +37,10 @@ impl NativeArchiveBuilder {
 }
 
 impl Writable for NativeArchiveBuilder {
-    fn add_file(&mut self, path: &str, asset_data: Vec<u8>, compress: bool) {
+    fn add_file(&mut self, path: &str, asset_data: Vec<u8>, compression: Compression) {
         self.archive_entries.push(FileTableEntry {
             path: path.to_string(),
-            compress,
+            compression,
             asset_data,
         });
     }
@@ -63,7 +62,7 @@ impl Writable for NativeArchiveBuilder {
                 &mut file_table,
                 &entry.path,
                 entry.asset_data,
-                entry.compress,
+                entry.compression,
             );
         }
 
@@ -73,7 +72,7 @@ impl Writable for NativeArchiveBuilder {
             file_information.to_bytes(&mut byte_writer).unwrap();
         }
 
-        let mut encoder = ZlibEncoder::new(byte_writer.as_slice(), Compression::fast());
+        let mut encoder = ZlibEncoder::new(byte_writer.as_slice(), flate2::Compression::best());
         let mut compressed = Vec::default();
         encoder.read_to_end(&mut compressed)?;
 
@@ -111,18 +110,24 @@ fn add_asset_to_file_table(
     file_table: &mut HashMap<String, FileTableRow>,
     path: &str,
     data: Vec<u8>,
-    compress: bool,
+    compression: Compression,
 ) {
     let uncompressed_size = data.len() as u32;
 
-    let data = match compress {
-        true => {
-            let mut encoder = ZlibEncoder::new(data.as_slice(), Compression::fast());
+    let data = match compression {
+        Compression::No => data,
+        Compression::Slow => {
+            let mut encoder = ZlibEncoder::new(data.as_slice(), flate2::Compression::best());
             let mut compressed = Vec::default();
             encoder.read_to_end(&mut compressed).expect("can't compress asset data");
             compressed
         }
-        false => data,
+        Compression::Fast => {
+            let mut encoder = ZlibEncoder::new(data.as_slice(), flate2::Compression::fast());
+            let mut compressed = Vec::default();
+            encoder.read_to_end(&mut compressed).expect("can't compress asset data");
+            compressed
+        }
     };
 
     let compressed_size = data.len() as u32;

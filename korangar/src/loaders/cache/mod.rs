@@ -1,7 +1,9 @@
 mod format;
 
+use std::fs;
 use std::path::Path;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use std::thread::available_parallelism;
 
 use blake3::Hash;
@@ -17,15 +19,17 @@ use ragnarok_bytes::{ByteReader, ByteWriter, ConversionResult, ConversionResultE
 use ragnarok_formats::signature::Signature;
 use ragnarok_formats::version::{InternalVersion, MajorFirst, Version};
 use rayon::ThreadPoolBuilder;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rayon::prelude::*;
 
-use crate::loaders::archive::folder::FolderArchive;
-use crate::loaders::archive::{Archive, Writable, os_specific_path};
+use crate::SHUTDOWN_SIGNAL;
+use crate::loaders::archive::seven_zip::{SevenZipArchive, SevenZipArchiveBuilder};
+use crate::loaders::archive::{Archive, Compression, Writable, os_specific_path};
 use crate::loaders::cache::format::{AllocationEntry, LookupEntry, TextureAtlasData};
 use crate::loaders::{GameFileLoader, MapLoader, ModelLoader, TextureAtlas, TextureAtlasEntry, TextureLoader, UncompressedTextureAtlas};
 
 const HASH_FILE_PATH: &str = "game_file_hash.txt";
-const CACHE_PATH_NAME: &str = "cache";
+const CACHE_PATH_NAME: &str = "cache.7z";
+const TEMPORARY_CACHE_PATH_NAME: &str = "cache.7z.tmp";
 const MAP_FILE_EXTENSION: &str = ".rsw";
 const ATLAS_FILE_EXTENSION: &str = ".kta";
 
@@ -57,15 +61,15 @@ impl Cache {
 
     #[allow(unused_variables)]
     fn get_cache_archive(game_file_hash: Hash) -> Option<Box<dyn Archive>> {
-        let folder_path = Path::new(CACHE_PATH_NAME);
+        let path = Path::new(CACHE_PATH_NAME);
 
-        if !folder_path.exists() && !folder_path.is_dir() {
+        if !path.exists() && !path.is_dir() {
             return None;
         }
 
-        let folder_archive = Box::new(FolderArchive::from_path(folder_path));
+        let archive = Box::new(SevenZipArchive::from_path(path));
 
-        let Some(hash_file) = folder_archive.get_file_by_path(HASH_FILE_PATH) else {
+        let Some(hash_file) = archive.get_file_by_path(HASH_FILE_PATH) else {
             #[cfg(feature = "debug")]
             print_debug!("Can't find game hash file. Using empty cache");
             return None;
@@ -81,7 +85,7 @@ impl Cache {
             print_debug!("[{}] Cache is out of sync. Please re-sync or delete the cache", "error".red());
         }
 
-        Some(folder_archive)
+        Some(archive)
     }
 
     fn sync_cache_archive(
@@ -93,18 +97,7 @@ impl Cache {
     ) -> Option<Box<dyn Archive>> {
         println!("Starting sync of cache");
 
-        let folder_path = Path::new(CACHE_PATH_NAME);
-
-        let mut folder_archive = Box::new(FolderArchive::from_path(folder_path));
-        folder_archive.add_file(HASH_FILE_PATH, game_file_hash.to_hex().as_bytes().to_vec(), false);
-
-        let mut cached_texture_atlas_paths = Vec::new();
-        folder_archive.get_files_with_extension(&mut cached_texture_atlas_paths, ATLAS_FILE_EXTENSION);
-
-        let cached_texture_atlas_paths: HashSet<String> = HashSet::from_iter(cached_texture_atlas_paths.iter().map(|map_file_path| {
-            let os_path = os_specific_path(map_file_path);
-            os_path.file_stem().unwrap().to_string_lossy().to_string()
-        }));
+        let path = Path::new(CACHE_PATH_NAME);
 
         let game_file_map_names: Vec<String> = game_file_loader
             .get_files_with_extension(MAP_FILE_EXTENSION)
@@ -115,78 +108,127 @@ impl Cache {
             })
             .collect();
 
-        let unused_map_atlas_names: HashSet<String> = cached_texture_atlas_paths
-            .difference(&HashSet::from_iter(game_file_map_names.iter().cloned()))
-            .cloned()
-            .collect();
+        let current_archive_exists = fs::exists(path).unwrap_or(false);
 
-        let thread_pool = ThreadPoolBuilder::new()
-            .num_threads(available_parallelism().unwrap().get())
-            .build()
-            .unwrap();
+        let (mut unused_map_atlas_names, mut outdated_map_names, mut new_map_names) = match current_archive_exists {
+            true => {
+                let mut cached_texture_atlas_paths = Vec::new();
 
-        println!("Test texture atlas compatibility");
-        let (outdated_map_names, new_map_names): (HashSet<&String>, HashSet<&String>) = thread_pool.install(|| {
-            game_file_map_names
-                .par_iter()
-                .fold(
-                    || (HashSet::new(), HashSet::new()),
-                    |mut accumulator, map_name| {
-                        let atlas_path = Self::get_texture_atlas_cache_base_path(map_name);
+                let current_archive = Box::new(SevenZipArchive::from_path(path));
+                current_archive.get_files_with_extension(&mut cached_texture_atlas_paths, ATLAS_FILE_EXTENSION);
 
-                        if let Some(atlas_data) = folder_archive.get_file_by_path(&atlas_path) {
-                            println!("Checking texture atlas for map `{map_name}`");
+                let cached_texture_atlas_paths: HashSet<String> =
+                    HashSet::from_iter(cached_texture_atlas_paths.iter().map(|map_file_path| {
+                        let os_path = os_specific_path(map_file_path);
+                        os_path.file_stem().unwrap().to_string_lossy().to_string()
+                    }));
 
-                            let mut byte_reader: ByteReader<Option<InternalVersion>> = ByteReader::with_default_metadata(&atlas_data);
-                            byte_reader.set_encoding(UTF_8);
+                let unused_map_atlas_names: HashSet<String> = cached_texture_atlas_paths
+                    .difference(&HashSet::from_iter(game_file_map_names.iter().cloned()))
+                    .cloned()
+                    .collect();
 
-                            if let Ok(cached_atlas) = CachedTextureAtlas::from_bytes(&mut byte_reader) {
-                                if let Ok(textures) = map_loader.collect_map_textures(model_loader, map_name) {
-                                    let texture_atlas = Self::create_texture_atlas(texture_loader.clone(), map_name, textures);
+                let thread_pool = ThreadPoolBuilder::new()
+                    .num_threads(available_parallelism().unwrap().get())
+                    .build()
+                    .unwrap();
 
-                                    if texture_atlas.hash() != cached_atlas.hash {
-                                        // Outdated maps
-                                        accumulator.0.insert(map_name);
+                println!("Test texture atlas compatibility");
+                let (outdated_map_names, new_map_names): (HashSet<&String>, HashSet<&String>) = thread_pool.install(|| {
+                    game_file_map_names
+                        .par_iter()
+                        .fold(
+                            || (HashSet::new(), HashSet::new()),
+                            |mut accumulator, map_name| {
+                                let atlas_path = Self::get_texture_atlas_cache_base_path(map_name);
+
+                                if let Some(atlas_data) = current_archive.get_file_by_path(&atlas_path) {
+                                    println!("Checking texture atlas for map `{map_name}`");
+
+                                    let mut byte_reader: ByteReader<Option<InternalVersion>> =
+                                        ByteReader::with_default_metadata(&atlas_data);
+                                    byte_reader.set_encoding(UTF_8);
+
+                                    if let Ok(cached_atlas) = CachedTextureAtlas::from_bytes(&mut byte_reader) {
+                                        if let Ok(textures) = map_loader.collect_map_textures(model_loader, map_name) {
+                                            let texture_atlas = Self::create_texture_atlas(texture_loader.clone(), map_name, textures);
+
+                                            if texture_atlas.hash() != cached_atlas.hash {
+                                                // Outdated maps
+                                                accumulator.0.insert(map_name);
+                                            }
+                                        }
                                     }
+                                } else {
+                                    // New maps
+                                    accumulator.1.insert(map_name);
                                 }
-                            }
-                        } else {
-                            // New maps
-                            accumulator.1.insert(map_name);
-                        }
 
-                        accumulator
-                    },
-                )
-                .reduce(
-                    || (HashSet::new(), HashSet::new()),
-                    |mut a, b| {
-                        a.0.extend(b.0);
-                        a.1.extend(b.1);
-                        a
-                    },
-                )
-        });
+                                accumulator
+                            },
+                        )
+                        .reduce(
+                            || (HashSet::new(), HashSet::new()),
+                            |mut a, b| {
+                                a.0.extend(b.0);
+                                a.1.extend(b.1);
+                                a
+                            },
+                        )
+                });
 
-        drop(thread_pool);
+                drop(thread_pool);
+
+                (
+                    Vec::from_iter(unused_map_atlas_names),
+                    Vec::from_iter(outdated_map_names),
+                    Vec::from_iter(new_map_names),
+                )
+            }
+            false => (Vec::new(), Vec::new(), Vec::from_iter(game_file_map_names.iter())),
+        };
+
+        unused_map_atlas_names.sort();
+        outdated_map_names.sort();
+        new_map_names.sort();
 
         let mut created_count = 0;
-        let mut removed_count = 0;
         let mut updated_count = 0;
         let mut error_count = 0;
 
-        for map_name in unused_map_atlas_names.iter() {
-            let atlas_path = Self::get_texture_atlas_cache_base_path(map_name);
+        let mut to_create_map_names = Vec::from_iter(outdated_map_names.iter().copied().chain(new_map_names.iter().copied()));
+        to_create_map_names.sort();
+        to_create_map_names.dedup();
 
-            println!("Deleting unused texture atlas file `{}`", atlas_path);
+        let outdated_map_names: HashSet<&String> = HashSet::from_iter(outdated_map_names.iter().copied());
+        let new_map_names: HashSet<&String> = HashSet::from_iter(new_map_names.iter().copied());
 
-            folder_archive.remove_file(&atlas_path);
+        let _ = fs::remove_file(TEMPORARY_CACHE_PATH_NAME);
 
-            removed_count += 1;
+        let archive_path = match current_archive_exists {
+            true => TEMPORARY_CACHE_PATH_NAME,
+            false => CACHE_PATH_NAME,
+        };
+
+        let mut builder = Box::new(SevenZipArchiveBuilder::from_path(Path::new(archive_path)));
+        builder.add_file(HASH_FILE_PATH, game_file_hash.to_hex().as_bytes().to_vec(), Compression::No);
+
+        if current_archive_exists {
+            let current_archive = Box::new(SevenZipArchive::from_path(path));
+
+            for map_name in game_file_map_names.iter() {
+                if !outdated_map_names.contains(&map_name) && !new_map_names.contains(&map_name) {
+                    let atlas_path = Self::get_texture_atlas_cache_base_path(map_name);
+                    if current_archive.file_exists(&atlas_path) {
+                        println!("Copying existing texture atlas for map `{map_name}`");
+                        builder.copy_file_from_archive(&current_archive, &atlas_path);
+                    }
+                }
+            }
         }
 
-        for &map_name in outdated_map_names.union(&new_map_names) {
-            println!("Re-creating texture atlas for map `{}`", map_name);
+        for &map_name in to_create_map_names.iter() {
+            println!("Creating texture atlas for map `{map_name}`");
 
             match map_loader.collect_map_textures(model_loader, map_name) {
                 Ok(textures) => {
@@ -194,28 +236,38 @@ impl Cache {
                     let mut byte_writer = ByteWriter::with_encoding(UTF_8);
 
                     if texture_atlas.to_cached_texture_atlas().to_bytes(&mut byte_writer).is_ok() {
-                        let atlas_path = Self::get_texture_atlas_cache_base_path(map_name);
-                        folder_archive.add_file(&atlas_path, byte_writer.into_inner(), true);
+                        if SHUTDOWN_SIGNAL.load(Ordering::SeqCst) {
+                            println!("Cache sync aborted. Created: {created_count} Updated: {updated_count} Errors: {error_count}");
+                            return None;
+                        }
 
-                        match outdated_map_names.contains(map_name) {
-                            true => updated_count += 1,
-                            false => created_count += 1,
+                        let atlas_path = Self::get_texture_atlas_cache_base_path(map_name);
+                        builder.add_file(&atlas_path, byte_writer.into_inner(), Compression::Fast);
+
+                        if outdated_map_names.contains(map_name) {
+                            updated_count += 1;
+                        } else {
+                            created_count += 1;
                         }
                     }
                 }
                 Err(error) => {
-                    println!("[error] Can't create texture atlas for map `{}`: {:?}", map_name, error);
+                    println!("[error] Can't create texture atlas for map `{map_name}`: {error:?}");
                     error_count += 1;
                 }
             }
         }
 
-        println!(
-            "Cache sync finished. Created: {} Removed: {} Updated: {} Errors: {}",
-            created_count, removed_count, updated_count, error_count
-        );
+        // Drop to finish the writing to the new archive.
+        drop(builder);
 
-        Some(folder_archive)
+        if current_archive_exists {
+            let _ = fs::rename(TEMPORARY_CACHE_PATH_NAME, CACHE_PATH_NAME);
+        }
+
+        println!("Cache sync finished. Created: {created_count} Updated: {updated_count} Errors: {error_count}");
+
+        Some(Box::new(SevenZipArchive::from_path(path)))
     }
 
     fn create_texture_atlas(texture_loader: Arc<TextureLoader>, map_name: &str, textures: HashSet<String>) -> UncompressedTextureAtlas {

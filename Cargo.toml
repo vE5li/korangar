@@ -45,7 +45,7 @@ rayon = "1"
 reqwest = "0.12"
 ron = "0.8"
 serde = "1"
-sevenz-rust2 = { version = "0.11", default-features = false }
+sevenz-rust2 = { version = "0.12", default-features = false }
 spin_sleep = "1"
 syn = "2"
 sys-locale = "0.3"

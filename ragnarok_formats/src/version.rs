@@ -13,6 +13,7 @@ pub struct MinorFirst;
 pub struct Version<T> {
     pub major: u8,
     pub minor: u8,
+    pub build: i32,
     phantom_data: PhantomData<T>,
 }
 
@@ -21,6 +22,7 @@ impl<T> Version<T> {
         Self {
             major,
             minor,
+            build: 0,
             phantom_data: PhantomData,
         }
     }
@@ -34,6 +36,7 @@ impl FromBytes for Version<MajorFirst> {
         Ok(Self {
             major,
             minor,
+            build: 0,
             phantom_data: PhantomData,
         })
     }
@@ -47,6 +50,7 @@ impl FromBytes for Version<MinorFirst> {
         Ok(Self {
             minor,
             major,
+            build: 0,
             phantom_data: PhantomData,
         })
     }
@@ -84,12 +88,13 @@ impl<T> Display for Version<T> {
 pub struct InternalVersion {
     pub major: u8,
     pub minor: u8,
+    pub build: i32,
 }
 
 impl<T> From<Version<T>> for InternalVersion {
     fn from(version: Version<T>) -> Self {
-        let Version { major, minor, .. } = version;
-        Self { major, minor }
+        let Version { major, minor, build, .. } = version;
+        Self { major, minor, build }
     }
 }
 
@@ -101,11 +106,17 @@ impl InternalVersion {
     pub fn equals_or_above(&self, major: u8, minor: u8) -> bool {
         self.major > major || (self.major == major && self.minor >= minor)
     }
+
+    pub fn version_build_equals_or_above(&self, major: u8, minor: u8, build: i32) -> bool {
+        self.major > major
+            || (self.major == major && self.minor > minor)
+            || (self.major == major && self.minor == minor && self.build >= build)
+    }
 }
 
 impl Display for InternalVersion {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(formatter, "{}.{}", self.major, self.minor)
+        write!(formatter, "{}.{}.{}", self.major, self.minor, self.build)
     }
 }
 

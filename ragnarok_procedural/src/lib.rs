@@ -47,6 +47,8 @@ pub fn derive_fixed_byte_size(token_stream: InterfaceTokenStream) -> InterfaceTo
         version,
         version_equals_or_above,
         version_smaller,
+        build_number,
+        version_build_equals_or_above,
     )
 )]
 pub fn derive_byte_convertable(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {

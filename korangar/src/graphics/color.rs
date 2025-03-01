@@ -1,5 +1,6 @@
 use std::ops::{Add, Mul, Sub};
 
+use mlua::{Lua, Value};
 use ragnarok_formats::color::{ColorBGRA, ColorRGB};
 use serde::{Deserialize, Serialize};
 
@@ -214,5 +215,24 @@ impl From<ColorBGRA> for Color {
     fn from(value: ColorBGRA) -> Self {
         let ColorBGRA { red, blue, green, alpha } = value;
         Color::rgba_u8(red, green, blue, alpha)
+    }
+}
+
+impl mlua::FromLua for Color {
+    fn from_lua(value: Value, _lua: &Lua) -> mlua::Result<Self> {
+        if let Value::Table(table) = value {
+            // Robust color parsing in case color values are not in u8 range.
+            let mut sequence = table.sequence_values::<i64>();
+            let r = i64::clamp(sequence.next().unwrap_or(Ok(0))?, 0, 255) as f32;
+            let g = i64::clamp(sequence.next().unwrap_or(Ok(0))?, 0, 255) as f32;
+            let b = i64::clamp(sequence.next().unwrap_or(Ok(0))?, 0, 255) as f32;
+            return Ok(Color::rgb(r / 255.0, g / 255.0, b / 255.0));
+        }
+
+        Err(mlua::Error::FromLuaConversionError {
+            from: "Table",
+            to: "Color".to_string(),
+            message: Some("Could not convert color".to_string()),
+        })
     }
 }

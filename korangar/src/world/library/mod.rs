@@ -4,10 +4,10 @@ use encoding_rs::EUC_KR;
 use hashbrown::HashMap;
 use korangar_networking::{InventoryItem, NoMetadata, ShopItem};
 use korangar_util::FileLoader;
-use mlua::Lua;
+use mlua::{Lua, Value};
 use ragnarok_packets::ItemId;
 
-use crate::graphics::Texture;
+use crate::graphics::{Color, Texture};
 use crate::loaders::{AsyncLoader, GameFileLoader, ImageType, ItemLocation};
 
 #[derive(Debug, Clone)]
@@ -24,9 +24,39 @@ struct ItemInfo {
     unidentified_resource: Option<String>,
 }
 
+#[allow(unused)]
+#[derive(Debug, Clone)]
+pub struct MapSkyData {
+    old_cloud_effect: Option<usize>,
+    bg_color: Option<Color>,
+    bg_fog: bool,
+    star_effect: bool,
+    cloud_effect: Vec<CloudEffect>,
+}
+
+#[allow(unused)]
+#[derive(Debug, Clone)]
+pub struct CloudEffect {
+    num: usize,
+    cull_dist: usize,
+    color: Color,
+    size: usize,
+    size_extra: usize,
+    expand_rate: f32,
+    alpha_inc_time: usize,
+    alpha_inc_time_extra: usize,
+    alpha_inc_speed: usize,
+    alpha_dec_time: usize,
+    alpha_dec_time_extra: usize,
+    alpha_dec_speed: f32,
+    height: usize,
+    height_extra: usize,
+}
+
 pub struct Library {
     job_identity_table: HashMap<usize, String>,
     item_table: HashMap<ItemId, ItemInfo>,
+    map_sky_data_table: HashMap<String, MapSkyData>,
 }
 
 impl Library {
@@ -54,9 +84,17 @@ impl Library {
 
         let item_table = Self::load_item_table(&state)?;
 
+        let data = game_file_loader
+            .get("data\\luafiles514\\lua files\\mapskydata\\mapskydata.lub")
+            .unwrap();
+        state.load(&data).exec()?;
+
+        let map_sky_data_table = Self::load_map_sky_data_table(&state)?;
+
         Ok(Self {
             job_identity_table,
             item_table,
+            map_sky_data_table,
         })
     }
 
@@ -124,6 +162,59 @@ impl Library {
         Ok(compacted)
     }
 
+    fn load_map_sky_data_table(state: &Lua) -> mlua::Result<HashMap<String, MapSkyData>> {
+        let globals = state.globals();
+        let mut result = HashMap::new();
+
+        if let Ok(table) = globals.get::<mlua::Table>("MapSkyData") {
+            for (map_rsw, map_sky_data_table) in table.pairs::<String, mlua::Table>().flatten() {
+                let resource_name = map_rsw.strip_suffix(".rsw").unwrap_or(&map_rsw).to_string();
+                let map_sky_data = Self::parse_map_sky_data(&map_sky_data_table);
+                result.insert(resource_name, map_sky_data);
+            }
+        }
+
+        let compacted = HashMap::from_iter(result);
+
+        Ok(compacted)
+    }
+
+    fn parse_map_sky_data(table: &mlua::Table) -> MapSkyData {
+        let mut cloud_effect = Vec::new();
+
+        if let Ok(Value::Table(cloud_effect_table)) = table.get("Cloud_Effect") {
+            let _ = cloud_effect_table.for_each(|_key: usize, value: mlua::Table| {
+                let effect = CloudEffect {
+                    num: value.get("Num").unwrap_or_default(),
+                    cull_dist: value.get("CullDist").unwrap_or_default(),
+                    color: value.get("Color").unwrap_or_default(),
+                    size: value.get("Size").unwrap_or_default(),
+                    size_extra: value.get("Size_Extra").unwrap_or_default(),
+                    expand_rate: value.get("Expand_Rate").unwrap_or_default(),
+                    alpha_inc_time: value.get("Alpha_Inc_Time").unwrap_or_default(),
+                    alpha_inc_time_extra: value.get("Alpha_Inc_Time_Extra").unwrap_or_default(),
+                    alpha_inc_speed: value.get("Alpha_Inc_Speed").unwrap_or_default(),
+                    alpha_dec_time: value.get("Alpha_Dec_Time").unwrap_or_default(),
+                    alpha_dec_time_extra: value.get("Alpha_Dec_Time_Extra").unwrap_or_default(),
+                    alpha_dec_speed: value.get("Alpha_Dec_Speed").unwrap_or_default(),
+                    height: value.get("Height").unwrap_or_default(),
+                    height_extra: value.get("Height_Extra").unwrap_or_default(),
+                };
+                cloud_effect.push(effect);
+
+                Ok(())
+            });
+        }
+
+        MapSkyData {
+            old_cloud_effect: table.get::<[usize; 1]>("Old_Cloud_Effect").ok().map(|effect| effect[0]),
+            bg_color: table.get("BG_Color").ok(),
+            bg_fog: table.get("BG_Fog").unwrap_or(false),
+            star_effect: table.get("Star_Effect").unwrap_or(false),
+            cloud_effect,
+        }
+    }
+
     pub fn get_job_identity_from_id(&self, job_id: usize) -> &str {
         self.job_identity_table
             .get(&job_id)
@@ -145,6 +236,10 @@ impl Library {
             false => self.item_table.get(&item_id).and_then(|info| info.unidentified_resource.as_deref()),
         }
         .unwrap_or("사과") // Apple
+    }
+
+    pub fn get_map_sky_data_from_resource_file(&self, resource_file: &str) -> Option<&MapSkyData> {
+        self.map_sky_data_table.get(resource_file)
     }
 
     pub fn load_inventory_item_metadata(

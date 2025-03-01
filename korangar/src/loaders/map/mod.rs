@@ -23,7 +23,7 @@ use self::vertices::{generate_tile_vertices, ground_vertices};
 use super::error::LoadError;
 use crate::graphics::{Buffer, ModelVertex, NativeModelVertex, Texture};
 use crate::loaders::{FALLBACK_MODEL_FILE, GameFileLoader, ImageType, ModelLoader, TextureAtlas, TextureLoader};
-use crate::world::{LightSourceKey, Lighting, Model};
+use crate::world::{Library, LightSourceKey, Lighting, Model};
 use crate::{EffectSourceExt, LightSourceExt, Map, Object, ObjectKey, SoundSourceExt};
 
 const MAP_OFFSET: f32 = 5.0;
@@ -82,6 +82,7 @@ impl MapLoader {
         resource_file: String,
         model_loader: &ModelLoader,
         texture_loader: Arc<TextureLoader>,
+        library: &Library,
         #[cfg(feature = "debug")] tile_texture_mapping: &[AtlasAllocation],
     ) -> Result<Box<Map>, LoadError> {
         #[cfg(feature = "debug")]
@@ -89,8 +90,11 @@ impl MapLoader {
 
         let mut deferred_vertex_generation: Vec<DeferredVertexGeneration> = Vec::new();
 
-        let map_file_name = format!("data\\{}.rsw", resource_file);
+        let map_file_name = format!("data\\{}.rsw", &resource_file);
         let mut map_data: MapData = parse_generic_data(&map_file_name, &self.game_file_loader)?;
+
+        // TODO: NHA Implement sky rendering
+        let _map_sky_data = library.get_map_sky_data_from_resource_file(&resource_file);
 
         let ground_file = format!("data\\{}", map_data.ground_file);
         let ground_data: GroundData = parse_generic_data(&ground_file, &self.game_file_loader)?;

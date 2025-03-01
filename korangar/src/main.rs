@@ -189,7 +189,7 @@ struct Client {
     font_loader: Arc<FontLoader>,
     sprite_loader: Arc<SpriteLoader>,
     texture_loader: Arc<TextureLoader>,
-    library: Library,
+    library: Arc<Library>,
 
     interface_renderer: InterfaceRenderer,
     bottom_interface_renderer: GameInterfaceRenderer,
@@ -428,7 +428,7 @@ impl Client {
             let effect_loader = Arc::new(EffectLoader::new(game_file_loader.clone()));
             let animation_loader = Arc::new(AnimationLoader::new());
 
-            let library = Library::new(&game_file_loader).unwrap_or_else(|_| {
+            let library = Arc::new(Library::new(&game_file_loader).unwrap_or_else(|_| {
                 // The library not being created correctly means that the lua files were
                 // not valid. It's possible that the archive was copied from a
                 // different machine with a different architecture, so the one thing
@@ -444,7 +444,7 @@ impl Client {
                 game_file_loader.load_patched_lua_files();
 
                 Library::new(&game_file_loader).unwrap()
-            });
+            }));
 
             let cache = Arc::new(Cache::new(
                 &game_file_loader,
@@ -468,6 +468,7 @@ impl Client {
                 model_loader.clone(),
                 sprite_loader.clone(),
                 texture_loader.clone(),
+                library.clone(),
             ));
 
             let interface_renderer = InterfaceRenderer::new(
@@ -640,6 +641,7 @@ impl Client {
                     DEFAULT_MAP.to_string(),
                     &model_loader,
                     texture_loader.clone(),
+                    &library,
                     #[cfg(feature = "debug")]
                     &tile_texture_mapping,
                 )

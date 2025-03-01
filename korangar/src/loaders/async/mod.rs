@@ -20,7 +20,7 @@ use crate::loaders::{
 };
 #[cfg(feature = "debug")]
 use crate::threads;
-use crate::world::{AnimationData, EntityType, Map};
+use crate::world::{AnimationData, EntityType, Library, Map};
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
 pub enum ItemLocation {
@@ -67,6 +67,7 @@ pub struct AsyncLoader {
     model_loader: Arc<ModelLoader>,
     sprite_loader: Arc<SpriteLoader>,
     texture_loader: Arc<TextureLoader>,
+    library: Arc<Library>,
     pending_loads: Arc<Mutex<HashMap<LoaderId, LoadStatus>>>,
     thread_pool: ThreadPool,
 }
@@ -80,6 +81,7 @@ impl AsyncLoader {
         model_loader: Arc<ModelLoader>,
         sprite_loader: Arc<SpriteLoader>,
         texture_loader: Arc<TextureLoader>,
+        library: Arc<Library>,
     ) -> Self {
         let thread_pool = ThreadPoolBuilder::new()
             .thread_name(|number| format!("light task thread pool {number}"))
@@ -96,6 +98,7 @@ impl AsyncLoader {
             model_loader,
             sprite_loader,
             texture_loader,
+            library,
             pending_loads: Arc::new(Mutex::new(HashMap::new())),
             thread_pool,
         }
@@ -174,6 +177,7 @@ impl AsyncLoader {
         let map_loader = self.map_loader.clone();
         let model_loader = self.model_loader.clone();
         let texture_loader = self.texture_loader.clone();
+        let library = self.library.clone();
 
         self.request_load(LoaderId::Map(map_name.clone()), move || {
             #[cfg(feature = "debug")]
@@ -195,6 +199,7 @@ impl AsyncLoader {
                 map_name,
                 &model_loader,
                 texture_loader,
+                &library,
                 #[cfg(feature = "debug")]
                 &tile_texture_mapping,
             )?;

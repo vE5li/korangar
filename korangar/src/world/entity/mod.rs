@@ -13,6 +13,8 @@ use korangar_util::pathing::{MAX_WALK_PATH_SIZE, PathFinder};
 use korangar_util::texture_atlas::AtlasAllocation;
 use ragnarok_packets::{AccountId, CharacterInformation, ClientTick, Direction, EntityId, Sex, StatusType, WorldPosition};
 #[cfg(feature = "debug")]
+use smallvec::smallvec_inline;
+#[cfg(feature = "debug")]
 use wgpu::{BufferUsages, Device, Queue};
 
 #[cfg(feature = "debug")]
@@ -652,7 +654,7 @@ impl Common {
                 texture_index,
                 mesh_color,
                 0.0,
-                [0; 3],
+                smallvec_inline![0; 3],
             ));
             native_pathing_vertices.push(NativeModelVertex::new(
                 second_position,
@@ -661,7 +663,7 @@ impl Common {
                 texture_index,
                 mesh_color,
                 0.0,
-                [0; 3],
+                smallvec_inline![0; 3],
             ));
             native_pathing_vertices.push(NativeModelVertex::new(
                 third_position,
@@ -670,7 +672,7 @@ impl Common {
                 texture_index,
                 mesh_color,
                 0.0,
-                [0; 3],
+                smallvec_inline![0; 3],
             ));
 
             native_pathing_vertices.push(NativeModelVertex::new(
@@ -680,7 +682,7 @@ impl Common {
                 texture_index,
                 mesh_color,
                 0.0,
-                [0; 3],
+                smallvec_inline![0; 3],
             ));
             native_pathing_vertices.push(NativeModelVertex::new(
                 third_position,
@@ -689,7 +691,7 @@ impl Common {
                 texture_index,
                 mesh_color,
                 0.0,
-                [0; 3],
+                smallvec_inline![0; 3],
             ));
             native_pathing_vertices.push(NativeModelVertex::new(
                 fourth_position,
@@ -698,7 +700,7 @@ impl Common {
                 texture_index,
                 mesh_color,
                 0.0,
-                [0; 3],
+                smallvec_inline![0; 3],
             ));
         }
 

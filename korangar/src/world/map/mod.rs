@@ -20,14 +20,12 @@ use ragnarok_formats::map::EffectSource;
 #[cfg(feature = "debug")]
 use ragnarok_formats::map::MapData;
 use ragnarok_formats::map::{LightSource, SoundSource, Tile, TileFlags, WaterSettings};
-#[cfg(feature = "debug")]
-use ragnarok_formats::transform::Transform;
 use ragnarok_packets::ClientTick;
 
 pub use self::lighting::Lighting;
 use super::{Camera, Entity, Object, PointLightId, PointLightManager, ResourceSet, ResourceSetBuffer};
 #[cfg(feature = "debug")]
-use super::{LightSourceExt, Model, PointLightSet};
+use super::{LightSourceExt, PointLightSet};
 #[cfg(feature = "debug")]
 use crate::graphics::ModelBatch;
 #[cfg(feature = "debug")]
@@ -285,7 +283,6 @@ impl Map {
 
         self.objects.iter().for_each(|(object_key, object)| {
             let bounding_box_matrix = object.get_bounding_box_matrix();
-            let bounding_box = AABB::from_transformation_matrix(bounding_box_matrix);
             let intersects = intersection_set.contains(&object_key);
 
             let color = match !frustum_culling || intersects {
@@ -293,13 +290,8 @@ impl Map {
                 false => Color::rgb_u8(255, 0, 255),
             };
 
-            let offset = bounding_box.size().y / 2.0;
-            let position = bounding_box.center() - Vector3::new(0.0, offset, 0.0);
-            let transform = Transform::position(position);
-            let world_matrix = Model::bounding_box_matrix(&bounding_box, &transform);
-
             instructions.push(DebugAabbInstruction {
-                world: world_matrix,
+                world: bounding_box_matrix,
                 color,
             });
         });

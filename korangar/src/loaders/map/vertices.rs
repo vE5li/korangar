@@ -5,6 +5,7 @@ use korangar_util::Rectangle;
 #[cfg(feature = "debug")]
 use korangar_util::texture_atlas::AtlasAllocation;
 use ragnarok_formats::map::{GatData, GroundData, GroundTile, SurfaceType};
+use smallvec::smallvec_inline;
 
 #[cfg(feature = "debug")]
 use crate::graphics::Color;
@@ -113,7 +114,7 @@ pub fn ground_vertices(ground_data: &GroundData, water_level: f32) -> (Vec<Nativ
                         ground_surface.texture_index as i32,
                         ground_surface.color.into(),
                         0.0,
-                        [0; 3],
+                        smallvec_inline![0;3],
                     ));
                     native_ground_vertices.push(NativeModelVertex::new(
                         second_position,
@@ -122,7 +123,7 @@ pub fn ground_vertices(ground_data: &GroundData, water_level: f32) -> (Vec<Nativ
                         ground_surface.texture_index as i32,
                         color_right,
                         0.0,
-                        [0; 3],
+                        smallvec_inline![0;3],
                     ));
                     native_ground_vertices.push(NativeModelVertex::new(
                         third_position,
@@ -131,7 +132,7 @@ pub fn ground_vertices(ground_data: &GroundData, water_level: f32) -> (Vec<Nativ
                         ground_surface.texture_index as i32,
                         color_top_right,
                         0.0,
-                        [0; 3],
+                        smallvec_inline![0;3],
                     ));
 
                     native_ground_vertices.push(NativeModelVertex::new(
@@ -141,7 +142,7 @@ pub fn ground_vertices(ground_data: &GroundData, water_level: f32) -> (Vec<Nativ
                         ground_surface.texture_index as i32,
                         ground_surface.color.into(),
                         0.0,
-                        [0; 3],
+                        smallvec_inline![0;3],
                     ));
                     native_ground_vertices.push(NativeModelVertex::new(
                         third_position,
@@ -150,7 +151,7 @@ pub fn ground_vertices(ground_data: &GroundData, water_level: f32) -> (Vec<Nativ
                         ground_surface.texture_index as i32,
                         color_top_right,
                         0.0,
-                        [0; 3],
+                        smallvec_inline![0;3],
                     ));
                     native_ground_vertices.push(NativeModelVertex::new(
                         fourth_position,
@@ -159,7 +160,7 @@ pub fn ground_vertices(ground_data: &GroundData, water_level: f32) -> (Vec<Nativ
                         ground_surface.texture_index as i32,
                         color_top,
                         0.0,
-                        [0; 3],
+                        smallvec_inline![0;3],
                     ));
                 }
 

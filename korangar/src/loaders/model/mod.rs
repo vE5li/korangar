@@ -183,8 +183,7 @@ impl ModelLoader {
         processed_node_indices: &mut [bool],
         vertex_offset: &mut usize,
         native_vertices: &mut Vec<NativeModelVertex>,
-        model_texture_mapping: &[ModelTexture],
-        hashmap_texture: &HashMap<String, i32>,
+        texture_mapping: &TextureMapping,
         parent_matrix: &Matrix4<f32>,
         main_bounding_box: &mut AABB,
         reverse_order: bool,
@@ -221,8 +220,7 @@ impl ModelLoader {
                     processed_node_indices,
                     vertex_offset,
                     native_vertices,
-                    model_texture_mapping,
-                    &hashmap_texture,
+                    &texture_mapping,
                     &box_transform_matrix,
                     main_bounding_box,
                     reverse_order,
@@ -233,21 +231,20 @@ impl ModelLoader {
             .collect();
 
         // Map the node texture index to the model texture index.
-        let (node_texture_mapping, texture_transparency): (Vec<i32>, Vec<bool>) = match version.equals_or_above(2, 3) {
-            false => current_node
+        let (node_texture_mapping, texture_transparency): (Vec<i32>, Vec<bool>) = match texture_mapping {
+            TextureMapping::PreVersion2_3(vector_texture) => current_node
                 .texture_indices
                 .iter()
                 .map(|&index| {
-                    let model_texture = model_texture_mapping[index as usize];
+                    let model_texture = vector_texture[index as usize];
                     (model_texture.index, model_texture.transparent)
                 })
                 .unzip(),
-            true => current_node
+            TextureMapping::PostVersion2_3(hashmap_texture) => current_node
                 .texture_names
                 .iter()
                 .map(|name| {
-                    let index = hashmap_texture.get(name.as_ref()).unwrap();
-                    let model_texture = model_texture_mapping[*index as usize];
+                    let model_texture = hashmap_texture.get(name.as_ref()).unwrap();
                     (model_texture.index, model_texture.transparent)
                 })
                 .unzip(),
@@ -409,16 +406,31 @@ impl ModelLoader {
             .map(|texture_name| texture_atlas.register(texture_name.as_ref()))
             .collect();
 
-        let hashmap_texture = HashMap::<String, i32>::from_iter(texture_names.iter().enumerate().map(|(i, name)| (name.clone(), i as i32)));
-
-        let texture_mapping: Vec<ModelTexture> = texture_allocation
-            .iter()
-            .enumerate()
-            .map(|(index, entry)| ModelTexture {
-                index: index as i32,
-                transparent: entry.transparent,
-            })
-            .collect();
+        let texture_mapping = match version.equals_or_above(2, 3) {
+            true => {
+                let hashmap_texture =
+                    HashMap::<String, ModelTexture>::from_iter(texture_names.into_iter().zip(texture_allocation.clone()).enumerate().map(
+                        |(index, (name, entry))| {
+                            (name.clone(), ModelTexture {
+                                index: index as i32,
+                                transparent: entry.transparent,
+                            })
+                        },
+                    ));
+                TextureMapping::PostVersion2_3(hashmap_texture)
+            }
+            false => {
+                let vector_texture: Vec<ModelTexture> = texture_allocation
+                    .iter()
+                    .enumerate()
+                    .map(|(index, entry)| ModelTexture {
+                        index: index as i32,
+                        transparent: entry.transparent,
+                    })
+                    .collect();
+                TextureMapping::PreVersion2_3(vector_texture)
+            }
+        };
 
         let mut root_node_names = Vec::<ModelString<40>>::new();
 
@@ -452,7 +464,6 @@ impl ModelLoader {
             vertex_offset,
             &mut native_model_vertices,
             &texture_mapping,
-            &hashmap_texture,
             &Matrix4::identity(),
             &mut bounding_box,
             reverse_order,
@@ -460,7 +471,7 @@ impl ModelLoader {
             model_data.animation_length,
         );
 
-        drop(hashmap_texture);
+        drop(texture_mapping);
 
         let mut root_nodes = vec![root_node];
         let is_static = match version.equals_or_above(2, 2) {
@@ -500,4 +511,9 @@ impl ModelLoader {
 struct ModelTexture {
     index: i32,
     transparent: bool,
+}
+
+enum TextureMapping {
+    PreVersion2_3(Vec<ModelTexture>),
+    PostVersion2_3(HashMap<String, ModelTexture>),
 }

@@ -1,10 +1,11 @@
 use cgmath::{EuclideanSpace, InnerSpace, Point2, Point3, Vector2, Vector3};
 use derive_new::new;
 use korangar_util::texture_atlas::AtlasAllocation;
+use smallvec::{SmallVec, smallvec_inline};
 
 use crate::graphics::{Color, ModelVertex};
 
-#[derive(Copy, Clone, new)]
+#[derive(Clone, new)]
 pub struct NativeModelVertex {
     pub position: Point3<f32>,
     pub normal: Vector3<f32>,
@@ -12,7 +13,7 @@ pub struct NativeModelVertex {
     pub texture_index: i32,
     pub color: Color,
     pub wind_affinity: f32,
-    pub smoothing_groups: [i32; 3],
+    pub smoothing_groups: SmallVec<[i32; 3]>,
 }
 
 impl NativeModelVertex {
@@ -24,7 +25,7 @@ impl NativeModelVertex {
             texture_index: 0,
             color: Color::rgba(0.0, 0.0, 0.0, 0.0),
             wind_affinity: 0.0,
-            smoothing_groups: [0; 3],
+            smoothing_groups: smallvec_inline![0; 3],
         }
     }
 

@@ -33,6 +33,9 @@ impl Capabilities {
         // which sample count they support.
         let supported_msaa = determine_supported_msaa(adapter, &[RENDER_TO_TEXTURE_FORMAT, RENDER_TO_TEXTURE_DEPTH_FORMAT]);
 
+        let mut required_limits = Limits::default().using_resolution(adapter.limits());
+        required_limits.max_storage_buffer_binding_size = 268435456;
+
         let mut capabilities = Self {
             supported_msaa,
             bindless: false,
@@ -42,7 +45,7 @@ impl Capabilities {
             #[cfg(feature = "debug")]
             polygon_mode_line: false,
             required_features: Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES,
-            required_limits: Limits::default().using_resolution(adapter.limits()),
+            required_limits,
         };
 
         if capabilities.required_limits.max_texture_dimension_2d < MAX_TEXTURE_SIZE {

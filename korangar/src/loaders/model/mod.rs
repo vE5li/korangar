@@ -439,52 +439,69 @@ impl ModelLoader {
             true => model_data.root_node_names.iter().map(|name| name.clone()).collect(),
             false => vec![model_data.root_node_name.clone().unwrap()],
         };
-        // TODO: CHECK FOR OTHER ROOT NODES
-        let (root_node_position, root_node) = model_data
-            .nodes
+
+        let root_info: Vec<(usize, &NodeData)> = root_node_names
             .iter()
-            .enumerate()
-            .find(|(_, node_data)| node_data.node_name == root_node_names[0])
-            .expect("failed to find main node");
+            .map(|node_name| {
+                let (root_node_position, root_node) = model_data
+                    .nodes
+                    .iter()
+                    .enumerate()
+                    .find(|(_, node_data)| node_data.node_name == *node_name)
+                    .expect("failed to find main node");
+                (root_node_position, root_node)
+            })
+            .collect();
 
         let mut processed_node_indices = vec![false; model_data.nodes.len()];
-        processed_node_indices[root_node_position] = true;
 
         let mut native_model_vertices = Vec::<NativeModelVertex>::new();
 
-        let mut bounding_box = AABB::uninitialized();
-        let root_node = Self::process_node_mesh(
-            version,
-            root_node,
-            &model_data.nodes,
-            &mut processed_node_indices,
-            vertex_offset,
-            &mut native_model_vertices,
-            &texture_mapping,
-            &Matrix4::identity(),
-            &mut bounding_box,
-            reverse_order,
-            model_data.shade_type == 2,
-            model_data.animation_length,
-        );
+        let (mut root_nodes, mut bounding_boxes): (Vec<Node>, Vec<AABB>) = root_info
+            .into_iter()
+            .map(|(root_node_position, root_node)| {
+                processed_node_indices[root_node_position] = true;
+
+                let mut bounding_box = AABB::uninitialized();
+                let root_node = Self::process_node_mesh(
+                    version,
+                    root_node,
+                    &model_data.nodes,
+                    &mut processed_node_indices,
+                    vertex_offset,
+                    &mut native_model_vertices,
+                    &texture_mapping,
+                    &Matrix4::identity(),
+                    &mut bounding_box,
+                    reverse_order,
+                    model_data.shade_type == 2,
+                    model_data.animation_length,
+                );
+                (root_node, bounding_box)
+            })
+            .unzip();
 
         drop(texture_mapping);
-
-        let mut root_nodes = vec![root_node];
         let is_static = match version.equals_or_above(2, 2) {
             // TODO: Need to add the dynamic RSM2.
             true => true,
             false => root_nodes.iter().all(Self::is_static),
         };
-
+        let bounding_box = bounding_boxes
+            .iter_mut()
+            .reduce(|aabb_1: &mut AABB, aabb_2: &mut AABB| {
+                aabb_1.extend(&aabb_2);
+                aabb_1
+            })
+            .expect("bounding box can't be calculated");
         for root_node in root_nodes.iter_mut() {
-            Self::calculate_transformation_matrix(root_node, true, bounding_box, &Matrix4::identity(), is_static);
+            Self::calculate_transformation_matrix(root_node, true, *bounding_box, &Matrix4::identity(), is_static);
         }
 
         let model = Model::new(
             version,
             root_nodes,
-            bounding_box,
+            *bounding_box,
             is_static,
             #[cfg(feature = "debug")]
             model_data,

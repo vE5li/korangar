@@ -386,20 +386,17 @@ impl ModelLoader {
             return self.load(texture_atlas, vertex_offset, FALLBACK_MODEL_FILE, reverse_order);
         }
 
-        let texture_names: Vec<String> = match version.equals_or_above(2, 3) {
-            false => model_data
-                .texture_names
-                .iter()
-                .map(|texture_name| texture_name.as_ref().to_string())
-                .collect(),
+        let texture_names: Vec<&str> = match version.equals_or_above(2, 3) {
+            false => model_data.texture_names.iter().map(|texture_name| texture_name.as_ref()).collect(),
             true => {
                 let mut hashset = HashSet::<String>::new();
-                let mut result = Vec::<String>::with_capacity(5);
+                let mut result = Vec::<&str>::with_capacity(5);
                 model_data.nodes.iter().for_each(|node_data| {
                     node_data.texture_names.iter().for_each(|name| {
-                        let string = name.as_ref().to_string().clone();
-                        if hashset.insert(string.clone()) {
-                            result.push(string);
+                        let string = &name.inner;
+                        if !hashset.contains(string) {
+                            hashset.insert(string.clone());
+                            result.push(name.as_ref());
                         }
                     })
                 });
@@ -417,7 +414,7 @@ impl ModelLoader {
                 let hashmap_texture =
                     HashMap::<String, ModelTexture>::from_iter(texture_names.into_iter().zip(texture_allocation.clone()).enumerate().map(
                         |(index, (name, entry))| {
-                            (name.clone(), ModelTexture {
+                            (name.to_string().clone(), ModelTexture {
                                 index: index as i32,
                                 transparent: entry.transparent,
                             })

@@ -11,7 +11,7 @@ use korangar_util::math::multiply_matrix4_and_point3;
 use korangar_util::texture_atlas::AllocationId;
 use num::Zero;
 use ragnarok_bytes::{ByteReader, FromBytes};
-use ragnarok_formats::model::{ModelData, ModelString, NodeData};
+use ragnarok_formats::model::{ModelData, NodeData};
 use ragnarok_formats::version::InternalVersion;
 use smallvec::{SmallVec, smallvec};
 
@@ -392,13 +392,19 @@ impl ModelLoader {
                 .iter()
                 .map(|texture_name| texture_name.as_ref().to_string())
                 .collect(),
-            true => model_data
-                .nodes
-                .iter()
-                .flat_map(|node_data| node_data.texture_names.iter().map(|name| name.as_ref().to_string()))
-                .collect::<HashSet<_>>() // TODO: seems not deterministic
-                .into_iter()
-                .collect(),
+            true => {
+                let mut hashset = HashSet::<String>::new();
+                let mut result = Vec::<String>::with_capacity(5);
+                model_data.nodes.iter().for_each(|node_data| {
+                    node_data.texture_names.iter().for_each(|name| {
+                        let string = name.as_ref().to_string().clone();
+                        if hashset.insert(string.clone()) {
+                            result.push(string);
+                        }
+                    })
+                });
+                result
+            }
         };
 
         let texture_allocation: Vec<TextureAtlasEntry> = texture_names
@@ -432,16 +438,10 @@ impl ModelLoader {
             }
         };
 
-        let mut root_node_names = Vec::<ModelString<40>>::new();
-
-        if version.equals_or_above(2, 2) {
-            for i in 0..model_data.root_node_count.unwrap() {
-                root_node_names.push(model_data.root_node_names[i as usize].clone());
-            }
-        } else {
-            let root_node_name = model_data.root_node_name.clone().unwrap();
-            root_node_names.push(root_node_name);
-        }
+        let root_node_names = match version.equals_or_above(2, 2) {
+            true => model_data.root_node_names.iter().map(|name| name.clone()).collect(),
+            false => vec![model_data.root_node_name.clone().unwrap()],
+        };
         // TODO: CHECK FOR OTHER ROOT NODES
         let (root_node_position, root_node) = model_data
             .nodes

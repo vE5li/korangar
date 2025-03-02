@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use cgmath::{EuclideanSpace, Matrix4, Point3, Rad, SquareMatrix, Vector2, Vector3};
+use cgmath::{Array, EuclideanSpace, Matrix4, Point3, Rad, SquareMatrix, Vector2, Vector3};
 use derive_new::new;
 use hashbrown::{HashMap, HashSet};
 #[cfg(feature = "debug")]
@@ -9,6 +9,7 @@ use korangar_util::FileLoader;
 use korangar_util::collision::AABB;
 use korangar_util::math::multiply_matrix4_and_point3;
 use korangar_util::texture_atlas::AllocationId;
+use num::Zero;
 use ragnarok_bytes::{ByteReader, FromBytes};
 use ragnarok_formats::model::{ModelData, ModelString, NodeData};
 use ragnarok_formats::version::InternalVersion;
@@ -148,35 +149,24 @@ impl ModelLoader {
         native_vertices
     }
 
-    fn calculate_matrices(
-        version: InternalVersion,
-        node: &NodeData,
-        parent_matrix: &Matrix4<f32>,
-    ) -> (Matrix4<f32>, Matrix4<f32>, Matrix4<f32>) {
-        match version.equals_or_above(2, 2) {
-            true => {
-                let main = Matrix4::from(node.offset_matrix);
-                let translation_matrix = Matrix4::from_translation(node.translation2);
-                let transform = translation_matrix;
-                (main, transform, transform)
-            }
-            false => {
-                let main = Matrix4::from_translation(node.translation1.unwrap()) * Matrix4::from(node.offset_matrix);
-                let scale = node.scale.unwrap();
-                let scale_matrix = Matrix4::from_nonuniform_scale(scale.x, scale.y, scale.z);
-                let rotation_matrix = Matrix4::from_axis_angle(node.rotation_axis.unwrap(), Rad(node.rotation_angle.unwrap()));
-                let translation_matrix = Matrix4::from_translation(node.translation2);
+    fn calculate_matrices(node: &NodeData, parent_matrix: &Matrix4<f32>) -> (Matrix4<f32>, Matrix4<f32>, Matrix4<f32>) {
+        let main = Matrix4::from_translation(node.translation1.unwrap_or(Vector3::zero())) * Matrix4::from(node.offset_matrix);
+        let scale = node.scale.unwrap_or(Vector3::from_value(1.0));
+        let scale_matrix = Matrix4::from_nonuniform_scale(scale.x, scale.y, scale.z);
+        let rotation_matrix = Matrix4::from_axis_angle(
+            node.rotation_axis.unwrap_or(Vector3::zero()),
+            Rad(node.rotation_angle.unwrap_or(0.0)),
+        );
+        let translation_matrix = Matrix4::from_translation(node.translation2);
 
-                let transform = match node.rotation_keyframe_count > 0 {
-                    true => translation_matrix * scale_matrix,
-                    false => translation_matrix * rotation_matrix * scale_matrix,
-                };
+        let transform = match node.rotation_keyframe_count > 0 {
+            true => translation_matrix * scale_matrix,
+            false => translation_matrix * rotation_matrix * scale_matrix,
+        };
 
-                let box_transform = parent_matrix * translation_matrix * rotation_matrix * scale_matrix;
+        let box_transform = parent_matrix * translation_matrix * rotation_matrix * scale_matrix;
 
-                (main, transform, box_transform)
-            }
-        }
+        (main, transform, box_transform)
     }
 
     fn calculate_centroid(vertices: &[NativeModelVertex]) -> Point3<f32> {
@@ -201,7 +191,7 @@ impl ModelLoader {
         smooth_normals: bool,
         animation_length: u32,
     ) -> Node {
-        let (main_matrix, transform_matrix, box_transform_matrix) = Self::calculate_matrices(version, current_node, parent_matrix);
+        let (main_matrix, transform_matrix, box_transform_matrix) = Self::calculate_matrices(current_node, parent_matrix);
 
         let box_matrix = box_transform_matrix * main_matrix;
         let bounding_box = AABB::from_vertices(
@@ -419,10 +409,7 @@ impl ModelLoader {
             .map(|texture_name| texture_atlas.register(texture_name.as_ref()))
             .collect();
 
-        let mut hashmap_texture = HashMap::<String, i32>::new();
-        texture_names.iter().enumerate().for_each(|(index, name)| {
-            hashmap_texture.insert(name.to_string(), index.try_into().unwrap());
-        });
+        let hashmap_texture = HashMap::<String, i32>::from_iter(texture_names.iter().enumerate().map(|(i, name)| (name.clone(), i as i32)));
 
         let texture_mapping: Vec<ModelTexture> = texture_allocation
             .iter()

@@ -9,6 +9,7 @@ use korangar_util::collision::AABB;
 #[cfg(feature = "debug")]
 use ragnarok_formats::model::ModelData;
 use ragnarok_formats::transform::Transform;
+use ragnarok_formats::version::InternalVersion;
 use ragnarok_packets::ClientTick;
 
 pub use self::node::Node;
@@ -21,6 +22,7 @@ use crate::world::Camera;
 
 #[derive(PrototypeElement, new)]
 pub struct Model {
+    pub version: InternalVersion,
     pub root_nodes: Vec<Node>,
     pub bounding_box: AABB,
     pub is_static: bool,
@@ -34,7 +36,10 @@ impl Model {
         let rotation_matrix = Matrix4::from_angle_z(-transform.rotation.z)
             * Matrix4::from_angle_x(-transform.rotation.x)
             * Matrix4::from_angle_y(transform.rotation.y);
-        let scale_matrix = Matrix4::from_nonuniform_scale(transform.scale.x, -transform.scale.y, transform.scale.z);
+        let scale_matrix = match self.version.equals_or_above(2, 2) {
+            true => Matrix4::from_nonuniform_scale(transform.scale.x, transform.scale.y, transform.scale.z),
+            false => Matrix4::from_nonuniform_scale(transform.scale.x, -transform.scale.y, transform.scale.z),
+        };
         translation_matrix * rotation_matrix * scale_matrix
     }
 

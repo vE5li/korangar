@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use cgmath::{EuclideanSpace, Matrix4, Point3, Rad, SquareMatrix, Vector2, Vector3};
 use derive_new::new;
-use hashbrown::HashSet;
+use hashbrown::{HashMap, HashSet};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, Timer, print_debug};
 use korangar_util::FileLoader;
@@ -10,7 +10,7 @@ use korangar_util::collision::AABB;
 use korangar_util::math::multiply_matrix4_and_point3;
 use korangar_util::texture_atlas::AllocationId;
 use ragnarok_bytes::{ByteReader, FromBytes};
-use ragnarok_formats::model::{ModelData, NodeData};
+use ragnarok_formats::model::{ModelData, ModelString, NodeData};
 use ragnarok_formats::version::InternalVersion;
 
 use super::error::LoadError;
@@ -84,7 +84,7 @@ impl ModelLoader {
         let mut face_index = 0;
         let mut back_face_index = face_vertex_count;
 
-        let array: [f32; 3] = node.scale.unwrap().into();
+        let array: [f32; 3] = node.scale.unwrap_or(Vector3::new(1.0, 1.0, 1.0)).into();
         let reverse_node_order = array.into_iter().fold(1.0, |a, b| a * b).is_sign_negative();
 
         if reverse_node_order {
@@ -107,7 +107,8 @@ impl ModelLoader {
                 None => [face.smooth_group, -1, -1],
                 Some(extras) if extras.len() == 1 => [face.smooth_group, extras[0], -1],
                 Some(extras) if extras.len() == 2 => [face.smooth_group, extras[0], extras[1]],
-                _ => panic!("more than three smoothing groups found"),
+                // TODO: add for more than two smoothing groups, default as no smoothing group
+                _ => [face.smooth_group, -1, -1],
             };
 
             Self::add_vertices(
@@ -144,21 +145,35 @@ impl ModelLoader {
         native_vertices
     }
 
-    fn calculate_matrices(node: &NodeData, parent_matrix: &Matrix4<f32>) -> (Matrix4<f32>, Matrix4<f32>, Matrix4<f32>) {
-        let main = Matrix4::from_translation(node.translation1.unwrap()) * Matrix4::from(node.offset_matrix);
-        let scale = node.scale.unwrap();
-        let scale_matrix = Matrix4::from_nonuniform_scale(scale.x, scale.y, scale.z);
-        let rotation_matrix = Matrix4::from_axis_angle(node.rotation_axis.unwrap(), Rad(node.rotation_angle.unwrap()));
-        let translation_matrix = Matrix4::from_translation(node.translation2);
+    fn calculate_matrices(
+        version: InternalVersion,
+        node: &NodeData,
+        parent_matrix: &Matrix4<f32>,
+    ) -> (Matrix4<f32>, Matrix4<f32>, Matrix4<f32>) {
+        match version.equals_or_above(2, 2) {
+            true => {
+                let main = Matrix4::from(node.offset_matrix);
+                let translation_matrix = Matrix4::from_translation(node.translation2);
+                let transform = translation_matrix;
+                (main, transform, transform)
+            }
+            false => {
+                let main = Matrix4::from_translation(node.translation1.unwrap()) * Matrix4::from(node.offset_matrix);
+                let scale = node.scale.unwrap();
+                let scale_matrix = Matrix4::from_nonuniform_scale(scale.x, scale.y, scale.z);
+                let rotation_matrix = Matrix4::from_axis_angle(node.rotation_axis.unwrap(), Rad(node.rotation_angle.unwrap()));
+                let translation_matrix = Matrix4::from_translation(node.translation2);
 
-        let transform = match node.rotation_keyframe_count > 0 {
-            true => translation_matrix * scale_matrix,
-            false => translation_matrix * rotation_matrix * scale_matrix,
-        };
+                let transform = match node.rotation_keyframe_count > 0 {
+                    true => translation_matrix * scale_matrix,
+                    false => translation_matrix * rotation_matrix * scale_matrix,
+                };
 
-        let box_transform = parent_matrix * translation_matrix * rotation_matrix * scale_matrix;
+                let box_transform = parent_matrix * translation_matrix * rotation_matrix * scale_matrix;
 
-        (main, transform, box_transform)
+                (main, transform, box_transform)
+            }
+        }
     }
 
     fn calculate_centroid(vertices: &[NativeModelVertex]) -> Point3<f32> {
@@ -169,19 +184,21 @@ impl ModelLoader {
     }
 
     fn process_node_mesh(
+        version: InternalVersion,
         current_node: &NodeData,
         nodes: &[NodeData],
         processed_node_indices: &mut [bool],
         vertex_offset: &mut usize,
         native_vertices: &mut Vec<NativeModelVertex>,
         model_texture_mapping: &[ModelTexture],
+        hashmap_texture: &HashMap<String, i32>,
         parent_matrix: &Matrix4<f32>,
         main_bounding_box: &mut AABB,
         reverse_order: bool,
         smooth_normals: bool,
         animation_length: u32,
     ) -> Node {
-        let (main_matrix, transform_matrix, box_transform_matrix) = Self::calculate_matrices(current_node, parent_matrix);
+        let (main_matrix, transform_matrix, box_transform_matrix) = Self::calculate_matrices(version, current_node, parent_matrix);
 
         let box_matrix = box_transform_matrix * main_matrix;
         let bounding_box = AABB::from_vertices(
@@ -205,12 +222,14 @@ impl ModelLoader {
             .iter()
             .map(|&index| {
                 Self::process_node_mesh(
+                    version,
                     &nodes[index],
                     nodes,
                     processed_node_indices,
                     vertex_offset,
                     native_vertices,
                     model_texture_mapping,
+                    &hashmap_texture,
                     &box_transform_matrix,
                     main_bounding_box,
                     reverse_order,
@@ -221,18 +240,30 @@ impl ModelLoader {
             .collect();
 
         // Map the node texture index to the model texture index.
-        let (node_texture_mapping, texture_transparency): (Vec<i32>, Vec<bool>) = current_node
-            .texture_indices
-            .iter()
-            .map(|&index| {
-                let model_texture = model_texture_mapping[index as usize];
-                (model_texture.index, model_texture.transparent)
-            })
-            .unzip();
+        let (node_texture_mapping, texture_transparency): (Vec<i32>, Vec<bool>) = match version.equals_or_above(2, 3) {
+            false => current_node
+                .texture_indices
+                .iter()
+                .map(|&index| {
+                    let model_texture = model_texture_mapping[index as usize];
+                    (model_texture.index, model_texture.transparent)
+                })
+                .unzip(),
+            true => current_node
+                .texture_names
+                .iter()
+                .map(|name| {
+                    let index = hashmap_texture.get(name.as_ref()).unwrap();
+                    let model_texture = model_texture_mapping[*index as usize];
+                    (model_texture.index, model_texture.transparent)
+                })
+                .unzip(),
+        };
 
         let has_transparent_parts = texture_transparency.iter().any(|x| *x);
 
-        let mut node_native_vertices = Self::make_vertices(current_node, &main_matrix, reverse_order, smooth_normals);
+        let new_reverse_order = reverse_order ^ version.equals_or_above(2, 2);
+        let mut node_native_vertices = Self::make_vertices(current_node, &main_matrix, new_reverse_order, smooth_normals);
         let centroid = Self::calculate_centroid(&node_native_vertices);
 
         node_native_vertices
@@ -246,6 +277,7 @@ impl ModelLoader {
         native_vertices.extend(node_native_vertices.iter());
 
         Node::new(
+            version,
             transform_matrix,
             centroid,
             has_transparent_parts,
@@ -261,7 +293,7 @@ impl ModelLoader {
         node: &mut Node,
         is_root: bool,
         bounding_box: AABB,
-        parent_matrix: Matrix4<f32>,
+        parent_matrix: &Matrix4<f32>,
         is_static: bool,
     ) {
         let transform_matrix = match is_root {
@@ -271,19 +303,24 @@ impl ModelLoader {
                     bounding_box.max().y,
                     bounding_box.center().z,
                 ));
-
-                translation_matrix * node.transform_matrix
+                match node.version.equals_or_above(2, 2) {
+                    true => node.transform_matrix,
+                    false => translation_matrix * node.transform_matrix,
+                }
             }
             false => node.transform_matrix,
         };
 
         node.transform_matrix = match is_static {
-            true => parent_matrix * transform_matrix,
+            true => match node.version.equals_or_above(2, 2) {
+                true => transform_matrix,
+                false => parent_matrix * transform_matrix,
+            },
             false => transform_matrix,
         };
 
         node.child_nodes.iter_mut().for_each(|child_node| {
-            Self::calculate_transformation_matrix(child_node, false, bounding_box, node.transform_matrix, is_static);
+            Self::calculate_transformation_matrix(child_node, false, bounding_box, &node.transform_matrix, is_static);
         });
     }
 
@@ -349,7 +386,7 @@ impl ModelLoader {
         // TODO: The model operation to translate keyframe is not implemented yet.
         // TODO: The model operation to modify texture keyframe is not implemented yet.
         let version: InternalVersion = model_data.version.into();
-        if version.equals_or_above(2, 2) {
+        if version.equals_or_above(2, 4) {
             #[cfg(feature = "debug")]
             {
                 print_debug!("Failed to load model because version {} is unsupported", version);
@@ -359,11 +396,30 @@ impl ModelLoader {
             return self.load(texture_atlas, vertex_offset, FALLBACK_MODEL_FILE, reverse_order);
         }
 
-        let texture_allocation: Vec<TextureAtlasEntry> = model_data
-            .texture_names
+        let texture_names: Vec<String> = match version.equals_or_above(2, 3) {
+            false => model_data
+                .texture_names
+                .iter()
+                .map(|texture_name| texture_name.as_ref().to_string())
+                .collect(),
+            true => model_data
+                .nodes
+                .iter()
+                .flat_map(|node_data| node_data.texture_names.iter().map(|name| name.as_ref().to_string()))
+                .collect::<HashSet<_>>() // TODO: seems not deterministic
+                .into_iter()
+                .collect(),
+        };
+
+        let texture_allocation: Vec<TextureAtlasEntry> = texture_names
             .iter()
             .map(|texture_name| texture_atlas.register(texture_name.as_ref()))
             .collect();
+
+        let mut hashmap_texture = HashMap::<String, i32>::new();
+        texture_names.iter().enumerate().for_each(|(index, name)| {
+            hashmap_texture.insert(name.to_string(), index.try_into().unwrap());
+        });
 
         let texture_mapping: Vec<ModelTexture> = texture_allocation
             .iter()
@@ -374,13 +430,22 @@ impl ModelLoader {
             })
             .collect();
 
-        let root_node_name = &model_data.root_node_name.clone().unwrap();
+        let mut root_node_names = Vec::<ModelString<40>>::new();
 
+        if version.equals_or_above(2, 2) {
+            for i in 0..model_data.root_node_count.unwrap() {
+                root_node_names.push(model_data.root_node_names[i as usize].clone());
+            }
+        } else {
+            let root_node_name = model_data.root_node_name.clone().unwrap();
+            root_node_names.push(root_node_name);
+        }
+        // TODO: CHECK FOR OTHER ROOT NODES
         let (root_node_position, root_node) = model_data
             .nodes
             .iter()
             .enumerate()
-            .find(|(_, node_data)| &node_data.node_name == root_node_name)
+            .find(|(_, node_data)| node_data.node_name == root_node_names[0])
             .expect("failed to find main node");
 
         let mut processed_node_indices = vec![false; model_data.nodes.len()];
@@ -390,12 +455,14 @@ impl ModelLoader {
 
         let mut bounding_box = AABB::uninitialized();
         let root_node = Self::process_node_mesh(
+            version,
             root_node,
             &model_data.nodes,
             &mut processed_node_indices,
             vertex_offset,
             &mut native_model_vertices,
             &texture_mapping,
+            &hashmap_texture,
             &Matrix4::identity(),
             &mut bounding_box,
             reverse_order,
@@ -403,14 +470,21 @@ impl ModelLoader {
             model_data.animation_length,
         );
 
+        drop(hashmap_texture);
+
         let mut root_nodes = vec![root_node];
-        let is_static = root_nodes.iter().all(Self::is_static);
+        let is_static = match version.equals_or_above(2, 2) {
+            // TODO: Need to add the dynamic RSM2.
+            true => true,
+            false => root_nodes.iter().all(Self::is_static),
+        };
 
         for root_node in root_nodes.iter_mut() {
-            Self::calculate_transformation_matrix(root_node, true, bounding_box, Matrix4::identity(), is_static);
+            Self::calculate_transformation_matrix(root_node, true, bounding_box, &Matrix4::identity(), is_static);
         }
 
         let model = Model::new(
+            version,
             root_nodes,
             bounding_box,
             is_static,

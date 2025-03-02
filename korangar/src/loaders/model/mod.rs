@@ -12,6 +12,7 @@ use korangar_util::texture_atlas::AllocationId;
 use ragnarok_bytes::{ByteReader, FromBytes};
 use ragnarok_formats::model::{ModelData, ModelString, NodeData};
 use ragnarok_formats::version::InternalVersion;
+use smallvec::{SmallVec, smallvec};
 
 use super::error::LoadError;
 use super::{FALLBACK_MODEL_FILE, smooth_model_normals};
@@ -30,7 +31,7 @@ impl ModelLoader {
         vertices: &mut [NativeModelVertex],
         vertex_positions: &[Point3<f32>],
         texture_coordinates: &[Vector2<f32>],
-        smoothing_groups: &[i32; 3],
+        smoothing_groups: &SmallVec<[i32; 3]>,
         texture_index: i32,
         reverse_vertices: bool,
         reverse_normal: bool,
@@ -39,6 +40,8 @@ impl ModelLoader {
             true => NativeModelVertex::calculate_normal(vertex_positions[0], vertex_positions[1], vertex_positions[2]),
             false => NativeModelVertex::calculate_normal(vertex_positions[2], vertex_positions[1], vertex_positions[0]),
         };
+        // TODO: more than 3 smoothing group isn't handled.
+        let smoothing_groups: [i32; 3] = [smoothing_groups[0], smoothing_groups[1], smoothing_groups[2]];
 
         if reverse_vertices {
             for ((vertex_position, texture_coordinates), target) in vertex_positions
@@ -54,7 +57,7 @@ impl ModelLoader {
                     texture_index,
                     Color::WHITE,
                     0.0, // TODO: actually add wind affinity
-                    *smoothing_groups,
+                    smoothing_groups,
                 );
             }
         } else {
@@ -68,7 +71,7 @@ impl ModelLoader {
                     texture_index,
                     Color::WHITE,
                     0.0, // TODO: actually add wind affinity
-                    *smoothing_groups,
+                    smoothing_groups,
                 );
             }
         }
@@ -102,15 +105,15 @@ impl ModelLoader {
                 let coordinate_index = face.texture_coordinate_indices[index];
                 node.texture_coordinates[coordinate_index as usize].coordinates
             });
-
-            let smoothing_groups = match face.smooth_group_extra.as_ref() {
-                None => [face.smooth_group, -1, -1],
-                Some(extras) if extras.len() == 1 => [face.smooth_group, extras[0], -1],
-                Some(extras) if extras.len() == 2 => [face.smooth_group, extras[0], extras[1]],
-                // TODO: add for more than two smoothing groups, default as no smoothing group
-                _ => [face.smooth_group, -1, -1],
+            let mut smoothing_groups: SmallVec<[i32; 3]> = smallvec![face.smooth_group];
+            if let Some(extras) = face.smooth_group_extra.as_ref() {
+                for extra in extras {
+                    smoothing_groups.push(*extra);
+                }
             };
-
+            if smoothing_groups.len() < 3 {
+                smoothing_groups.resize_with(3, || -1);
+            }
             Self::add_vertices(
                 &mut native_vertices[face_index..face_index + 3],
                 &vertex_positions,

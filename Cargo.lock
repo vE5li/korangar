@@ -1677,6 +1677,7 @@ dependencies = [
  "ron",
  "serde",
  "sevenz-rust2",
+ "smallvec",
  "spin_sleep",
  "sys-locale",
  "walkdir",

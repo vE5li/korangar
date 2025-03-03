@@ -2,6 +2,7 @@ use cgmath::{Matrix4, Point3, SquareMatrix, Transform as PointTransform};
 use derive_new::new;
 use korangar_interface::elements::PrototypeElement;
 use ragnarok_formats::model::RotationKeyframeData;
+use ragnarok_formats::version::InternalVersion;
 use ragnarok_packets::ClientTick;
 
 use crate::graphics::ModelInstruction;
@@ -9,6 +10,7 @@ use crate::world::Camera;
 
 #[derive(PrototypeElement, new)]
 pub struct Node {
+    pub version: InternalVersion,
     #[hidden_element]
     pub transform_matrix: Matrix4<f32>,
     #[hidden_element]

@@ -252,8 +252,7 @@ impl ModelLoader {
 
         let has_transparent_parts = texture_transparency.iter().any(|x| *x);
 
-        let new_reverse_order = reverse_order ^ version.equals_or_above(2, 2);
-        let mut node_native_vertices = Self::make_vertices(current_node, &main_matrix, new_reverse_order, smooth_normals);
+        let mut node_native_vertices = Self::make_vertices(current_node, &main_matrix, reverse_order, smooth_normals);
         let centroid = Self::calculate_centroid(&node_native_vertices);
 
         node_native_vertices
@@ -473,7 +472,7 @@ impl ModelLoader {
                     &texture_mapping,
                     &Matrix4::identity(),
                     &mut bounding_box,
-                    reverse_order,
+                    reverse_order ^ version.equals_or_above(2, 2),
                     model_data.shade_type == 2,
                     model_data.animation_length,
                 );

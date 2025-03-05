@@ -41,8 +41,6 @@ impl ModelLoader {
             true => NativeModelVertex::calculate_normal(vertex_positions[0], vertex_positions[1], vertex_positions[2]),
             false => NativeModelVertex::calculate_normal(vertex_positions[2], vertex_positions[1], vertex_positions[0]),
         };
-        // TODO: more than 3 smoothing group isn't handled.
-        let smoothing_groups: [i32; 3] = [smoothing_groups[0], smoothing_groups[1], smoothing_groups[2]];
 
         if reverse_vertices {
             for ((vertex_position, texture_coordinates), target) in vertex_positions
@@ -58,7 +56,7 @@ impl ModelLoader {
                     texture_index,
                     Color::WHITE,
                     0.0, // TODO: actually add wind affinity
-                    smoothing_groups,
+                    smoothing_groups.clone(),
                 );
             }
         } else {
@@ -72,7 +70,7 @@ impl ModelLoader {
                     texture_index,
                     Color::WHITE,
                     0.0, // TODO: actually add wind affinity
-                    smoothing_groups,
+                    smoothing_groups.clone(),
                 );
             }
         }
@@ -112,9 +110,6 @@ impl ModelLoader {
                     smoothing_groups.push(*extra);
                 }
             };
-            if smoothing_groups.len() < 3 {
-                smoothing_groups.resize_with(3, || -1);
-            }
             Self::add_vertices(
                 &mut native_vertices[face_index..face_index + 3],
                 &vertex_positions,
@@ -263,7 +258,7 @@ impl ModelLoader {
         let node_vertex_offset = *vertex_offset;
         let node_vertex_count = node_native_vertices.len();
         *vertex_offset += node_vertex_count;
-        native_vertices.extend(node_native_vertices.iter());
+        native_vertices.extend(node_native_vertices.iter().cloned());
 
         Node::new(
             version,

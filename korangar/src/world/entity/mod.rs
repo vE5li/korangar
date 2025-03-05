@@ -652,7 +652,7 @@ impl Common {
                 texture_index,
                 mesh_color,
                 0.0,
-                [0; 3],
+                [0; 3].into(),
             ));
             native_pathing_vertices.push(NativeModelVertex::new(
                 second_position,
@@ -661,7 +661,7 @@ impl Common {
                 texture_index,
                 mesh_color,
                 0.0,
-                [0; 3],
+                [0; 3].into(),
             ));
             native_pathing_vertices.push(NativeModelVertex::new(
                 third_position,
@@ -670,7 +670,7 @@ impl Common {
                 texture_index,
                 mesh_color,
                 0.0,
-                [0; 3],
+                [0; 3].into(),
             ));
 
             native_pathing_vertices.push(NativeModelVertex::new(
@@ -680,7 +680,7 @@ impl Common {
                 texture_index,
                 mesh_color,
                 0.0,
-                [0; 3],
+                [0; 3].into(),
             ));
             native_pathing_vertices.push(NativeModelVertex::new(
                 third_position,
@@ -689,7 +689,7 @@ impl Common {
                 texture_index,
                 mesh_color,
                 0.0,
-                [0; 3],
+                [0; 3].into(),
             ));
             native_pathing_vertices.push(NativeModelVertex::new(
                 fourth_position,
@@ -698,7 +698,7 @@ impl Common {
                 texture_index,
                 mesh_color,
                 0.0,
-                [0; 3],
+                [0; 3].into(),
             ));
         }
 

@@ -21,10 +21,7 @@ impl<const LENGTH: usize> FromBytes for ModelString<LENGTH> {
             .equals_or_above(2, 2)
         {
             let length = u32::from_bytes(byte_reader).trace::<Self>()? as usize;
-            let mut inner = String::from_n_bytes(byte_reader, length).trace::<Self>()?;
-            // need to remove the last character for some reason
-            inner.pop();
-            inner
+            String::from_n_bytes(byte_reader, length).trace::<Self>()?
         } else {
             String::from_n_bytes(byte_reader, LENGTH).trace::<Self>()?
         };
@@ -91,6 +88,7 @@ pub struct TexturesKeyframeData {
 /// See: https://rathena.org/board/topic/127587-rsm2-file-format/
 #[derive(Debug, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[numeric_type(u32)]
 pub enum TextureOperation {
     /// Texture translation on the X axis. The texture is tiled.
     TranslationX,

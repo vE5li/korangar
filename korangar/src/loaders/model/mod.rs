@@ -220,7 +220,7 @@ impl ModelLoader {
                     processed_node_indices,
                     vertex_offset,
                     native_vertices,
-                    &texture_mapping,
+                    texture_mapping,
                     &box_transform_matrix,
                     main_bounding_box,
                     reverse_order,
@@ -435,7 +435,7 @@ impl ModelLoader {
         };
 
         let root_node_names = match version.equals_or_above(2, 2) {
-            true => model_data.root_node_names.iter().map(|name| name.clone()).collect(),
+            true => model_data.root_node_names.to_vec(),
             false => vec![model_data.root_node_name.clone().unwrap()],
         };
 
@@ -454,9 +454,10 @@ impl ModelLoader {
 
         let mut processed_node_indices = vec![false; model_data.nodes.len()];
 
+        let mut model_bounding_box = AABB::uninitialized();
         let mut native_model_vertices = Vec::<NativeModelVertex>::new();
 
-        let (mut root_nodes, mut bounding_boxes): (Vec<Node>, Vec<AABB>) = root_info
+        let mut root_nodes: Vec<Node> = root_info
             .into_iter()
             .map(|(root_node_position, root_node)| {
                 processed_node_indices[root_node_position] = true;
@@ -476,9 +477,11 @@ impl ModelLoader {
                     model_data.shade_type == 2,
                     model_data.animation_length,
                 );
-                (root_node, bounding_box)
+                model_bounding_box.extend(&bounding_box);
+
+                root_node
             })
-            .unzip();
+            .collect();
 
         drop(texture_mapping);
         let is_static = match version.equals_or_above(2, 2) {
@@ -486,21 +489,14 @@ impl ModelLoader {
             true => true,
             false => root_nodes.iter().all(Self::is_static),
         };
-        let bounding_box = bounding_boxes
-            .iter_mut()
-            .reduce(|aabb_1: &mut AABB, aabb_2: &mut AABB| {
-                aabb_1.extend(&aabb_2);
-                aabb_1
-            })
-            .expect("bounding box can't be calculated");
         for root_node in root_nodes.iter_mut() {
-            Self::calculate_transformation_matrix(root_node, true, *bounding_box, &Matrix4::identity(), is_static);
+            Self::calculate_transformation_matrix(root_node, true, model_bounding_box, &Matrix4::identity(), is_static);
         }
 
         let model = Model::new(
             version,
             root_nodes,
-            *bounding_box,
+            model_bounding_box,
             is_static,
             #[cfg(feature = "debug")]
             model_data,

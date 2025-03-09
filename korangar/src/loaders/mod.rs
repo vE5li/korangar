@@ -3,7 +3,6 @@ mod animation;
 mod archive;
 
 mod r#async;
-mod cache;
 mod effect;
 pub mod error;
 mod font;

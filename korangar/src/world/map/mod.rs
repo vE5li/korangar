@@ -20,6 +20,7 @@ use ragnarok_formats::map::EffectSource;
 #[cfg(feature = "debug")]
 use ragnarok_formats::map::MapData;
 use ragnarok_formats::map::{LightSource, SoundSource, Tile, TileFlags, WaterSettings};
+#[cfg(feature = "debug")]
 use ragnarok_formats::transform::Transform;
 use ragnarok_packets::ClientTick;
 

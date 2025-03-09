@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 
 use block_compression::{BC7Settings, CompressionVariant, GpuBlockCompressor};
 use hashbrown::HashMap;
-use image::{GenericImageView, GrayImage, ImageBuffer, ImageFormat, ImageReader, Rgba, RgbaImage};
+use image::{GrayImage, ImageBuffer, ImageFormat, ImageReader, Rgba, RgbaImage};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, Timer, print_debug};
 use korangar_util::FileLoader;
@@ -135,13 +135,11 @@ impl TextureLoader {
         )
     }
 
-    pub(crate) fn create_uncompressed_with_mipmaps(
-        &self,
-        name: &str,
-        mip_level_count: u32,
-        transparent: bool,
-        image: RgbaImage,
-    ) -> Arc<Texture> {
+    pub(crate) fn create_uncompressed_with_mipmaps(&self, name: &str, transparent: bool, image: RgbaImage) -> Arc<Texture> {
+        let width = image.width();
+        let height = image.height();
+        let mip_level_count = calculate_valid_mip_level_count(width, height);
+
         let texture = Texture::new_with_data(
             &self.device,
             &self.queue,
@@ -199,7 +197,7 @@ impl TextureLoader {
         Arc::new(texture)
     }
 
-    pub(crate) fn create_compressed_with_mipmaps(&self, mips_level: u32, image: RgbaImage) -> Vec<u8> {
+    pub(crate) fn create_compressed_with_mipmaps(&self, image: RgbaImage, mip_level_count: u32, compressed_data: &mut [u8]) {
         let width = image.width();
         let height = image.height();
 
@@ -215,7 +213,7 @@ impl TextureLoader {
                     height,
                     depth_or_array_layers: 1,
                 },
-                mip_level_count: mips_level,
+                mip_level_count,
                 sample_count: 1,
                 dimension: TextureDimension::D2,
                 format: TextureFormat::Rgba8UnormSrgb,
@@ -241,13 +239,13 @@ impl TextureLoader {
             },
         );
 
-        let mut mip_views = Vec::with_capacity(mips_level as usize);
+        let mut mip_views = Vec::with_capacity(mip_level_count as usize);
         let variant = CompressionVariant::BC7(BC7Settings::alpha_slow());
 
         let mut total_size = 0;
-        let mut offsets = Vec::with_capacity(mips_level as usize);
+        let mut offsets = Vec::with_capacity(mip_level_count as usize);
 
-        for level in 0..mips_level {
+        for level in 0..mip_level_count {
             let mip_width = width >> level;
             let mip_height = height >> level;
 
@@ -273,7 +271,7 @@ impl TextureLoader {
             label: Some("compression encoder"),
         });
 
-        for index in 0..(mips_level - 1) as usize {
+        for index in 0..(mip_level_count - 1) as usize {
             let mut pass = self
                 .mip_map_render_context
                 .create_pass(&self.device, &mut encoder, &mip_views[index], &mip_views[index + 1]);
@@ -289,7 +287,7 @@ impl TextureLoader {
             mapped_at_creation: false,
         });
 
-        for level in 0..mips_level {
+        for level in 0..mip_level_count {
             let mip_width = width >> level;
             let mip_height = height >> level;
             let chunk_height = 128;
@@ -350,10 +348,10 @@ impl TextureLoader {
             }
         }
 
-        self.download_blocks_data(output_buffer)
+        self.download_blocks_data(output_buffer, compressed_data);
     }
 
-    fn download_blocks_data(&self, block_buffer: Buffer) -> Vec<u8> {
+    fn download_blocks_data(&self, block_buffer: Buffer, compressed_data: &mut [u8]) {
         let size = block_buffer.size();
 
         let staging_buffer = self.device.create_buffer(&BufferDescriptor {
@@ -371,8 +369,6 @@ impl TextureLoader {
 
         self.queue.submit([copy_encoder.finish()]);
 
-        let result;
-
         {
             let buffer_slice = staging_buffer.slice(..);
 
@@ -386,7 +382,7 @@ impl TextureLoader {
                         // Check if shutdown initiated
                         if SHUTDOWN_SIGNAL.load(Ordering::Relaxed) {
                             staging_buffer.unmap();
-                            return Vec::new();
+                            return;
                         }
                         std::thread::sleep(std::time::Duration::from_millis(100));
                     }
@@ -395,27 +391,21 @@ impl TextureLoader {
 
             match rx.recv() {
                 Ok(Ok(())) => {
-                    result = buffer_slice.get_mapped_range().to_vec();
+                    let size = compressed_data.len();
+                    compressed_data.copy_from_slice(&buffer_slice.get_mapped_range()[..size]);
                 }
                 _ => panic!("couldn't read from buffer"),
             }
         }
 
         staging_buffer.unmap();
-
-        result
     }
 
     pub fn load(&self, path: &str, image_type: ImageType) -> Result<Arc<Texture>, LoadError> {
         let texture = match image_type {
             ImageType::Color => {
                 let (texture_data, transparent) = self.load_texture_data(path, false)?;
-                self.create_uncompressed_with_mipmaps(
-                    path,
-                    calculate_max_mip_level(texture_data.width(), texture_data.height()),
-                    transparent,
-                    texture_data,
-                )
+                self.create_uncompressed_with_mipmaps(path, transparent, texture_data)
             }
             ImageType::Sdf => {
                 let texture_data = self.load_grayscale_texture_data(path)?;
@@ -681,7 +671,17 @@ impl TextureSetBuilder {
     }
 }
 
-fn calculate_max_mip_level(width: u32, height: u32) -> u32 {
-    let max_dimension = width.max(height);
-    (max_dimension as f64).log2().floor() as u32 + 1
+/// This function can be used for both uncompressed and compressed textures.
+pub fn calculate_valid_mip_level_count(width: u32, height: u32) -> u32 {
+    let mut mip_level = 0;
+    let mut current_width = width;
+    let mut current_height = height;
+
+    while current_width >= 4 && current_height >= 4 && current_width % 4 == 0 && current_height % 4 == 0 {
+        mip_level += 1;
+        current_width /= 2;
+        current_height /= 2;
+    }
+
+    mip_level.max(1)
 }

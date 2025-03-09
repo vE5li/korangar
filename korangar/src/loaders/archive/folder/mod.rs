@@ -90,8 +90,12 @@ impl Archive for FolderArchive {
         })
     }
 
-    fn get_files_with_extension(&self, files: &mut Vec<String>, extension: &str) {
-        let found_files = self.file_mapping.keys().filter(|file_name| file_name.ends_with(extension)).cloned();
+    fn get_files_with_extension(&self, files: &mut Vec<String>, extensions: &[&str]) {
+        let found_files = self
+            .file_mapping
+            .keys()
+            .filter(|file_name| extensions.iter().any(|extension| file_name.ends_with(extension)))
+            .cloned();
         files.extend(found_files);
     }
 

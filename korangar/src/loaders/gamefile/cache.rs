@@ -234,8 +234,5 @@ fn finish_archive(current_archive_exists: bool, builder: Box<SevenZipArchiveBuil
 }
 
 pub fn texture_file_dds_name(image_file_name: &str) -> String {
-    let char_count = image_file_name.chars().count();
-    let mut name: String = image_file_name.chars().take(char_count - 4).collect();
-    name.push_str(DDS_FILE_EXTENSION);
-    name
+    format!("{image_file_name}{DDS_FILE_EXTENSION}")
 }

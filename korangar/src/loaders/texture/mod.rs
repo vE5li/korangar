@@ -408,32 +408,10 @@ impl TextureLoader {
         let texture = match image_type {
             ImageType::Color => {
                 let path = fix_broken_texture_file_endings(path);
-                let dds_file_name = texture_file_dds_name(&path);
 
-                match self.game_file_loader.get(&dds_file_name) {
-                    Ok(dds_file_data) => {
-                        // TODO: NHA don't panic
-                        let dds = Dds::read(dds_file_data.as_slice()).expect("can't decode DDS file");
-                        assert_eq!(dds.get_dxgi_format(), Some(DxgiFormat::BC7_UNorm_sRGB));
-                        let height = dds.get_num_mipmap_levels();
-                        let width = dds.get_num_mipmap_levels();
-                        let mip_level_count = dds.get_num_mipmap_levels();
-                        let transparent = dds
-                            .header10
-                            .map(|header10| header10.alpha_mode == AlphaMode::PreMultiplied)
-                            .unwrap_or(false);
-
-                        self.create_raw(
-                            path.as_str(),
-                            width,
-                            height,
-                            mip_level_count,
-                            TextureFormat::Bc7RgbaUnormSrgb,
-                            transparent,
-                            &dds.data,
-                        )
-                    }
-                    Err(_) => {
+                match self.try_load_dds(&path) {
+                    Some(texture) => texture,
+                    None => {
                         let (texture_data, transparent) = self.load_texture_data(&path, false)?;
                         self.create_uncompressed_with_mipmaps(&path, transparent, texture_data)
                     }
@@ -457,6 +435,39 @@ impl TextureLoader {
             .unwrap();
 
         Ok(texture)
+    }
+
+    fn try_load_dds(&self, path: &str) -> Option<Arc<Texture>> {
+        let dds_file_name = texture_file_dds_name(path);
+
+        let dds_file_data = self.game_file_loader.get(&dds_file_name).ok()?;
+        let Ok(dds) = Dds::read(dds_file_data.as_slice()) else {
+            #[cfg(feature = "debug")]
+            print_debug!("Could not decode DDS file: {}", dds_file_name);
+            return None;
+        };
+
+        if dds.get_dxgi_format() != Some(DxgiFormat::BC7_UNorm_sRGB) {
+            #[cfg(feature = "debug")]
+            print_debug!("DDS file is not a BC7 texture: {}", dds_file_name);
+            return None;
+        }
+
+        let height = dds.get_num_mipmap_levels();
+        let width = dds.get_num_mipmap_levels();
+        let mip_level_count = dds.get_num_mipmap_levels();
+
+        let transparent = dds.header10.map(|header10| header10.alpha_mode == AlphaMode::PreMultiplied)?;
+
+        Some(self.create_raw(
+            path,
+            width,
+            height,
+            mip_level_count,
+            TextureFormat::Bc7RgbaUnormSrgb,
+            transparent,
+            &dds.data,
+        ))
     }
 
     pub fn load_texture_data(&self, path: &str, raw: bool) -> Result<(RgbaImage, bool), LoadError> {

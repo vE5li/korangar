@@ -32,7 +32,7 @@ impl Object {
         self.model.render_geometry(instructions, &self.transform, client_tick, camera);
     }
 
-    pub fn get_bounding_box(&self) -> AABB {
+    pub fn calculate_object_aabb(&self) -> AABB {
         self.model.calculate_aabb(&self.transform)
     }
 

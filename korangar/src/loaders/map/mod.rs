@@ -154,7 +154,7 @@ impl MapLoader {
                     model,
                     object_data.transform,
                 );
-                let bounding_box = object.get_bounding_box();
+                let bounding_box = object.calculate_object_aabb();
                 let key = objects.insert(object).expect("objects slab is full");
 
                 (key, bounding_box)

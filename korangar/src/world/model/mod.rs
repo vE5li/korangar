@@ -66,7 +66,25 @@ impl Model {
         });
     }
 
-    pub fn get_bounding_box_matrix(&self, transform: &Transform) -> Matrix4<f32> {
+    #[cfg(feature = "debug")]
+    pub fn bounding_box_matrix(bounding_box: &AABB, transform: &Transform) -> Matrix4<f32> {
+        let size = bounding_box.size() / 2.0;
+        let scale = size.zip(transform.scale, f32::mul);
+        let position = transform.position;
+
+        let offset_matrix = Matrix4::from_translation(Vector3::new(0.0, scale.y, 0.0));
+
+        let rotation_matrix = Matrix4::from_angle_z(-transform.rotation.z)
+            * Matrix4::from_angle_x(-transform.rotation.x)
+            * Matrix4::from_angle_y(transform.rotation.y);
+
+        Matrix4::from_translation(position.to_vec())
+            * rotation_matrix
+            * offset_matrix
+            * Matrix4::from_nonuniform_scale(scale.x, scale.y, scale.z)
+    }
+
+    pub fn get_bounding_box(&self, transform: &Transform) -> AABB {
         let size = self.bounding_box.size() / 2.0;
         let scale = size.zip(transform.scale, f32::mul);
         let position = transform.position;
@@ -91,16 +109,18 @@ impl Model {
             * Matrix4::from_angle_x(-transform.rotation.x)
             * Matrix4::from_angle_y(transform.rotation.y);
 
-        Matrix4::from_translation(position.to_vec())
+        let transform = Matrix4::from_translation(position.to_vec())
             * rotation_matrix
             * offset_matrix
             * Matrix4::from_nonuniform_scale(scale.x, scale.y, scale.z)
-            * shift_matrix
+            * shift_matrix;
+
+        AABB::from_transformation_matrix(transform)
     }
 
     #[cfg(feature = "debug")]
     pub fn render_bounding_box(&self, instructions: &mut Vec<DebugAabbInstruction>, root_transform: &Transform, color: Color) {
-        let world_matrix = self.get_bounding_box_matrix(root_transform);
+        let world_matrix = Self::bounding_box_matrix(&self.bounding_box, root_transform);
         instructions.push(DebugAabbInstruction {
             world: world_matrix,
             color,

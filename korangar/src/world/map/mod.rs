@@ -27,7 +27,7 @@ use ragnarok_packets::ClientTick;
 pub use self::lighting::Lighting;
 use super::{Camera, Entity, Object, PointLightId, PointLightManager, ResourceSet, ResourceSetBuffer};
 #[cfg(feature = "debug")]
-use super::{LightSourceExt, PointLightSet};
+use super::{LightSourceExt, Model, PointLightSet};
 #[cfg(feature = "debug")]
 use crate::graphics::ModelBatch;
 #[cfg(feature = "debug")]

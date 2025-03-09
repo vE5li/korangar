@@ -283,7 +283,6 @@ impl Map {
         let intersection_set: HashSet<ObjectKey> = object_set.iterate_visible().copied().collect();
 
         self.objects.iter().for_each(|(object_key, object)| {
-            let bounding_box = object.get_bounding_box();
             let intersects = intersection_set.contains(&object_key);
 
             let color = match !frustum_culling || intersects {
@@ -291,6 +290,7 @@ impl Map {
                 false => Color::rgb_u8(255, 0, 255),
             };
 
+            let bounding_box = object.get_bounding_box();
             let offset = bounding_box.size().y / 2.0;
             let position = bounding_box.center() - Vector3::new(0.0, offset, 0.0);
             let transform = Transform::position(position);

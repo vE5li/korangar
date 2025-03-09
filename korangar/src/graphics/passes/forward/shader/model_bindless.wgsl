@@ -162,7 +162,7 @@ fn fragment(input: VertexOutput) -> vec4<f32> {
 
         if (ALPHA_TO_COVERAGE_ACTIVATED) {
             // Apply mip level scaling for better mipmap coverage
-            let texture_size = vec2<f32>(textureDimensions(texture, 0));
+            let texture_size = vec2<f32>(textureDimensions(textures[input.texture_index], 0));
             let coverage = saturate(alpha_channel * (1.0 + max(0.0, calculate_mip_level(input.texture_coordinates * texture_size)) * MIP_SCALE));
 
             // Apply screen-space derivative scaling for better alpha to coverage anti-aliasing

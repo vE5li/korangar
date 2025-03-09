@@ -16,7 +16,9 @@ use crate::graphics::passes::forward::ForwardRenderPassContext;
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, DrawIndirectArgs, Drawer, ModelBatchDrawData, RenderPassContext,
 };
-use crate::graphics::{Buffer, Capabilities, GlobalContext, ModelBatch, ModelVertex, Msaa, Prepare, RenderInstruction, Texture};
+use crate::graphics::{
+    Buffer, Capabilities, GlobalContext, ModelBatch, ModelVertex, Msaa, Prepare, RenderInstruction, Texture, TextureSet,
+};
 
 const SHADER_BINDLESS: ShaderModuleDescriptor = include_wgsl!("shader/model_bindless.wgsl");
 #[cfg(feature = "debug")]
@@ -137,7 +139,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
                 pass_bind_group_layouts[0],
                 pass_bind_group_layouts[1],
                 &bind_group_layout,
-                Texture::bind_group_layout(device),
+                TextureSet::bind_group_layout(device, capabilities.get_max_textures_per_shader_stage()),
             ],
             push_constant_ranges: &[],
         });

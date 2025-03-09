@@ -1,6 +1,5 @@
-use cgmath::{EuclideanSpace, InnerSpace, Point2, Point3, Vector2, Vector3};
+use cgmath::{InnerSpace, Point3, Vector2, Vector3};
 use derive_new::new;
-use korangar_util::texture_atlas::AtlasAllocation;
 use smallvec::{SmallVec, smallvec_inline};
 
 use crate::graphics::{Color, ModelVertex};
@@ -29,19 +28,20 @@ impl NativeModelVertex {
         }
     }
 
-    fn convert_to_vertex(self, texture_mapping: &[AtlasAllocation]) -> ModelVertex {
-        let allocation = texture_mapping[self.texture_index as usize];
+    fn to_model_vertex(self, texture_mapping: &[i32]) -> ModelVertex {
+        let texture_index = texture_mapping[self.texture_index as usize];
 
         ModelVertex::new(
             self.position,
             self.normal,
-            allocation.map_to_atlas(Point2::from_vec(self.texture_coordinates)).to_vec(),
+            self.texture_coordinates,
             self.color,
+            texture_index,
             self.wind_affinity,
         )
     }
 
-    pub fn to_vertices(mut native_vertices: Vec<NativeModelVertex>, texture_mapping: &[AtlasAllocation]) -> Vec<ModelVertex> {
+    pub fn to_vertices(mut native_vertices: Vec<NativeModelVertex>, texture_mapping: &[i32]) -> Vec<ModelVertex> {
         let mut vertices = Vec::new();
         let mut drain_iterator = native_vertices.drain(..);
 
@@ -53,9 +53,9 @@ impl NativeModelVertex {
             second_partial.normal = second_partial.normal.normalize();
             third_partial.normal = third_partial.normal.normalize();
 
-            vertices.push(first_partial.convert_to_vertex(texture_mapping));
-            vertices.push(second_partial.convert_to_vertex(texture_mapping));
-            vertices.push(third_partial.convert_to_vertex(texture_mapping));
+            vertices.push(first_partial.to_model_vertex(texture_mapping));
+            vertices.push(second_partial.to_model_vertex(texture_mapping));
+            vertices.push(third_partial.to_model_vertex(texture_mapping));
         }
 
         vertices

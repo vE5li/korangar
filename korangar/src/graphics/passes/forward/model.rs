@@ -101,7 +101,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
             attributes: &[VertexAttribute {
                 format: VertexFormat::Uint32,
                 offset: 0,
-                shader_location: 5,
+                shader_location: 6,
             }],
         };
 

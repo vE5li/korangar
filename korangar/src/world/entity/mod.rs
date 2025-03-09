@@ -9,8 +9,6 @@ use korangar_interface::elements::PrototypeElement;
 use korangar_interface::windows::{PrototypeWindow, Window};
 use korangar_networking::EntityData;
 use korangar_util::pathing::{MAX_WALK_PATH_SIZE, PathFinder};
-#[cfg(feature = "debug")]
-use korangar_util::texture_atlas::AtlasAllocation;
 use ragnarok_packets::{AccountId, CharacterInformation, ClientTick, Direction, EntityId, Sex, StatusType, WorldPosition};
 #[cfg(feature = "debug")]
 use smallvec::smallvec_inline;

@@ -16,9 +16,7 @@ use crate::graphics::passes::forward::ForwardRenderPassContext;
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, DrawIndirectArgs, Drawer, ModelBatchDrawData, RenderPassContext,
 };
-use crate::graphics::{
-    Buffer, Capabilities, GlobalContext, ModelBatch, ModelVertex, Msaa, Prepare, RenderInstruction, Texture, TextureSet,
-};
+use crate::graphics::{Buffer, Capabilities, GlobalContext, ModelBatch, ModelVertex, Msaa, Prepare, RenderInstruction, TextureSet};
 
 const SHADER_BINDLESS: ShaderModuleDescriptor = include_wgsl!("shader/model_bindless.wgsl");
 #[cfg(feature = "debug")]

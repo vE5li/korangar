@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 
 use block_compression::{BC7Settings, CompressionVariant, GpuBlockCompressor};
 use hashbrown::HashMap;
-use image::{GrayImage, ImageBuffer, ImageFormat, ImageReader, Rgba, RgbaImage};
+use image::{GenericImageView, GrayImage, ImageBuffer, ImageFormat, ImageReader, Rgba, RgbaImage};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, Timer, print_debug};
 use korangar_util::FileLoader;
@@ -410,7 +410,12 @@ impl TextureLoader {
         let texture = match image_type {
             ImageType::Color => {
                 let (texture_data, transparent) = self.load_texture_data(path, false)?;
-                self.create_color(path, texture_data, transparent)
+                self.create_uncompressed_with_mipmaps(
+                    path,
+                    calculate_max_mip_level(texture_data.width(), texture_data.height()),
+                    transparent,
+                    texture_data,
+                )
             }
             ImageType::Sdf => {
                 let texture_data = self.load_grayscale_texture_data(path)?;
@@ -665,14 +670,7 @@ impl TextureSetBuilder {
         }
 
         // TODO: NHA Support compressed textures with pre-computed mip maps.
-        // TODO: Support proper caching in both cases.
-        let (texture_data, transparent) = self.texture_loader.load_texture_data(path, false).expect("can't load texture data");
-        let texture = self.texture_loader.create_uncompressed_with_mipmaps(
-            path,
-            Self::calculate_max_mip_level(texture_data.height(), texture_data.width()),
-            transparent,
-            texture_data,
-        );
+        let texture = self.texture_loader.get_or_load(path, ImageType::Color).expect("can't load texture");
         let index = i32::try_from(self.textures.len()).expect("texture set is full");
         let is_transparent = texture.is_transparent();
 
@@ -685,9 +683,9 @@ impl TextureSetBuilder {
     pub fn get_index(&self, path: &str) -> Option<i32> {
         self.lookup.get(path).copied()
     }
+}
 
-    fn calculate_max_mip_level(width: u32, height: u32) -> u32 {
-        let max_dimension = width.max(height);
-        (max_dimension as f64).log2().floor() as u32 + 1
-    }
+fn calculate_max_mip_level(width: u32, height: u32) -> u32 {
+    let max_dimension = width.max(height);
+    (max_dimension as f64).log2().floor() as u32 + 1
 }

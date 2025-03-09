@@ -14,7 +14,7 @@ use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, DirectionalShadowRenderPassContext, DrawIndirectArgs, Drawer,
     ModelBatchDrawData, RenderPassContext,
 };
-use crate::graphics::{Buffer, Capabilities, GlobalContext, ModelVertex, Prepare, RenderInstruction, Texture, TextureSet};
+use crate::graphics::{Buffer, Capabilities, GlobalContext, ModelVertex, Prepare, RenderInstruction, TextureSet};
 
 const SHADER_BINDLESS: ShaderModuleDescriptor = include_wgsl!("shader/model_bindless.wgsl");
 const DRAWER_NAME: &str = "directional shadow model";

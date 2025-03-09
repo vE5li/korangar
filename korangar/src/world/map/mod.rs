@@ -294,7 +294,7 @@ impl Map {
             let offset = bounding_box.size().y / 2.0;
             let position = bounding_box.center() - Vector3::new(0.0, offset, 0.0);
             let transform = Transform::position(position);
-            let world_matrix = Model::bounding_box_matrix(&bounding_box, &transform);
+            let world_matrix = Model::calculate_bounding_box_matrix(&bounding_box, &transform);
 
             instructions.push(DebugAabbInstruction {
                 world: world_matrix,

@@ -679,10 +679,6 @@ impl TextureSetBuilder {
 
         (index, is_transparent)
     }
-
-    pub fn get_index(&self, path: &str) -> Option<i32> {
-        self.lookup.get(path).copied()
-    }
 }
 
 fn calculate_max_mip_level(width: u32, height: u32) -> u32 {

@@ -33,7 +33,7 @@ impl Object {
     }
 
     pub fn get_bounding_box(&self) -> AABB {
-        self.model.get_bounding_box(&self.transform)
+        self.model.calculate_aabb(&self.transform)
     }
 
     #[cfg(feature = "debug")]

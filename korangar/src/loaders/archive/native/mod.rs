@@ -104,11 +104,11 @@ impl Archive for NativeArchive {
         })
     }
 
-    fn get_files_with_extension(&self, files: &mut Vec<String>, extension: &str) {
+    fn get_files_with_extension(&self, files: &mut Vec<String>, extensions: &[&str]) {
         let found_files = self
             .file_table
             .iter()
-            .filter(|(file_name, row)| file_name.ends_with(extension) && row.flags == 0x01)
+            .filter(|(file_name, row)| row.flags == 0x01 && extensions.iter().any(|extension| file_name.ends_with(extension)))
             .map(|(file_name, _)| file_name.clone());
 
         files.extend(found_files);

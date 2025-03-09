@@ -12,9 +12,19 @@ const MAX_TEXTURES_PER_SHADER_STAGE: u32 = 1024;
 /// available.
 pub const MAX_TEXTURE_SIZE: u32 = 8192;
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum BindlessSupport {
+    /// Full bindless support.
+    Full,
+    /// Limited bindless support.
+    Limited,
+    /// Bindless is not supported at all.
+    None,
+}
+
 pub struct Capabilities {
     supported_msaa: Vec<Msaa>,
-    bindless: bool,
+    bindless: BindlessSupport,
     multidraw_indirect: bool,
     clamp_to_border: bool,
     texture_compression: bool,
@@ -38,7 +48,7 @@ impl Capabilities {
 
         let mut capabilities = Self {
             supported_msaa,
-            bindless: false,
+            bindless: BindlessSupport::None,
             multidraw_indirect: false,
             clamp_to_border: false,
             texture_compression: false,
@@ -68,17 +78,19 @@ impl Capabilities {
             Self::check_feature(adapter_features, Features::POLYGON_MODE_LINE);
         }
 
-        if adapter_features.contains(
-            Features::PARTIALLY_BOUND_BINDING_ARRAY
-                | Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING
-                | Features::TEXTURE_BINDING_ARRAY,
-        ) && adapter_limits.max_sampled_textures_per_shader_stage >= MAX_TEXTURES_PER_SHADER_STAGE
+        if adapter_features
+            .contains(Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING | Features::TEXTURE_BINDING_ARRAY)
+            && adapter_limits.max_sampled_textures_per_shader_stage >= MAX_TEXTURES_PER_SHADER_STAGE
         {
-            capabilities.bindless = true;
-            capabilities.required_features |= Features::PARTIALLY_BOUND_BINDING_ARRAY
-                | Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING
-                | Features::TEXTURE_BINDING_ARRAY;
+            capabilities.bindless = BindlessSupport::Limited;
+            capabilities.required_features |=
+                Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING | Features::TEXTURE_BINDING_ARRAY;
             capabilities.required_limits.max_sampled_textures_per_shader_stage = MAX_TEXTURES_PER_SHADER_STAGE;
+
+            if adapter_features.contains(Features::PARTIALLY_BOUND_BINDING_ARRAY) {
+                capabilities.bindless = BindlessSupport::Full;
+                capabilities.required_features |= Features::PARTIALLY_BOUND_BINDING_ARRAY;
+            }
         }
 
         if adapter_features.contains(Features::INDIRECT_FIRST_INSTANCE | Features::MULTI_DRAW_INDIRECT) {
@@ -102,7 +114,15 @@ impl Capabilities {
             capabilities.required_features |= Features::POLYGON_MODE_LINE;
         }
 
+        if capabilities.bindless == BindlessSupport::None {
+            panic!("GPU supports not form of bindless");
+        }
+
         capabilities
+    }
+
+    pub fn get_max_textures_per_shader_stage(&self) -> u32 {
+        MAX_TEXTURES_PER_SHADER_STAGE
     }
 
     pub fn get_supported_msaa(&self) -> &[Msaa] {
@@ -134,9 +154,8 @@ impl Capabilities {
         self.multidraw_indirect
     }
 
-    /// Returns `true` if the backend supports all features and limits to
-    /// support bindless fully.
-    pub fn supports_bindless(&self) -> bool {
+    /// Returns the supported bindless level.
+    pub fn bindless_support(&self) -> BindlessSupport {
         self.bindless
     }
 

@@ -16,7 +16,7 @@ use crate::graphics::passes::{
 };
 use crate::graphics::{Buffer, Capabilities, GlobalContext, ModelVertex, Prepare, RenderInstruction, Texture};
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/model.wgsl");
+const SHADER_BINDLESS: ShaderModuleDescriptor = include_wgsl!("shader/model_bindless.wgsl");
 const DRAWER_NAME: &str = "directional shadow model";
 const INITIAL_INSTRUCTION_SIZE: usize = 256;
 
@@ -50,7 +50,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
         _global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {
-        let shader_module = device.create_shader_module(SHADER);
+        let shader_module = device.create_shader_module(SHADER_BINDLESS);
 
         let instance_data_buffer = Buffer::with_capacity(
             device,
@@ -73,7 +73,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
             attributes: &[VertexAttribute {
                 format: VertexFormat::Uint32,
                 offset: 0,
-                shader_location: 5,
+                shader_location: 6,
             }],
         };
 
@@ -166,7 +166,8 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
                 continue;
             }
 
-            pass.set_bind_group(3, batch.texture.get_bind_group(), &[]);
+            // TODO: NHA support non-bindless
+            pass.set_bind_group(3, batch.texture_set.get_bind_group().unwrap(), &[]);
             pass.set_vertex_buffer(0, batch.vertex_buffer.slice(..));
             pass.set_vertex_buffer(1, self.instance_index_vertex_buffer.slice(..));
 

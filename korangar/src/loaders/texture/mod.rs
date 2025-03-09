@@ -3,17 +3,14 @@ use std::num::{NonZeroU32, NonZeroUsize};
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
-use blake3::{Hash, Hasher};
 use block_compression::{BC7Settings, CompressionVariant, GpuBlockCompressor};
 use hashbrown::HashMap;
-use image::codecs::tga::TgaEncoder;
 use image::{GrayImage, ImageBuffer, ImageFormat, ImageReader, Rgba, RgbaImage};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, Timer, print_debug};
 use korangar_util::FileLoader;
 use korangar_util::color::contains_transparent_pixel;
 use korangar_util::container::SimpleCache;
-use korangar_util::texture_atlas::{AllocationId, AtlasAllocation, OfflineTextureAtlas};
 use wgpu::{
     Buffer, BufferDescriptor, BufferUsages, CommandEncoderDescriptor, ComputePassDescriptor, Device, Extent3d, Maintain, MaintainResult,
     MapMode, Queue, TexelCopyBufferLayout, TextureAspect, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
@@ -21,9 +18,9 @@ use wgpu::{
 };
 
 use super::error::LoadError;
-use super::{CachedTextureAtlas, FALLBACK_BMP_FILE, FALLBACK_JPEG_FILE, FALLBACK_PNG_FILE, FALLBACK_TGA_FILE, MIP_LEVELS};
+use super::{FALLBACK_BMP_FILE, FALLBACK_JPEG_FILE, FALLBACK_PNG_FILE, FALLBACK_TGA_FILE};
 use crate::SHUTDOWN_SIGNAL;
-use crate::graphics::{Lanczos3Drawer, MipMapRenderPassContext, Texture};
+use crate::graphics::{BindlessSupport, Capabilities, Lanczos3Drawer, MipMapRenderPassContext, Texture, TextureSet};
 use crate::loaders::GameFileLoader;
 
 const MAX_CACHE_COUNT: u32 = 512;
@@ -44,10 +41,12 @@ pub struct TextureLoader {
     lanczos3_drawer: Lanczos3Drawer,
     block_compressor: Mutex<GpuBlockCompressor>,
     cache: Mutex<SimpleCache<(String, ImageType), Arc<Texture>>>,
+    bindless_support: BindlessSupport,
+    max_textures_per_shader_stage: u32,
 }
 
 impl TextureLoader {
-    pub fn new(device: Arc<Device>, queue: Arc<Queue>, game_file_loader: Arc<GameFileLoader>) -> Self {
+    pub fn new(device: Arc<Device>, queue: Arc<Queue>, capabilities: &Capabilities, game_file_loader: Arc<GameFileLoader>) -> Self {
         let lanczos3_drawer = Lanczos3Drawer::new(&device);
         let block_compressor = Mutex::new(GpuBlockCompressor::new(device.clone(), queue.clone()));
 
@@ -62,6 +61,8 @@ impl TextureLoader {
                 NonZeroU32::new(MAX_CACHE_COUNT).unwrap(),
                 NonZeroUsize::new(MAX_CACHE_SIZE).unwrap(),
             )),
+            bindless_support: capabilities.bindless_support(),
+            max_textures_per_shader_stage: capabilities.get_max_textures_per_shader_stage(),
         }
     }
 
@@ -137,7 +138,7 @@ impl TextureLoader {
     pub(crate) fn create_uncompressed_with_mipmaps(
         &self,
         name: &str,
-        mips_level: u32,
+        mip_level_count: u32,
         transparent: bool,
         image: RgbaImage,
     ) -> Arc<Texture> {
@@ -151,7 +152,7 @@ impl TextureLoader {
                     height: image.height(),
                     depth_or_array_layers: 1,
                 },
-                mip_level_count: MIP_LEVELS,
+                mip_level_count,
                 sample_count: 1,
                 dimension: TextureDimension::D2,
                 format: TextureFormat::Rgba8UnormSrgb,
@@ -162,10 +163,10 @@ impl TextureLoader {
             transparent,
         );
 
-        if mips_level > 1 {
-            let mut mip_views = Vec::with_capacity(mips_level as usize);
+        if mip_level_count > 1 {
+            let mut mip_views = Vec::with_capacity(mip_level_count as usize);
 
-            for level in 0..mips_level {
+            for level in 0..mip_level_count {
                 let view = texture.get_texture().create_view(&TextureViewDescriptor {
                     label: Some(&format!("mip map level {level}")),
                     format: None,
@@ -184,7 +185,7 @@ impl TextureLoader {
                 label: Some("TextureLoader"),
             });
 
-            for index in 0..(mips_level - 1) as usize {
+            for index in 0..(mip_level_count - 1) as usize {
                 let mut pass =
                     self.mip_map_render_context
                         .create_pass(&self.device, &mut encoder, &mip_views[index], &mip_views[index + 1]);
@@ -618,193 +619,75 @@ fn premultiply_alpha(image_buffer: RgbaImage) -> ImageBuffer<Rgba<u8>, Vec<u8>> 
     RgbaImage::from_raw(width, height, bytes).unwrap()
 }
 
-#[derive(Copy, Clone)]
-pub struct TextureAtlasEntry {
-    pub allocation_id: AllocationId,
-    pub transparent: bool,
-}
-
-pub trait TextureAtlas {
-    /// Registers the given texture by its path. Will return an allocation ID
-    /// which can later be used to get the actual allocation and flag that shows
-    /// if a texture contains transparent pixels.
-    fn register(&mut self, path: &str) -> TextureAtlasEntry;
-
-    fn build_atlas(&mut self);
-
-    fn get_allocation(&self, allocation_id: AllocationId) -> Option<AtlasAllocation>;
-    fn create_texture(&mut self, texture_loader: &TextureLoader) -> Arc<Texture>;
-}
-
-pub struct UncompressedTextureAtlas {
+pub struct TextureSetBuilder {
     texture_loader: Arc<TextureLoader>,
-    offline_atlas: OfflineTextureAtlas,
-    lookup: HashMap<String, TextureAtlasEntry>,
     name: String,
-    create_mip_map: bool,
-    transparent: bool,
-    hasher: Option<Hasher>,
+    textures: Vec<Arc<Texture>>,
+    lookup: HashMap<String, i32>,
 }
 
-impl UncompressedTextureAtlas {
-    pub fn new(
-        texture_loader: Arc<TextureLoader>,
-        name: impl Into<String>,
-        add_padding: bool,
-        create_mip_map: bool,
-        calculate_hash: bool,
-    ) -> Self {
-        let mip_level_count = if create_mip_map { NonZeroU32::new(MIP_LEVELS) } else { None };
-
+impl TextureSetBuilder {
+    pub fn new(texture_loader: Arc<TextureLoader>, name: impl Into<String>) -> Self {
         Self {
-            offline_atlas: OfflineTextureAtlas::new(add_padding, mip_level_count),
             texture_loader,
-            lookup: HashMap::default(),
             name: name.into(),
-            create_mip_map,
-            transparent: false,
-            hasher: if calculate_hash { Some(Hasher::default()) } else { None },
+            textures: Vec::new(),
+            lookup: HashMap::default(),
         }
     }
 
     #[cfg(feature = "debug")]
-    pub fn create_from_group(
-        texture_loader: Arc<TextureLoader>,
-        name: impl Into<String>,
-        add_padding: bool,
-        paths: &[&str],
-    ) -> (Vec<AtlasAllocation>, Arc<Texture>) {
-        let mut factory = Self::new(texture_loader.clone(), name, add_padding, false, false);
+    pub fn build_from_group(texture_loader: Arc<TextureLoader>, name: impl Into<String>, paths: &[&str]) -> TextureSet {
+        let mut factory = Self::new(texture_loader.clone(), name);
 
-        let mut ids: Vec<TextureAtlasEntry> = paths.iter().map(|path| factory.register(path)).collect();
-        factory.offline_atlas.build_atlas();
+        paths.iter().for_each(|path| {
+            let _ = factory.register(path);
+        });
 
-        let mapping = ids
-            .drain(..)
-            .map(|entry| factory.get_allocation(entry.allocation_id).unwrap())
-            .collect();
-
-        let texture = factory.create_texture(&texture_loader);
-
-        (mapping, texture)
+        factory.build()
     }
 
-    pub fn to_cached_texture_atlas(mut self) -> CachedTextureAtlas {
-        let hash = self.hash();
-        self.build_atlas();
-
-        let lookup = self.lookup;
-        let allocations = self.offline_atlas.get_allocations();
-        let rgba_image = self.offline_atlas.get_atlas();
-
-        let mut uncompressed_data = Vec::new();
-        rgba_image
-            .write_with_encoder(TgaEncoder::new(&mut uncompressed_data))
-            .expect("can't encode texture atlas as TGA file");
-
-        let width = rgba_image.width();
-        let height = rgba_image.height();
-        let compressed_data = self.texture_loader.create_compressed_with_mipmaps(MIP_LEVELS, rgba_image);
-
-        CachedTextureAtlas {
-            hash,
-            name: self.name,
-            width,
-            height,
-            mipmaps_count: MIP_LEVELS,
-            transparent: self.transparent,
-            lookup,
-            allocations,
-            compressed_data,
-        }
-    }
-
-    pub fn hash(&self) -> Hash {
-        match self.hasher.as_ref() {
-            None => Hash::from_bytes([0; 32]),
-            Some(hasher) => hasher.finalize(),
-        }
-    }
-}
-
-impl TextureAtlas for UncompressedTextureAtlas {
-    fn register(&mut self, path: &str) -> TextureAtlasEntry {
-        if let Some(cached_entry) = self.lookup.get(path).copied() {
-            return cached_entry;
-        }
-
-        let (data, transparent) = self.texture_loader.load_texture_data(path, false).expect("can't load texture data");
-        self.transparent |= transparent;
-
-        if let Some(hasher) = &mut self.hasher {
-            hasher.update(data.as_raw());
-        }
-
-        let allocation_id = self.offline_atlas.register_image(data);
-
-        let entry = TextureAtlasEntry {
-            allocation_id,
-            transparent,
-        };
-        self.lookup.insert(path.to_string(), entry);
-
-        entry
-    }
-
-    fn build_atlas(&mut self) {
-        self.offline_atlas.build_atlas();
-    }
-
-    fn get_allocation(&self, allocation_id: AllocationId) -> Option<AtlasAllocation> {
-        self.offline_atlas.get_allocation(allocation_id)
-    }
-
-    fn create_texture(&mut self, texture_loader: &TextureLoader) -> Arc<Texture> {
-        self.build_atlas();
-
-        let name = format!("{} texture atlas", self.name);
-
-        let mips_level = match self.create_mip_map {
-            true => MIP_LEVELS,
-            false => 1,
-        };
-
-        texture_loader.create_uncompressed_with_mipmaps(&name, mips_level, self.transparent, self.offline_atlas.get_atlas())
-    }
-}
-
-impl TextureAtlas for CachedTextureAtlas {
-    fn register(&mut self, path: &str) -> TextureAtlasEntry {
-        match self.lookup.get(path).copied() {
-            None => {
-                #[cfg(feature = "debug")]
-                print_debug!(
-                    "[{}] Texture not found in cached texture atlas. Please re-sync or delete the cache",
-                    "error".red()
-                );
-                self.lookup.values().copied().take(1).next().expect("lookup is empty")
-            }
-            Some(path) => path,
-        }
-    }
-
-    fn build_atlas(&mut self) {
-        /* Nothing to do */
-    }
-
-    fn get_allocation(&self, allocation_id: AllocationId) -> Option<AtlasAllocation> {
-        self.allocations.get(allocation_id).copied()
-    }
-
-    fn create_texture(&mut self, texture_loader: &TextureLoader) -> Arc<Texture> {
-        texture_loader.create_raw(
+    pub fn build(self) -> TextureSet {
+        TextureSet::new(
+            &self.texture_loader.device,
+            self.texture_loader.bindless_support,
+            self.texture_loader.max_textures_per_shader_stage,
             &self.name,
-            self.width,
-            self.height,
-            self.mipmaps_count,
-            TextureFormat::Bc7RgbaUnormSrgb,
-            self.transparent,
-            &self.compressed_data,
+            self.textures,
         )
+    }
+
+    #[must_use]
+    pub fn register(&mut self, path: &str) -> (i32, bool) {
+        if let Some(index) = self.lookup.get(path).copied() {
+            let is_transparent = self.textures[index as usize].is_transparent();
+            return (index, is_transparent);
+        }
+
+        // TODO: NHA Support compressed textures with pre-computed mip maps.
+        // TODO: Support proper caching in both cases.
+        let (texture_data, transparent) = self.texture_loader.load_texture_data(path, false).expect("can't load texture data");
+        let texture = self.texture_loader.create_uncompressed_with_mipmaps(
+            path,
+            Self::calculate_max_mip_level(texture_data.height(), texture_data.width()),
+            transparent,
+            texture_data,
+        );
+        let index = i32::try_from(self.textures.len()).expect("texture set is full");
+        let is_transparent = texture.is_transparent();
+
+        self.textures.push(texture);
+        self.lookup.insert(path.to_string(), index);
+
+        (index, is_transparent)
+    }
+
+    pub fn get_index(&self, path: &str) -> Option<i32> {
+        self.lookup.get(path).copied()
+    }
+
+    fn calculate_max_mip_level(width: u32, height: u32) -> u32 {
+        let max_dimension = width.max(height);
+        (max_dimension as f64).log2().floor() as u32 + 1
     }
 }

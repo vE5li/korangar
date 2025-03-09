@@ -28,20 +28,18 @@ impl NativeModelVertex {
         }
     }
 
-    fn to_model_vertex(self, texture_mapping: &[i32]) -> ModelVertex {
-        let texture_index = texture_mapping[self.texture_index as usize];
-
+    fn to_model_vertex(self) -> ModelVertex {
         ModelVertex::new(
             self.position,
             self.normal,
             self.texture_coordinates,
             self.color,
-            texture_index,
+            self.texture_index,
             self.wind_affinity,
         )
     }
 
-    pub fn to_vertices(mut native_vertices: Vec<NativeModelVertex>, texture_mapping: &[i32]) -> Vec<ModelVertex> {
+    pub fn to_vertices(mut native_vertices: Vec<NativeModelVertex>) -> Vec<ModelVertex> {
         let mut vertices = Vec::new();
         let mut drain_iterator = native_vertices.drain(..);
 
@@ -53,9 +51,9 @@ impl NativeModelVertex {
             second_partial.normal = second_partial.normal.normalize();
             third_partial.normal = third_partial.normal.normalize();
 
-            vertices.push(first_partial.to_model_vertex(texture_mapping));
-            vertices.push(second_partial.to_model_vertex(texture_mapping));
-            vertices.push(third_partial.to_model_vertex(texture_mapping));
+            vertices.push(first_partial.to_model_vertex());
+            vertices.push(second_partial.to_model_vertex());
+            vertices.push(third_partial.to_model_vertex());
         }
 
         vertices

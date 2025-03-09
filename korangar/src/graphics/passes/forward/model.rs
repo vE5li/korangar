@@ -18,7 +18,7 @@ use crate::graphics::passes::{
 };
 use crate::graphics::{Buffer, Capabilities, GlobalContext, ModelBatch, ModelVertex, Msaa, Prepare, RenderInstruction, Texture};
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/model.wgsl");
+const SHADER_BINDLESS: ShaderModuleDescriptor = include_wgsl!("shader/model_bindless.wgsl");
 #[cfg(feature = "debug")]
 const SHADER_WIREFRAME: ShaderModuleDescriptor = include_wgsl!("shader/model_wireframe.wgsl");
 const DRAWER_NAME: &str = "forward model";
@@ -76,7 +76,8 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
         global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {
-        let shader_module = device.create_shader_module(SHADER);
+        // TODO: NHA Support non-bindless
+        let shader_module = device.create_shader_module(SHADER_BINDLESS);
         #[cfg(feature = "debug")]
         let shader_module_wireframe = device.create_shader_module(SHADER_WIREFRAME);
 
@@ -242,7 +243,8 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
             multi_draw_indirect_support: bool,
         ) {
             for batch in batches {
-                pass.set_bind_group(3, batch.texture.get_bind_group(), &[]);
+                // TODO: NHA support non-bindless
+                pass.set_bind_group(3, batch.texture_set.get_bind_group().unwrap(), &[]);
                 pass.set_vertex_buffer(0, batch.vertex_buffer.slice(..));
                 pass.set_vertex_buffer(1, instance_index_vertex_buffer.slice(..));
 
@@ -361,24 +363,27 @@ impl Prepare for ForwardModelDrawer {
                 let opaque_count = relative_transparent_start;
                 let transparent_count = end - absolute_transparent_start;
 
+                // TODO: NHA support non-bindless
                 self.opaque_batches.push(ModelBatch {
                     offset: batch.offset,
                     count: opaque_count,
-                    texture: batch.texture.clone(),
+                    texture_set: batch.texture_set.clone(),
                     vertex_buffer: batch.vertex_buffer.clone(),
                 });
 
+                // TODO: NHA support non-bindless
                 self.transparent_batches.push(ModelBatch {
                     offset: absolute_transparent_start,
                     count: transparent_count,
-                    texture: batch.texture.clone(),
+                    texture_set: batch.texture_set.clone(),
                     vertex_buffer: batch.vertex_buffer.clone(),
                 });
             } else {
+                // TODO: NHA support non-bindless
                 self.opaque_batches.push(ModelBatch {
                     offset: batch.offset,
                     count: batch.count,
-                    texture: batch.texture.clone(),
+                    texture_set: batch.texture_set.clone(),
                     vertex_buffer: batch.vertex_buffer.clone(),
                 });
             }

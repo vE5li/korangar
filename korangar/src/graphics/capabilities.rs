@@ -121,6 +121,10 @@ impl Capabilities {
         capabilities
     }
 
+    pub fn get_max_textures_per_shader_stage(&self) -> u32 {
+        MAX_TEXTURES_PER_SHADER_STAGE
+    }
+
     pub fn get_supported_msaa(&self) -> &[Msaa] {
         self.supported_msaa.as_ref()
     }
@@ -151,7 +155,7 @@ impl Capabilities {
     }
 
     /// Returns the supported bindless level.
-    pub fn supports_bindless(&self) -> BindlessSupport {
+    pub fn bindless_support(&self) -> BindlessSupport {
         self.bindless
     }
 

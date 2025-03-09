@@ -20,10 +20,11 @@ use ragnarok_formats::map::EffectSource;
 #[cfg(feature = "debug")]
 use ragnarok_formats::map::MapData;
 use ragnarok_formats::map::{LightSource, SoundSource, Tile, TileFlags, WaterSettings};
+use ragnarok_formats::transform::Transform;
 use ragnarok_packets::ClientTick;
 
 pub use self::lighting::Lighting;
-use super::{Camera, Entity, Object, PointLightId, PointLightManager, ResourceSet, ResourceSetBuffer};
+use super::{Camera, Entity, Model, Object, PointLightId, PointLightManager, ResourceSet, ResourceSetBuffer};
 #[cfg(feature = "debug")]
 use super::{LightSourceExt, PointLightSet};
 #[cfg(feature = "debug")]
@@ -32,7 +33,7 @@ use crate::graphics::ModelBatch;
 use crate::graphics::RenderSettings;
 #[cfg(feature = "debug")]
 use crate::graphics::{DebugAabbInstruction, DebugCircleInstruction, DebugRectangleInstruction};
-use crate::graphics::{EntityInstruction, IndicatorInstruction, ModelInstruction, Texture, WaterInstruction};
+use crate::graphics::{EntityInstruction, IndicatorInstruction, ModelInstruction, Texture, TextureSet, WaterInstruction};
 #[cfg(feature = "debug")]
 use crate::interface::application::InterfaceSettings;
 #[cfg(feature = "debug")]
@@ -73,7 +74,7 @@ pub struct Map {
     ground_vertex_offset: usize,
     ground_vertex_count: usize,
     vertex_buffer: Arc<Buffer<ModelVertex>>,
-    texture: Arc<Texture>,
+    texture_set: Arc<TextureSet>,
     water_textures: Option<Vec<Arc<Texture>>>,
     objects: SimpleSlab<ObjectKey, Object>,
     light_sources: SimpleSlab<LightSourceKey, LightSource>,
@@ -113,8 +114,8 @@ impl Map {
         self.background_music_track_name.as_deref()
     }
 
-    pub fn get_texture(&self) -> &Arc<Texture> {
-        &self.texture
+    pub fn get_texture_set(&self) -> &Arc<TextureSet> {
+        &self.texture_set
     }
 
     pub fn get_model_vertex_buffer(&self) -> &Arc<Buffer<ModelVertex>> {
@@ -279,22 +280,32 @@ impl Map {
         frustum_culling: bool,
         object_set: &ResourceSet<ObjectKey>,
     ) {
-        let intersection_set: HashSet<ObjectKey> = object_set.iterate_visible().copied().collect();
-
-        self.objects.iter().for_each(|(object_key, object)| {
-            let bounding_box_matrix = object.get_bounding_box_matrix();
-            let intersects = intersection_set.contains(&object_key);
-
-            let color = match !frustum_culling || intersects {
-                true => Color::rgb_u8(255, 255, 0),
-                false => Color::rgb_u8(255, 0, 255),
-            };
-
-            instructions.push(DebugAabbInstruction {
-                world: bounding_box_matrix,
-                color,
-            });
-        });
+        // TODO: NHA Fix
+        // let intersection_set: HashSet<ObjectKey> =
+        // object_set.iterate_visible().copied().collect();
+        //
+        // self.objects.iter().for_each(|(object_key, object)| {
+        //     let bounding_box_matrix = object.get_bounding_box_matrix();
+        //     let bounding_box =
+        // AABB::from_transformation_matrix(bounding_box_matrix);
+        //     let intersects = intersection_set.contains(&object_key);
+        //
+        //     let color = match !frustum_culling || intersects {
+        //         true => Color::rgb_u8(255, 255, 0),
+        //         false => Color::rgb_u8(255, 0, 255),
+        //     };
+        //
+        //     let offset = bounding_box.size().y / 2.0;
+        //     let position = bounding_box.center() - Vector3::new(0.0, offset,
+        // 0.0);     let transform = Transform::position(position);
+        //     let world_matrix = Model::bounding_box_matrix(&bounding_box,
+        // &transform);
+        //
+        //     instructions.push(DebugAabbInstruction {
+        //         world: world_matrix,
+        //         color,
+        //     });
+        // });
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
@@ -380,7 +391,7 @@ impl Map {
         &self,
         model_instructions: &mut Vec<ModelInstruction>,
         model_batches: &mut Vec<ModelBatch>,
-        tile_texture: &Arc<Texture>,
+        tile_texture_set: &Arc<TextureSet>,
     ) {
         let vertex_count = self.tile_vertex_buffer.count() as usize;
         let offset = model_instructions.len();
@@ -396,7 +407,7 @@ impl Map {
         model_batches.push(ModelBatch {
             offset,
             count: 1,
-            texture: tile_texture.clone(),
+            texture_set: tile_texture_set.clone(),
             vertex_buffer: self.tile_vertex_buffer.clone(),
         });
     }
@@ -408,7 +419,7 @@ impl Map {
         model_instructions: &mut Vec<ModelInstruction>,
         model_batches: &mut Vec<ModelBatch>,
         entities: &[Entity],
-        path_texture: &Arc<Texture>,
+        path_texture_set: &Arc<TextureSet>,
     ) {
         entities.iter().for_each(|entity| {
             if let Some(vertex_buffer) = entity.get_pathing_vertex_buffer() {
@@ -426,7 +437,7 @@ impl Map {
                 model_batches.push(ModelBatch {
                     offset,
                     count: 1,
-                    texture: path_texture.clone(),
+                    texture_set: path_texture_set.clone(),
                     vertex_buffer: vertex_buffer.clone(),
                 });
             }

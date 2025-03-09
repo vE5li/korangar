@@ -14,7 +14,7 @@ use blake3::Hash;
 use korangar_debug::logging::{Colorize, Timer, print_debug};
 use korangar_util::{FileLoader, FileNotFoundError};
 
-pub use self::cache::sync_cache_archive;
+pub use self::cache::{sync_cache_archive, texture_file_dds_name};
 use self::list::GameArchiveList;
 use super::archive::folder::FolderArchive;
 use super::archive::native::{NativeArchive, NativeArchiveBuilder};
@@ -243,4 +243,26 @@ impl GameFileLoader {
 
         self.add_archive(archive, false);
     }
+}
+
+pub fn fix_broken_texture_file_endings(path: &str) -> String {
+    let mut path = path.to_string();
+
+    if path.ends_with(".bm") {
+        path.push('p');
+    }
+
+    if path.ends_with(".jp") {
+        path.push('g');
+    }
+
+    if path.ends_with(".pn") {
+        path.push('g');
+    }
+
+    if path.ends_with(".tg") {
+        path.push('a');
+    }
+
+    path
 }

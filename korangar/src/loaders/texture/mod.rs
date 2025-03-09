@@ -4,6 +4,7 @@ use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
 use block_compression::{BC7Settings, CompressionVariant, GpuBlockCompressor};
+use ddsfile::{AlphaMode, Dds, DxgiFormat};
 use hashbrown::HashMap;
 use image::{GrayImage, ImageBuffer, ImageFormat, ImageReader, Rgba, RgbaImage};
 #[cfg(feature = "debug")]
@@ -18,7 +19,9 @@ use wgpu::{
 };
 
 use super::error::LoadError;
-use super::{FALLBACK_BMP_FILE, FALLBACK_JPEG_FILE, FALLBACK_PNG_FILE, FALLBACK_TGA_FILE};
+use super::{
+    FALLBACK_BMP_FILE, FALLBACK_JPEG_FILE, FALLBACK_PNG_FILE, FALLBACK_TGA_FILE, fix_broken_texture_file_endings, texture_file_dds_name,
+};
 use crate::SHUTDOWN_SIGNAL;
 use crate::graphics::{BindlessSupport, Capabilities, Lanczos3Drawer, MipMapRenderPassContext, Texture, TextureSet};
 use crate::loaders::GameFileLoader;
@@ -404,8 +407,37 @@ impl TextureLoader {
     pub fn load(&self, path: &str, image_type: ImageType) -> Result<Arc<Texture>, LoadError> {
         let texture = match image_type {
             ImageType::Color => {
-                let (texture_data, transparent) = self.load_texture_data(path, false)?;
-                self.create_uncompressed_with_mipmaps(path, transparent, texture_data)
+                let path = fix_broken_texture_file_endings(path);
+                let dds_file_name = texture_file_dds_name(&path);
+
+                match self.game_file_loader.get(&dds_file_name) {
+                    Ok(dds_file_data) => {
+                        // TODO: NHA don't panic
+                        let dds = Dds::read(dds_file_data.as_slice()).expect("can't decode DDS file");
+                        assert_eq!(dds.get_dxgi_format(), Some(DxgiFormat::BC7_UNorm_sRGB));
+                        let height = dds.get_num_mipmap_levels();
+                        let width = dds.get_num_mipmap_levels();
+                        let mip_level_count = dds.get_num_mipmap_levels();
+                        let transparent = dds
+                            .header10
+                            .map(|header10| header10.alpha_mode == AlphaMode::PreMultiplied)
+                            .unwrap_or(false);
+
+                        self.create_raw(
+                            path.as_str(),
+                            width,
+                            height,
+                            mip_level_count,
+                            TextureFormat::Bc7RgbaUnormSrgb,
+                            transparent,
+                            &dds.data,
+                        )
+                    }
+                    Err(_) => {
+                        let (texture_data, transparent) = self.load_texture_data(&path, false)?;
+                        self.create_uncompressed_with_mipmaps(&path, transparent, texture_data)
+                    }
+                }
             }
             ImageType::Sdf => {
                 let texture_data = self.load_grayscale_texture_data(path)?;
@@ -430,8 +462,6 @@ impl TextureLoader {
     pub fn load_texture_data(&self, path: &str, raw: bool) -> Result<(RgbaImage, bool), LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load texture data from {}", path.magenta()));
-
-        let path = Self::fix_broken_file_endings(path);
 
         let image_format = match &path[path.len() - 4..] {
             ".bmp" | ".BMP" => ImageFormat::Bmp,
@@ -507,28 +537,6 @@ impl TextureLoader {
         timer.stop();
 
         Ok((image_buffer, transparent))
-    }
-
-    fn fix_broken_file_endings(path: &str) -> String {
-        let mut path = path.to_string();
-
-        if path.ends_with(".bm") {
-            path.push('p');
-        }
-
-        if path.ends_with(".jp") {
-            path.push('g');
-        }
-
-        if path.ends_with(".pn") {
-            path.push('g');
-        }
-
-        if path.ends_with(".tg") {
-            path.push('a');
-        }
-
-        path
     }
 
     pub fn load_grayscale_texture_data(&self, path: &str) -> Result<GrayImage, LoadError> {
@@ -659,7 +667,6 @@ impl TextureSetBuilder {
             return (index, is_transparent);
         }
 
-        // TODO: NHA Support compressed textures with pre-computed mip maps.
         let texture = self.texture_loader.get_or_load(path, ImageType::Color).expect("can't load texture");
         let index = i32::try_from(self.textures.len()).expect("texture set is full");
         let is_transparent = texture.is_transparent();

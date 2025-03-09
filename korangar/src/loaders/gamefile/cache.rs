@@ -48,7 +48,10 @@ pub fn sync_cache_archive(game_file_loader: &GameFileLoader, texture_loader: Arc
             current_archive.get_files_with_extension(&mut existing_dds_files, &[DDS_FILE_EXTENSION]);
 
             let existing_dds_set: HashSet<String> = existing_dds_files.into_iter().collect();
-            let texture_to_dds: HashSet<String> = texture_files.iter().map(|texture_file| dds_file_name(texture_file)).collect();
+            let texture_to_dds: HashSet<String> = texture_files
+                .iter()
+                .map(|texture_file| texture_file_dds_name(texture_file))
+                .collect();
             let unused_textures = existing_dds_set
                 .iter()
                 .filter(|dds_file| !texture_to_dds.contains(*dds_file) && *dds_file != HASH_FILE_PATH)
@@ -59,7 +62,7 @@ pub fn sync_cache_archive(game_file_loader: &GameFileLoader, texture_loader: Arc
             let mut new_textures = Vec::new();
 
             for texture_file_name in &texture_files {
-                let dds_name = dds_file_name(texture_file_name);
+                let dds_name = texture_file_dds_name(texture_file_name);
 
                 match current_archive.get_file_by_path(&dds_name) {
                     Some(dds_file) if dds_file.len() >= blake3::OUT_LEN => {
@@ -96,7 +99,7 @@ pub fn sync_cache_archive(game_file_loader: &GameFileLoader, texture_loader: Arc
                 .filter_map(|unused_texture| {
                     texture_files
                         .iter()
-                        .find(|texture_file| dds_file_name(texture_file) == *unused_texture)
+                        .find(|texture_file| texture_file_dds_name(texture_file) == *unused_texture)
                 })
                 .collect();
 
@@ -136,7 +139,7 @@ pub fn sync_cache_archive(game_file_loader: &GameFileLoader, texture_loader: Arc
         let current_archive = Box::new(SevenZipArchive::from_path(path));
 
         for texture_file_name in texture_files.iter() {
-            let dds_file_name = dds_file_name(texture_file_name);
+            let dds_file_name = texture_file_dds_name(texture_file_name);
 
             if current_archive.file_exists(&dds_file_name)
                 && !outdated_textures.contains(&texture_file_name)
@@ -158,7 +161,7 @@ pub fn sync_cache_archive(game_file_loader: &GameFileLoader, texture_loader: Arc
         }
 
         if let Some(texture_name) = texture_file_name.strip_prefix(TEXTURE_PREFIX) {
-            let dds_file_name = dds_file_name(texture_file_name);
+            let dds_file_name = texture_file_dds_name(texture_file_name);
 
             match texture_loader.load_texture_data(texture_name, false) {
                 Ok((image, transparent)) if image.height() % 4 == 0 && image.width() % 4 == 0 => {
@@ -230,7 +233,7 @@ fn finish_archive(current_archive_exists: bool, builder: Box<SevenZipArchiveBuil
     }
 }
 
-fn dds_file_name(image_file_name: &str) -> String {
+pub fn texture_file_dds_name(image_file_name: &str) -> String {
     let char_count = image_file_name.chars().count();
     let mut name: String = image_file_name.chars().take(char_count - 4).collect();
     name.push_str(DDS_FILE_EXTENSION);

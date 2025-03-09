@@ -25,7 +25,7 @@ use ragnarok_formats::transform::Transform;
 use ragnarok_packets::ClientTick;
 
 pub use self::lighting::Lighting;
-use super::{Camera, Entity, Model, Object, PointLightId, PointLightManager, ResourceSet, ResourceSetBuffer};
+use super::{Camera, Entity, Object, PointLightId, PointLightManager, ResourceSet, ResourceSetBuffer};
 #[cfg(feature = "debug")]
 use super::{LightSourceExt, PointLightSet};
 #[cfg(feature = "debug")]

@@ -439,28 +439,28 @@ impl TextureLoader {
 
     fn try_load_dds(&self, path: &str) -> Option<Arc<Texture>> {
         let dds_file_name = texture_file_dds_name(path);
+        let full_dds_file_name = format!("data\\texture\\{dds_file_name}");
 
-        let dds_file_data = self.game_file_loader.get(&dds_file_name).ok()?;
+        let dds_file_data = self.game_file_loader.get(&full_dds_file_name).ok()?;
         let Ok(dds) = Dds::read(dds_file_data.as_slice()) else {
             #[cfg(feature = "debug")]
-            print_debug!("Could not decode DDS file: {}", dds_file_name);
+            print_debug!("Could not decode DDS file: {}", full_dds_file_name);
             return None;
         };
 
         if dds.get_dxgi_format() != Some(DxgiFormat::BC7_UNorm_sRGB) {
             #[cfg(feature = "debug")]
-            print_debug!("DDS file is not a BC7 texture: {}", dds_file_name);
+            print_debug!("DDS file is not a BC7 texture: {}", full_dds_file_name);
             return None;
         }
 
-        let height = dds.get_num_mipmap_levels();
-        let width = dds.get_num_mipmap_levels();
+        let width = dds.get_width();
+        let height = dds.get_height();
         let mip_level_count = dds.get_num_mipmap_levels();
-
         let transparent = dds.header10.map(|header10| header10.alpha_mode == AlphaMode::PreMultiplied)?;
 
         Some(self.create_raw(
-            path,
+            dds_file_name.as_str(),
             width,
             height,
             mip_level_count,

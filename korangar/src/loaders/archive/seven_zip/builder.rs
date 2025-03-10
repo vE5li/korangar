@@ -8,7 +8,6 @@ use std::fs::File;
 use std::io::BufWriter;
 use std::path::Path;
 
-use sevenz_rust2::lzma::LZMA2Options;
 use sevenz_rust2::{SevenZArchiveEntry, SevenZMethod, SevenZMethodConfiguration, SevenZWriter};
 
 use super::SevenZipArchive;
@@ -31,7 +30,7 @@ impl SevenZipArchiveBuilder {
     }
 
     pub fn copy_file_from_archive(&mut self, archive: &SevenZipArchive, path: &str) {
-        let Some(compression) = archive.file_is_compressed(path) else {
+        let Some(mut compression) = archive.file_is_compressed(path) else {
             return;
         };
 
@@ -47,6 +46,12 @@ impl SevenZipArchiveBuilder {
         get_parent_directories(&path_with_slash)
             .iter()
             .for_each(|directory| self.add_directory(directory));
+
+        // Custom overrides if we want to use different compressions on re-sync in
+        // future versions.
+        if path.ends_with(".dds") {
+            compression = Compression::Off;
+        }
 
         self.add_file(path, data, compression);
     }
@@ -79,7 +84,7 @@ impl Writable for SevenZipArchiveBuilder {
 
             match compression {
                 Compression::Off => writer.set_content_methods(vec![SevenZMethodConfiguration::new(SevenZMethod::COPY)]),
-                Compression::Default => writer.set_content_methods(vec![LZMA2Options::with_preset(3).into()]),
+                Compression::Default => writer.set_content_methods(vec![SevenZMethodConfiguration::new(SevenZMethod::LZ4)]),
             };
 
             writer

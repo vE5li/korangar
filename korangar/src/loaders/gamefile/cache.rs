@@ -217,7 +217,9 @@ pub fn sync_cache_archive(game_file_loader: &GameFileLoader, texture_loader: Arc
                     dds.write(&mut dds_file_data).expect("can't write DDS file");
                     dds_file_data.write_all(hash.as_bytes()).expect("can't append hash");
 
-                    builder.add_file(dds_file_name.as_str(), dds_file_data, Compression::Default);
+                    // `Compression::Off` currently gives the best load times with not too much
+                    // higher file sizes.
+                    builder.add_file(dds_file_name.as_str(), dds_file_data, Compression::Off);
 
                     if outdated_textures.contains(texture_file_name) {
                         updated_count += 1;

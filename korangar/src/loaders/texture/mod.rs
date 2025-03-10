@@ -26,7 +26,7 @@ use crate::graphics::{BindlessSupport, Capabilities, Lanczos3Drawer, MipMapRende
 use crate::loaders::GameFileLoader;
 
 const MAX_CACHE_COUNT: u32 = 4096;
-const MAX_CACHE_SIZE: usize = 1024 * 1024 * 1024;
+const MAX_CACHE_SIZE: usize = 512 * 1024 * 1024;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum ImageType {

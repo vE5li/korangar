@@ -61,14 +61,9 @@ impl Archive for SevenZipArchive {
                 .iter()
                 .any(|method| method.id() == sevenz_rust2::SevenZMethod::ID_COPY)
             {
-                Compression::No
-            } else if compression_methods
-                .iter()
-                .any(|method| method.id() == sevenz_rust2::SevenZMethod::ID_ZSTD)
-            {
-                Compression::Fast
+                Compression::Off
             } else {
-                Compression::Slow
+                Compression::Default
             };
 
             file_index.insert(name_with_backslash, FileIndexEntry {

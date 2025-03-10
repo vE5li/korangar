@@ -132,13 +132,9 @@ impl Writable for FolderArchive {
         }
 
         let (path, data) = match compression {
-            Compression::No => (full_path, file_data),
-            Compression::Slow => {
-                let mut encoder = GzEncoder::new(file_data.as_slice(), flate2::Compression::best());
-                Self::compress_gz(full_path, &mut encoder)
-            }
-            Compression::Fast => {
-                let mut encoder = GzEncoder::new(file_data.as_slice(), flate2::Compression::fast());
+            Compression::Off => (full_path, file_data),
+            Compression::Default => {
+                let mut encoder = GzEncoder::new(file_data.as_slice(), flate2::Compression::new(3));
                 Self::compress_gz(full_path, &mut encoder)
             }
         };

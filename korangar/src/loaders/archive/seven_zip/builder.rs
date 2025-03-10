@@ -78,9 +78,8 @@ impl Writable for SevenZipArchiveBuilder {
             entry.has_last_modified_date = has_date;
 
             match compression {
-                Compression::No => writer.set_content_methods(vec![SevenZMethodConfiguration::new(SevenZMethod::COPY)]),
-                Compression::Slow => writer.set_content_methods(vec![LZMA2Options::with_preset(9).into()]),
-                Compression::Fast => writer.set_content_methods(vec![LZMA2Options::with_preset(3).into()]),
+                Compression::Off => writer.set_content_methods(vec![SevenZMethodConfiguration::new(SevenZMethod::COPY)]),
+                Compression::Default => writer.set_content_methods(vec![LZMA2Options::with_preset(3).into()]),
             };
 
             writer

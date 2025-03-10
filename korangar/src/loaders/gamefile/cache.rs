@@ -149,7 +149,7 @@ pub fn sync_cache_archive(game_file_loader: &GameFileLoader, texture_loader: Arc
     };
 
     let mut builder = Box::new(SevenZipArchiveBuilder::from_path(Path::new(archive_path)));
-    builder.add_file(HASH_FILE_PATH, game_file_hash.to_hex().as_bytes().to_vec(), Compression::No);
+    builder.add_file(HASH_FILE_PATH, game_file_hash.to_hex().as_bytes().to_vec(), Compression::Off);
 
     if current_archive_exists {
         let current_archive = Box::new(SevenZipArchive::from_path(path));
@@ -217,7 +217,7 @@ pub fn sync_cache_archive(game_file_loader: &GameFileLoader, texture_loader: Arc
                     dds.write(&mut dds_file_data).expect("can't write DDS file");
                     dds_file_data.write_all(hash.as_bytes()).expect("can't append hash");
 
-                    builder.add_file(dds_file_name.as_str(), dds_file_data, Compression::Fast);
+                    builder.add_file(dds_file_name.as_str(), dds_file_data, Compression::Default);
 
                     if outdated_textures.contains(texture_file_name) {
                         updated_count += 1;

@@ -115,15 +115,9 @@ fn add_asset_to_file_table(
     let uncompressed_size = data.len() as u32;
 
     let data = match compression {
-        Compression::No => data,
-        Compression::Slow => {
-            let mut encoder = ZlibEncoder::new(data.as_slice(), flate2::Compression::best());
-            let mut compressed = Vec::default();
-            encoder.read_to_end(&mut compressed).expect("can't compress asset data");
-            compressed
-        }
-        Compression::Fast => {
-            let mut encoder = ZlibEncoder::new(data.as_slice(), flate2::Compression::fast());
+        Compression::Off => data,
+        Compression::Default => {
+            let mut encoder = ZlibEncoder::new(data.as_slice(), flate2::Compression::new(3));
             let mut compressed = Vec::default();
             encoder.read_to_end(&mut compressed).expect("can't compress asset data");
             compressed

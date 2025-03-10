@@ -29,11 +29,9 @@ pub enum ArchiveType {
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Compression {
     /// No compression.
-    No,
-    /// Slow compression allowed.
-    Slow,
-    /// Fast compression requested.
-    Fast,
+    Off,
+    /// Default compression level.
+    Default,
 }
 
 /// A common trait to all writable archives.

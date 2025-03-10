@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use cgmath::Matrix4;
 use derive_new::new;
 use korangar_interface::elements::PrototypeElement;
 use korangar_interface::windows::PrototypeWindow;
+use korangar_util::collision::AABB;
 use ragnarok_formats::transform::Transform;
 use ragnarok_packets::ClientTick;
 
@@ -32,8 +32,8 @@ impl Object {
         self.model.render_geometry(instructions, &self.transform, client_tick, camera);
     }
 
-    pub fn get_bounding_box_matrix(&self) -> Matrix4<f32> {
-        self.model.get_bounding_box_matrix(&self.transform)
+    pub fn calculate_object_aabb(&self) -> AABB {
+        self.model.calculate_aabb(&self.transform)
     }
 
     #[cfg(feature = "debug")]

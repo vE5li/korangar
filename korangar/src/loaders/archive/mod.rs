@@ -13,7 +13,7 @@ pub trait Archive: Send + Sync {
     fn get_file_by_path(&self, asset_path: &str) -> Option<Vec<u8>>;
 
     /// Get a list of all files with a given extension.
-    fn get_files_with_extension(&self, files: &mut Vec<String>, extension: &str);
+    fn get_files_with_extension(&self, files: &mut Vec<String>, extensions: &[&str]);
 
     /// Hashes the archive with the given hasher.
     fn hash(&self, hasher: &mut blake3::Hasher);
@@ -29,11 +29,9 @@ pub enum ArchiveType {
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Compression {
     /// No compression.
-    No,
-    /// Slow compression allowed.
-    Slow,
-    /// Fast compression requested.
-    Fast,
+    Off,
+    /// Default compression level.
+    Default,
 }
 
 /// A common trait to all writable archives.

@@ -9,7 +9,7 @@ use super::color::Color;
 #[cfg(feature = "debug")]
 use super::settings::RenderSettings;
 use super::vertices::ModelVertex;
-use super::{Buffer, ShadowQuality, Texture, TileVertex};
+use super::{Buffer, ShadowQuality, Texture, TextureSet, TileVertex};
 use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
@@ -162,7 +162,7 @@ pub struct PointShadowCasterInstruction {
     pub position: Point3<f32>,
     pub color: Color,
     pub range: f32,
-    pub model_texture: Arc<Texture>,
+    pub model_texture_set: Arc<TextureSet>,
     pub model_vertex_buffer: Arc<Buffer<ModelVertex>>,
     /// Start point inside the point_shadow_entities.
     pub entity_offset: [usize; 6],
@@ -270,7 +270,7 @@ pub struct IndicatorInstruction {
 pub struct ModelBatch {
     pub offset: usize,
     pub count: usize,
-    pub texture: Arc<Texture>,
+    pub texture_set: Arc<TextureSet>,
     pub vertex_buffer: Arc<Buffer<ModelVertex>>,
 }
 

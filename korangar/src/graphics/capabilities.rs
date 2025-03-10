@@ -64,6 +64,11 @@ impl Capabilities {
 
         #[cfg(feature = "debug")]
         {
+            Self::check_limit(
+                "max_sampled_textures_per_shader_stage",
+                adapter_limits.max_sampled_textures_per_shader_stage,
+                MAX_TEXTURES_PER_SHADER_STAGE,
+            );
             Self::check_feature(adapter_features, Features::ADDRESS_MODE_CLAMP_TO_BORDER);
             Self::check_feature(adapter_features, Features::ADDRESS_MODE_CLAMP_TO_ZERO);
             Self::check_feature(adapter_features, Features::INDIRECT_FIRST_INSTANCE);
@@ -112,10 +117,6 @@ impl Capabilities {
         if adapter_features.contains(Features::POLYGON_MODE_LINE) {
             capabilities.polygon_mode_line = true;
             capabilities.required_features |= Features::POLYGON_MODE_LINE;
-        }
-
-        if capabilities.bindless == BindlessSupport::None {
-            panic!("GPU supports not form of bindless");
         }
 
         capabilities
@@ -184,6 +185,15 @@ impl Capabilities {
             false => "unsupported".yellow(),
         };
         print_debug!("{:?}: {}", feature, supported);
+    }
+
+    #[cfg(feature = "debug")]
+    fn check_limit(name: &str, actual: u32, required: u32) {
+        let status = match actual < required {
+            true => format!("{} ({} < {})", "warn".yellow(), actual, required),
+            false => "ok".green().to_string(),
+        };
+        print_debug!("Limit({}): {}", name, status);
     }
 }
 

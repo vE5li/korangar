@@ -1,10 +1,9 @@
-use std::io::Cursor;
+use std::io::{Cursor, Read};
 use std::num::{NonZeroU32, NonZeroUsize};
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
 use block_compression::{BC7Settings, CompressionVariant, GpuBlockCompressor};
-use ddsfile::{AlphaMode, Dds, DxgiFormat};
 use hashbrown::HashMap;
 use image::{GrayImage, ImageBuffer, ImageFormat, ImageReader, Rgba, RgbaImage};
 #[cfg(feature = "debug")]
@@ -270,24 +269,28 @@ impl TextureLoader {
             mip_views.push(view);
         }
 
-        let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor {
-            label: Some("compression encoder"),
+        let mut resize_encoder = self.device.create_command_encoder(&CommandEncoderDescriptor {
+            label: Some("resize encoder"),
         });
 
         for index in 0..(mip_level_count - 1) as usize {
-            let mut pass = self
-                .mip_map_render_context
-                .create_pass(&self.device, &mut encoder, &mip_views[index], &mip_views[index + 1]);
+            let mut pass =
+                self.mip_map_render_context
+                    .create_pass(&self.device, &mut resize_encoder, &mip_views[index], &mip_views[index + 1]);
             self.lanczos3_drawer.draw(&mut pass);
         }
 
-        self.queue.submit([encoder.finish()]);
+        self.queue.submit([resize_encoder.finish()]);
 
         let output_buffer = self.device.create_buffer(&BufferDescriptor {
             label: Some("compressed output buffer"),
             size: total_size as u64,
             usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC,
             mapped_at_creation: false,
+        });
+
+        let mut compression_encoder = self.device.create_command_encoder(&CommandEncoderDescriptor {
+            label: Some("compression encoder"),
         });
 
         for level in 0..mip_level_count {
@@ -330,14 +333,7 @@ impl TextureLoader {
                     Some(blocks_offset as u32),
                 );
 
-                // We could be more efficient by queueing all chunks in one encoder and one
-                // queue submit. But doing this in smaller chunks seems to be more stable and
-                // not tax the system as much.
-                let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor {
-                    label: Some("compression encoder"),
-                });
-
-                let mut pass = encoder.begin_compute_pass(&ComputePassDescriptor {
+                let mut pass = compression_encoder.begin_compute_pass(&ComputePassDescriptor {
                     label: Some("texture compression pass"),
                     timestamp_writes: None,
                 });
@@ -346,10 +342,10 @@ impl TextureLoader {
 
                 drop(pass);
                 drop(block_compressor);
-
-                self.queue.submit([encoder.finish()]);
             }
         }
+
+        self.queue.submit([compression_encoder.finish()]);
 
         self.download_blocks_data(output_buffer, compressed_data);
     }
@@ -364,13 +360,13 @@ impl TextureLoader {
             mapped_at_creation: false,
         });
 
-        let mut copy_encoder = self.device.create_command_encoder(&CommandEncoderDescriptor {
-            label: Some("copy encoder"),
+        let mut download_encoder = self.device.create_command_encoder(&CommandEncoderDescriptor {
+            label: Some("download encoder"),
         });
 
-        copy_encoder.copy_buffer_to_buffer(&block_buffer, 0, &staging_buffer, 0, size);
+        download_encoder.copy_buffer_to_buffer(&block_buffer, 0, &staging_buffer, 0, size);
 
-        self.queue.submit([copy_encoder.finish()]);
+        self.queue.submit([download_encoder.finish()]);
 
         {
             let buffer_slice = staging_buffer.slice(..);
@@ -409,8 +405,8 @@ impl TextureLoader {
             ImageType::Color => {
                 let path = fix_broken_texture_file_endings(path);
 
-                match self.try_load_dds(&path) {
-                    Some(texture) => texture,
+                match self.try_load_compressed(&path) {
+                    Some(compressed_texture) => compressed_texture,
                     None => {
                         let (texture_data, transparent) = self.load_texture_data(&path, false)?;
                         self.create_uncompressed_with_mipmaps(&path, transparent, texture_data)
@@ -437,36 +433,25 @@ impl TextureLoader {
         Ok(texture)
     }
 
-    fn try_load_dds(&self, path: &str) -> Option<Arc<Texture>> {
+    fn try_load_compressed(&self, path: &str) -> Option<Arc<Texture>> {
         let dds_file_name = texture_file_dds_name(path);
-        let full_dds_file_name = format!("data\\texture\\{dds_file_name}");
+        let dds_file_path = format!("data\\texture\\{dds_file_name}");
 
-        let dds_file_data = self.game_file_loader.get(&full_dds_file_name).ok()?;
-        let Ok(dds) = Dds::read(dds_file_data.as_slice()) else {
+        let dds_file_data = self.game_file_loader.get(&dds_file_path).ok()?;
+        let Some(dds) = Dds::read_bc7(dds_file_data.as_slice()) else {
             #[cfg(feature = "debug")]
-            print_debug!("Could not decode DDS file: {}", full_dds_file_name);
+            print_debug!("Could not decode DDS file: {}", dds_file_path);
             return None;
         };
 
-        if dds.get_dxgi_format() != Some(DxgiFormat::BC7_UNorm_sRGB) {
-            #[cfg(feature = "debug")]
-            print_debug!("DDS file is not a BC7 texture: {}", full_dds_file_name);
-            return None;
-        }
-
-        let width = dds.get_width();
-        let height = dds.get_height();
-        let mip_level_count = dds.get_num_mipmap_levels();
-        let transparent = dds.header10.map(|header10| header10.alpha_mode == AlphaMode::PreMultiplied)?;
-
         Some(self.create_raw(
             dds_file_name.as_str(),
-            width,
-            height,
-            mip_level_count,
+            dds.width,
+            dds.height,
+            dds.num_mipmap_levels,
             TextureFormat::Bc7RgbaUnormSrgb,
-            transparent,
-            &dds.data,
+            dds.alpha_mode == ddsfile::AlphaMode::PreMultiplied,
+            dds.data,
         ))
     }
 
@@ -618,6 +603,79 @@ impl TextureLoader {
         };
 
         Ok(texture)
+    }
+}
+
+struct Dds<'a> {
+    width: u32,
+    height: u32,
+    num_mipmap_levels: u32,
+    alpha_mode: ddsfile::AlphaMode,
+    data: &'a [u8],
+}
+
+impl<'a> Dds<'a> {
+    /// Custom DDS reader, since the upstream [`ddsfile::Dds`] does a needless
+    /// copy of the data.
+    fn read_bc7(mut data: &'a [u8]) -> Option<Self> {
+        const DDS_MAGIC: u32 = 0x20534444; // b"DDS " in little endian
+
+        let mut magic_bytes = [0; 4];
+        data.read_exact(&mut magic_bytes[..]).ok()?;
+        let magic = u32::from_le_bytes(magic_bytes);
+
+        if magic != DDS_MAGIC {
+            #[cfg(feature = "debug")]
+            print_debug!("DDS file has invalid magic bytes: {:?}", magic_bytes);
+            return None;
+        }
+
+        let Ok(header) = ddsfile::Header::read(data) else {
+            #[cfg(feature = "debug")]
+            print_debug!("DDS file has invalid header");
+            return None;
+        };
+
+        let header10 = if header.spf.fourcc == Some(ddsfile::FourCC(<ddsfile::FourCC>::DX10)) {
+            ddsfile::Header10::read(data).ok()?
+        } else {
+            #[cfg(feature = "debug")]
+            print_debug!("DDS file has no valid header10");
+            return None;
+        };
+
+        if header10.dxgi_format != ddsfile::DxgiFormat::BC7_UNorm_sRGB {
+            #[cfg(feature = "debug")]
+            print_debug!("DDS file is not a BC7 texture");
+            return None;
+        }
+
+        let num_mipmap_levels = header.mip_map_count.unwrap_or(1);
+        let mut total_size = 0;
+
+        // BC7 format uses 4x4 pixel blocks with 16 bytes per block
+        for level in 0..num_mipmap_levels {
+            let mip_width = std::cmp::max(1, header.width >> level);
+            let mip_height = std::cmp::max(1, header.height >> level);
+            let blocks_wide = mip_width.div_ceil(4);
+            let blocks_high = mip_height.div_ceil(4);
+            let level_size = blocks_wide * blocks_high * 16;
+            total_size += level_size;
+        }
+
+        let Some(data) = data.get(..total_size as usize) else {
+            #[cfg(feature = "debug")]
+            print_debug!("DDS file does not contain the expected data size");
+            return None;
+        };
+
+        Some(Self {
+            width: header.width,
+            height: header.height,
+            num_mipmap_levels,
+            alpha_mode: header10.alpha_mode,
+            data,
+        })
     }
 }
 

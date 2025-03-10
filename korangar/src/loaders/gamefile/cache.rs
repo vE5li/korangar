@@ -8,6 +8,7 @@ use blake3::Hash;
 use ddsfile::{AlphaMode, D3D10ResourceDimension, Dds, DxgiFormat, NewDxgiParams};
 use hashbrown::HashSet;
 use image::EncodableLayout;
+use rayon::prelude::*;
 
 use crate::SHUTDOWN_SIGNAL;
 use crate::loaders::archive::seven_zip::{SevenZipArchive, SevenZipArchiveBuilder};
@@ -30,76 +31,91 @@ pub fn sync_cache_archive(game_file_loader: &GameFileLoader, texture_loader: Arc
 
     println!("Collecting all texture file names");
 
-    let mut texture_files = game_file_loader
+    let mut texture_files: Vec<String> = game_file_loader
         .get_files_with_extension(&[BMP_FILE_EXTENSION, JPG_FILE_EXTENSION, TGA_FILE_EXTENSION, PNG_FILE_EXTENSION])
         .drain(..)
         .filter(|file_name| file_name.starts_with(TEXTURE_PREFIX))
-        .collect::<Vec<String>>();
+        .collect();
 
     texture_files.sort();
     texture_files.dedup();
 
     let current_archive_exists = fs::exists(path).unwrap_or(false);
-    let mut existing_dds_files = Vec::new();
 
     let (mut unused_textures, mut outdated_textures, mut new_textures): (Vec<&String>, Vec<&String>, Vec<&String>) = {
         if current_archive_exists {
             let current_archive = SevenZipArchive::from_path(path);
-            current_archive.get_files_with_extension(&mut existing_dds_files, &[DDS_FILE_EXTENSION]);
 
+            let mut existing_dds_files = Vec::new();
+            current_archive.get_files_with_extension(&mut existing_dds_files, &[DDS_FILE_EXTENSION]);
             let existing_dds_set: HashSet<String> = existing_dds_files.into_iter().collect();
+
             let texture_to_dds: HashSet<String> = texture_files
                 .iter()
                 .map(|texture_file| texture_file_dds_name(texture_file))
                 .collect();
-            let unused_textures = existing_dds_set
+            let unused_textures: Vec<&String> = existing_dds_set
                 .iter()
-                .filter(|dds_file| !texture_to_dds.contains(*dds_file) && *dds_file != HASH_FILE_PATH)
-                .map(|s| s.to_string())
-                .collect::<Vec<String>>();
+                .filter(|dds_file| !texture_to_dds.contains(dds_file.as_str()) && dds_file.as_str() != HASH_FILE_PATH)
+                .collect();
 
-            let mut outdated_textures = Vec::new();
-            let mut new_textures = Vec::new();
+            let outdated_textures: Vec<&String> = texture_files
+                .par_iter()
+                .filter(|texture_file_name| {
+                    if SHUTDOWN_SIGNAL.load(Ordering::SeqCst) {
+                        return false;
+                    }
 
-            for texture_file_name in &texture_files {
-                let dds_name = texture_file_dds_name(texture_file_name);
+                    let dds_name = texture_file_dds_name(texture_file_name);
 
-                match current_archive.get_file_by_path(&dds_name) {
-                    Some(dds_file) if dds_file.len() >= blake3::OUT_LEN => {
-                        println!("Checking compressed texture '{dds_name}'");
+                    match current_archive.get_file_by_path(&dds_name) {
+                        Some(dds_file) if dds_file.len() >= blake3::OUT_LEN => {
+                            println!("Checking compressed texture '{dds_name}'");
 
-                        let mut dds_hash_bytes = [0; blake3::OUT_LEN];
-                        let size = dds_file.len();
+                            let mut dds_hash_bytes = [0; blake3::OUT_LEN];
+                            let size = dds_file.len();
 
-                        dds_hash_bytes.copy_from_slice(&dds_file[size - blake3::OUT_LEN..]);
-                        let dds_hash = Hash::from_bytes(dds_hash_bytes);
+                            dds_hash_bytes.copy_from_slice(&dds_file[size - blake3::OUT_LEN..]);
+                            let dds_hash = Hash::from_bytes(dds_hash_bytes);
 
-                        if let Some(texture_name) = texture_file_name.strip_prefix(TEXTURE_PREFIX) {
-                            match texture_loader.load_texture_data(texture_name, false) {
-                                Ok((image, _)) => {
-                                    let hash = blake3::hash(image.as_bytes());
-                                    if hash != dds_hash {
-                                        outdated_textures.push(texture_file_name);
+                            if let Some(texture_name) = texture_file_name.strip_prefix(TEXTURE_PREFIX) {
+                                match texture_loader.load_texture_data(texture_name, false) {
+                                    Ok((image, _)) => {
+                                        let hash = blake3::hash(image.as_bytes());
+                                        hash != dds_hash
+                                    }
+                                    Err(err) => {
+                                        println!("Can't load texture file data: {err:?}");
+                                        false
                                     }
                                 }
-                                Err(err) => {
-                                    println!("Can't load texture file data: {err:?}");
-                                }
+                            } else {
+                                false
                             }
                         }
+                        _ => false,
                     }
-                    _ => {
-                        new_textures.push(texture_file_name);
+                })
+                .collect();
+
+            let new_textures: Vec<&String> = texture_files
+                .par_iter()
+                .filter(|texture_file_name| {
+                    if SHUTDOWN_SIGNAL.load(Ordering::SeqCst) {
+                        return false;
                     }
-                }
-            }
+
+                    let dds_name = texture_file_dds_name(texture_file_name);
+                    !existing_dds_set.contains(&dds_name)
+                })
+                .collect();
 
             let unused_textures: Vec<&String> = unused_textures
-                .iter()
+                .par_iter()
                 .filter_map(|unused_texture| {
                     texture_files
                         .iter()
-                        .find(|texture_file| texture_file_dds_name(texture_file) == *unused_texture)
+                        .find(|texture_file| texture_file_dds_name(texture_file).as_str() == unused_texture.as_str())
                 })
                 .collect();
 
@@ -118,12 +134,12 @@ pub fn sync_cache_archive(game_file_loader: &GameFileLoader, texture_loader: Arc
     let mut skipped_count = 0;
     let mut error_count = 0;
 
-    let mut to_create_textures = Vec::from_iter(outdated_textures.iter().copied().chain(new_textures.iter().copied()));
+    let mut to_create_textures: Vec<&String> = outdated_textures.iter().copied().chain(new_textures.iter().copied()).collect();
     to_create_textures.sort();
     to_create_textures.dedup();
 
-    let outdated_textures: HashSet<&String> = HashSet::from_iter(outdated_textures.iter().copied());
-    let new_textures: HashSet<&String> = HashSet::from_iter(new_textures.iter().copied());
+    let outdated_textures: HashSet<&String> = outdated_textures.iter().copied().collect();
+    let new_textures: HashSet<&String> = new_textures.iter().copied().collect();
 
     let _ = fs::remove_file(TEMPORARY_CACHE_FILE_NAME);
 
@@ -139,6 +155,10 @@ pub fn sync_cache_archive(game_file_loader: &GameFileLoader, texture_loader: Arc
         let current_archive = Box::new(SevenZipArchive::from_path(path));
 
         for texture_file_name in texture_files.iter() {
+            if SHUTDOWN_SIGNAL.load(Ordering::SeqCst) {
+                return;
+            }
+
             let dds_file_name = texture_file_dds_name(texture_file_name);
 
             if current_archive.file_exists(&dds_file_name)
@@ -197,9 +217,7 @@ pub fn sync_cache_archive(game_file_loader: &GameFileLoader, texture_loader: Arc
                     dds.write(&mut dds_file_data).expect("can't write DDS file");
                     dds_file_data.write_all(hash.as_bytes()).expect("can't append hash");
 
-                    // TODO: NHA It seems using ZSTD sometimes creates corrupt entries! LZMA2 works
-                    //       fine though.
-                    builder.add_file(dds_file_name.as_str(), dds_file_data, Compression::Slow);
+                    builder.add_file(dds_file_name.as_str(), dds_file_data, Compression::Fast);
 
                     if outdated_textures.contains(texture_file_name) {
                         updated_count += 1;

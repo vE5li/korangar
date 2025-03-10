@@ -37,7 +37,7 @@ rand_aes = { workspace = true, features = ["tls", "tls_aes128_ctr128"] }
 rayon = { workspace = true }
 ron = { workspace = true }
 serde = { workspace = true }
-sevenz-rust2 = { workspace = true, features = ["compress", "zstd"] }
+sevenz-rust2 = { workspace = true, features = ["compress"] }
 smallvec = { workspace = true, features = ["const_generics", "const_new", "union"] }
 spin_sleep = { workspace = true }
 sys-locale = { workspace = true }

@@ -8,7 +8,8 @@ use std::fs::File;
 use std::io::BufWriter;
 use std::path::Path;
 
-use sevenz_rust2::{SevenZArchiveEntry, SevenZMethod, SevenZMethodConfiguration, SevenZWriter, ZStandardOptions};
+use sevenz_rust2::lzma::LZMA2Options;
+use sevenz_rust2::{SevenZArchiveEntry, SevenZMethod, SevenZMethodConfiguration, SevenZWriter};
 
 use super::SevenZipArchive;
 use crate::loaders::archive::{Compression, Writable};
@@ -78,10 +79,8 @@ impl Writable for SevenZipArchiveBuilder {
 
             match compression {
                 Compression::No => writer.set_content_methods(vec![SevenZMethodConfiguration::new(SevenZMethod::COPY)]),
-                Compression::Slow => writer.set_content_methods(vec![SevenZMethodConfiguration::new(SevenZMethod::LZMA2)]),
-                Compression::Fast => writer.set_content_methods(vec![
-                    SevenZMethodConfiguration::new(SevenZMethod::ZSTD).with_options(ZStandardOptions::from_level(9).into()),
-                ]),
+                Compression::Slow => writer.set_content_methods(vec![LZMA2Options::with_preset(9).into()]),
+                Compression::Fast => writer.set_content_methods(vec![LZMA2Options::with_preset(3).into()]),
             };
 
             writer

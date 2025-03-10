@@ -25,8 +25,8 @@ use crate::SHUTDOWN_SIGNAL;
 use crate::graphics::{BindlessSupport, Capabilities, Lanczos3Drawer, MipMapRenderPassContext, Texture, TextureSet};
 use crate::loaders::GameFileLoader;
 
-const MAX_CACHE_COUNT: u32 = 512;
-const MAX_CACHE_SIZE: usize = 512 * 1024 * 1024;
+const MAX_CACHE_COUNT: u32 = 4096;
+const MAX_CACHE_SIZE: usize = 1024 * 1024 * 1024;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum ImageType {
@@ -438,13 +438,17 @@ impl TextureLoader {
         let dds_file_path = format!("data\\texture\\{dds_file_name}");
 
         let dds_file_data = self.game_file_loader.get(&dds_file_path).ok()?;
+
+        #[cfg(feature = "debug")]
+        let timer = Timer::new_dynamic(format!("load compressed texture data from {}", dds_file_path.magenta()));
+
         let Some(dds) = Dds::read_bc7(dds_file_data.as_slice()) else {
             #[cfg(feature = "debug")]
             print_debug!("Could not decode DDS file: {}", dds_file_path);
             return None;
         };
 
-        Some(self.create_raw(
+        let texture = self.create_raw(
             dds_file_name.as_str(),
             dds.width,
             dds.height,
@@ -452,7 +456,12 @@ impl TextureLoader {
             TextureFormat::Bc7RgbaUnormSrgb,
             dds.alpha_mode == ddsfile::AlphaMode::PreMultiplied,
             dds.data,
-        ))
+        );
+
+        #[cfg(feature = "debug")]
+        timer.stop();
+
+        Some(texture)
     }
 
     pub fn load_texture_data(&self, path: &str, raw: bool) -> Result<(RgbaImage, bool), LoadError> {
@@ -621,7 +630,10 @@ impl<'a> Dds<'a> {
         const DDS_MAGIC: u32 = 0x20534444; // b"DDS " in little endian
 
         let mut magic_bytes = [0; 4];
-        data.read_exact(&mut magic_bytes[..]).ok()?;
+        if (&mut data).read_exact(&mut magic_bytes[..]).is_err() {
+            #[cfg(feature = "debug")]
+            print_debug!("Could not read magic bytes from DDS file");
+        }
         let magic = u32::from_le_bytes(magic_bytes);
 
         if magic != DDS_MAGIC {
@@ -630,14 +642,21 @@ impl<'a> Dds<'a> {
             return None;
         }
 
-        let Ok(header) = ddsfile::Header::read(data) else {
+        let Ok(header) = ddsfile::Header::read(&mut data) else {
             #[cfg(feature = "debug")]
             print_debug!("DDS file has invalid header");
             return None;
         };
 
         let header10 = if header.spf.fourcc == Some(ddsfile::FourCC(<ddsfile::FourCC>::DX10)) {
-            ddsfile::Header10::read(data).ok()?
+            match ddsfile::Header10::read(&mut data) {
+                Ok(header) => header,
+                Err(_) => {
+                    #[cfg(feature = "debug")]
+                    print_debug!("Can't read header10 from DDS file");
+                    return None;
+                }
+            }
         } else {
             #[cfg(feature = "debug")]
             print_debug!("DDS file has no valid header10");

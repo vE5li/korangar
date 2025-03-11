@@ -78,6 +78,10 @@ impl Archive for NativeArchive {
         }
     }
 
+    fn file_exists(&self, asset_path: &str) -> bool {
+        self.file_table.contains_key(asset_path)
+    }
+
     fn get_file_by_path(&self, asset_path: &str) -> Option<Vec<u8>> {
         self.file_table.get(asset_path).map(|file_information| {
             let mut compressed_file_buffer = vec![0u8; file_information.compressed_size_aligned as usize];
@@ -104,11 +108,11 @@ impl Archive for NativeArchive {
         })
     }
 
-    fn get_files_with_extension(&self, files: &mut Vec<String>, extension: &str) {
+    fn get_files_with_extension(&self, files: &mut Vec<String>, extensions: &[&str]) {
         let found_files = self
             .file_table
             .iter()
-            .filter(|(file_name, row)| file_name.ends_with(extension) && row.flags == 0x01)
+            .filter(|(file_name, row)| row.flags == 0x01 && extensions.iter().any(|extension| file_name.ends_with(extension)))
             .map(|(file_name, _)| file_name.clone());
 
         files.extend(found_files);

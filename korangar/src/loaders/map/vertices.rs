@@ -1,16 +1,12 @@
-#[cfg(feature = "debug")]
-use cgmath::EuclideanSpace;
 use cgmath::{Array, Point2, Point3, Vector2};
 use korangar_util::Rectangle;
-#[cfg(feature = "debug")]
-use korangar_util::texture_atlas::AtlasAllocation;
 use ragnarok_formats::map::{GatData, GroundData, GroundTile, SurfaceType};
 use smallvec::smallvec_inline;
 
 #[cfg(feature = "debug")]
 use crate::graphics::Color;
 use crate::graphics::{ModelVertex, NativeModelVertex, PickerTarget, TileVertex};
-use crate::loaders::smooth_ground_normals;
+use crate::loaders::{TextureSetBuilder, smooth_ground_normals};
 
 pub const MAP_TILE_SIZE: f32 = 10.0;
 
@@ -22,7 +18,11 @@ pub enum Heights {
     LowerRight,
 }
 
-pub fn ground_vertices(ground_data: &GroundData, water_level: f32) -> (Vec<NativeModelVertex>, Rectangle<f32>) {
+pub fn ground_vertices(
+    ground_data: &GroundData,
+    water_level: f32,
+    texture_set_builder: &mut TextureSetBuilder,
+) -> (Vec<ModelVertex>, Rectangle<f32>, Vec<bool>) {
     let mut native_ground_vertices = Vec::new();
 
     let mut water_bound_min = Point2::from_value(f32::MAX);
@@ -190,13 +190,22 @@ pub fn ground_vertices(ground_data: &GroundData, water_level: f32) -> (Vec<Nativ
 
     smooth_ground_normals(&mut native_ground_vertices);
 
-    (native_ground_vertices, water_bounds)
+    let (ground_texture_mapping, ground_texture_transparencies): (Vec<i32>, Vec<bool>) = ground_data
+        .textures
+        .iter()
+        .map(|texture| texture_set_builder.register(texture))
+        .unzip();
+
+    native_ground_vertices
+        .iter_mut()
+        .for_each(|vertice| vertice.texture_index = ground_texture_mapping[vertice.texture_index as usize]);
+
+    let vertices = NativeModelVertex::to_vertices(native_ground_vertices);
+
+    (vertices, water_bounds, ground_texture_transparencies)
 }
 
-pub fn generate_tile_vertices(
-    gat_data: &mut GatData,
-    #[cfg(feature = "debug")] tile_texture_mapping: &[AtlasAllocation],
-) -> (Vec<ModelVertex>, Vec<TileVertex>) {
+pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<TileVertex>) {
     const HALF_TILE_SIZE: f32 = MAP_TILE_SIZE / 2.0;
 
     #[allow(unused_mut)]
@@ -237,18 +246,18 @@ pub fn generate_tile_vertices(
                 let second_normal = NativeModelVertex::calculate_normal(fourth_position, first_position, third_position);
 
                 let tile_type_index = TryInto::<u8>::try_into(tile.flags).unwrap() as usize;
-                let atlas_allocation = tile_texture_mapping[tile_type_index];
 
-                let first_texture_coordinates = atlas_allocation.map_to_atlas(Point2::new(0.0, 0.0)).to_vec();
-                let second_texture_coordinates = atlas_allocation.map_to_atlas(Point2::new(0.0, 1.0)).to_vec();
-                let third_texture_coordinates = atlas_allocation.map_to_atlas(Point2::new(1.0, 1.0)).to_vec();
-                let fourth_texture_coordinates = atlas_allocation.map_to_atlas(Point2::new(1.0, 0.0)).to_vec();
+                let first_texture_coordinates = Vector2::new(0.0, 0.0);
+                let second_texture_coordinates = Vector2::new(0.0, 1.0);
+                let third_texture_coordinates = Vector2::new(1.0, 1.0);
+                let fourth_texture_coordinates = Vector2::new(1.0, 0.0);
 
                 tile_vertices.push(ModelVertex::new(
                     first_position,
                     first_normal,
                     first_texture_coordinates,
                     Color::WHITE,
+                    tile_type_index as i32,
                     0.0,
                 ));
                 tile_vertices.push(ModelVertex::new(
@@ -256,6 +265,7 @@ pub fn generate_tile_vertices(
                     first_normal,
                     second_texture_coordinates,
                     Color::WHITE,
+                    tile_type_index as i32,
                     0.0,
                 ));
                 tile_vertices.push(ModelVertex::new(
@@ -263,6 +273,7 @@ pub fn generate_tile_vertices(
                     first_normal,
                     third_texture_coordinates,
                     Color::WHITE,
+                    tile_type_index as i32,
                     0.0,
                 ));
 
@@ -271,6 +282,7 @@ pub fn generate_tile_vertices(
                     second_normal,
                     first_texture_coordinates,
                     Color::WHITE,
+                    tile_type_index as i32,
                     0.0,
                 ));
                 tile_vertices.push(ModelVertex::new(
@@ -278,6 +290,7 @@ pub fn generate_tile_vertices(
                     second_normal,
                     third_texture_coordinates,
                     Color::WHITE,
+                    tile_type_index as i32,
                     0.0,
                 ));
                 tile_vertices.push(ModelVertex::new(
@@ -285,6 +298,7 @@ pub fn generate_tile_vertices(
                     second_normal,
                     fourth_texture_coordinates,
                     Color::WHITE,
+                    tile_type_index as i32,
                     0.0,
                 ));
             }

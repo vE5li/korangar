@@ -73,6 +73,10 @@ impl Archive for FolderArchive {
         Self { folder_path, file_mapping }
     }
 
+    fn file_exists(&self, asset_path: &str) -> bool {
+        self.file_mapping.contains_key(asset_path)
+    }
+
     fn get_file_by_path(&self, asset_path: &str) -> Option<Vec<u8>> {
         self.file_mapping.get(asset_path).and_then(|file_path| {
             fs::read(file_path)
@@ -90,8 +94,12 @@ impl Archive for FolderArchive {
         })
     }
 
-    fn get_files_with_extension(&self, files: &mut Vec<String>, extension: &str) {
-        let found_files = self.file_mapping.keys().filter(|file_name| file_name.ends_with(extension)).cloned();
+    fn get_files_with_extension(&self, files: &mut Vec<String>, extensions: &[&str]) {
+        let found_files = self
+            .file_mapping
+            .keys()
+            .filter(|file_name| extensions.iter().any(|extension| file_name.ends_with(extension)))
+            .cloned();
         files.extend(found_files);
     }
 
@@ -128,13 +136,9 @@ impl Writable for FolderArchive {
         }
 
         let (path, data) = match compression {
-            Compression::No => (full_path, file_data),
-            Compression::Slow => {
-                let mut encoder = GzEncoder::new(file_data.as_slice(), flate2::Compression::best());
-                Self::compress_gz(full_path, &mut encoder)
-            }
-            Compression::Fast => {
-                let mut encoder = GzEncoder::new(file_data.as_slice(), flate2::Compression::fast());
+            Compression::Off => (full_path, file_data),
+            Compression::Default => {
+                let mut encoder = GzEncoder::new(file_data.as_slice(), flate2::Compression::new(3));
                 Self::compress_gz(full_path, &mut encoder)
             }
         };

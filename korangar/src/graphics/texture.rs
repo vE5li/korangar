@@ -1,4 +1,5 @@
 use std::fmt::{Debug, Formatter};
+use std::num::NonZeroU32;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
@@ -12,6 +13,7 @@ use wgpu::{
     TextureViewDimension,
 };
 
+use crate::graphics::BindlessSupport;
 use crate::interface::layout::ScreenSize;
 
 static TEXTURE_ID: AtomicU64 = AtomicU64::new(0);
@@ -213,6 +215,68 @@ impl Texture {
                         multisampled: false,
                     },
                     count: None,
+                }],
+            })
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct TextureSet {
+    textures: Vec<Arc<Texture>>,
+    bind_group: Option<BindGroup>,
+}
+
+impl TextureSet {
+    pub fn new(device: &Device, bindless_support: BindlessSupport, texture_set_size: u32, name: &str, textures: Vec<Arc<Texture>>) -> Self {
+        let bind_group = match bindless_support {
+            BindlessSupport::Full | BindlessSupport::Limited => {
+                let mut views = Vec::from_iter(textures.iter().map(|texture| texture.get_texture_view()));
+
+                if bindless_support == BindlessSupport::Limited && !textures.is_empty() {
+                    let default_view = textures[0].get_texture_view();
+                    views.resize_with(texture_set_size as usize, || default_view);
+                }
+
+                let bind_group = device.create_bind_group(&BindGroupDescriptor {
+                    label: Some(name),
+                    layout: Self::bind_group_layout(device, texture_set_size),
+                    entries: &[BindGroupEntry {
+                        binding: 0,
+                        resource: BindingResource::TextureViewArray(&views),
+                    }],
+                });
+
+                Some(bind_group)
+            }
+            BindlessSupport::None => None,
+        };
+
+        Self { textures, bind_group }
+    }
+
+    pub fn get_texture_bind_group(&self, texture_id: i32) -> &BindGroup {
+        self.textures[texture_id as usize].get_bind_group()
+    }
+
+    pub fn get_bind_group(&self) -> Option<&BindGroup> {
+        self.bind_group.as_ref()
+    }
+
+    pub fn bind_group_layout(device: &Device, texture_set_size: u32) -> &'static BindGroupLayout {
+        static LAYOUT: OnceLock<BindGroupLayout> = OnceLock::new();
+        LAYOUT.get_or_init(|| {
+            device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+                label: None,
+                entries: &[BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Texture {
+                        sample_type: TextureSampleType::Float { filterable: true },
+                        view_dimension: TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: NonZeroU32::new(texture_set_size),
                 }],
             })
         })

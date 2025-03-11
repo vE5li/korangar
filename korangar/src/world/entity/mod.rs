@@ -9,28 +9,28 @@ use korangar_interface::elements::PrototypeElement;
 use korangar_interface::windows::{PrototypeWindow, Window};
 use korangar_networking::EntityData;
 use korangar_util::pathing::{MAX_WALK_PATH_SIZE, PathFinder};
-#[cfg(feature = "debug")]
-use korangar_util::texture_atlas::AtlasAllocation;
 use ragnarok_packets::{AccountId, CharacterInformation, ClientTick, Direction, EntityId, Sex, StatusType, WorldPosition};
 #[cfg(feature = "debug")]
 use smallvec::smallvec_inline;
 #[cfg(feature = "debug")]
 use wgpu::{BufferUsages, Device, Queue};
 
-#[cfg(feature = "debug")]
-use crate::graphics::DebugRectangleInstruction;
 use crate::graphics::EntityInstruction;
+#[cfg(feature = "debug")]
+use crate::graphics::{BindlessSupport, DebugRectangleInstruction};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 use crate::interface::theme::GameTheme;
 use crate::interface::windows::WindowCache;
 use crate::loaders::GameFileLoader;
+#[cfg(feature = "debug")]
+use crate::loaders::split_mesh_by_texture;
 use crate::renderer::GameInterfaceRenderer;
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
-#[cfg(feature = "debug")]
-use crate::world::MarkerIdentifier;
 use crate::world::{ActionEvent, AnimationActionType, AnimationData, AnimationState, Camera, Library, Map};
+#[cfg(feature = "debug")]
+use crate::world::{MarkerIdentifier, SubMesh};
 #[cfg(feature = "debug")]
 use crate::{Buffer, Color, ModelVertex};
 
@@ -62,7 +62,13 @@ pub struct Movement {
     #[cfg(feature = "debug")]
     #[new(default)]
     #[hidden_element]
-    pub pathing_vertex_buffer: Option<Arc<Buffer<ModelVertex>>>,
+    pub pathing: Option<Pathing>,
+}
+
+#[cfg(feature = "debug")]
+pub struct Pathing {
+    pub vertex_buffer: Arc<Buffer<ModelVertex>>,
+    pub submeshes: Vec<SubMesh>,
 }
 
 #[derive(Copy, Clone)]
@@ -600,7 +606,7 @@ impl Common {
     }
 
     #[cfg(feature = "debug")]
-    pub fn generate_pathing_mesh(&mut self, device: &Device, queue: &Queue, map: &Map, pathing_mapping: &[AtlasAllocation]) {
+    pub fn generate_pathing_mesh(&mut self, device: &Device, queue: &Queue, bindless_support: BindlessSupport, map: &Map) {
         use crate::{Color, MAP_TILE_SIZE, NativeModelVertex};
 
         const HALF_TILE_SIZE: f32 = MAP_TILE_SIZE / 2.0;
@@ -704,12 +710,25 @@ impl Common {
             ));
         }
 
-        let pathing_vertices = NativeModelVertex::to_vertices(native_pathing_vertices, pathing_mapping);
+        let mut pathing_vertices = NativeModelVertex::to_vertices(native_pathing_vertices);
 
-        if let Some(steps_vertex_buffer) = &active_movement.pathing_vertex_buffer {
-            steps_vertex_buffer.write_exact(queue, pathing_vertices.as_slice());
+        let submeshes = match bindless_support {
+            BindlessSupport::Full | BindlessSupport::Limited => {
+                vec![SubMesh {
+                    vertex_offset: 0,
+                    vertex_count: pathing_vertices.len(),
+                    texture_index: 0,
+                    transparent: true,
+                }]
+            }
+            BindlessSupport::None => split_mesh_by_texture(&mut pathing_vertices, None, None),
+        };
+
+        if let Some(pathing) = active_movement.pathing.as_mut() {
+            pathing.vertex_buffer.write_exact(queue, pathing_vertices.as_slice());
+            pathing.submeshes = submeshes;
         } else {
-            let vertex_buffer = Arc::new(Buffer::with_data(
+            let pathing_vertex_buffer = Arc::new(Buffer::with_data(
                 device,
                 queue,
                 "pathing vertex buffer",
@@ -717,7 +736,10 @@ impl Common {
                 &pathing_vertices,
             ));
 
-            active_movement.pathing_vertex_buffer = Some(vertex_buffer);
+            active_movement.pathing = Some(Pathing {
+                vertex_buffer: pathing_vertex_buffer,
+                submeshes,
+            });
         }
     }
 
@@ -1070,9 +1092,8 @@ impl Entity {
     }
 
     #[cfg(feature = "debug")]
-    pub fn generate_pathing_mesh(&mut self, device: &Device, queue: &Queue, map: &Map, pathing_texture_mapping: &[AtlasAllocation]) {
-        self.get_common_mut()
-            .generate_pathing_mesh(device, queue, map, pathing_texture_mapping);
+    pub fn generate_pathing_mesh(&mut self, device: &Device, queue: &Queue, bindless_support: BindlessSupport, map: &Map) {
+        self.get_common_mut().generate_pathing_mesh(device, queue, bindless_support, map);
     }
 
     pub fn render(&self, instructions: &mut Vec<EntityInstruction>, camera: &dyn Camera, add_to_picker: bool) {
@@ -1085,11 +1106,11 @@ impl Entity {
     }
 
     #[cfg(feature = "debug")]
-    pub fn get_pathing_vertex_buffer(&self) -> Option<&Arc<Buffer<ModelVertex>>> {
+    pub fn get_pathing(&self) -> Option<&Pathing> {
         self.get_common()
             .active_movement
             .as_ref()
-            .and_then(|movement| movement.pathing_vertex_buffer.as_ref())
+            .and_then(|movement| movement.pathing.as_ref())
     }
 
     #[cfg(feature = "debug")]

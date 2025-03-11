@@ -16,6 +16,8 @@ use wgpu::{
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
+#[cfg(feature = "debug")]
+use super::BindlessSupport;
 use super::{
     AntiAliasingResources, Capabilities, FramePacer, FrameStage, GlobalContext, LimitFramerate, Msaa, Prepare, PresentModeInfo,
     RENDER_TO_TEXTURE_FORMAT, ScreenSpaceAntiAliasing, ShadowDetail, Ssaa, Surface, TextureSamplerType,
@@ -408,6 +410,11 @@ impl GraphicsEngine {
                 print_debug!("created {}", "surface".magenta());
             });
         }
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn bindless_support(&self) -> BindlessSupport {
+        self.capabilities.bindless_support()
     }
 
     fn check_high_quality_interface_requirements(&self, mut high_quality_interface: bool, screen_size: ScreenSize) -> bool {

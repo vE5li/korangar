@@ -62,8 +62,6 @@ use korangar_networking::{
     ShopItem,
 };
 use korangar_util::pathing::PathFinder;
-#[cfg(feature = "debug")]
-use korangar_util::texture_atlas::AtlasAllocation;
 #[cfg(not(feature = "debug"))]
 use ragnarok_packets::handler::NoPacketCallback;
 use ragnarok_packets::{
@@ -280,13 +278,9 @@ struct Client {
     bounding_box_object_set_buffer: ResourceSetBuffer<ObjectKey>,
 
     #[cfg(feature = "debug")]
-    pathing_texture_mapping: Vec<AtlasAllocation>,
+    pathing_texture_set: Arc<TextureSet>,
     #[cfg(feature = "debug")]
-    pathing_texture: Arc<Texture>,
-    #[cfg(feature = "debug")]
-    tile_texture: Arc<Texture>,
-    #[cfg(feature = "debug")]
-    tile_texture_mapping: Arc<Vec<AtlasAllocation>>,
+    tile_texture_set: Arc<TextureSet>,
 
     chat_messages: PlainTrackedState<Vec<ChatMessage>>,
     main_menu_click_sound_effect: SoundEffectKey,
@@ -414,14 +408,20 @@ impl Client {
         time_phase!("create resource managers", {
             std::fs::create_dir_all("client/themes").unwrap();
 
-            let model_loader = Arc::new(ModelLoader::new(game_file_loader.clone()));
-            let texture_loader = Arc::new(TextureLoader::new(device.clone(), queue.clone(), game_file_loader.clone()));
+            let model_loader = Arc::new(ModelLoader::new(game_file_loader.clone(), capabilities.bindless_support()));
+            let texture_loader = Arc::new(TextureLoader::new(
+                device.clone(),
+                queue.clone(),
+                &capabilities,
+                game_file_loader.clone(),
+            ));
             let font_loader = Arc::new(FontLoader::new(application.get_fonts(), &game_file_loader, &texture_loader));
             let map_loader = Arc::new(MapLoader::new(
                 device.clone(),
                 queue.clone(),
                 game_file_loader.clone(),
                 audio_engine.clone(),
+                capabilities.bindless_support(),
             ));
             let sprite_loader = Arc::new(SpriteLoader::new(game_file_loader.clone(), texture_loader.clone()));
             let action_loader = Arc::new(ActionLoader::new(game_file_loader.clone(), audio_engine.clone()));
@@ -446,22 +446,14 @@ impl Client {
                 Library::new(&game_file_loader).unwrap()
             }));
 
-            let cache = Arc::new(Cache::new(
-                &game_file_loader,
-                texture_loader.clone(),
-                &map_loader,
-                &model_loader,
-                game_file_hash,
-                capabilities.supports_texture_compression(),
-                sync_cache,
-            ));
-
             if sync_cache {
+                sync_cache_archive(&game_file_loader, texture_loader, game_file_hash);
                 return None;
             }
 
+            game_file_loader.load_cache_archive(game_file_hash);
+
             let async_loader = Arc::new(AsyncLoader::new(
-                cache.clone(),
                 action_loader.clone(),
                 animation_loader.clone(),
                 map_loader.clone(),
@@ -590,26 +582,26 @@ impl Client {
             let bounding_box_object_set_buffer = ResourceSetBuffer::default();
 
             #[cfg(feature = "debug")]
-            let (pathing_texture_mapping, pathing_texture) =
-                UncompressedTextureAtlas::create_from_group(texture_loader.clone(), "pathing", false, &[
-                    "pathing_goal.png",
-                    "pathing_straight.png",
-                    "pathing_diagonal.png",
-                ]);
+            let pathing_texture_set = TextureSetBuilder::build_from_group(texture_loader.clone(), "pathing", &[
+                "pathing_goal.png",
+                "pathing_straight.png",
+                "pathing_diagonal.png",
+            ]);
+            #[cfg(feature = "debug")]
+            let pathing_texture_set = Arc::new(pathing_texture_set);
 
             #[cfg(feature = "debug")]
-            let (tile_texture_mapping, tile_texture) =
-                UncompressedTextureAtlas::create_from_group(texture_loader.clone(), "tile", false, &[
-                    "tile_0.png",
-                    "tile_1.png",
-                    "tile_2.png",
-                    "tile_3.png",
-                    "tile_4.png",
-                    "tile_5.png",
-                    "tile_6.png",
-                ]);
+            let tile_texture_set = TextureSetBuilder::build_from_group(texture_loader.clone(), "tile", &[
+                "tile_0.png",
+                "tile_1.png",
+                "tile_2.png",
+                "tile_3.png",
+                "tile_4.png",
+                "tile_5.png",
+                "tile_6.png",
+            ]);
             #[cfg(feature = "debug")]
-            let tile_texture_mapping = Arc::new(tile_texture_mapping);
+            let tile_texture_set = Arc::new(tile_texture_set);
 
             let welcome_string = format!(
                 "Welcome to ^ff8800Korangar^000000 version ^ff8800{}^000000!",
@@ -624,27 +616,8 @@ impl Client {
         });
 
         time_phase!("load default map", {
-            let mut texture_atlas: Box<dyn TextureAtlas> = match cache.load_texture_atlas(DEFAULT_MAP) {
-                Some(texture_atlas) => Box::new(texture_atlas),
-                None => Box::new(UncompressedTextureAtlas::new(
-                    texture_loader.clone(),
-                    DEFAULT_MAP.to_string(),
-                    true,
-                    true,
-                    false,
-                )),
-            };
-
             let map = map_loader
-                .load(
-                    &mut (*texture_atlas),
-                    DEFAULT_MAP.to_string(),
-                    &model_loader,
-                    texture_loader.clone(),
-                    &library,
-                    #[cfg(feature = "debug")]
-                    &tile_texture_mapping,
-                )
+                .load(DEFAULT_MAP.to_string(), &model_loader, texture_loader.clone(), &library)
                 .expect("failed to load initial map");
 
             audio_engine.play_background_music_track(DEFAULT_BACKGROUND_MUSIC);
@@ -740,13 +713,9 @@ impl Client {
             #[cfg(feature = "debug")]
             bounding_box_object_set_buffer,
             #[cfg(feature = "debug")]
-            pathing_texture_mapping,
+            pathing_texture_set,
             #[cfg(feature = "debug")]
-            pathing_texture,
-            #[cfg(feature = "debug")]
-            tile_texture_mapping,
-            #[cfg(feature = "debug")]
-            tile_texture,
+            tile_texture_set,
             chat_messages,
             main_menu_click_sound_effect,
             map: Some(map),
@@ -945,12 +914,8 @@ impl Client {
 
                     self.interface.close_all_windows_except(&mut self.focus_state);
 
-                    self.async_loader.request_map_load(
-                        DEFAULT_MAP.to_string(),
-                        Some(TilePosition::new(0, 0)),
-                        #[cfg(feature = "debug")]
-                        self.tile_texture_mapping.clone(),
-                    );
+                    self.async_loader
+                        .request_map_load(DEFAULT_MAP.to_string(), Some(TilePosition::new(0, 0)));
                 }
                 NetworkEvent::ResurrectPlayer { entity_id } => {
                     // If the resurrected player is us, close the resurrect window.
@@ -1092,6 +1057,9 @@ impl Client {
                             npc.set_animation_data(animation_data);
                         }
 
+                        #[cfg(feature = "debug")]
+                        npc.generate_pathing_mesh(&self.device, &self.queue, self.graphics_engine.bindless_support(), map);
+
                         self.entities.push(npc);
                     }
                 }
@@ -1129,17 +1097,17 @@ impl Client {
 
                         entity.move_from_to(map, &mut self.path_finder, position_from, position_to, starting_timestamp);
                         #[cfg(feature = "debug")]
-                        entity.generate_pathing_mesh(&self.device, &self.queue, map, &self.pathing_texture_mapping);
+                        entity.generate_pathing_mesh(&self.device, &self.queue, self.graphics_engine.bindless_support(), map);
                     }
                 }
                 NetworkEvent::PlayerMove(position_from, position_to, starting_timestamp) => {
                     if let Some(map) = self.map.as_ref() {
                         let position_from = Vector2::new(position_from.x, position_from.y);
                         let position_to = Vector2::new(position_to.x, position_to.y);
-                        self.entities[0].move_from_to(map, &mut self.path_finder, position_from, position_to, starting_timestamp);
 
+                        self.entities[0].move_from_to(map, &mut self.path_finder, position_from, position_to, starting_timestamp);
                         #[cfg(feature = "debug")]
-                        self.entities[0].generate_pathing_mesh(&self.device, &self.queue, map, &self.pathing_texture_mapping);
+                        self.entities[0].generate_pathing_mesh(&self.device, &self.queue, self.graphics_engine.bindless_support(), map);
                     }
                 }
                 NetworkEvent::ChangeMap(map_name, player_position) => {
@@ -1152,12 +1120,7 @@ impl Client {
                     // Only the player must stay alive between map changes.
                     self.entities.truncate(1);
 
-                    self.async_loader.request_map_load(
-                        map_name,
-                        Some(player_position),
-                        #[cfg(feature = "debug")]
-                        self.tile_texture_mapping.clone(),
-                    );
+                    self.async_loader.request_map_load(map_name, Some(player_position));
                 }
                 NetworkEvent::UpdateClientTick { client_tick, received_at } => {
                     self.game_timer.set_client_tick(client_tick, received_at);
@@ -2172,7 +2135,7 @@ impl Client {
                     self.directional_shadow_model_batches.push(ModelBatch {
                         offset,
                         count,
-                        texture: map.get_texture().clone(),
+                        texture_set: map.get_texture_set().clone(),
                         vertex_buffer: map.get_model_vertex_buffer().clone(),
                     });
 
@@ -2181,7 +2144,7 @@ impl Client {
                     map.render_overlay_tiles(
                         &mut self.directional_shadow_model_instructions,
                         &mut self.directional_shadow_model_batches,
-                        &self.tile_texture,
+                        &self.tile_texture_set,
                     );
 
                     #[cfg(feature = "debug")]
@@ -2190,7 +2153,7 @@ impl Client {
                         &mut self.directional_shadow_model_instructions,
                         &mut self.directional_shadow_model_batches,
                         &self.entities,
-                        &self.pathing_texture,
+                        &self.pathing_texture_set,
                     );
 
                     #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
@@ -2241,13 +2204,13 @@ impl Client {
                     self.model_batches.push(ModelBatch {
                         offset,
                         count,
-                        texture: map.get_texture().clone(),
+                        texture_set: map.get_texture_set().clone(),
                         vertex_buffer: map.get_model_vertex_buffer().clone(),
                     });
 
                     #[cfg(feature = "debug")]
                     #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map_tiles))]
-                    map.render_overlay_tiles(&mut self.model_instructions, &mut self.model_batches, &self.tile_texture);
+                    map.render_overlay_tiles(&mut self.model_instructions, &mut self.model_batches, &self.tile_texture_set);
 
                     #[cfg(feature = "debug")]
                     #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_pathing))]
@@ -2255,7 +2218,7 @@ impl Client {
                         &mut self.model_instructions,
                         &mut self.model_batches,
                         &self.entities,
-                        &self.pathing_texture,
+                        &self.pathing_texture_set,
                     );
 
                     let entity_camera = match true {

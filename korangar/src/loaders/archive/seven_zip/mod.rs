@@ -61,14 +61,9 @@ impl Archive for SevenZipArchive {
                 .iter()
                 .any(|method| method.id() == sevenz_rust2::SevenZMethod::ID_COPY)
             {
-                Compression::No
-            } else if compression_methods
-                .iter()
-                .any(|method| method.id() == sevenz_rust2::SevenZMethod::ID_ZSTD)
-            {
-                Compression::Fast
+                Compression::Off
             } else {
-                Compression::Slow
+                Compression::Default
             };
 
             file_index.insert(name_with_backslash, FileIndexEntry {
@@ -87,20 +82,28 @@ impl Archive for SevenZipArchive {
         }
     }
 
+    fn file_exists(&self, asset_path: &str) -> bool {
+        self.file_index.contains_key(asset_path)
+    }
+
     fn get_file_by_path(&self, asset_path: &str) -> Option<Vec<u8>> {
         self.file_index
             .get(asset_path)
             .and_then(|entry| self.reader.lock().unwrap().read_file(entry.file_name.as_str()).ok())
     }
 
-    fn get_files_with_extension(&self, files: &mut Vec<String>, extension: &str) {
+    fn get_files_with_extension(&self, files: &mut Vec<String>, extensions: &[&str]) {
         self.reader
             .lock()
             .unwrap()
             .archive()
             .files
             .iter()
-            .filter(|file| file.name().ends_with(extension))
+            .filter(|file| {
+                extensions
+                    .iter()
+                    .any(|extension| !file.is_directory() && file.name().ends_with(extension))
+            })
             .for_each(|file| {
                 let name_with_backslash = file.name().replace('/', "\\").to_lowercase();
                 files.push(name_with_backslash)

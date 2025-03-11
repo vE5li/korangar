@@ -11,6 +11,7 @@ pub struct ModelVertex {
     pub normal: [f32; 3],
     pub texture_coordinates: [f32; 2],
     pub color: [f32; 3],
+    pub texture_index: i32,
     pub wind_affinity: f32,
 }
 
@@ -20,6 +21,7 @@ impl ModelVertex {
         normal: Vector3<f32>,
         texture_coordinates: Vector2<f32>,
         color: Color,
+        texture_index: i32,
         wind_affinity: f32,
     ) -> Self {
         Self {
@@ -27,6 +29,7 @@ impl ModelVertex {
             normal: [normal.x, normal.y, normal.z],
             texture_coordinates: [texture_coordinates.x, texture_coordinates.y],
             color: [color.red, color.green, color.blue],
+            texture_index,
             wind_affinity,
         }
     }
@@ -37,7 +40,8 @@ impl ModelVertex {
                 1 => Float32x3,
                 2 => Float32x2,
                 3 => Float32x3,
-                4 => Float32,
+                4 => Sint32,
+                5 => Float32,
         );
 
         VertexBufferLayout {

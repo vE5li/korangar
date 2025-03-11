@@ -14,9 +14,10 @@ use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, DirectionalShadowRenderPassContext, DrawIndirectArgs, Drawer,
     ModelBatchDrawData, RenderPassContext,
 };
-use crate::graphics::{Buffer, Capabilities, GlobalContext, ModelVertex, Prepare, RenderInstruction, Texture};
+use crate::graphics::{BindlessSupport, Buffer, Capabilities, GlobalContext, ModelVertex, Prepare, RenderInstruction, Texture, TextureSet};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/model.wgsl");
+const SHADER_BINDLESS: ShaderModuleDescriptor = include_wgsl!("shader/model_bindless.wgsl");
 const DRAWER_NAME: &str = "directional shadow model";
 const INITIAL_INSTRUCTION_SIZE: usize = 256;
 
@@ -28,6 +29,7 @@ struct InstanceData {
 
 pub(crate) struct DirectionalShadowModelDrawer {
     multi_draw_indirect_support: bool,
+    bindless_support: BindlessSupport,
     instance_data_buffer: Buffer<InstanceData>,
     instance_index_vertex_buffer: Buffer<u32>,
     command_buffer: Buffer<DrawIndirectArgs>,
@@ -50,7 +52,10 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
         _global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {
-        let shader_module = device.create_shader_module(SHADER);
+        let shader_module = match capabilities.bindless_support() {
+            BindlessSupport::Full | BindlessSupport::Limited => device.create_shader_module(SHADER_BINDLESS),
+            BindlessSupport::None => device.create_shader_module(SHADER),
+        };
 
         let instance_data_buffer = Buffer::with_capacity(
             device,
@@ -73,7 +78,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
             attributes: &[VertexAttribute {
                 format: VertexFormat::Uint32,
                 offset: 0,
-                shader_location: 5,
+                shader_location: 6,
             }],
         };
 
@@ -100,13 +105,20 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
 
         let bind_group = Self::create_bind_group(device, &bind_group_layout, &instance_data_buffer);
 
+        let texture_bind_group = match capabilities.bindless_support() {
+            BindlessSupport::Full | BindlessSupport::Limited => {
+                TextureSet::bind_group_layout(device, capabilities.get_max_textures_per_shader_stage())
+            }
+            BindlessSupport::None => Texture::bind_group_layout(device),
+        };
+
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some(DRAWER_NAME),
             bind_group_layouts: &[
                 Self::Context::bind_group_layout(device)[0],
                 Self::Context::bind_group_layout(device)[1],
                 &bind_group_layout,
-                Texture::bind_group_layout(device),
+                texture_bind_group,
             ],
             push_constant_ranges: &[],
         });
@@ -141,6 +153,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
 
         Self {
             multi_draw_indirect_support: capabilities.supports_multidraw_indirect(),
+            bindless_support: capabilities.bindless_support(),
             instance_data_buffer,
             instance_index_vertex_buffer,
             command_buffer,
@@ -161,31 +174,58 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(2, &self.bind_group, &[]);
 
-        for batch in draw_data.batches.iter() {
-            if batch.count == 0 {
-                continue;
+        match self.bindless_support {
+            BindlessSupport::Full | BindlessSupport::Limited => {
+                for batch in draw_data.batches.iter() {
+                    if batch.count == 0 {
+                        continue;
+                    }
+
+                    pass.set_bind_group(3, batch.texture_set.get_bind_group().unwrap(), &[]);
+                    pass.set_vertex_buffer(0, batch.vertex_buffer.slice(..));
+                    pass.set_vertex_buffer(1, self.instance_index_vertex_buffer.slice(..));
+
+                    if self.multi_draw_indirect_support {
+                        pass.multi_draw_indirect(
+                            self.command_buffer.get_buffer(),
+                            (batch.offset * size_of::<DrawIndirectArgs>()) as BufferAddress,
+                            batch.count as u32,
+                        );
+                    } else {
+                        let start = batch.offset;
+                        let end = start + batch.count;
+
+                        for (index, instruction) in draw_data.instructions[start..end].iter().enumerate() {
+                            let vertex_start = instruction.vertex_offset as u32;
+                            let vertex_end = vertex_start + instruction.vertex_count as u32;
+                            let index = (start + index) as u32;
+
+                            pass.draw(vertex_start..vertex_end, index..index + 1);
+                        }
+                    }
+                }
             }
+            BindlessSupport::None => {
+                for batch in draw_data.batches.iter() {
+                    if batch.count == 0 {
+                        continue;
+                    }
 
-            pass.set_bind_group(3, batch.texture.get_bind_group(), &[]);
-            pass.set_vertex_buffer(0, batch.vertex_buffer.slice(..));
-            pass.set_vertex_buffer(1, self.instance_index_vertex_buffer.slice(..));
+                    pass.set_vertex_buffer(0, batch.vertex_buffer.slice(..));
+                    pass.set_vertex_buffer(1, self.instance_index_vertex_buffer.slice(..));
 
-            if self.multi_draw_indirect_support {
-                pass.multi_draw_indirect(
-                    self.command_buffer.get_buffer(),
-                    (batch.offset * size_of::<DrawIndirectArgs>()) as BufferAddress,
-                    batch.count as u32,
-                );
-            } else {
-                let start = batch.offset;
-                let end = start + batch.count;
+                    let start = batch.offset;
+                    let end = start + batch.count;
 
-                for (index, instruction) in draw_data.instructions[start..end].iter().enumerate() {
-                    let vertex_start = instruction.vertex_offset as u32;
-                    let vertex_end = vertex_start + instruction.vertex_count as u32;
-                    let index = (start + index) as u32;
+                    for (index, instruction) in draw_data.instructions[start..end].iter().enumerate() {
+                        let vertex_start = instruction.vertex_offset as u32;
+                        let vertex_end = vertex_start + instruction.vertex_count as u32;
+                        let index = (start + index) as u32;
+                        let texture_bind_group = batch.texture_set.get_texture_bind_group(instruction.texture_index);
 
-                    pass.draw(vertex_start..vertex_end, index..index + 1);
+                        pass.set_bind_group(3, texture_bind_group, &[]);
+                        pass.draw(vertex_start..vertex_end, index..index + 1);
+                    }
                 }
             }
         }

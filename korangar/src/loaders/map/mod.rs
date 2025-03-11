@@ -5,14 +5,13 @@ use std::sync::Arc;
 use bytemuck::Pod;
 use cgmath::{Array, Point2, Vector3};
 use derive_new::new;
-use hashbrown::{HashMap, HashSet};
+use hashbrown::HashMap;
 use korangar_audio::AudioEngine;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::Timer;
 use korangar_util::FileLoader;
 use korangar_util::collision::{AABB, KDTree, Sphere};
 use korangar_util::container::SimpleSlab;
-use korangar_util::texture_atlas::{AllocationId, AtlasAllocation};
 use ragnarok_bytes::{ByteReader, FromBytes};
 use ragnarok_formats::map::{GatData, GroundData, MapData, MapResources};
 use ragnarok_formats::version::InternalVersion;
@@ -21,9 +20,9 @@ use wgpu::{BufferUsages, Device, Queue};
 pub use self::vertices::MAP_TILE_SIZE;
 use self::vertices::{generate_tile_vertices, ground_vertices};
 use super::error::LoadError;
-use crate::graphics::{Buffer, ModelVertex, NativeModelVertex, Texture};
-use crate::loaders::{FALLBACK_MODEL_FILE, GameFileLoader, ImageType, ModelLoader, TextureAtlas, TextureLoader};
-use crate::world::{Library, LightSourceKey, Lighting, Model};
+use crate::graphics::{BindlessSupport, Buffer, ModelVertex, Texture, TextureSet};
+use crate::loaders::{GameFileLoader, ImageType, ModelLoader, TextureLoader, TextureSetBuilder, split_mesh_by_texture};
+use crate::world::{Library, LightSourceKey, Lighting, Model, SubMesh};
 use crate::{EffectSourceExt, LightSourceExt, Map, Object, ObjectKey, SoundSourceExt};
 
 const MAP_OFFSET: f32 = 5.0;
@@ -41,54 +40,27 @@ fn assert_byte_reader_empty<Meta>(mut byte_reader: ByteReader<Meta>, file_name: 
     }
 }
 
-pub struct DeferredVertexGeneration {
-    pub native_model_vertices: Vec<NativeModelVertex>,
-    pub texture_allocation: Vec<AllocationId>,
-}
-
 #[derive(new)]
 pub struct MapLoader {
     device: Arc<Device>,
     queue: Arc<Queue>,
     game_file_loader: Arc<GameFileLoader>,
     audio_engine: Arc<AudioEngine<GameFileLoader>>,
+    bindless_support: BindlessSupport,
 }
 
 impl MapLoader {
-    pub fn collect_map_textures(&self, model_loader: &ModelLoader, resource_file: &str) -> Result<HashSet<String>, LoadError> {
-        let mut textures = HashSet::new();
-        let map_file_name = format!("data\\{}.rsw", resource_file);
-        let map_data: MapData = parse_generic_data(&map_file_name, &self.game_file_loader)?;
-
-        let ground_file = format!("data\\{}", map_data.ground_file);
-        let ground_data: GroundData = parse_generic_data(&ground_file, &self.game_file_loader)?;
-
-        ground_data.textures.iter().for_each(|texture_name| {
-            textures.insert(texture_name.clone());
-        });
-
-        model_loader.collect_model_textures(&mut textures, FALLBACK_MODEL_FILE);
-
-        map_data.resources.objects.iter().for_each(|object_data| {
-            model_loader.collect_model_textures(&mut textures, object_data.model_name.as_str());
-        });
-
-        Ok(textures)
-    }
-
     pub fn load(
         &self,
-        texture_atlas: &mut dyn TextureAtlas,
         resource_file: String,
         model_loader: &ModelLoader,
         texture_loader: Arc<TextureLoader>,
         library: &Library,
-        #[cfg(feature = "debug")] tile_texture_mapping: &[AtlasAllocation],
     ) -> Result<Box<Map>, LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load map from {}", &resource_file));
 
-        let mut deferred_vertex_generation: Vec<DeferredVertexGeneration> = Vec::new();
+        let mut texture_set_builder = TextureSetBuilder::new(texture_loader.clone(), resource_file.clone());
 
         let map_file_name = format!("data\\{}.rsw", &resource_file);
         let mut map_data: MapData = parse_generic_data(&map_file_name, &self.game_file_loader)?;
@@ -106,7 +78,7 @@ impl MapLoader {
         let map_data_clone = map_data.clone();
 
         #[cfg(feature = "debug")]
-        let (tile_vertices, tile_picker_vertices) = generate_tile_vertices(&mut gat_data, tile_texture_mapping);
+        let (mut tile_vertices, tile_picker_vertices) = generate_tile_vertices(&mut gat_data);
         #[cfg(not(feature = "debug"))]
         let (_, tile_picker_vertices) = generate_tile_vertices(&mut gat_data);
 
@@ -116,26 +88,27 @@ impl MapLoader {
             .and_then(|settings| settings.water_level)
             .unwrap_or_default();
 
-        let (ground_native_vertices, water_bounds) = ground_vertices(&ground_data, water_level);
+        let (mut model_vertices, water_bounds, mut ground_texture_transparencies) =
+            ground_vertices(&ground_data, water_level, &mut texture_set_builder);
 
-        let ground_vertex_offset = 0;
-        let ground_vertex_count = ground_native_vertices.len();
-        let mut vertex_offset = ground_vertex_count;
-
-        let ground_texture_allocation: Vec<AllocationId> = ground_data
-            .textures
-            .iter()
-            .map(|texture_name| {
-                let entry = texture_atlas.register(texture_name);
-                debug_assert!(!entry.transparent, "found transparent ground texture");
-                entry.allocation_id
-            })
-            .collect();
-
-        deferred_vertex_generation.push(DeferredVertexGeneration {
-            native_model_vertices: ground_native_vertices,
-            texture_allocation: ground_texture_allocation,
-        });
+        let sub_meshes = match self.bindless_support {
+            BindlessSupport::Full | BindlessSupport::Limited => {
+                vec![SubMesh {
+                    vertex_offset: 0,
+                    vertex_count: model_vertices.len(),
+                    texture_index: 0,
+                    transparent: false,
+                }]
+            }
+            BindlessSupport::None => {
+                let ground_texture_transparencies = ground_texture_transparencies
+                    .drain(..)
+                    .enumerate()
+                    .map(|(index, transparent)| (index as i32, transparent))
+                    .collect();
+                split_mesh_by_texture(&mut model_vertices, None, Some(&ground_texture_transparencies))
+            }
+        };
 
         let water_textures: Option<Vec<Arc<Texture>>> =
             map_data
@@ -155,11 +128,20 @@ impl MapLoader {
                 });
 
         #[cfg(feature = "debug")]
-        let tile_vertex_buffer = Arc::new(
-            (!tile_vertices.is_empty())
-                .then(|| self.create_vertex_buffer(&resource_file, "tile", &tile_vertices))
-                .unwrap(),
-        );
+        let tile_submeshes = match self.bindless_support {
+            BindlessSupport::Full | BindlessSupport::Limited => {
+                vec![SubMesh {
+                    vertex_offset: 0,
+                    vertex_count: tile_vertices.len(),
+                    texture_index: 0,
+                    transparent: true,
+                }]
+            }
+            BindlessSupport::None => split_mesh_by_texture(&mut tile_vertices, None, None),
+        };
+
+        #[cfg(feature = "debug")]
+        let tile_vertex_buffer = Arc::new(self.create_vertex_buffer(&resource_file, "tile", &tile_vertices));
 
         let tile_picker_vertex_buffer =
             (!tile_picker_vertices.is_empty()).then(|| self.create_vertex_buffer(&resource_file, "tile picker", &tile_picker_vertices));
@@ -180,16 +162,16 @@ impl MapLoader {
                 let model = model_cache
                     .entry((object_data.model_name.clone(), reverse_order))
                     .or_insert_with(|| {
-                        let (model, deferred) = model_loader
-                            .load(
-                                &mut (*texture_atlas),
-                                &mut vertex_offset,
-                                object_data.model_name.as_str(),
-                                reverse_order,
-                            )
-                            .expect("can't find model");
-                        deferred_vertex_generation.push(deferred);
-                        Arc::new(model)
+                        Arc::new(
+                            model_loader
+                                .load(
+                                    &mut texture_set_builder,
+                                    &mut model_vertices,
+                                    object_data.model_name.as_str(),
+                                    reverse_order,
+                                )
+                                .expect("can't find model"),
+                        )
                     })
                     .clone();
 
@@ -199,8 +181,7 @@ impl MapLoader {
                     model,
                     object_data.transform,
                 );
-                let bounding_box_matrix = object.get_bounding_box_matrix();
-                let bounding_box = AABB::from_transformation_matrix(bounding_box_matrix);
+                let bounding_box = object.calculate_object_aabb();
                 let key = objects.insert(object).expect("objects slab is full");
 
                 (key, bounding_box)
@@ -208,13 +189,7 @@ impl MapLoader {
             .collect();
         let object_kdtree = KDTree::from_objects(&object_bounding_boxes);
 
-        let (texture, vertex_buffer) = self.generate_vertex_buffer_and_atlas_texture(
-            &resource_file,
-            &texture_loader,
-            texture_atlas,
-            deferred_vertex_generation,
-            vertex_offset,
-        );
+        let (texture_set, vertex_buffer) = self.build_vertex_buffer_and_texture_set(&resource_file, texture_set_builder, model_vertices);
 
         let lighting = Lighting::new(map_data.light_settings);
 
@@ -245,10 +220,9 @@ impl MapLoader {
             water_settings,
             water_bounds,
             gat_data.tiles,
-            ground_vertex_offset,
-            ground_vertex_count,
+            sub_meshes,
             vertex_buffer,
-            texture,
+            texture_set,
             water_textures,
             objects,
             light_sources,
@@ -258,6 +232,8 @@ impl MapLoader {
             tile_picker_vertex_buffer.unwrap(),
             #[cfg(feature = "debug")]
             tile_vertex_buffer,
+            #[cfg(feature = "debug")]
+            tile_submeshes,
             object_kdtree,
             light_sources_kdtree,
             background_music_track_name,
@@ -271,33 +247,15 @@ impl MapLoader {
         Ok(Box::new(map))
     }
 
-    fn generate_vertex_buffer_and_atlas_texture(
+    fn build_vertex_buffer_and_texture_set(
         &self,
         resource_file: &str,
-        texture_loader: &TextureLoader,
-        texture_atlas: &mut dyn TextureAtlas,
-        mut deferred_vertex_generation: Vec<DeferredVertexGeneration>,
-        vertex_offset: usize,
-    ) -> (Arc<Texture>, Arc<Buffer<ModelVertex>>) {
-        // We can now generate the final texture atlas. Then we can map the final model
-        // vertices texture coordinates.
-        texture_atlas.build_atlas();
-
-        let mut vertices = Vec::with_capacity(vertex_offset);
-        for mut deferred in deferred_vertex_generation.drain(..) {
-            let texture_mapping: Vec<AtlasAllocation> = deferred
-                .texture_allocation
-                .drain(..)
-                .map(|allocation_id| texture_atlas.get_allocation(allocation_id).unwrap())
-                .collect();
-            let model_vertices = NativeModelVertex::to_vertices(deferred.native_model_vertices, &texture_mapping);
-            vertices.extend(model_vertices);
-        }
-
-        let texture = texture_atlas.create_texture(texture_loader);
-        let vertex_buffer = Arc::new(self.create_vertex_buffer(resource_file, "map vertices", &vertices));
-
-        (texture, vertex_buffer)
+        texture_set_builder: TextureSetBuilder,
+        model_vertices: Vec<ModelVertex>,
+    ) -> (Arc<TextureSet>, Arc<Buffer<ModelVertex>>) {
+        let texture_set = Arc::new(texture_set_builder.build());
+        let vertex_buffer = Arc::new(self.create_vertex_buffer(resource_file, "map vertices", &model_vertices));
+        (texture_set, vertex_buffer)
     }
 
     fn create_vertex_buffer<T: Pod>(&self, resource: &str, label: &str, vertices: &[T]) -> Buffer<T> {

@@ -8,7 +8,6 @@ use korangar_debug::logging::{Colorize, Timer, print_debug};
 use korangar_util::FileLoader;
 use korangar_util::collision::AABB;
 use korangar_util::math::multiply_matrix4_and_point3;
-use korangar_util::texture_atlas::AllocationId;
 use num::Zero;
 use ragnarok_bytes::{ByteReader, FromBytes};
 use ragnarok_formats::model::{ModelData, NodeData};
@@ -16,15 +15,15 @@ use ragnarok_formats::version::InternalVersion;
 use smallvec::{SmallVec, smallvec};
 
 use super::error::LoadError;
-use super::{FALLBACK_MODEL_FILE, smooth_model_normals};
-use crate::graphics::{Color, NativeModelVertex};
-use crate::loaders::map::DeferredVertexGeneration;
-use crate::loaders::{GameFileLoader, TextureAtlas, TextureAtlasEntry};
-use crate::world::{Model, Node};
+use super::{FALLBACK_MODEL_FILE, TextureSetBuilder, smooth_model_normals};
+use crate::graphics::{BindlessSupport, Color, ModelVertex, NativeModelVertex};
+use crate::loaders::GameFileLoader;
+use crate::world::{Model, Node, SubMesh};
 
 #[derive(new)]
 pub struct ModelLoader {
     game_file_loader: Arc<GameFileLoader>,
+    bindless_support: BindlessSupport,
 }
 
 impl ModelLoader {
@@ -181,12 +180,12 @@ impl ModelLoader {
     }
 
     fn process_node_mesh(
+        bindless_support: BindlessSupport,
         version: InternalVersion,
         current_node: &NodeData,
         nodes: &[NodeData],
         processed_node_indices: &mut [bool],
-        vertex_offset: &mut usize,
-        native_vertices: &mut Vec<NativeModelVertex>,
+        model_vertices: &mut Vec<ModelVertex>,
         texture_mapping: &TextureMapping,
         parent_matrix: &Matrix4<f32>,
         main_bounding_box: &mut AABB,
@@ -225,12 +224,12 @@ impl ModelLoader {
             .iter()
             .map(|&index| {
                 Self::process_node_mesh(
+                    bindless_support,
                     version,
                     &nodes[index],
                     nodes,
                     processed_node_indices,
-                    vertex_offset,
-                    native_vertices,
+                    model_vertices,
                     texture_mapping,
                     &box_transform_matrix,
                     main_bounding_box,
@@ -242,40 +241,27 @@ impl ModelLoader {
             })
             .collect();
 
-        // Map the node texture index to the model texture index.
-        let (node_texture_mapping, texture_transparency): (Vec<i32>, Vec<bool>) = match texture_mapping {
+        let node_textures: Vec<ModelTexture> = match texture_mapping {
             TextureMapping::PreVersion2_3(vector_texture) => current_node
                 .texture_indices
                 .iter()
-                .map(|&index| {
-                    let model_texture = vector_texture[index as usize];
-                    (model_texture.index, model_texture.transparent)
-                })
-                .unzip(),
+                .map(|&index| vector_texture[index as usize])
+                .collect(),
             TextureMapping::PostVersion2_3(hashmap_texture) => current_node
                 .texture_names
                 .iter()
-                .map(|name| {
-                    let model_texture = hashmap_texture.get(name.as_ref()).unwrap();
-                    (model_texture.index, model_texture.transparent)
-                })
-                .unzip(),
+                .map(|name| *hashmap_texture.get(name.as_ref()).unwrap())
+                .collect(),
         };
-
-        let has_transparent_parts = texture_transparency.iter().any(|x| *x);
 
         let mut node_native_vertices = Self::make_vertices(current_node, &main_matrix, reverse_order, smooth_normals);
         let centroid = Self::calculate_centroid(&node_native_vertices);
 
         node_native_vertices
             .iter_mut()
-            .for_each(|vertice| vertice.texture_index = node_texture_mapping[vertice.texture_index as usize]);
+            .for_each(|vertice| vertice.texture_index = node_textures[vertice.texture_index as usize].index);
 
-        // Remember the vertex offset/count and gather node vertices.
-        let node_vertex_offset = *vertex_offset;
-        let node_vertex_count = node_native_vertices.len();
-        *vertex_offset += node_vertex_count;
-        native_vertices.extend(node_native_vertices.iter().cloned());
+        let mut node_model_vertices = NativeModelVertex::to_vertices(node_native_vertices);
 
         // Apply the frames per second on the keyframes values.
         let animation_length = match version.equals_or_above(2, 2) {
@@ -316,22 +302,54 @@ impl ModelLoader {
             false => current_node.rotation_keyframes.clone(),
         };
 
-        Node::new(
-            version,
-            transform_matrix,
-            rotation_matrix.into(),
-            Matrix4::<f32>::identity(),
-            position,
-            centroid,
-            has_transparent_parts,
-            node_vertex_offset,
-            node_vertex_count,
-            child_nodes,
-            animation_length,
-            scale_keyframes,
-            translation_keyframes,
-            rotation_keyframes,
-        )
+        match bindless_support {
+            BindlessSupport::Full | BindlessSupport::Limited => {
+                // Remember the vertex offset/count and gather node vertices.
+                let vertex_offset = model_vertices.len();
+                let vertex_count = node_model_vertices.len();
+                model_vertices.extend(node_model_vertices);
+
+                Node::new(
+                    version,
+                    transform_matrix,
+                    rotation_matrix.into(),
+                    Matrix4::identity(),
+                    position,
+                    centroid,
+                    vec![SubMesh {
+                        vertex_offset,
+                        vertex_count,
+                        texture_index: 0,
+                        transparent: node_textures.iter().any(|texture| texture.transparent),
+                    }],
+                    child_nodes,
+                    animation_length,
+                    scale_keyframes,
+                    translation_keyframes,
+                    rotation_keyframes,
+                )
+            }
+            BindlessSupport::None => {
+                let texture_transparencies: HashMap<i32, bool> =
+                    node_textures.iter().map(|texture| (texture.index, texture.transparent)).collect();
+                let submeshes = split_mesh_by_texture(&mut node_model_vertices, Some(model_vertices), Some(&texture_transparencies));
+
+                Node::new(
+                    version,
+                    transform_matrix,
+                    rotation_matrix.into(),
+                    Matrix4::identity(),
+                    position,
+                    centroid,
+                    submeshes,
+                    child_nodes,
+                    animation_length,
+                    scale_keyframes,
+                    translation_keyframes,
+                    rotation_keyframes,
+                )
+            }
+        }
     }
 
     pub fn calculate_transformation_matrix(
@@ -414,31 +432,13 @@ impl ModelLoader {
         }
     }
 
-    pub fn collect_model_textures(&self, textures: &mut HashSet<String>, model_file: &str) {
-        let Ok(bytes) = self.game_file_loader.get(&format!("data\\model\\{model_file}")) else {
-            return;
-        };
-        let mut byte_reader: ByteReader<Option<InternalVersion>> = ByteReader::with_default_metadata(&bytes);
-
-        let Ok(model_data) = ModelData::from_bytes(&mut byte_reader) else {
-            return;
-        };
-
-        let version: InternalVersion = model_data.version.into();
-
-        let texture_names = ModelLoader::collect_versioned_texture_names(&version, &model_data);
-        texture_names.into_iter().for_each(|texture_name| {
-            let _ = textures.insert(texture_name);
-        });
-    }
-
     pub fn load(
         &self,
-        texture_atlas: &mut dyn TextureAtlas,
-        vertex_offset: &mut usize,
+        texture_set_builder: &mut TextureSetBuilder,
+        model_vertices: &mut Vec<ModelVertex>,
         model_file: &str,
         reverse_order: bool,
-    ) -> Result<(Model, DeferredVertexGeneration), LoadError> {
+    ) -> Result<Model, LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load rsm model from {}", model_file.magenta()));
 
@@ -451,7 +451,7 @@ impl ModelLoader {
                     print_debug!("Replacing with fallback");
                 }
 
-                return self.load(texture_atlas, vertex_offset, FALLBACK_MODEL_FILE, reverse_order);
+                return self.load(texture_set_builder, model_vertices, FALLBACK_MODEL_FILE, reverse_order);
             }
         };
         let mut byte_reader: ByteReader<Option<InternalVersion>> = ByteReader::with_default_metadata(&bytes);
@@ -465,7 +465,7 @@ impl ModelLoader {
                     print_debug!("Replacing with fallback");
                 }
 
-                return self.load(texture_atlas, vertex_offset, FALLBACK_MODEL_FILE, reverse_order);
+                return self.load(texture_set_builder, model_vertices, FALLBACK_MODEL_FILE, reverse_order);
             }
         };
 
@@ -479,40 +479,26 @@ impl ModelLoader {
                 print_debug!("Replacing with fallback");
             }
 
-            return self.load(texture_atlas, vertex_offset, FALLBACK_MODEL_FILE, reverse_order);
+            return self.load(texture_set_builder, model_vertices, FALLBACK_MODEL_FILE, reverse_order);
         }
 
         let texture_names = ModelLoader::collect_versioned_texture_names(&version, &model_data);
 
-        let texture_allocation: Vec<TextureAtlasEntry> = texture_names
+        let model_textures: Vec<ModelTexture> = texture_names
             .iter()
-            .map(|texture_name| texture_atlas.register(texture_name.as_ref()))
+            .map(|texture_name| {
+                let (index, transparent) = texture_set_builder.register(texture_name.as_ref());
+                ModelTexture { index, transparent }
+            })
             .collect();
 
         let texture_mapping = match version.equals_or_above(2, 3) {
             true => {
-                let hashmap_texture =
-                    HashMap::<String, ModelTexture>::from_iter(texture_names.into_iter().zip(texture_allocation.clone()).enumerate().map(
-                        |(index, (name, entry))| {
-                            (name, ModelTexture {
-                                index: index as i32,
-                                transparent: entry.transparent,
-                            })
-                        },
-                    ));
-                TextureMapping::PostVersion2_3(hashmap_texture)
+                let model_textures =
+                    HashMap::<String, ModelTexture>::from_iter(texture_names.into_iter().zip(model_textures.iter().copied()));
+                TextureMapping::PostVersion2_3(model_textures)
             }
-            false => {
-                let vector_texture: Vec<ModelTexture> = texture_allocation
-                    .iter()
-                    .enumerate()
-                    .map(|(index, entry)| ModelTexture {
-                        index: index as i32,
-                        transparent: entry.transparent,
-                    })
-                    .collect();
-                TextureMapping::PreVersion2_3(vector_texture)
-            }
+            false => TextureMapping::PreVersion2_3(model_textures),
         };
 
         let root_node_names = match version.equals_or_above(2, 2) {
@@ -535,19 +521,18 @@ impl ModelLoader {
 
         let mut processed_node_indices = vec![false; model_data.nodes.len()];
         let mut model_bounding_box = AABB::uninitialized();
-        let mut native_model_vertices = Vec::<NativeModelVertex>::new();
 
         let mut root_nodes: Vec<Node> = root_info
             .into_iter()
             .map(|(root_node_position, root_node)| {
                 processed_node_indices[root_node_position] = true;
                 Self::process_node_mesh(
+                    self.bindless_support,
                     version,
                     root_node,
                     &model_data.nodes,
                     &mut processed_node_indices,
-                    vertex_offset,
-                    &mut native_model_vertices,
+                    model_vertices,
                     &texture_mapping,
                     &Matrix4::identity(),
                     &mut model_bounding_box,
@@ -583,18 +568,59 @@ impl ModelLoader {
             model_data,
         );
 
-        let texture_allocation: Vec<AllocationId> = texture_allocation.iter().map(|entry| entry.allocation_id).collect();
-
-        let deferred = DeferredVertexGeneration {
-            native_model_vertices,
-            texture_allocation,
-        };
-
         #[cfg(feature = "debug")]
         timer.stop();
 
-        Ok((model, deferred))
+        Ok(model)
     }
+}
+
+/// When bindless is not supported, we need to create separate meshes for
+/// each texture used in the mesh so we can bind the appropriate texture
+/// before drawing each sub-mesh.
+pub fn split_mesh_by_texture(
+    model_vertices: &mut [ModelVertex],
+    mut global_model_vertices: Option<&mut Vec<ModelVertex>>,
+    texture_transparencies: Option<&HashMap<i32, bool>>,
+) -> Vec<SubMesh> {
+    // Stable sort preserves original order within same texture
+    model_vertices.sort_by_key(|v| v.texture_index);
+
+    let mut submeshes = Vec::new();
+
+    let mut start_index = 0;
+    while start_index < model_vertices.len() {
+        let texture_index = model_vertices[start_index].texture_index;
+        let transparent = texture_transparencies
+            .and_then(|transparencies| transparencies.get(&texture_index).copied())
+            .unwrap_or(false);
+
+        let mut end_index = start_index + 1;
+        while end_index < model_vertices.len() && model_vertices[end_index].texture_index == texture_index {
+            end_index += 1;
+        }
+
+        let (vertex_offset, vertex_count) = match global_model_vertices.as_mut() {
+            None => (start_index, end_index - start_index),
+            Some(global_model_vertices) => {
+                let vertex_offset = global_model_vertices.len();
+                let vertex_count = end_index - start_index;
+                global_model_vertices.extend_from_slice(&model_vertices[start_index..end_index]);
+                (vertex_offset, vertex_count)
+            }
+        };
+
+        submeshes.push(SubMesh {
+            vertex_offset,
+            vertex_count,
+            texture_index,
+            transparent,
+        });
+
+        start_index = end_index;
+    }
+
+    submeshes
 }
 
 #[derive(Copy, Clone)]

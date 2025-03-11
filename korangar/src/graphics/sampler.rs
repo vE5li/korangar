@@ -11,9 +11,9 @@ pub(crate) fn create_new_sampler(
     match sampler_type.into() {
         SamplerType::TextureNearest => device.create_sampler(&SamplerDescriptor {
             label: Some(label),
-            address_mode_u: AddressMode::default(),
-            address_mode_v: AddressMode::default(),
-            address_mode_w: AddressMode::default(),
+            address_mode_u: AddressMode::Repeat,
+            address_mode_v: AddressMode::Repeat,
+            address_mode_w: AddressMode::Repeat,
             mag_filter: FilterMode::Nearest,
             min_filter: FilterMode::Nearest,
             mipmap_filter: FilterMode::Nearest,
@@ -25,9 +25,9 @@ pub(crate) fn create_new_sampler(
         }),
         SamplerType::TextureLinear => device.create_sampler(&SamplerDescriptor {
             label: Some(label),
-            address_mode_u: AddressMode::default(),
-            address_mode_v: AddressMode::default(),
-            address_mode_w: AddressMode::default(),
+            address_mode_u: AddressMode::Repeat,
+            address_mode_v: AddressMode::Repeat,
+            address_mode_w: AddressMode::Repeat,
             mag_filter: FilterMode::Linear,
             min_filter: FilterMode::Linear,
             mipmap_filter: FilterMode::Linear,
@@ -39,9 +39,9 @@ pub(crate) fn create_new_sampler(
         }),
         SamplerType::TextureAnisotropic(anisotropy_clamp) => device.create_sampler(&SamplerDescriptor {
             label: Some(label),
-            address_mode_u: AddressMode::default(),
-            address_mode_v: AddressMode::default(),
-            address_mode_w: AddressMode::default(),
+            address_mode_u: AddressMode::Repeat,
+            address_mode_v: AddressMode::Repeat,
+            address_mode_w: AddressMode::Repeat,
             mag_filter: FilterMode::Linear,
             min_filter: FilterMode::Linear,
             mipmap_filter: FilterMode::Linear,

@@ -7,7 +7,7 @@ use ragnarok_packets::ClientTick;
 
 #[cfg(feature = "debug")]
 use crate::graphics::RenderSettings;
-use crate::graphics::{Buffer, ModelInstruction, ModelVertex, PointLightInstruction, PointShadowCasterInstruction, Texture};
+use crate::graphics::{Buffer, ModelInstruction, ModelVertex, PointLightInstruction, PointShadowCasterInstruction, TextureSet};
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
 #[cfg(feature = "debug")]
@@ -67,7 +67,7 @@ impl PointLight {
         instructions: &mut Vec<PointShadowCasterInstruction>,
         view_projection_matrices: [Matrix4<f32>; 6],
         view_matrices: [Matrix4<f32>; 6],
-        model_texture: Arc<Texture>,
+        model_texture_set: Arc<TextureSet>,
         model_vertex_buffer: Arc<Buffer<ModelVertex>>,
         entity_offset: [usize; 6],
         entity_count: [usize; 6],
@@ -80,7 +80,7 @@ impl PointLight {
             position: self.position,
             color: self.color,
             range: self.range,
-            model_texture,
+            model_texture_set,
             model_vertex_buffer,
             entity_offset,
             entity_count,
@@ -268,7 +268,7 @@ impl PointLightSet<'_> {
                 point_light_with_shadow_instructions,
                 view_projection_matrices,
                 view_matrices,
-                map.get_texture().clone(),
+                map.get_texture_set().clone(),
                 map.get_model_vertex_buffer().clone(),
                 entity_offsets,
                 entity_counts,

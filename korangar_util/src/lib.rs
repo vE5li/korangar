@@ -9,7 +9,6 @@ mod loader;
 pub mod math;
 pub mod pathing;
 mod rectangle;
-pub mod texture_atlas;
 
 pub use loader::{FileLoader, FileNotFoundError};
 pub use rectangle::Rectangle;

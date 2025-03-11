@@ -17,7 +17,7 @@ use wgpu::{
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, ForwardRenderPassContext, RenderPassContext,
 };
-use crate::graphics::{Buffer, Capabilities, EntityInstruction, GlobalContext, Prepare, RenderInstruction, Texture};
+use crate::graphics::{BindlessSupport, Buffer, Capabilities, EntityInstruction, GlobalContext, Prepare, RenderInstruction, Texture};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/entity.wgsl");
 const SHADER_BINDLESS: ShaderModuleDescriptor = include_wgsl!("shader/entity_bindless.wgsl");
@@ -79,7 +79,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
         global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {
-        let shader_module = if capabilities.supports_bindless() {
+        let shader_module = if capabilities.bindless_support() == BindlessSupport::Full {
             device.create_shader_module(SHADER_BINDLESS)
         } else {
             device.create_shader_module(SHADER)
@@ -92,7 +92,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
             (size_of::<InstanceData>() * INITIAL_INSTRUCTION_SIZE) as _,
         );
 
-        let bind_group_layout = if capabilities.supports_bindless() {
+        let bind_group_layout = if capabilities.bindless_support() == BindlessSupport::Full {
             device.create_bind_group_layout(&BindGroupLayoutDescriptor {
                 label: Some(DRAWER_NAME),
                 entries: &[
@@ -134,7 +134,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
             })
         };
 
-        let bind_group = if capabilities.supports_bindless() {
+        let bind_group = if capabilities.bindless_support() == BindlessSupport::Full {
             Self::create_bind_group_bindless(device, &bind_group_layout, &instance_data_buffer, &[global_context
                 .solid_pixel_texture
                 .get_texture_view()])
@@ -144,7 +144,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
 
         let pass_bind_group_layouts = Self::Context::bind_group_layout(device);
 
-        let bind_group_layouts: &[&BindGroupLayout] = if capabilities.supports_bindless() {
+        let bind_group_layouts: &[&BindGroupLayout] = if capabilities.bindless_support() == BindlessSupport::Full {
             &[pass_bind_group_layouts[0], pass_bind_group_layouts[1], &bind_group_layout]
         } else {
             &[
@@ -184,7 +184,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
         );
 
         Self {
-            bindless_support: capabilities.supports_bindless(),
+            bindless_support: capabilities.bindless_support() == BindlessSupport::Full,
             solid_pixel_texture: global_context.solid_pixel_texture.clone(),
             instance_data_buffer,
             bind_group_layout,

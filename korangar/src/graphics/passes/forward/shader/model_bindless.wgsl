@@ -47,6 +47,7 @@ struct VertexOutput {
     @location(2) normal: vec3<f32>,
     @location(3) texture_coordinates: vec2<f32>,
     @location(4) color: vec3<f32>,
+    @location(5) texture_index: i32,
 }
 
 override PASS_MODE: u32;
@@ -75,7 +76,7 @@ struct WboitOutput {
 @group(1) @binding(4) var<storage, read> tile_light_indices: array<TileLightIndices>;
 @group(1) @binding(5) var point_shadow_maps: texture_depth_cube_array;
 @group(2) @binding(0) var<storage, read> instance_data: array<InstanceData>;
-@group(3) @binding(0) var texture: texture_2d<f32>;
+@group(3) @binding(0) var textures: binding_array<texture_2d<f32>>;
 
 override ALPHA_TO_COVERAGE_ACTIVATED: bool;
 
@@ -85,6 +86,7 @@ fn vs_main(
     @location(1) normal: vec3<f32>,
     @location(2) texture_coordinates: vec2<f32>,
     @location(3) color: vec3<f32>,
+    @location(4) texture_index: i32,
     @location(5) wind_affinity: f32,
     @location(6) instance_id: u32
 ) -> VertexOutput {
@@ -102,6 +104,7 @@ fn vs_main(
     output.normal = normalize((instance.inv_world * vec4<f32>(normal, 0.0)).xyz);
     output.texture_coordinates = texture_coordinates;
     output.color = color;
+    output.texture_index = texture_index;
     return output;
 }
 
@@ -128,11 +131,11 @@ fn fragment(input: VertexOutput) -> vec4<f32> {
     var alpha_channel: f32;
 
     if (ALPHA_TO_COVERAGE_ACTIVATED) {
-        diffuse_color = textureSample(texture, texture_sampler, input.texture_coordinates);
+        diffuse_color = textureSample(textures[input.texture_index], texture_sampler, input.texture_coordinates);
         alpha_channel = diffuse_color.a;
     } else {
-        diffuse_color = textureSample(texture, texture_sampler, input.texture_coordinates);
-        alpha_channel = textureSampleLevel(texture, nearest_sampler, input.texture_coordinates, 0.0).a;
+        diffuse_color = textureSample(textures[input.texture_index], texture_sampler, input.texture_coordinates);
+        alpha_channel = textureSampleLevel(textures[input.texture_index], nearest_sampler, input.texture_coordinates, 0.0).a;
     }
 
     var fragment_color: vec4<f32>;
@@ -159,7 +162,7 @@ fn fragment(input: VertexOutput) -> vec4<f32> {
 
         if (ALPHA_TO_COVERAGE_ACTIVATED) {
             // Apply mip level scaling for better mipmap coverage
-            let texture_size = vec2<f32>(textureDimensions(texture, 0));
+            let texture_size = vec2<f32>(textureDimensions(textures[input.texture_index], 0));
             let coverage = saturate(alpha_channel * (1.0 + max(0.0, calculate_mip_level(input.texture_coordinates * texture_size)) * MIP_SCALE));
 
             // Apply screen-space derivative scaling for better alpha to coverage anti-aliasing

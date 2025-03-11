@@ -21,14 +21,20 @@ pub struct Node {
     pub position: Vector4<f32>,
     #[hidden_element]
     pub centroid: Point3<f32>,
-    pub transparent: bool,
-    pub vertex_offset: usize,
-    pub vertex_count: usize,
+    pub sub_meshes: Vec<SubMesh>,
     pub child_nodes: Vec<Node>,
     pub animation_length: u32,
     pub scale_keyframes: Vec<ScaleKeyframeData>,
     pub translation_keyframes: Vec<TranslationKeyframeData>,
     pub rotation_keyframes: Vec<RotationKeyframeData>,
+}
+
+#[derive(PrototypeElement)]
+pub struct SubMesh {
+    pub vertex_offset: usize,
+    pub vertex_count: usize,
+    pub texture_index: i32,
+    pub transparent: bool,
 }
 
 impl Node {
@@ -229,12 +235,15 @@ impl Node {
             },
         };
 
-        instructions.push(ModelInstruction {
-            model_matrix,
-            vertex_offset: self.vertex_offset,
-            vertex_count: self.vertex_count,
-            distance,
-            transparent: self.transparent,
+        self.sub_meshes.iter().for_each(|mesh| {
+            instructions.push(ModelInstruction {
+                model_matrix,
+                vertex_offset: mesh.vertex_offset,
+                vertex_count: mesh.vertex_count,
+                texture_index: mesh.texture_index,
+                distance,
+                transparent: mesh.transparent,
+            });
         });
 
         self.child_nodes.iter().enumerate().for_each(|(node_index, node)| {

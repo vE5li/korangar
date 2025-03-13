@@ -182,8 +182,8 @@ impl FontLoader {
 
             for &id in &ids {
                 glyph_cache.insert(id, glyphs.clone());
+                let _ = font_system.get_font(id);
             }
-            font_system.cache_fonts(ids);
 
             font_map
         } else {
@@ -230,8 +230,8 @@ impl FontLoader {
 
                 for &id in &ids {
                     glyph_cache.insert(id, adjusted_glyphs.clone());
+                    let _ = font_system.get_font(id);
                 }
-                font_system.cache_fonts(ids);
 
                 imageops::replace(&mut font_map_image_data, &font_map, 0, start_height);
                 start_height += font_map_height as i64;
@@ -284,6 +284,7 @@ impl FontLoader {
                 ColorSpanIterator::new(text, default_color, attributes),
                 attributes,
                 Shaping::Advanced,
+                None,
             );
 
             buffer

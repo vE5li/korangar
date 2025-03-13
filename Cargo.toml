@@ -11,7 +11,7 @@ bumpalo = "3"
 bytemuck = "1"
 cgmath = "0.18"
 chrono = "0.4"
-cosmic-text = { version = "0.12", default-features = false }
+cosmic-text = { version = "0.13", default-features = false }
 cpal = "0.15"
 ctrlc = "3"
 ddsfile = "0.5"

@@ -28,7 +28,7 @@ impl NativeModelVertex {
         }
     }
 
-    fn to_model_vertex(self) -> ModelVertex {
+    fn into_model_vertex(self) -> ModelVertex {
         ModelVertex::new(
             self.position,
             self.normal,
@@ -51,9 +51,9 @@ impl NativeModelVertex {
             second_partial.normal = second_partial.normal.normalize();
             third_partial.normal = third_partial.normal.normalize();
 
-            vertices.push(first_partial.to_model_vertex());
-            vertices.push(second_partial.to_model_vertex());
-            vertices.push(third_partial.to_model_vertex());
+            vertices.push(first_partial.into_model_vertex());
+            vertices.push(second_partial.into_model_vertex());
+            vertices.push(third_partial.into_model_vertex());
         }
 
         vertices

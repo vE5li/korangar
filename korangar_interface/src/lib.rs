@@ -427,12 +427,7 @@ where
     #[cfg_attr(feature = "debug", korangar_debug::profile("check window exists"))]
     fn window_exists(&self, window_class: Option<&str>) -> bool {
         match window_class {
-            Some(window_class) => self.windows.iter().any(|window| {
-                window
-                    .0
-                    .get_window_class()
-                    .map_or(false, |other_window_class| window_class == other_window_class)
-            }),
+            Some(window_class) => self.windows.iter().any(|window| window.0.get_window_class() == Some(window_class)),
             None => false,
         }
     }

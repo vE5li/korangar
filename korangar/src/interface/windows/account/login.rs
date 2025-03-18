@@ -22,11 +22,11 @@ pub struct LoginWindow<'a> {
     client_info: &'a ClientInfo,
 }
 
-impl<'a> LoginWindow<'a> {
+impl LoginWindow<'_> {
     pub const WINDOW_CLASS: &'static str = "login";
 }
 
-impl<'a> PrototypeWindow<InterfaceSettings> for LoginWindow<'a> {
+impl PrototypeWindow<InterfaceSettings> for LoginWindow<'_> {
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }

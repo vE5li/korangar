@@ -42,7 +42,7 @@ impl PrototypeMutableRangeElement<f32> for f32 {
         // implementing `PrototypeMutableRangeElement` will be valid and pinned while
         // this element exists. Additionally, it should only be used in a debug
         // context.
-        let static_self = unsafe { std::mem::transmute::<_, &'static Self>(self) };
+        let static_self = unsafe { std::mem::transmute::<&Self, &'static Self>(self) };
 
         let elements = vec![
             StaticLabel::new(display.clone()).wrap(),
@@ -70,7 +70,7 @@ where
         // implementing `PrototypeMutableRangeElement` will be valid and pinned while
         // this element exists. Additionally, it should only be used in a debug
         // context.
-        let static_self = unsafe { std::mem::transmute::<_, &'static Self>(self) };
+        let static_self = unsafe { std::mem::transmute::<&Self, &'static Self>(self) };
 
         let elements = vec![
             StaticLabel::new(display.clone()).wrap(),

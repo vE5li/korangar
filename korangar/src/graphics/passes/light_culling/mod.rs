@@ -1,3 +1,4 @@
+#[allow(clippy::module_inception)]
 mod light_culling;
 
 pub(crate) use light_culling::LightCullingDispatcher;

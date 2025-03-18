@@ -12,12 +12,18 @@ pub struct DragButtonBuilder<Title, Width> {
     width_bound: Width,
 }
 
-impl DragButtonBuilder<Unset, Unset> {
-    pub fn new() -> Self {
+impl Default for DragButtonBuilder<Unset, Unset> {
+    fn default() -> Self {
         Self {
             title: Unset,
             width_bound: Unset,
         }
+    }
+}
+
+impl DragButtonBuilder<Unset, Unset> {
+    pub fn new() -> Self {
+        Self::default()
     }
 }
 

@@ -22,3 +22,19 @@ jobs:
 
       - name: Check formatting
         run: cargo fmt --all --check
+
+  flake-nix:
+    name: flake.nix formatting
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v25
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Check flake.nix
+        run: nix fmt flake.nix -- --check

@@ -178,7 +178,7 @@ pub struct DrainIter<'a, I: SimpleKey, T> {
     len: usize,
 }
 
-impl<'a, I: SimpleKey, T> Iterator for DrainIter<'a, I, T> {
+impl<I: SimpleKey, T> Iterator for DrainIter<'_, I, T> {
     type Item = (I, T);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -198,7 +198,7 @@ impl<'a, I: SimpleKey, T> Iterator for DrainIter<'a, I, T> {
     }
 }
 
-impl<'a, I: SimpleKey, T> Drop for DrainIter<'a, I, T> {
+impl<I: SimpleKey, T> Drop for DrainIter<'_, I, T> {
     fn drop(&mut self) {
         // Exhaust the iterator to ensure all remaining elements are dropped.
         for _ in self {}

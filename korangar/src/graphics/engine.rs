@@ -1254,7 +1254,7 @@ struct UploadVisitor<'a> {
     encoder: &'a mut CommandEncoder,
 }
 
-impl<'a> UploadVisitor<'a> {
+impl UploadVisitor<'_> {
     fn upload(&mut self, context: &mut impl Prepare) {
         context.upload(self.device, self.staging_belt, self.encoder);
     }

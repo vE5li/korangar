@@ -505,6 +505,7 @@ impl AttachmentTexture {
             *filterable = false;
         }
 
+        #[allow(clippy::type_complexity)]
         static LAYOUTS: OnceLock<Mutex<HashMap<(bool, TextureSampleType), Arc<BindGroupLayout>>>> = OnceLock::new();
         let layouts = LAYOUTS.get_or_init(|| Mutex::new(HashMap::new()));
         let lock = layouts.lock().unwrap();
@@ -541,7 +542,7 @@ pub(crate) struct AttachmentTextureFactory<'a> {
     padded_width: Option<u32>,
 }
 
-impl<'a> AttachmentTextureFactory<'a> {
+impl AttachmentTextureFactory<'_> {
     pub(crate) fn new_attachment(
         &self,
         texture_name: &str,

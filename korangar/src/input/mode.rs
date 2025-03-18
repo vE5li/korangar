@@ -42,10 +42,7 @@ impl MouseInputMode {
 
     pub fn grabbed(&self) -> Option<Grabbed> {
         match self {
-            MouseInputMode::MoveItem(_, item) => match item.metadata.texture.as_ref() {
-                None => None,
-                Some(texture) => Some(Grabbed::Texture(texture.clone())),
-            },
+            MouseInputMode::MoveItem(_, item) => item.metadata.texture.as_ref().map(|texture| Grabbed::Texture(texture.clone())),
             MouseInputMode::MoveSkill(_, skill) => Some(Grabbed::Action(
                 skill.sprite.clone(),
                 skill.actions.clone(),

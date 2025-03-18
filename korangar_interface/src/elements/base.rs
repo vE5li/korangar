@@ -39,7 +39,7 @@ where
     pub clip: App::Clip,
 }
 
-impl<'a, App> ElementRenderer<'a, App>
+impl<App> ElementRenderer<'_, App>
 where
     App: Application,
 {
@@ -106,6 +106,7 @@ where
         );
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn render_element(
         &mut self,
         element: &dyn Element<App>,
@@ -328,7 +329,7 @@ where
             .and_then(|weak_pointer| weak_pointer.upgrade())
             .and_then(|element| (*element).borrow_mut().scroll(delta))
     }
-
+    #[allow(clippy::too_many_arguments)]
     fn render(
         &self,
         render: &App::Renderer,

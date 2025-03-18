@@ -29,7 +29,7 @@ pub struct Colorized<'a, T> {
     color: &'static str,
 }
 
-impl<'a, T> Display for Colorized<'a, T>
+impl<T> Display for Colorized<'_, T>
 where
     T: Display,
 {
@@ -38,7 +38,7 @@ where
     }
 }
 
-impl<'a, T> Debug for Colorized<'a, T>
+impl<T> Debug for Colorized<'_, T>
 where
     T: Debug,
 {

@@ -161,7 +161,7 @@ impl<'a, T> Iterator for RingBufferIterator<'a, T> {
     }
 }
 
-impl<'a, T> ExactSizeIterator for RingBufferIterator<'a, T> {
+impl<T> ExactSizeIterator for RingBufferIterator<'_, T> {
     #[inline]
     fn len(&self) -> usize {
         self.front.len() + self.back.len()

@@ -24,6 +24,7 @@ where
     size_bound: SizeBound,
     size: App::Size,
     elements: Vec<ElementCell<App>>,
+    #[allow(clippy::type_complexity)]
     popup_element: Option<(ElementCell<App>, Tracker<App::Position>, Tracker<App::Size>)>,
     closable: bool,
     background_color: Option<ColorSelector<App>>,

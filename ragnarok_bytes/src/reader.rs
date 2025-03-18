@@ -143,7 +143,7 @@ where
         As: 'static,
     {
         match TypeId::of::<Meta>() == TypeId::of::<As>() {
-            true => unsafe { Ok(std::mem::transmute::<_, &As>(&self.metadata)) },
+            true => unsafe { Ok(std::mem::transmute::<&Meta, &As>(&self.metadata)) },
             false => Err(ConversionError::from_error_type(ConversionErrorType::IncorrectMetadata {
                 type_name: std::any::type_name::<Caller>(),
             })),
@@ -155,7 +155,7 @@ where
         As: 'static,
     {
         match TypeId::of::<Meta>() == TypeId::of::<As>() {
-            true => unsafe { Ok(std::mem::transmute::<_, &mut As>(&mut self.metadata)) },
+            true => unsafe { Ok(std::mem::transmute::<&mut Meta, &mut As>(&mut self.metadata)) },
             false => Err(ConversionError::from_error_type(ConversionErrorType::IncorrectMetadata {
                 type_name: std::any::type_name::<Caller>(),
             })),

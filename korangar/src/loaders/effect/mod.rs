@@ -36,6 +36,7 @@ impl EffectLoader {
         }
     }
 
+    #[allow(clippy::mut_range_bound)]
     fn load(&self, path: &str, texture_loader: &TextureLoader) -> Result<Arc<Effect>, LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load effect from {}", path.magenta()));

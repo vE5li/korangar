@@ -148,6 +148,7 @@ impl InputSystem {
         &self.keys[key_code as usize]
     }
 
+    #[allow(clippy::type_complexity)]
     #[cfg_attr(feature = "debug", korangar_debug::profile("update user input"))]
     pub fn user_events(
         &mut self,

@@ -1,0 +1,33 @@
+on:
+  push:
+  pull_request:
+    branches:
+      - main
+
+name: Lint
+
+jobs:
+  clippy:
+    name: Run cargo clippy
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+        run: cargo clippy --all-features -- -Dwarnings
+
+  flake-nix:
+    name: flake.nix linting
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v25
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Check flake.nix
+        run: nix flake check -L --all-systems

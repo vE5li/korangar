@@ -13,7 +13,7 @@ use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use cgmath::{InnerSpace, Matrix3, Point3, Quaternion, Vector3};
+use cgmath::{InnerSpace, Matrix3, One, Point3, Quaternion, Vector3};
 use cpal::BufferSize;
 use kira::backend::cpal::{CpalBackend, CpalBackendSettings};
 use kira::listener::ListenerHandle;
@@ -151,7 +151,7 @@ impl<F: FileLoader> AudioEngine<F> {
             .add_sub_track(TrackBuilder::new())
             .expect("Can't create spatial sound effect track");
         let position = Vector3::new(0.0, 0.0, 0.0);
-        let orientation = Quaternion::new(0.0, 0.0, 0.0, 0.0);
+        let orientation = Quaternion::one();
         let spatial_listener = manager.add_listener(position, orientation).expect("Can't create spatial listener");
 
         let loading_sound_effect = HashSet::new();

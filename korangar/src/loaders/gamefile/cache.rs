@@ -1,6 +1,7 @@
 use std::fs;
 use std::io::Write;
 use std::path::Path;
+use std::process::{Command, Stdio};
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
@@ -8,6 +9,7 @@ use blake3::Hash;
 use ddsfile::{AlphaMode, D3D10ResourceDimension, Dds, DxgiFormat, NewDxgiParams};
 use hashbrown::HashSet;
 use image::{EncodableLayout, RgbaImage};
+use korangar_util::FileLoader;
 use rayon::prelude::*;
 
 use crate::SHUTDOWN_SIGNAL;
@@ -16,133 +18,74 @@ use crate::loaders::archive::{Archive, Compression, Writable};
 use crate::loaders::texture::calculate_valid_mip_level_count;
 use crate::loaders::{CACHE_FILE_NAME, GameFileLoader, HASH_FILE_PATH, TEMPORARY_CACHE_FILE_NAME, TextureLoader};
 
+const BIK_FILE_EXTENSION: &str = ".bik";
 const BMP_FILE_EXTENSION: &str = ".bmp";
 const JPG_FILE_EXTENSION: &str = ".jpg";
 const TGA_FILE_EXTENSION: &str = ".tga";
 const PNG_FILE_EXTENSION: &str = ".png";
 
 const DDS_FILE_EXTENSION: &str = ".dds";
+const H264_FILE_EXTENSION: &str = ".h264";
 const TEXTURE_PREFIX: &str = "data\\texture\\";
+const VIDEO_PREFIX: &str = "data\\video\\";
+
+enum MediaType {
+    Texture,
+    Video,
+}
+
+#[derive(Default)]
+struct ProcessingCounts {
+    created: u32,
+    skipped: u32,
+    error: u32,
+}
+
+fn is_ffmpeg_available() -> bool {
+    match Command::new("ffmpeg").arg("-version").stdout(Stdio::null()).status() {
+        Ok(status) => status.success(),
+        Err(_) => false,
+    }
+}
 
 pub fn sync_cache_archive(game_file_loader: &GameFileLoader, texture_loader: Arc<TextureLoader>, game_file_hash: Hash) {
     println!("Starting sync of cache");
+    let ffmpeg_available = is_ffmpeg_available();
+
+    if !ffmpeg_available {
+        println!("FFmpeg not found. Video re-encoding will be skipped");
+    }
 
     let path = Path::new(CACHE_FILE_NAME);
-
-    println!("Collecting all texture file names");
-
-    let mut texture_files: Vec<String> = game_file_loader
-        .get_files_with_extension(&[BMP_FILE_EXTENSION, JPG_FILE_EXTENSION, TGA_FILE_EXTENSION, PNG_FILE_EXTENSION])
-        .drain(..)
-        .filter(|file_name| file_name.starts_with(TEXTURE_PREFIX))
-        .collect();
-
-    texture_files.sort();
-    texture_files.dedup();
-
     let current_archive_exists = fs::exists(path).unwrap_or(false);
 
-    let (mut unused_textures, mut outdated_textures, mut new_textures): (Vec<&String>, Vec<&String>, Vec<&String>) = {
-        if current_archive_exists {
-            let current_archive = SevenZipArchive::from_path(path);
-
-            let mut existing_dds_files = Vec::new();
-            current_archive.get_files_with_extension(&mut existing_dds_files, &[DDS_FILE_EXTENSION]);
-            let existing_dds_set: HashSet<String> = existing_dds_files.into_iter().collect();
-
-            let texture_to_dds: HashSet<String> = texture_files
-                .iter()
-                .map(|texture_file| texture_file_dds_name(texture_file))
-                .collect();
-            let unused_textures: Vec<&String> = existing_dds_set
-                .iter()
-                .filter(|dds_file| !texture_to_dds.contains(dds_file.as_str()) && dds_file.as_str() != HASH_FILE_PATH)
-                .collect();
-
-            let outdated_textures: Vec<&String> = texture_files
-                .par_iter()
-                .filter(|texture_file_name| {
-                    if SHUTDOWN_SIGNAL.load(Ordering::SeqCst) {
-                        return false;
-                    }
-
-                    let dds_name = texture_file_dds_name(texture_file_name);
-
-                    match current_archive.get_file_by_path(&dds_name) {
-                        Some(dds_file) if dds_file.len() >= blake3::OUT_LEN => {
-                            println!("Checking compressed texture '{dds_name}'");
-
-                            let mut dds_hash_bytes = [0; blake3::OUT_LEN];
-                            let size = dds_file.len();
-
-                            dds_hash_bytes.copy_from_slice(&dds_file[size - blake3::OUT_LEN..]);
-                            let dds_hash = Hash::from_bytes(dds_hash_bytes);
-
-                            if let Some(texture_name) = texture_file_name.strip_prefix(TEXTURE_PREFIX) {
-                                match texture_loader.load_texture_data(texture_name, false) {
-                                    Ok((image, _)) => {
-                                        let hash = blake3::hash(image.as_bytes());
-                                        hash != dds_hash
-                                    }
-                                    Err(err) => {
-                                        println!("Can't load texture file data: {err:?}");
-                                        false
-                                    }
-                                }
-                            } else {
-                                false
-                            }
-                        }
-                        _ => false,
-                    }
-                })
-                .collect();
-
-            let new_textures: Vec<&String> = texture_files
-                .par_iter()
-                .filter(|texture_file_name| {
-                    if SHUTDOWN_SIGNAL.load(Ordering::SeqCst) {
-                        return false;
-                    }
-
-                    let dds_name = texture_file_dds_name(texture_file_name);
-                    !existing_dds_set.contains(&dds_name)
-                })
-                .collect();
-
-            let unused_textures: Vec<&String> = unused_textures
-                .par_iter()
-                .filter_map(|unused_texture| {
-                    texture_files
-                        .iter()
-                        .find(|texture_file| texture_file_dds_name(texture_file).as_str() == unused_texture.as_str())
-                })
-                .collect();
-
-            (unused_textures, outdated_textures, new_textures)
-        } else {
-            (Vec::new(), Vec::new(), texture_files.iter().collect())
-        }
+    println!("Collecting all media files");
+    let texture_files = collect_files(game_file_loader, MediaType::Texture);
+    let video_files = if ffmpeg_available {
+        collect_files(game_file_loader, MediaType::Video)
+    } else {
+        Vec::new()
     };
 
-    unused_textures.sort();
-    outdated_textures.sort();
-    new_textures.sort();
+    let texture_to_process = analyze_files(
+        &texture_files,
+        current_archive_exists,
+        path,
+        MediaType::Texture,
+        game_file_loader,
+        Some(&texture_loader),
+    );
 
-    let mut created_count = 0;
-    let mut updated_count = 0;
-    let mut skipped_count = 0;
-    let mut error_count = 0;
-
-    let mut to_create_textures: Vec<&String> = outdated_textures.iter().copied().chain(new_textures.iter().copied()).collect();
-    to_create_textures.sort();
-    to_create_textures.dedup();
-
-    let outdated_textures: HashSet<&String> = outdated_textures.iter().copied().collect();
-    let new_textures: HashSet<&String> = new_textures.iter().copied().collect();
+    let video_to_process = analyze_files(
+        &video_files,
+        current_archive_exists,
+        path,
+        MediaType::Video,
+        game_file_loader,
+        None,
+    );
 
     let _ = fs::remove_file(TEMPORARY_CACHE_FILE_NAME);
-
     let archive_path = match current_archive_exists {
         true => TEMPORARY_CACHE_FILE_NAME,
         false => CACHE_FILE_NAME,
@@ -153,76 +96,255 @@ pub fn sync_cache_archive(game_file_loader: &GameFileLoader, texture_loader: Arc
 
     if current_archive_exists {
         let current_archive = Box::new(SevenZipArchive::from_path(path));
-
-        for texture_file_name in texture_files.iter() {
-            if SHUTDOWN_SIGNAL.load(Ordering::SeqCst) {
-                return;
-            }
-
-            let dds_file_name = texture_file_dds_name(texture_file_name);
-
-            if current_archive.file_exists(&dds_file_name)
-                && !outdated_textures.contains(&texture_file_name)
-                && !new_textures.contains(&texture_file_name)
-            {
-                println!("Copying existing compressed texture `{dds_file_name}`");
-                builder.copy_file_from_archive(&current_archive, &dds_file_name);
-            }
-        }
+        copy_existing_files(
+            &mut builder,
+            &current_archive,
+            &texture_files,
+            &texture_to_process,
+            MediaType::Texture,
+        );
+        copy_existing_files(
+            &mut builder,
+            &current_archive,
+            &video_files,
+            &video_to_process,
+            MediaType::Video,
+        );
     }
 
-    for &texture_file_name in to_create_textures.iter() {
-        if SHUTDOWN_SIGNAL.load(Ordering::SeqCst) {
-            finish_archive(current_archive_exists, builder);
-            println!(
-                "Cache sync aborted. Created: {created_count} Updated: {updated_count} Skipped: {skipped_count} Errors: {error_count}"
-            );
-            return;
-        }
+    let texture_counts = process_media_files(
+        &texture_to_process,
+        &mut builder,
+        MediaType::Texture,
+        game_file_loader,
+        Some(&texture_loader),
+    );
 
-        if let Some(texture_name) = texture_file_name.strip_prefix(TEXTURE_PREFIX) {
-            let dds_file_name = texture_file_dds_name(texture_file_name);
-
-            match texture_loader.load_texture_data(texture_name, false) {
-                Ok((image, transparent))
-                    if (image.height() % 4 == 0 && image.width() % 4 == 0) || (image.height() >= 48 && image.width() >= 48) =>
-                {
-                    compress_image(
-                        &texture_loader,
-                        &mut builder,
-                        &mut created_count,
-                        &mut updated_count,
-                        &outdated_textures,
-                        texture_file_name,
-                        dds_file_name.as_str(),
-                        image,
-                        transparent,
-                    );
-                }
-                Ok(_) => {
-                    // We skip compressing textures if they would need to be cropped while also
-                    // being very small, which would lead to noticeable cropping artifacts.
-                    skipped_count += 1;
-                }
-                Err(err) => {
-                    println!("Failed to load texture for `{texture_file_name}`: {err:?}");
-                    error_count += 1;
-                }
-            }
-        }
-    }
+    let video_counts = process_media_files(&video_to_process, &mut builder, MediaType::Video, game_file_loader, None);
 
     finish_archive(current_archive_exists, builder);
 
-    println!("Cache sync finished. Created: {created_count} Updated: {updated_count} Skipped: {skipped_count} Errors: {error_count}");
+    println!("Cache sync finished");
+    println!(
+        "Textures - Created: {} Skipped: {} Errors: {}",
+        texture_counts.created, texture_counts.skipped, texture_counts.error
+    );
+    println!(
+        "Videos - Created: {} Skipped: {} Errors: {}",
+        video_counts.created, video_counts.skipped, video_counts.error
+    );
+
+    if !ffmpeg_available && !video_files.is_empty() {
+        println!("No videos re-encoded. Is FFmpeg installed and added to PATH?");
+    }
 }
 
-fn compress_image(
+fn collect_files(game_file_loader: &GameFileLoader, media_type: MediaType) -> Vec<String> {
+    let mut files: Vec<String> = match media_type {
+        MediaType::Texture => game_file_loader
+            .get_files_with_extension(&[BMP_FILE_EXTENSION, JPG_FILE_EXTENSION, TGA_FILE_EXTENSION, PNG_FILE_EXTENSION])
+            .drain(..)
+            .filter(|file_name| file_name.starts_with(TEXTURE_PREFIX))
+            .collect(),
+        MediaType::Video => game_file_loader
+            .get_files_with_extension(&[BIK_FILE_EXTENSION])
+            .drain(..)
+            .filter(|file_name| file_name.starts_with(VIDEO_PREFIX))
+            .collect(),
+    };
+    files.sort();
+    files.dedup();
+    files
+}
+
+fn analyze_files(
+    source_files: &[String],
+    current_archive_exists: bool,
+    archive_path: &Path,
+    media_type: MediaType,
+    game_file_loader: &GameFileLoader,
+    texture_loader: Option<&Arc<TextureLoader>>,
+) -> Vec<String> {
+    if !current_archive_exists {
+        return source_files.to_vec();
+    }
+
+    let current_archive = SevenZipArchive::from_path(archive_path);
+
+    let extension = match media_type {
+        MediaType::Texture => DDS_FILE_EXTENSION,
+        MediaType::Video => H264_FILE_EXTENSION,
+    };
+
+    let mut existing_files = Vec::new();
+    current_archive.get_files_with_extension(&mut existing_files, &[extension]);
+    let existing_set: HashSet<String> = existing_files.into_iter().collect();
+
+    source_files
+        .par_iter()
+        .filter(|source_file| {
+            if SHUTDOWN_SIGNAL.load(Ordering::SeqCst) {
+                return false;
+            }
+
+            let target_name = get_target_filename(source_file, &media_type);
+
+            if !existing_set.contains(&target_name) {
+                return true;
+            }
+
+            // Check if file is outdated
+            match current_archive.get_file_by_path(&target_name) {
+                Some(cached_file) if cached_file.len() >= blake3::OUT_LEN => {
+                    println!("Checking file '{target_name}'");
+
+                    let mut hash_bytes = [0; blake3::OUT_LEN];
+                    let size = cached_file.len();
+
+                    hash_bytes.copy_from_slice(&cached_file[size - blake3::OUT_LEN..]);
+                    let cached_hash = Hash::from_bytes(hash_bytes);
+
+                    match media_type {
+                        MediaType::Texture => {
+                            if let (Some(texture_loader), Some(texture_name)) = (texture_loader, source_file.strip_prefix(TEXTURE_PREFIX)) {
+                                match texture_loader.load_texture_data(texture_name, false) {
+                                    Ok((image, _)) => {
+                                        let hash = blake3::hash(image.as_bytes());
+                                        hash != cached_hash
+                                    }
+                                    Err(_) => false,
+                                }
+                            } else {
+                                false
+                            }
+                        }
+                        MediaType::Video => match game_file_loader.get(source_file) {
+                            Ok(data) => {
+                                let hash = blake3::hash(&data);
+                                hash != cached_hash
+                            }
+                            Err(_) => false,
+                        },
+                    }
+                }
+                _ => false,
+            }
+        })
+        .map(|s| s.to_string())
+        .collect()
+}
+
+fn copy_existing_files(
+    builder: &mut SevenZipArchiveBuilder,
+    current_archive: &SevenZipArchive,
+    source_files: &[String],
+    to_process: &[String],
+    media_type: MediaType,
+) {
+    let to_process_set: HashSet<&str> = to_process.iter().map(|s| s.as_str()).collect();
+
+    for source_file in source_files {
+        if SHUTDOWN_SIGNAL.load(Ordering::SeqCst) {
+            return;
+        }
+
+        if to_process_set.contains(source_file.as_str()) {
+            // Skip files that need processing.
+            continue;
+        }
+
+        let target_file = get_target_filename(source_file, &media_type);
+
+        if current_archive.file_exists(&target_file) {
+            let file_type = match media_type {
+                MediaType::Texture => "compressed texture",
+                MediaType::Video => "encoded video",
+            };
+
+            println!("Copying existing {} `{}`", file_type, target_file);
+            builder.copy_file_from_archive(current_archive, &target_file);
+        }
+    }
+}
+
+fn process_media_files(
+    to_process: &[String],
+    builder: &mut SevenZipArchiveBuilder,
+    media_type: MediaType,
+    game_file_loader: &GameFileLoader,
+    texture_loader: Option<&Arc<TextureLoader>>,
+) -> ProcessingCounts {
+    let mut counts = ProcessingCounts::default();
+
+    for source_file in to_process {
+        if SHUTDOWN_SIGNAL.load(Ordering::SeqCst) {
+            let media = match media_type {
+                MediaType::Texture => "Textures",
+                MediaType::Video => "Videos",
+            };
+            println!("Cache sync aborted");
+            println!(
+                "{} - Created: {} Skipped: {} Errors: {}",
+                media, counts.created, counts.skipped, counts.error
+            );
+            return counts;
+        }
+
+        let target_file = get_target_filename(source_file, &media_type);
+
+        match media_type {
+            MediaType::Texture => {
+                if let (Some(texture_loader), Some(texture_name)) = (texture_loader, source_file.strip_prefix(TEXTURE_PREFIX)) {
+                    match texture_loader.load_texture_data(texture_name, false) {
+                        Ok((image, transparent))
+                            if (image.height() % 4 == 0 && image.width() % 4 == 0) || (image.height() >= 48 && image.width() >= 48) =>
+                        {
+                            process_texture(
+                                texture_loader,
+                                builder,
+                                &mut counts.created,
+                                source_file,
+                                &target_file,
+                                image,
+                                transparent,
+                            );
+                        }
+                        Ok(_) => {
+                            counts.skipped += 1;
+                        }
+                        Err(error) => {
+                            println!("Failed to load texture for `{source_file}`: {error:?}");
+                            counts.error += 1;
+                        }
+                    }
+                }
+            }
+            MediaType::Video => match game_file_loader.get(source_file) {
+                Ok(bik_data) => {
+                    process_video(builder, &mut counts.created, source_file, &target_file, bik_data);
+                }
+                Err(error) => {
+                    println!("Failed to load video for `{source_file}`: {error:?}");
+                    counts.error += 1;
+                }
+            },
+        }
+    }
+
+    counts
+}
+
+fn get_target_filename(source_file: &str, media_type: &MediaType) -> String {
+    match media_type {
+        MediaType::Texture => texture_file_dds_name(source_file),
+        MediaType::Video => video_file_h264_name(source_file),
+    }
+}
+
+fn process_texture(
     texture_loader: &TextureLoader,
     builder: &mut SevenZipArchiveBuilder,
-    created_count: &mut i32,
-    updated_count: &mut i32,
-    outdated_textures: &HashSet<&String>,
+    created_count: &mut u32,
     texture_file_name: &String,
     dds_file_name: &str,
     image: RgbaImage,
@@ -266,10 +388,76 @@ fn compress_image(
     // higher file sizes.
     builder.add_file(dds_file_name, dds_file_data, Compression::Off);
 
-    if outdated_textures.contains(texture_file_name) {
-        *updated_count += 1;
-    } else {
-        *created_count += 1;
+    *created_count += 1;
+}
+
+fn process_video(
+    builder: &mut SevenZipArchiveBuilder,
+    created_count: &mut u32,
+    bik_file_name: &String,
+    h264_file_name: &str,
+    bik_data: Vec<u8>,
+) {
+    println!("Encoding video for `{bik_file_name}`");
+    let hash = blake3::hash(&bik_data);
+
+    let cmd = Command::new("ffmpeg")
+        .arg("-i")
+        .arg("pipe:0")
+        .arg("-profile")
+        .arg("main")
+        .arg("-crf")
+        .arg("18")
+        .arg("-preset")
+        .arg("slow")
+        .arg("-pix_fmt")
+        .arg("nv12")
+        .arg("-f")
+        .arg("h264")
+        .arg("pipe:1")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn();
+
+    match cmd {
+        Ok(mut child) => {
+            if let Some(mut stdin) = child.stdin.take() {
+                std::thread::spawn(move || {
+                    if let Err(error) = stdin.write_all(&bik_data) {
+                        println!("Failed to write to FFmpeg stdin: {error:?}");
+                        return;
+                    }
+
+                    if let Err(error) = stdin.flush() {
+                        println!("Failed to flush FFmpeg stdin: {error:?}");
+                    }
+                });
+            }
+
+            match child.wait_with_output() {
+                Ok(output) => {
+                    if output.status.success() {
+                        let mut h264_data = output.stdout;
+
+                        h264_data.extend_from_slice(hash.as_bytes());
+
+                        builder.add_file(h264_file_name, h264_data, Compression::Off);
+
+                        *created_count += 1;
+                    } else {
+                        let error = String::from_utf8_lossy(&output.stderr);
+                        println!("FFmpeg failed to encode `{bik_file_name}`: {error}");
+                    }
+                }
+                Err(error) => {
+                    println!("Failed to get FFmpeg output: {error:?}");
+                }
+            }
+        }
+        Err(error) => {
+            println!("Failed to start FFmpeg: {error:?}");
+        }
     }
 }
 
@@ -291,7 +479,6 @@ fn crop_to_multiple_of_four(mut image: RgbaImage) -> RgbaImage {
 }
 
 fn finish_archive(current_archive_exists: bool, builder: Box<SevenZipArchiveBuilder>) {
-    // Drop to finish the writing to the new archive.
     drop(builder);
 
     if current_archive_exists {
@@ -301,4 +488,8 @@ fn finish_archive(current_archive_exists: bool, builder: Box<SevenZipArchiveBuil
 
 pub fn texture_file_dds_name(image_file_name: &str) -> String {
     format!("{image_file_name}{DDS_FILE_EXTENSION}")
+}
+
+pub fn video_file_h264_name(bik_file_name: &str) -> String {
+    format!("{bik_file_name}{H264_FILE_EXTENSION}")
 }

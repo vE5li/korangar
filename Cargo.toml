@@ -31,6 +31,7 @@ korangar_util = { path = "korangar_util" }
 lunify = "1"
 mlua = "0.10"
 num = "0.4"
+openh264 = "0.8"
 option-ext = "0.2"
 pcap = "2"
 pollster = "0.4"

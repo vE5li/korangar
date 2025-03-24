@@ -12,7 +12,7 @@ use rayon::{ThreadPool, ThreadPoolBuilder};
 use crate::graphics::Texture;
 use crate::init_tls_rand;
 use crate::loaders::error::LoadError;
-use crate::loaders::{ActionLoader, AnimationLoader, ImageType, MapLoader, ModelLoader, SpriteLoader, TextureLoader};
+use crate::loaders::{ActionLoader, AnimationLoader, ImageType, MapLoader, ModelLoader, SpriteLoader, TextureLoader, VideoLoader};
 #[cfg(feature = "debug")]
 use crate::threads;
 use crate::world::{AnimationData, EntityType, Library, Map};
@@ -61,6 +61,7 @@ pub struct AsyncLoader {
     model_loader: Arc<ModelLoader>,
     sprite_loader: Arc<SpriteLoader>,
     texture_loader: Arc<TextureLoader>,
+    video_loader: Arc<VideoLoader>,
     library: Arc<Library>,
     pending_loads: Arc<Mutex<HashMap<LoaderId, LoadStatus>>>,
     thread_pool: ThreadPool,
@@ -74,6 +75,7 @@ impl AsyncLoader {
         model_loader: Arc<ModelLoader>,
         sprite_loader: Arc<SpriteLoader>,
         texture_loader: Arc<TextureLoader>,
+        video_loader: Arc<VideoLoader>,
         library: Arc<Library>,
     ) -> Self {
         let thread_pool = ThreadPoolBuilder::new()
@@ -90,6 +92,7 @@ impl AsyncLoader {
             model_loader,
             sprite_loader,
             texture_loader,
+            video_loader,
             library,
             pending_loads: Arc::new(Mutex::new(HashMap::new())),
             thread_pool,
@@ -163,12 +166,13 @@ impl AsyncLoader {
         let map_loader = self.map_loader.clone();
         let model_loader = self.model_loader.clone();
         let texture_loader = self.texture_loader.clone();
+        let video_loader = self.video_loader.clone();
         let library = self.library.clone();
 
         self.request_load(LoaderId::Map(map_name.clone()), move || {
             #[cfg(feature = "debug")]
             let _load_measurement = Profiler::start_measurement("map load");
-            let map = map_loader.load(map_name, &model_loader, texture_loader, &library)?;
+            let map = map_loader.load(map_name, &model_loader, texture_loader, video_loader.clone(), &library)?;
             Ok(LoadableResource::Map { map, player_position })
         });
     }

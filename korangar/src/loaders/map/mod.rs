@@ -1,6 +1,6 @@
 mod vertices;
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use bytemuck::Pod;
 use cgmath::{Array, Point2, Vector3};
@@ -21,8 +21,8 @@ pub use self::vertices::MAP_TILE_SIZE;
 use self::vertices::{generate_tile_vertices, ground_vertices};
 use super::error::LoadError;
 use crate::graphics::{BindlessSupport, Buffer, ModelVertex, Texture, TextureSet};
-use crate::loaders::{GameFileLoader, ImageType, ModelLoader, TextureLoader, TextureSetBuilder, split_mesh_by_texture};
-use crate::world::{Library, LightSourceKey, Lighting, Model, SubMesh};
+use crate::loaders::{GameFileLoader, ImageType, ModelLoader, TextureLoader, TextureSetBuilder, VideoLoader, split_mesh_by_texture};
+use crate::world::{Library, LightSourceKey, Lighting, Model, SubMesh, Video};
 use crate::{EffectSourceExt, LightSourceExt, Map, Object, ObjectKey, SoundSourceExt};
 
 const MAP_OFFSET: f32 = 5.0;
@@ -55,12 +55,13 @@ impl MapLoader {
         resource_file: String,
         model_loader: &ModelLoader,
         texture_loader: Arc<TextureLoader>,
+        video_loader: Arc<VideoLoader>,
         library: &Library,
     ) -> Result<Box<Map>, LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load map from {}", &resource_file));
 
-        let mut texture_set_builder = TextureSetBuilder::new(texture_loader.clone(), resource_file.clone());
+        let mut texture_set_builder = TextureSetBuilder::new(texture_loader.clone(), video_loader, resource_file.clone());
 
         let map_file_name = format!("data\\{}.rsw", &resource_file);
         let mut map_data: MapData = parse_generic_data(&map_file_name, &self.game_file_loader)?;
@@ -189,7 +190,8 @@ impl MapLoader {
             .collect();
         let object_kdtree = KDTree::from_objects(&object_bounding_boxes);
 
-        let (texture_set, vertex_buffer) = self.build_vertex_buffer_and_texture_set(&resource_file, texture_set_builder, model_vertices);
+        let (vertex_buffer, texture_set, videos) =
+            self.build_vertex_buffer_and_texture_set_and_videos(&resource_file, texture_set_builder, model_vertices);
 
         let lighting = Lighting::new(map_data.light_settings);
 
@@ -237,6 +239,7 @@ impl MapLoader {
             object_kdtree,
             light_sources_kdtree,
             background_music_track_name,
+            videos,
             #[cfg(feature = "debug")]
             map_data_clone,
         );
@@ -247,15 +250,17 @@ impl MapLoader {
         Ok(Box::new(map))
     }
 
-    fn build_vertex_buffer_and_texture_set(
+    fn build_vertex_buffer_and_texture_set_and_videos(
         &self,
         resource_file: &str,
         texture_set_builder: TextureSetBuilder,
         model_vertices: Vec<ModelVertex>,
-    ) -> (Arc<TextureSet>, Arc<Buffer<ModelVertex>>) {
-        let texture_set = Arc::new(texture_set_builder.build());
+    ) -> (Arc<Buffer<ModelVertex>>, Arc<TextureSet>, Mutex<Vec<Video>>) {
         let vertex_buffer = Arc::new(self.create_vertex_buffer(resource_file, "map vertices", &model_vertices));
-        (texture_set, vertex_buffer)
+        let (texture_set, videos) = texture_set_builder.build();
+        let texture_set = Arc::new(texture_set);
+        let videos = Mutex::new(videos);
+        (vertex_buffer, texture_set, videos)
     }
 
     fn create_vertex_buffer<T: Pod>(&self, resource: &str, label: &str, vertices: &[T]) -> Buffer<T> {

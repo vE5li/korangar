@@ -10,6 +10,7 @@ mod model;
 mod object;
 mod particles;
 mod sound;
+mod video;
 
 pub use self::action::*;
 pub use self::animation::*;
@@ -23,6 +24,7 @@ pub use self::model::*;
 pub use self::object::*;
 pub use self::particles::*;
 pub use self::sound::*;
+pub use self::video::*;
 
 pub struct ResourceSetBuffer<K> {
     visible: Vec<K>,

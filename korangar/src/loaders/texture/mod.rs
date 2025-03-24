@@ -19,11 +19,13 @@ use wgpu::{
 
 use super::error::LoadError;
 use super::{
-    FALLBACK_BMP_FILE, FALLBACK_JPEG_FILE, FALLBACK_PNG_FILE, FALLBACK_TGA_FILE, fix_broken_texture_file_endings, texture_file_dds_name,
+    FALLBACK_BMP_FILE, FALLBACK_JPEG_FILE, FALLBACK_PNG_FILE, FALLBACK_TGA_FILE, VideoLoader, fix_broken_texture_file_endings,
+    texture_file_dds_name,
 };
 use crate::SHUTDOWN_SIGNAL;
 use crate::graphics::{BindlessSupport, Capabilities, Lanczos3Drawer, MipMapRenderPassContext, Texture, TextureSet};
 use crate::loaders::GameFileLoader;
+use crate::world::Video;
 
 const MAX_CACHE_COUNT: u32 = 4096;
 const MAX_CACHE_SIZE: usize = 512 * 1024 * 1024;
@@ -70,7 +72,37 @@ impl TextureLoader {
         }
     }
 
-    fn create_raw(
+    pub fn create_raw(
+        &self,
+        name: &str,
+        width: u32,
+        height: u32,
+        mip_level_count: u32,
+        format: TextureFormat,
+        transparent: bool,
+    ) -> Arc<Texture> {
+        let texture = Texture::new(
+            &self.device,
+            &TextureDescriptor {
+                label: Some(name),
+                size: Extent3d {
+                    width,
+                    height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count,
+                sample_count: 1,
+                dimension: TextureDimension::D2,
+                format,
+                usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
+            },
+            transparent,
+        );
+        Arc::new(texture)
+    }
+
+    pub fn create_raw_with_data(
         &self,
         name: &str,
         width: u32,
@@ -104,7 +136,7 @@ impl TextureLoader {
     }
 
     pub fn create_color(&self, name: &str, image: RgbaImage, transparent: bool) -> Arc<Texture> {
-        self.create_raw(
+        self.create_raw_with_data(
             name,
             image.width(),
             image.height(),
@@ -116,7 +148,7 @@ impl TextureLoader {
     }
 
     pub fn create_sdf(&self, name: &str, image: GrayImage) -> Arc<Texture> {
-        self.create_raw(
+        self.create_raw_with_data(
             name,
             image.width(),
             image.height(),
@@ -128,7 +160,7 @@ impl TextureLoader {
     }
 
     pub(crate) fn create_msdf(&self, name: &str, image: RgbaImage) -> Arc<Texture> {
-        self.create_raw(
+        self.create_raw_with_data(
             name,
             image.width(),
             image.height(),
@@ -452,7 +484,7 @@ impl TextureLoader {
             return None;
         };
 
-        let texture = self.create_raw(
+        let texture = self.create_raw_with_data(
             dds_file_name.as_str(),
             dds.width,
             dds.height,
@@ -716,40 +748,52 @@ fn premultiply_alpha(image_buffer: RgbaImage) -> ImageBuffer<Rgba<u8>, Vec<u8>> 
 
 pub struct TextureSetBuilder {
     texture_loader: Arc<TextureLoader>,
+    video_loader: Arc<VideoLoader>,
     name: String,
     textures: Vec<Arc<Texture>>,
+    videos: Vec<Video>,
     lookup: HashMap<String, i32>,
 }
 
 impl TextureSetBuilder {
-    pub fn new(texture_loader: Arc<TextureLoader>, name: impl Into<String>) -> Self {
+    pub fn new(texture_loader: Arc<TextureLoader>, video_loader: Arc<VideoLoader>, name: impl Into<String>) -> Self {
         Self {
             texture_loader,
+            video_loader,
             name: name.into(),
             textures: Vec::new(),
+            videos: Vec::new(),
             lookup: HashMap::default(),
         }
     }
 
     #[cfg(feature = "debug")]
-    pub fn build_from_group(texture_loader: Arc<TextureLoader>, name: impl Into<String>, paths: &[&str]) -> TextureSet {
-        let mut factory = Self::new(texture_loader.clone(), name);
+    pub fn build_from_group(
+        texture_loader: Arc<TextureLoader>,
+        video_loader: Arc<VideoLoader>,
+        name: impl Into<String>,
+        paths: &[&str],
+    ) -> TextureSet {
+        let mut factory = Self::new(texture_loader.clone(), video_loader, name);
 
         paths.iter().for_each(|path| {
             let _ = factory.register(path);
         });
 
-        factory.build()
+        let (set, _) = factory.build();
+
+        set
     }
 
-    pub fn build(self) -> TextureSet {
-        TextureSet::new(
+    pub fn build(self) -> (TextureSet, Vec<Video>) {
+        let set = TextureSet::new(
             &self.texture_loader.device,
             self.texture_loader.bindless_support,
             self.texture_loader.max_textures_per_shader_stage,
             &self.name,
             self.textures,
-        )
+        );
+        (set, self.videos)
     }
 
     #[must_use]
@@ -759,7 +803,19 @@ impl TextureSetBuilder {
             return (index, is_transparent);
         }
 
-        let texture = self.texture_loader.get_or_load(path, ImageType::Color).expect("can't load texture");
+        let texture;
+
+        match self.video_loader.is_video_file(path) {
+            true => {
+                let video = self.video_loader.load(path);
+                texture = video.get_texture().clone();
+                self.videos.push(video);
+            }
+            false => {
+                texture = self.texture_loader.get_or_load(path, ImageType::Color).expect("can't load texture");
+            }
+        }
+
         let index = i32::try_from(self.textures.len()).expect("texture set is full");
         let is_transparent = texture.is_transparent();
 

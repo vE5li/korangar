@@ -14,7 +14,7 @@ use blake3::Hash;
 use korangar_debug::logging::{Colorize, Timer, print_debug};
 use korangar_util::{FileLoader, FileNotFoundError};
 
-pub use self::cache::{sync_cache_archive, texture_file_dds_name};
+pub use self::cache::{sync_cache_archive, texture_file_dds_name, video_file_h264_name};
 use self::list::GameArchiveList;
 use super::archive::folder::FolderArchive;
 use super::archive::native::{NativeArchive, NativeArchiveBuilder};

@@ -70,13 +70,13 @@ use ragnarok_packets::{
 };
 use renderer::InterfaceRenderer;
 use settings::AudioSettings;
+#[cfg(feature = "debug")]
+use wgpu::Device;
 use wgpu::util::initialize_adapter_from_env_or_default;
 use wgpu::{
     BackendOptions, Backends, DeviceDescriptor, Dx12BackendOptions, Dx12Compiler, GlBackendOptions, Gles3MinorVersion, Instance,
-    InstanceDescriptor, InstanceFlags, MemoryHints,
+    InstanceDescriptor, InstanceFlags, MemoryHints, Queue,
 };
-#[cfg(feature = "debug")]
-use wgpu::{Device, Queue};
 use winit::application::ApplicationHandler;
 use winit::dpi::{LogicalSize, PhysicalSize};
 use winit::event::WindowEvent;
@@ -295,7 +295,6 @@ struct Client {
     networking_system: NetworkingSystem<NoPacketCallback>,
     audio_engine: Arc<AudioEngine<GameFileLoader>>,
     graphics_engine: GraphicsEngine,
-    #[cfg(feature = "debug")]
     queue: Arc<Queue>,
     #[cfg(feature = "debug")]
     device: Arc<Device>,
@@ -412,6 +411,11 @@ impl Client {
                 &capabilities,
                 game_file_loader.clone(),
             ));
+            let video_loader = Arc::new(VideoLoader::new(
+                queue.clone(),
+                game_file_loader.clone(),
+                texture_loader.clone(),
+            ));
             let font_loader = Arc::new(FontLoader::new(application.get_fonts(), &game_file_loader, &texture_loader));
             let map_loader = Arc::new(MapLoader::new(
                 device.clone(),
@@ -457,6 +461,7 @@ impl Client {
                 model_loader.clone(),
                 sprite_loader.clone(),
                 texture_loader.clone(),
+                video_loader.clone(),
                 library.clone(),
             ));
 
@@ -579,7 +584,7 @@ impl Client {
             let bounding_box_object_set_buffer = ResourceSetBuffer::default();
 
             #[cfg(feature = "debug")]
-            let pathing_texture_set = TextureSetBuilder::build_from_group(texture_loader.clone(), "pathing", &[
+            let pathing_texture_set = TextureSetBuilder::build_from_group(texture_loader.clone(), video_loader.clone(), "pathing", &[
                 "pathing_goal.png",
                 "pathing_straight.png",
                 "pathing_diagonal.png",
@@ -588,7 +593,7 @@ impl Client {
             let pathing_texture_set = Arc::new(pathing_texture_set);
 
             #[cfg(feature = "debug")]
-            let tile_texture_set = TextureSetBuilder::build_from_group(texture_loader.clone(), "tile", &[
+            let tile_texture_set = TextureSetBuilder::build_from_group(texture_loader.clone(), video_loader.clone(), "tile", &[
                 "tile_0.png",
                 "tile_1.png",
                 "tile_2.png",
@@ -614,7 +619,13 @@ impl Client {
 
         time_phase!("load default map", {
             let map = map_loader
-                .load(DEFAULT_MAP.to_string(), &model_loader, texture_loader.clone(), &library)
+                .load(
+                    DEFAULT_MAP.to_string(),
+                    &model_loader,
+                    texture_loader.clone(),
+                    video_loader,
+                    &library,
+                )
                 .expect("failed to load initial map");
 
             audio_engine.play_background_music_track(DEFAULT_BACKGROUND_MUSIC);
@@ -722,7 +733,6 @@ impl Client {
             networking_system,
             audio_engine,
             graphics_engine,
-            #[cfg(feature = "debug")]
             queue,
             #[cfg(feature = "debug")]
             device,
@@ -1949,6 +1959,14 @@ impl Client {
 
                 #[cfg(feature = "debug")]
                 update_main_camera_measurement.stop();
+
+                #[cfg(feature = "debug")]
+                let update_videos_measurement = Profiler::start_measurement("update videos");
+
+                map.advance_videos(&self.queue, delta_time);
+
+                #[cfg(feature = "debug")]
+                update_videos_measurement.stop();
 
                 #[cfg(feature = "debug")]
                 let update_entities_measurement = Profiler::start_measurement("update entities");

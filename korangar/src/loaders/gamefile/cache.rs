@@ -407,7 +407,7 @@ fn process_video(
         .arg("-vf")
         .arg("fps=30")
         .arg("-profile")
-        .arg("main")
+        .arg("baseline")
         .arg("-crf")
         .arg("18")
         .arg("-preset")

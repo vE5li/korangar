@@ -27,6 +27,7 @@ korangar_util = { workspace = true, features = ["interface"] }
 lunify = { workspace = true }
 mlua = { workspace = true, features = ["lua51", "vendored"] }
 num = { workspace = true }
+openh264 = { workspace = true }
 option-ext = { workspace = true }
 pollster = { workspace = true }
 quick-xml = { workspace = true, features = ["serde", "serialize"] }

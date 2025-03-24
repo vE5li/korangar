@@ -2,7 +2,7 @@ mod lighting;
 
 #[cfg(feature = "debug")]
 use std::collections::HashSet;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use cgmath::{Matrix4, Point3, SquareMatrix, Vector2, Vector3};
 use derive_new::new;
@@ -23,9 +23,10 @@ use ragnarok_formats::map::{LightSource, SoundSource, Tile, TileFlags, WaterSett
 #[cfg(feature = "debug")]
 use ragnarok_formats::transform::Transform;
 use ragnarok_packets::ClientTick;
+use wgpu::Queue;
 
 pub use self::lighting::Lighting;
-use super::{Camera, Entity, Object, PointLightId, PointLightManager, ResourceSet, ResourceSetBuffer, SubMesh};
+use super::{Camera, Entity, Object, PointLightId, PointLightManager, ResourceSet, ResourceSetBuffer, SubMesh, Video};
 #[cfg(feature = "debug")]
 use super::{LightSourceExt, Model, PointLightSet};
 #[cfg(feature = "debug")]
@@ -89,6 +90,7 @@ pub struct Map {
     object_kdtree: KDTree<ObjectKey, AABB>,
     light_source_kdtree: KDTree<LightSourceKey, Sphere>,
     background_music_track_name: Option<String>,
+    videos: Mutex<Vec<Video>>,
     #[cfg(feature = "debug")]
     map_data: MapData,
 }
@@ -646,6 +648,17 @@ impl Map {
 
         let (screen_position, screen_size) = camera.screen_position_size(top_left_position, bottom_right_position);
         Some((screen_position, screen_size))
+    }
+
+    pub fn advance_videos(&self, queue: &Queue, delta_time: f64) {
+        let mut videos = self.videos.lock().unwrap();
+
+        for video in videos.iter_mut() {
+            if video.should_update_frame(delta_time) {
+                video.update_texture(queue);
+                video.advance_frame();
+            }
+        }
     }
 }
 

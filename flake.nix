@@ -24,7 +24,7 @@
           pkg-config
         ];
         buildInputs = with pkgs;
-          [libpcap nixpkgs-fmt openssl shaderc vulkan-headers vulkan-loader]
+          [libpcap nasm nixpkgs-fmt openssl shaderc vulkan-headers vulkan-loader]
           ++ lib.optional stdenv.isDarwin [
             darwin.apple_sdk.frameworks.AppKit
             darwin.apple_sdk.frameworks.CoreGraphics

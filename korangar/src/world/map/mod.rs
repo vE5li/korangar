@@ -654,10 +654,11 @@ impl Map {
         let mut videos = self.videos.lock().unwrap();
 
         for video in videos.iter_mut() {
-            if video.should_update_frame(delta_time) {
+            if video.should_show_next_frame(delta_time) {
                 video.update_texture(queue);
-                video.advance_frame();
             }
+
+            video.check_for_next_frame();
         }
     }
 }

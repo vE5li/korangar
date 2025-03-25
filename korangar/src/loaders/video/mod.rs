@@ -1,118 +1,84 @@
+use std::io::Cursor;
 use std::sync::Arc;
 
 use derive_new::new;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, Timer, print_debug};
 use korangar_util::FileLoader;
-use openh264::formats::YUVSource;
+use korangar_video::ivf::Ivf;
 use wgpu::TextureFormat;
 
-use crate::loaders::{FALLBACK_PNG_FILE, GameFileLoader, TextureLoader, video_file_h264_name};
-use crate::world::{FRAME_TIME_30_FPS, H264Video, Video};
+use crate::loaders::{FALLBACK_PNG_FILE, GameFileLoader, TextureLoader, video_file_ivf_name};
+use crate::world::{AV1Video, Video};
 
 const BIK_FILE_ENDING: &str = ".bik";
 
 #[derive(new)]
 pub struct VideoLoader {
-    queue: Arc<wgpu::Queue>,
     game_file_loader: Arc<GameFileLoader>,
     texture_loader: Arc<TextureLoader>,
 }
 
 impl VideoLoader {
-    fn convert_frame(&self, decoded: &openh264::decoder::DecodedYUV, old_buffer: Option<Vec<u8>>) -> Vec<u8> {
-        let (width, height) = decoded.dimensions();
-        let mut rgba = old_buffer.unwrap_or_else(|| vec![0u8; width * height * 4]);
-        decoded.write_rgba8(&mut rgba);
-        rgba
-    }
-
     pub fn is_video_file(&self, path: &str) -> bool {
         path.ends_with(BIK_FILE_ENDING)
     }
 
     fn load_video(&self, path: &str) -> Option<Video> {
-        let video_file_name = video_file_h264_name(path);
+        let video_file_name = video_file_ivf_name(path);
         let path = format!("data\\video\\{video_file_name}");
 
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load video data from {}", path.magenta()));
 
-        let Ok(mut h264_data) = self.game_file_loader.get(&path) else {
+        let Ok(mut ivf_data) = self.game_file_loader.get(&path) else {
             #[cfg(feature = "debug")]
-            print_debug!("Could not find H264 video file: {}", path);
+            print_debug!("Could not find IVF video file `{}`", path);
             return None;
         };
 
-        // The h264 file contains a blake3 hash value at the end, which we cut off.
-        h264_data.truncate(h264_data.len() - blake3::OUT_LEN);
+        // The IVF file contains a blake3 hash value at the end, which we cut off.
+        ivf_data.truncate(ivf_data.len() - blake3::OUT_LEN);
 
-        let mut decoder = openh264::decoder::Decoder::new().expect("Can't create h264 decoder");
-        let mut offset = 0;
-
-        let decoded = loop {
-            let Some(packet) = Video::next_packet(&h264_data, &mut offset) else {
+        let ivf_file = match Ivf::new(Cursor::new(ivf_data)) {
+            Ok(ivf_file) => ivf_file,
+            Err(_error) => {
                 #[cfg(feature = "debug")]
-                print_debug!("No NAL unit found");
+                print_debug!("Can't open IVF video file `{}`: {}", path, _error);
                 return None;
-            };
-
-            match decoder.decode(packet) {
-                Ok(Some(frame)) => break frame,
-                Ok(None) => { /* frame not ready yet */ }
-                Err(_error) => {
-                    #[cfg(feature = "debug")]
-                    print_debug!("Can't decode frame: {}", _error);
-                    return None;
-                }
             }
         };
 
-        let (width, height) = decoded.dimensions();
-        let (width, height) = (width as u32, height as u32);
+        let Ok(decoder) = korangar_video::Decoder::new() else {
+            #[cfg(feature = "debug")]
+            print_debug!("Can't initialize decoder");
+            return None;
+        };
 
-        let mut frame_data = self.convert_frame(&decoded, None);
+        if ivf_file.four_cc() != [b'A', b'V', b'0', b'1'] && ivf_file.four_cc() != [b'a', b'v', b'0', b'1'] {
+            #[cfg(feature = "debug")]
+            print_debug!("IVF is not an AV1 video file: {:?}", ivf_file.four_cc());
+            return None;
+        }
+
+        let width = ivf_file.width() as u32;
+        let height = ivf_file.height() as u32;
+        let timescale = ivf_file.header().timebase_numerator as f64 / ivf_file.header().timebase_denominator as f64;
 
         let texture = self
             .texture_loader
             .create_raw(&video_file_name, width, height, 1, TextureFormat::Rgba8UnormSrgb, false);
 
-        let mut next_frame_timestamp = None;
-
-        loop {
-            let Some(packet) = Video::next_packet(&h264_data, &mut offset) else {
-                break;
-            };
-
-            match decoder.decode(packet) {
-                Ok(Some(decoded_frame)) => {
-                    next_frame_timestamp = Some(decoded_frame.timestamp().as_millis());
-                    frame_data = self.convert_frame(&decoded_frame, Some(frame_data));
-                    break;
-                }
-                Ok(None) => { /* frame not ready yet */ }
-                Err(_error) => {
-                    #[cfg(feature = "debug")]
-                    print_debug!("Can't decode frame: {}", _error);
-                    return None;
-                }
-            }
-        }
-
-        let mut video = match next_frame_timestamp {
-            // Video has only one frame
-            None => Video::new(width, height, None, texture),
-            // Video has multiple frames
-            Some(_) => Video::new(
-                width,
-                height,
-                Some(H264Video::new(h264_data, decoder, frame_data, 0.0, FRAME_TIME_30_FPS, offset)),
-                texture,
-            ),
-        };
-
-        video.update_texture(&self.queue);
-        video.advance_frame();
+        let video = Video::new(
+            width,
+            height,
+            Some(AV1Video::new(ivf_file, decoder, 0.0, -1, -1, timescale, None, vec![
+                0;
+                width as usize * height as usize
+                    * 4
+            ])),
+            texture,
+        );
 
         #[cfg(feature = "debug")]
         timer.stop();

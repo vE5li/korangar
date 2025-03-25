@@ -411,11 +411,7 @@ impl Client {
                 &capabilities,
                 game_file_loader.clone(),
             ));
-            let video_loader = Arc::new(VideoLoader::new(
-                queue.clone(),
-                game_file_loader.clone(),
-                texture_loader.clone(),
-            ));
+            let video_loader = Arc::new(VideoLoader::new(game_file_loader.clone(), texture_loader.clone()));
             let font_loader = Arc::new(FontLoader::new(application.get_fonts(), &game_file_loader, &texture_loader));
             let map_loader = Arc::new(MapLoader::new(
                 device.clone(),

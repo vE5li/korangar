@@ -25,7 +25,7 @@ const TGA_FILE_EXTENSION: &str = ".tga";
 const PNG_FILE_EXTENSION: &str = ".png";
 
 const DDS_FILE_EXTENSION: &str = ".dds";
-const H264_FILE_EXTENSION: &str = ".h264";
+const IVF_FILE_EXTENSION: &str = ".ivf";
 const TEXTURE_PREFIX: &str = "data\\texture\\";
 const VIDEO_PREFIX: &str = "data\\video\\";
 
@@ -173,7 +173,7 @@ fn analyze_files(
 
     let extension = match media_type {
         MediaType::Texture => DDS_FILE_EXTENSION,
-        MediaType::Video => H264_FILE_EXTENSION,
+        MediaType::Video => IVF_FILE_EXTENSION,
     };
 
     let mut existing_files = Vec::new();
@@ -337,7 +337,7 @@ fn process_media_files(
 fn get_target_filename(source_file: &str, media_type: &MediaType) -> String {
     match media_type {
         MediaType::Texture => texture_file_dds_name(source_file),
-        MediaType::Video => video_file_h264_name(source_file),
+        MediaType::Video => video_file_ivf_name(source_file),
     }
 }
 
@@ -395,7 +395,7 @@ fn process_video(
     builder: &mut SevenZipArchiveBuilder,
     created_count: &mut u32,
     bik_file_name: &String,
-    h264_file_name: &str,
+    ivf_file_name: &str,
     bik_data: Vec<u8>,
 ) {
     println!("Encoding video for `{bik_file_name}`");
@@ -404,16 +404,14 @@ fn process_video(
     let cmd = Command::new("ffmpeg")
         .arg("-i")
         .arg("pipe:0")
-        .arg("-vf")
-        .arg("fps=30")
-        .arg("-profile")
-        .arg("baseline")
+        .arg("-c:v")
+        .arg("libsvtav1")
         .arg("-crf")
-        .arg("18")
+        .arg("32")
         .arg("-preset")
-        .arg("slow")
+        .arg("4")
         .arg("-f")
-        .arg("h264")
+        .arg("ivf")
         .arg("pipe:1")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -438,11 +436,11 @@ fn process_video(
             match child.wait_with_output() {
                 Ok(output) => {
                     if output.status.success() {
-                        let mut h264_data = output.stdout;
+                        let mut ivf_data = output.stdout;
 
-                        h264_data.extend_from_slice(hash.as_bytes());
+                        ivf_data.extend_from_slice(hash.as_bytes());
 
-                        builder.add_file(h264_file_name, h264_data, Compression::Off);
+                        builder.add_file(ivf_file_name, ivf_data, Compression::Off);
 
                         *created_count += 1;
                     } else {
@@ -490,6 +488,6 @@ pub fn texture_file_dds_name(image_file_name: &str) -> String {
     format!("{image_file_name}{DDS_FILE_EXTENSION}")
 }
 
-pub fn video_file_h264_name(bik_file_name: &str) -> String {
-    format!("{bik_file_name}{H264_FILE_EXTENSION}")
+pub fn video_file_ivf_name(bik_file_name: &str) -> String {
+    format!("{bik_file_name}{IVF_FILE_EXTENSION}")
 }

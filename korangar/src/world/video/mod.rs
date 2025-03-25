@@ -1,50 +1,116 @@
+use std::io::Cursor;
 use std::sync::Arc;
 
 use derive_new::new;
-use openh264::decoder::{DecodeOptions, Flush};
+use korangar_video::ivf::Ivf;
+use korangar_video::{Decoder, Error, Picture};
 use wgpu::{Extent3d, Queue, TexelCopyBufferLayout, TexelCopyTextureInfo};
 
 use crate::graphics::Texture;
-
-const DECODER_OPTIONS: DecodeOptions = DecodeOptions::new().flush_after_decode(Flush::NoFlush);
-pub const FRAME_TIME_30_FPS: f64 = 1000.0 / 30.0;
 
 #[derive(new)]
 pub struct Video {
     width: u32,
     height: u32,
-    h264_video: Option<H264Video>,
+    av1_video: Option<AV1Video>,
     texture: Arc<Texture>,
 }
 
-/// Currently always assumes 30 FPS.
 #[derive(new)]
-pub struct H264Video {
-    bitstream: Vec<u8>,
-    decoder: openh264::decoder::Decoder,
-    next_frame_data: Vec<u8>,
+pub struct AV1Video {
+    ivf: Ivf<Cursor<Vec<u8>>>,
+    decoder: Decoder,
     current_timestamp: f64,
-    next_frame_timestamp: f64,
-    offset: usize,
+    last_timestamp: i64,
+    next_picture_timestamp: i64,
+    timescale: f64,
+    next_picture: Option<Picture>,
+    rgba_data: Vec<u8>,
 }
 
 impl Video {
-    /// Delta time is expected to be in seconds.
-    pub fn should_update_frame(&mut self, delta_time: f64) -> bool {
-        match self.h264_video.as_mut() {
-            Some(h264_video) => {
-                let ms = delta_time * 1000.0;
-                h264_video.current_timestamp += ms;
-                h264_video.current_timestamp >= h264_video.next_frame_timestamp
+    pub fn check_for_next_frame(&mut self) {
+        let Some(av1_video) = &mut self.av1_video else {
+            return;
+        };
+
+        if av1_video.next_picture_timestamp >= 0 {
+            return;
+        }
+
+        match av1_video.decoder.get_picture(av1_video.next_picture.take()) {
+            Ok(picture) => {
+                let next_timestamp = picture.timestamp().unwrap_or(0);
+
+                if next_timestamp < av1_video.last_timestamp {
+                    // Video is looping.
+                    av1_video.current_timestamp = 0.0;
+                }
+                av1_video.last_timestamp = next_timestamp;
+
+                av1_video.next_picture_timestamp = next_timestamp;
+                av1_video.next_picture = Some(picture);
             }
-            None => false,
+            Err(Error::Again) => loop {
+                match av1_video.decoder.send_pending_data() {
+                    Ok(_) => { /* No pending data left */ }
+                    Err(Error::Again) => break,
+                    Err(_error) => {
+                        /* Decoding error. Nothing we can do. */
+                        return;
+                    }
+                }
+
+                let Ok(Some(frame)) = av1_video.ivf.read_frame() else {
+                    let _ = av1_video.ivf.reset();
+                    continue;
+                };
+
+                let timestamp = (frame.timestamp as f64 / av1_video.timescale).floor() as i64;
+
+                match av1_video.decoder.send_data(frame.packet, None, Some(timestamp), None) {
+                    Ok(_) => continue,
+                    Err(Error::Again) => match av1_video.decoder.send_pending_data() {
+                        Ok(_) | Err(Error::Again) => break,
+                        Err(_error) => {
+                            /* Decoding error. Nothing we can do. */
+                            return;
+                        }
+                    },
+                    Err(_error) => {
+                        /* Decoding error. Nothing we can do. */
+                        return;
+                    }
+                }
+            },
+            Err(_error) => { /* Decoding error. Nothing we can do. */ }
+        };
+    }
+
+    /// Delta time is expected to be in seconds.
+    pub fn should_show_next_frame(&mut self, delta_time: f64) -> bool {
+        match self.av1_video.as_mut() {
+            Some(av1_video) => {
+                let ms = delta_time * 1000.0;
+                av1_video.current_timestamp += ms;
+                av1_video.next_picture_timestamp >= 0 && av1_video.current_timestamp.floor() as i64 >= av1_video.next_picture_timestamp
+            }
+            _ => false,
         }
     }
 
     pub fn update_texture(&mut self, queue: &Queue) {
-        let Some(h264_video) = &mut self.h264_video else {
+        let Some(av1_video) = &mut self.av1_video else {
             return;
         };
+
+        av1_video.next_picture_timestamp = -1;
+
+        let Some(picture) = av1_video.next_picture.as_ref() else {
+            return;
+        };
+
+        picture.write_rgba8(&mut av1_video.rgba_data);
 
         queue.write_texture(
             TexelCopyTextureInfo {
@@ -53,7 +119,7 @@ impl Video {
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
-            &h264_video.next_frame_data,
+            av1_video.rgba_data.as_slice(),
             TexelCopyBufferLayout {
                 offset: 0,
                 bytes_per_row: Some(self.width * 4),
@@ -67,55 +133,7 @@ impl Video {
         );
     }
 
-    pub fn advance_frame(&mut self) {
-        let Some(h264_video) = &mut self.h264_video else {
-            return;
-        };
-
-        let decoded = loop {
-            let Some(packet) = Self::next_packet(&h264_video.bitstream, &mut h264_video.offset) else {
-                h264_video.current_timestamp = 0.0;
-                h264_video.next_frame_timestamp = FRAME_TIME_30_FPS;
-                return;
-            };
-
-            match h264_video.decoder.decode_with_options(packet, DECODER_OPTIONS) {
-                Ok(Some(frame)) => break frame,
-                Ok(None) => { /* frame not ready yet */ }
-                Err(_) => return,
-            }
-        };
-
-        decoded.write_rgba8(&mut h264_video.next_frame_data);
-
-        h264_video.next_frame_timestamp += FRAME_TIME_30_FPS
-    }
-
     pub fn get_texture(&self) -> &Arc<Texture> {
         &self.texture
-    }
-
-    pub fn next_packet<'a>(data: &'a [u8], offset: &mut usize) -> Option<&'a [u8]> {
-        let data = &data[*offset..];
-
-        if data.is_empty() {
-            return None;
-        }
-
-        match openh264::nal_units(data).next() {
-            None => match *offset == 0 {
-                true => None,
-                false => {
-                    // Reset video stream
-                    *offset = 0;
-                    None
-                }
-            },
-            Some(packet) => {
-                let size = packet.len();
-                *offset += size;
-                Some(packet)
-            }
-        }
     }
 }

@@ -28,10 +28,11 @@ korangar_debug = { path = "korangar_debug" }
 korangar_interface = { path = "korangar_interface" }
 korangar_networking = { path = "korangar_networking" }
 korangar_util = { path = "korangar_util" }
+korangar_video = { path = "korangar_video" }
+libc = "0.2"
 lunify = "1"
 mlua = "0.10"
 num = "0.4"
-openh264 = "0.8"
 option-ext = "0.2"
 pcap = "2"
 pollster = "0.4"
@@ -43,6 +44,7 @@ ragnarok_formats = { path = "ragnarok_formats" }
 ragnarok_packets = { path = "ragnarok_packets" }
 ragnarok_procedural = { path = "ragnarok_procedural" }
 rand_aes = { version = "0.5", default-features = false }
+rav1d = { version = "1.0", git = "https://github.com/memorysafety/rav1d", rev = "9bf16e9c9c1351822205ee49fb15b14d0cf052a6" }
 rayon = "1"
 reqwest = "0.12"
 ron = "0.8"
@@ -66,6 +68,10 @@ opt-level = 3
 [profile.dev.package."*"]
 opt-level = 3
 
+[profile.dev.package.rav1d]
+opt-level = 3
+debug-assertions = false
+
 [profile.dev.package.korangar]
 opt-level = 0
 
@@ -82,6 +88,9 @@ opt-level = 3
 opt-level = 3
 
 [profile.dev.package.korangar_util]
+opt-level = 3
+
+[profile.dev.package.korangar_video]
 opt-level = 3
 
 [profile.dev.package.ragnarok_bytes]

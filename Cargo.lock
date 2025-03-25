@@ -191,6 +191,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "assert_matches"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b34d609dfbaf33d6889b2b7106d3ca345eacad44200913df5ba02bfd31d2ba9"
+
+[[package]]
 name = "atomic-arena"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -201,6 +207,26 @@ name = "atomic-waker"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
+
+[[package]]
+name = "atomig"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8c3eff224f34d90a14c90d2adedfbabcc9f92e4a823c74364fcbae5f07f28389"
+dependencies = [
+ "atomig-macro",
+]
+
+[[package]]
+name = "atomig-macro"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a10c8c98ca4c65e4bdd6f1506beb768671f8dce3f5df4dd7d14632b6ecc6f43"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
 
 [[package]]
 name = "autocfg"
@@ -1721,10 +1747,10 @@ dependencies = [
  "korangar_interface",
  "korangar_networking",
  "korangar_util",
+ "korangar_video",
  "lunify",
  "mlua",
  "num",
- "openh264",
  "option-ext",
  "pollster",
  "quick-xml",
@@ -1799,6 +1825,16 @@ dependencies = [
  "image",
  "korangar_interface",
  "rand_aes",
+]
+
+[[package]]
+name = "korangar_video"
+version = "0.1.0"
+dependencies = [
+ "bitflags 2.9.0",
+ "bytemuck",
+ "libc",
+ "rav1d",
 ]
 
 [[package]]
@@ -2099,6 +2135,9 @@ name = "nasm-rs"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "12fcfa1bd49e0342ec1d07ed2be83b59963e7acbeb9310e1bb2c07b69dadd959"
+dependencies = [
+ "jobserver",
+]
 
 [[package]]
 name = "native-tls"
@@ -2578,27 +2617,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cde51589ab56b20a6f686b2c68f7a0bd6add753d697abf720d63f8db3ab7b1ad"
 
 [[package]]
-name = "openh264"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dceb5b210cf91c441ccf50806f6997ffde68d72f0c646e76890afee2200d1bf5"
-dependencies = [
- "openh264-sys2",
- "wide",
-]
-
-[[package]]
-name = "openh264-sys2"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae78d5d5bd87ae2e6de819e35d6faadeb5d6e5b31cbbc9a142aeb3ae722ec127"
-dependencies = [
- "cc",
- "nasm-rs",
- "walkdir",
-]
-
-[[package]]
 name = "openssl"
 version = "0.10.71"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3015,6 +3033,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f60fcc7d6849342eff22c4350c8b9a989ee8ceabc4b481253e8946b9fe83d684"
 
 [[package]]
+name = "rav1d"
+version = "1.0.0"
+source = "git+https://github.com/memorysafety/rav1d?rev=9bf16e9c9c1351822205ee49fb15b14d0cf052a6#9bf16e9c9c1351822205ee49fb15b14d0cf052a6"
+dependencies = [
+ "assert_matches",
+ "atomig",
+ "bitflags 2.9.0",
+ "cc",
+ "cfg-if",
+ "libc",
+ "nasm-rs",
+ "parking_lot",
+ "paste",
+ "raw-cpuid",
+ "strum",
+ "to_method",
+ "zerocopy 0.7.35",
+]
+
+[[package]]
 name = "rav1e"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3062,6 +3100,15 @@ dependencies = [
  "rav1e",
  "rayon",
  "rgb",
+]
+
+[[package]]
+name = "raw-cpuid"
+version = "11.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6df7ab838ed27997ba19a4664507e6f82b41fe6e20be42929332156e5e85146"
+dependencies = [
+ "bitflags 2.9.0",
 ]
 
 [[package]]
@@ -3352,15 +3399,6 @@ name = "ryu"
 version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
-
-[[package]]
-name = "safe_arch"
-version = "0.7.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96b02de82ddbe1b636e6170c21be622223aea188ef2e139be0a5b219ec215323"
-dependencies = [
- "bytemuck",
-]
 
 [[package]]
 name = "same-file"
@@ -4013,6 +4051,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
+name = "to_method"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c7c4ceeeca15c8384bbc3e011dbd8fccb7f068a440b752b7d9b32ceb0ca0e2e8"
+
+[[package]]
 name = "tokio"
 version = "1.44.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4657,16 +4701,6 @@ dependencies = [
  "env_home",
  "rustix 0.38.44",
  "winsafe",
-]
-
-[[package]]
-name = "wide"
-version = "0.7.32"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41b5576b9a81633f3e8df296ce0063042a73507636cbe956c61133dd7034ab22"
-dependencies = [
- "bytemuck",
- "safe_arch",
 ]
 
 [[package]]
@@ -5342,6 +5376,7 @@ version = "0.7.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b9b4fd18abc82b8136838da5d50bae7bdea537c574d8dc1a34ed098d6c166f0"
 dependencies = [
+ "byteorder",
  "zerocopy-derive 0.7.35",
 ]
 

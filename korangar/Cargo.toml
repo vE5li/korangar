@@ -24,10 +24,10 @@ korangar_debug = { workspace = true, optional = true }
 korangar_interface = { workspace = true, features = ["serde", "cgmath"] }
 korangar_networking = { workspace = true, features = ["debug"] }
 korangar_util = { workspace = true, features = ["interface"] }
+korangar_video = { workspace = true }
 lunify = { workspace = true }
 mlua = { workspace = true, features = ["lua51", "vendored"] }
 num = { workspace = true }
-openh264 = { workspace = true }
 option-ext = { workspace = true }
 pollster = { workspace = true }
 quick-xml = { workspace = true, features = ["serde", "serialize"] }

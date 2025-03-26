@@ -4,6 +4,9 @@
 //! `rav1d` currently doesn't expose a safe Rust API, but will most likely
 //! re-implement the API of `dav1d-rs`.
 //!
+//! The unsafe code in this crate is only needed because of the C-API that
+//! currently `rav1d` exposes.
+//!
 //! `dav1d-rs` is also licensed under MIT.
 
 /// Implements the IVF file format.
@@ -594,11 +597,11 @@ impl Picture {
 
     /// Stride in pixels of the `component` for the decoded frame.
     pub fn stride(&self, component: PlanarImageComponent) -> u32 {
-        let s = match component {
+        let index = match component {
             PlanarImageComponent::Y => 0,
             _ => 1,
         };
-        self.inner.stride[s] as u32
+        self.inner.stride[index] as u32
     }
 
     /// Raw pointer to the data of the `component` for the decoded frame.
@@ -614,7 +617,7 @@ impl Picture {
         let height = match component {
             PlanarImageComponent::Y => self.height(),
             _ => match self.pixel_layout() {
-                PixelLayout::I420 => (self.height() + 1) / 2,
+                PixelLayout::I420 => self.height().div_ceil(2),
                 PixelLayout::I400 | PixelLayout::I422 | PixelLayout::I444 => self.height(),
             },
         };
@@ -641,14 +644,14 @@ impl Picture {
     ///
     /// Check [`Picture::bit_depth`] for the number of storage bits.
     pub fn bits_per_component(&self) -> Option<BitsPerComponent> {
-        unsafe {
-            match self.inner.seq_hdr.unwrap().as_ref().hbd {
+        self.inner.seq_hdr.as_ref().and_then(|seq_hdr| unsafe {
+            match seq_hdr.as_ref().hbd {
                 0 => Some(BitsPerComponent(8)),
                 1 => Some(BitsPerComponent(10)),
                 2 => Some(BitsPerComponent(12)),
                 _ => None,
             }
-        }
+        })
     }
 
     /// Width of the frame.
@@ -669,7 +672,7 @@ impl Picture {
             headers::DAV1D_PIXEL_LAYOUT_I420 => PixelLayout::I420,
             headers::DAV1D_PIXEL_LAYOUT_I422 => PixelLayout::I422,
             headers::DAV1D_PIXEL_LAYOUT_I444 => PixelLayout::I444,
-            _ => unreachable!(),
+            _ => panic!("Unknown DAV1D_PIXEL_LAYOUT"),
         }
     }
 
@@ -695,7 +698,7 @@ impl Picture {
     /// This is the same offset as the one provided to [`Decoder::send_data`] or
     /// `-1` if none was provided.
     pub fn offset(&self) -> i64 {
-        i64::from(self.inner.m.offset)
+        self.inner.m.offset as _
     }
 
     /// Chromaticity coordinates of the source colour primaries.

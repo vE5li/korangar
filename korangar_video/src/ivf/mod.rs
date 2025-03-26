@@ -1,7 +1,7 @@
 //! IVF container parsing.
 
 use std::convert::TryFrom;
-use std::io::{BufRead, Seek, SeekFrom};
+use std::io::BufRead;
 
 use bytemuck::{Pod, Zeroable};
 pub use error::IvfError;
@@ -17,20 +17,16 @@ type Result<T> = std::result::Result<T, IvfError>;
 pub struct Ivf<R> {
     reader: R,
     header: IvfHeader,
-
-    data_start: u64,
     size_buffer: [u8; 4],
     timestamp_buffer: [u8; 8],
 }
 
-impl<R: BufRead + Seek> Ivf<R> {
+impl<R: BufRead> Ivf<R> {
     /// Creates a new IVF using the given reader.
     pub fn new(mut reader: R) -> Result<Self> {
         let mut d = [0u8; size_of::<IvfHeader>()];
         reader.read_exact(&mut d)?;
         let header: IvfHeader = bytemuck::cast(d);
-
-        let data_start = reader.stream_position()?;
 
         if header.signature != [b'D', b'K', b'I', b'F'] {
             return Err(IvfError::InvalidHeader("invalid signature".to_owned()));
@@ -47,7 +43,6 @@ impl<R: BufRead + Seek> Ivf<R> {
         Ok(Self {
             reader,
             header,
-            data_start,
             size_buffer: [0u8; 4],
             timestamp_buffer: [0u8; 8],
         })
@@ -100,23 +95,16 @@ impl<R: BufRead + Seek> Ivf<R> {
             return Err(IvfError::UnexpectedFileEnding);
         }
 
-        let size = usize::try_from(u32::from_le_bytes(self.size_buffer))?;
+        let packet_size = usize::try_from(u32::from_le_bytes(self.size_buffer))?;
         let timestamp = u64::from_le_bytes(self.timestamp_buffer);
 
-        let mut data = vec![0u8; size];
+        let mut packet = vec![0u8; packet_size];
 
-        if self.reader.read_exact(&mut data).is_err() {
+        if self.reader.read_exact(&mut packet).is_err() {
             return Err(IvfError::UnexpectedFileEnding);
         }
 
-        Ok(Some(Frame { timestamp, packet: data }))
-    }
-
-    /// Resets the internal reader to the start of the first frame. Can be used
-    /// to loop the video.
-    pub fn reset(&mut self) -> Result<()> {
-        self.reader.seek(SeekFrom::Start(self.data_start)).map_err(IvfError::IoError)?;
-        Ok(())
+        Ok(Some(Frame { timestamp, packet }))
     }
 }
 

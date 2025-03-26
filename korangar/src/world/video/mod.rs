@@ -1,58 +1,68 @@
-use std::io::Cursor;
 use std::sync::Arc;
 
-use derive_new::new;
-use korangar_video::ivf::Ivf;
 use korangar_video::{Decoder, Error, Picture};
 use wgpu::{Extent3d, Queue, TexelCopyBufferLayout, TexelCopyTextureInfo};
 
 use crate::graphics::Texture;
 
-#[derive(new)]
 pub struct Video {
     width: u32,
     height: u32,
-    av1_video: Option<AV1Video>,
-    texture: Arc<Texture>,
-}
-
-#[derive(new)]
-pub struct AV1Video {
-    ivf: Ivf<Cursor<Vec<u8>>>,
+    timescale: f64,
+    frames: Vec<VideoFrame>,
     decoder: Decoder,
     current_timestamp: f64,
     last_timestamp: i64,
     next_picture_timestamp: i64,
-    timescale: f64,
+    next_frame_index: usize,
     next_picture: Option<Picture>,
     rgba_data: Vec<u8>,
+    texture: Arc<Texture>,
+}
+
+pub struct VideoFrame {
+    pub timestamp: i64,
+    pub packet: Arc<[u8]>,
 }
 
 impl Video {
-    pub fn check_for_next_frame(&mut self) {
-        let Some(av1_video) = &mut self.av1_video else {
-            return;
-        };
+    pub fn new(width: u32, height: u32, timescale: f64, frames: Vec<VideoFrame>, texture: Arc<Texture>) -> Self {
+        Self {
+            width,
+            height,
+            timescale,
+            frames,
+            decoder: Decoder::new().expect("Can't create decoder"),
+            current_timestamp: 0.0,
+            last_timestamp: -1,
+            next_picture_timestamp: -1,
+            next_frame_index: 0,
+            next_picture: None,
+            rgba_data: vec![0; width as usize * height as usize * 4],
+            texture,
+        }
+    }
 
-        if av1_video.next_picture_timestamp >= 0 {
+    pub fn check_for_next_frame(&mut self) {
+        if self.frames.is_empty() || self.next_picture_timestamp >= 0 {
             return;
         }
 
-        match av1_video.decoder.get_picture(av1_video.next_picture.take()) {
+        match self.decoder.get_picture(self.next_picture.take()) {
             Ok(picture) => {
                 let next_timestamp = picture.timestamp().unwrap_or(0);
 
-                if next_timestamp < av1_video.last_timestamp {
+                if next_timestamp < self.last_timestamp {
                     // Video is looping.
-                    av1_video.current_timestamp = 0.0;
+                    self.current_timestamp = 0.0;
                 }
-                av1_video.last_timestamp = next_timestamp;
+                self.last_timestamp = next_timestamp;
 
-                av1_video.next_picture_timestamp = next_timestamp;
-                av1_video.next_picture = Some(picture);
+                self.next_picture_timestamp = next_timestamp;
+                self.next_picture = Some(picture);
             }
             Err(Error::Again) => loop {
-                match av1_video.decoder.send_pending_data() {
+                match self.decoder.send_pending_data() {
                     Ok(_) => { /* No pending data left */ }
                     Err(Error::Again) => break,
                     Err(_error) => {
@@ -61,16 +71,17 @@ impl Video {
                     }
                 }
 
-                let Ok(Some(frame)) = av1_video.ivf.read_frame() else {
-                    let _ = av1_video.ivf.reset();
+                let Some(frame) = self.frames.get(self.next_frame_index) else {
+                    self.next_frame_index = 0;
                     continue;
                 };
+                self.next_frame_index += 1;
 
-                let timestamp = (frame.timestamp as f64 / av1_video.timescale).floor() as i64;
+                let timestamp = (frame.timestamp as f64 / self.timescale).floor() as i64;
 
-                match av1_video.decoder.send_data(frame.packet, None, Some(timestamp), None) {
+                match self.decoder.send_data(Arc::clone(&frame.packet), None, Some(timestamp), None) {
                     Ok(_) => continue,
-                    Err(Error::Again) => match av1_video.decoder.send_pending_data() {
+                    Err(Error::Again) => match self.decoder.send_pending_data() {
                         Ok(_) | Err(Error::Again) => break,
                         Err(_error) => {
                             /* Decoding error. Nothing we can do. */
@@ -89,28 +100,24 @@ impl Video {
 
     /// Delta time is expected to be in seconds.
     pub fn should_show_next_frame(&mut self, delta_time: f64) -> bool {
-        match self.av1_video.as_mut() {
-            Some(av1_video) => {
-                let ms = delta_time * 1000.0;
-                av1_video.current_timestamp += ms;
-                av1_video.next_picture_timestamp >= 0 && av1_video.current_timestamp.floor() as i64 >= av1_video.next_picture_timestamp
-            }
-            _ => false,
+        if self.frames.is_empty() {
+            return false;
         }
+
+        let ms = delta_time * 1000.0;
+        self.current_timestamp += ms;
+
+        self.next_picture_timestamp >= 0 && self.current_timestamp.floor() as i64 >= self.next_picture_timestamp
     }
 
     pub fn update_texture(&mut self, queue: &Queue) {
-        let Some(av1_video) = &mut self.av1_video else {
+        self.next_picture_timestamp = -1;
+
+        let Some(picture) = self.next_picture.as_ref() else {
             return;
         };
 
-        av1_video.next_picture_timestamp = -1;
-
-        let Some(picture) = av1_video.next_picture.as_ref() else {
-            return;
-        };
-
-        picture.write_rgba8(&mut av1_video.rgba_data);
+        picture.write_rgba8(&mut self.rgba_data);
 
         queue.write_texture(
             TexelCopyTextureInfo {
@@ -119,7 +126,7 @@ impl Video {
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
-            av1_video.rgba_data.as_slice(),
+            self.rgba_data.as_slice(),
             TexelCopyBufferLayout {
                 offset: 0,
                 bytes_per_row: Some(self.width * 4),

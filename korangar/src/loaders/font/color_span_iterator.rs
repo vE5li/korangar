@@ -42,13 +42,13 @@ impl<'r, 's> Iterator for ColorSpanIterator<'r, 's> {
                     if absolute_color_position > start_position {
                         let span_text = &self.text[start_position..absolute_color_position];
                         self.position = absolute_color_position;
-                        return Some((span_text, self.attributes));
+                        return Some((span_text, self.attributes.clone()));
                     }
 
                     self.position = absolute_color_position + 7;
-                    self.attributes = match potential_color {
-                        "000000" => self.attributes.color(self.default_color),
-                        code => self.attributes.color(Color::rgb_hex(code).into()),
+                    self.attributes.color_opt = match potential_color {
+                        "000000" => Some(self.default_color),
+                        code => Some(Color::rgb_hex(code).into()),
                     };
 
                     return self.next();
@@ -66,7 +66,7 @@ impl<'r, 's> Iterator for ColorSpanIterator<'r, 's> {
         if self.position < self.text.len() {
             let span_text = &self.text[self.position..];
             self.position = self.text.len();
-            Some((span_text, self.attributes))
+            Some((span_text, self.attributes.clone()))
         } else {
             None
         }

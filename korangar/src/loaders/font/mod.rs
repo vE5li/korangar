@@ -281,8 +281,8 @@ impl FontLoader {
             buffer.set_size(&mut font_system, Some(available_width), None);
             buffer.set_rich_text(
                 &mut font_system,
-                ColorSpanIterator::new(text, default_color, attributes),
-                attributes,
+                ColorSpanIterator::new(text, default_color, attributes.clone()),
+                &attributes,
                 Shaping::Advanced,
                 None,
             );

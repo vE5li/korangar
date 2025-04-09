@@ -133,10 +133,11 @@ pub(crate) trait Dispatch<const BIND: BindGroupCount> {
 /// We reimplement the WGPU type, since we want to have bytemuck support.
 #[repr(C)]
 #[derive(Copy, Clone, Pod, Zeroable)]
-pub(crate) struct DrawIndirectArgs {
-    vertex_count: u32,
+pub(crate) struct DrawIndexedIndirectArgs {
+    index_count: u32,
     instance_count: u32,
-    first_vertex: u32,
+    first_index: u32,
+    base_vertex: i32,
     first_instance: u32,
 }
 

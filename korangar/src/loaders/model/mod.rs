@@ -12,11 +12,11 @@ use num::Zero;
 use ragnarok_bytes::{ByteReader, FromBytes};
 use ragnarok_formats::model::{ModelData, NodeData};
 use ragnarok_formats::version::InternalVersion;
-use smallvec::{SmallVec, smallvec};
+use smallvec::SmallVec;
 
 use super::error::LoadError;
 use super::{FALLBACK_MODEL_FILE, TextureSetBuilder, smooth_model_normals};
-use crate::graphics::{BindlessSupport, Color, ModelVertex, NativeModelVertex};
+use crate::graphics::{BindlessSupport, Color, ModelVertex, NativeModelVertex, reduce_model_vertices};
 use crate::loaders::GameFileLoader;
 use crate::world::{Model, Node, SubMesh};
 
@@ -81,7 +81,8 @@ impl ModelLoader {
         let two_sided_face_count = node.faces.iter().filter(|face| face.two_sided != 0).count();
         let total_vertices = (face_count + two_sided_face_count) * 3;
 
-        let mut native_vertices = vec![NativeModelVertex::zeroed(); total_vertices];
+        let mut vertices = vec![NativeModelVertex::zeroed(); total_vertices];
+
         let mut face_index = 0;
         let mut back_face_index = face_vertex_count;
 
@@ -103,14 +104,13 @@ impl ModelLoader {
                 let coordinate_index = face.texture_coordinate_indices[index];
                 node.texture_coordinates[coordinate_index as usize].coordinates
             });
-            let mut smoothing_groups: SmallVec<[i32; 3]> = smallvec![face.smooth_group];
-            if let Some(extras) = face.smooth_group_extra.as_ref() {
-                for extra in extras {
-                    smoothing_groups.push(*extra);
-                }
-            };
+
+            let smoothing_groups: SmallVec<[i32; 3]> = SmallVec::from_iter(
+                std::iter::once(face.smooth_group).chain(face.smooth_group_extra.as_ref().iter().flat_map(|extra| extra.iter().copied())),
+            );
+
             Self::add_vertices(
-                &mut native_vertices[face_index..face_index + 3],
+                &mut vertices[face_index..face_index + 3],
                 &vertex_positions,
                 &texture_coordinates,
                 &smoothing_groups,
@@ -122,7 +122,7 @@ impl ModelLoader {
 
             if face.two_sided != 0 {
                 Self::add_vertices(
-                    &mut native_vertices[back_face_index..back_face_index + 3],
+                    &mut vertices[back_face_index..back_face_index + 3],
                     &vertex_positions,
                     &texture_coordinates,
                     &smoothing_groups,
@@ -135,12 +135,12 @@ impl ModelLoader {
         }
 
         if smooth_normals {
-            let (face_vertices, back_face_vertices) = native_vertices.split_at_mut(face_vertex_count);
+            let (face_vertices, back_face_vertices) = vertices.split_at_mut(face_vertex_count);
             smooth_model_normals(face_vertices);
             smooth_model_normals(back_face_vertices);
         }
 
-        native_vertices
+        vertices
     }
 
     fn calculate_matrices_rsm1(node: &NodeData, parent_matrix: &Matrix4<f32>) -> (Matrix4<f32>, Matrix4<f32>, Matrix4<f32>) {
@@ -186,6 +186,7 @@ impl ModelLoader {
         nodes: &[NodeData],
         processed_node_indices: &mut [bool],
         model_vertices: &mut Vec<ModelVertex>,
+        model_indices: &mut Vec<u32>,
         texture_mapping: &TextureMapping,
         parent_matrix: &Matrix4<f32>,
         main_bounding_box: &mut AABB,
@@ -230,6 +231,7 @@ impl ModelLoader {
                     nodes,
                     processed_node_indices,
                     model_vertices,
+                    model_indices,
                     texture_mapping,
                     &box_transform_matrix,
                     main_bounding_box,
@@ -255,13 +257,15 @@ impl ModelLoader {
         };
 
         let mut node_native_vertices = Self::make_vertices(current_node, &main_matrix, reverse_order, smooth_normals);
-        let centroid = Self::calculate_centroid(&node_native_vertices);
 
         node_native_vertices
             .iter_mut()
             .for_each(|vertice| vertice.texture_index = node_textures[vertice.texture_index as usize].index);
 
-        let mut node_model_vertices = NativeModelVertex::to_vertices(node_native_vertices);
+        let centroid = Self::calculate_centroid(&node_native_vertices);
+
+        let node_vertices = NativeModelVertex::to_model_vertices(node_native_vertices);
+        let (node_vertices, mut node_indices) = reduce_model_vertices(&node_vertices);
 
         // Apply the frames per second on the keyframes values.
         let animation_length = match version.equals_or_above(2, 2) {
@@ -304,10 +308,12 @@ impl ModelLoader {
 
         match bindless_support {
             BindlessSupport::Full | BindlessSupport::Limited => {
-                // Remember the vertex offset/count and gather node vertices.
-                let vertex_offset = model_vertices.len();
-                let vertex_count = node_model_vertices.len();
-                model_vertices.extend(node_model_vertices);
+                // Remember the index offset, index count, base vertex and gather node vertices.
+                let index_offset = model_indices.len() as u32;
+                let index_count = node_indices.len() as u32;
+                let base_vertex = model_vertices.len() as i32;
+                model_vertices.extend(node_vertices);
+                model_indices.extend(node_indices);
 
                 Node::new(
                     version,
@@ -317,8 +323,9 @@ impl ModelLoader {
                     position,
                     centroid,
                     vec![SubMesh {
-                        vertex_offset,
-                        vertex_count,
+                        index_offset,
+                        index_count,
+                        base_vertex,
                         texture_index: 0,
                         transparent: node_textures.iter().any(|texture| texture.transparent),
                     }],
@@ -332,7 +339,14 @@ impl ModelLoader {
             BindlessSupport::None => {
                 let texture_transparencies: HashMap<i32, bool> =
                     node_textures.iter().map(|texture| (texture.index, texture.transparent)).collect();
-                let submeshes = split_mesh_by_texture(&mut node_model_vertices, Some(model_vertices), Some(&texture_transparencies));
+
+                let submeshes = split_mesh_by_texture(
+                    &node_vertices,
+                    &mut node_indices,
+                    Some(model_vertices),
+                    Some(model_indices),
+                    Some(&texture_transparencies),
+                );
 
                 Node::new(
                     version,
@@ -436,6 +450,7 @@ impl ModelLoader {
         &self,
         texture_set_builder: &mut TextureSetBuilder,
         model_vertices: &mut Vec<ModelVertex>,
+        model_indices: &mut Vec<u32>,
         model_file: &str,
         reverse_order: bool,
     ) -> Result<Model, LoadError> {
@@ -451,7 +466,13 @@ impl ModelLoader {
                     print_debug!("Replacing with fallback");
                 }
 
-                return self.load(texture_set_builder, model_vertices, FALLBACK_MODEL_FILE, reverse_order);
+                return self.load(
+                    texture_set_builder,
+                    model_vertices,
+                    model_indices,
+                    FALLBACK_MODEL_FILE,
+                    reverse_order,
+                );
             }
         };
         let mut byte_reader: ByteReader<Option<InternalVersion>> = ByteReader::with_default_metadata(&bytes);
@@ -465,7 +486,13 @@ impl ModelLoader {
                     print_debug!("Replacing with fallback");
                 }
 
-                return self.load(texture_set_builder, model_vertices, FALLBACK_MODEL_FILE, reverse_order);
+                return self.load(
+                    texture_set_builder,
+                    model_vertices,
+                    model_indices,
+                    FALLBACK_MODEL_FILE,
+                    reverse_order,
+                );
             }
         };
 
@@ -479,7 +506,13 @@ impl ModelLoader {
                 print_debug!("Replacing with fallback");
             }
 
-            return self.load(texture_set_builder, model_vertices, FALLBACK_MODEL_FILE, reverse_order);
+            return self.load(
+                texture_set_builder,
+                model_vertices,
+                model_indices,
+                FALLBACK_MODEL_FILE,
+                reverse_order,
+            );
         }
 
         let texture_names = ModelLoader::collect_versioned_texture_names(&version, &model_data);
@@ -533,6 +566,7 @@ impl ModelLoader {
                     &model_data.nodes,
                     &mut processed_node_indices,
                     model_vertices,
+                    model_indices,
                     &texture_mapping,
                     &Matrix4::identity(),
                     &mut model_bounding_box,
@@ -579,45 +613,82 @@ impl ModelLoader {
 /// each texture used in the mesh so we can bind the appropriate texture
 /// before drawing each sub-mesh.
 pub fn split_mesh_by_texture(
-    model_vertices: &mut [ModelVertex],
+    vertices: &[ModelVertex],
+    indices: &mut [u32],
     mut global_model_vertices: Option<&mut Vec<ModelVertex>>,
+    mut global_model_indices: Option<&mut Vec<u32>>,
     texture_transparencies: Option<&HashMap<i32, bool>>,
 ) -> Vec<SubMesh> {
-    // Stable sort preserves original order within same texture
-    model_vertices.sort_by_key(|v| v.texture_index);
+    let mut texture_to_faces: HashMap<i32, Vec<[u32; 3]>> = HashMap::new();
+
+    indices.chunks(3).filter(|chunk| chunk.len() == 3).for_each(|chunk| {
+        let texture_index = vertices[chunk[0] as usize].texture_index;
+        texture_to_faces
+            .entry(texture_index)
+            .or_default()
+            .push([chunk[0], chunk[1], chunk[2]])
+    });
 
     let mut submeshes = Vec::new();
 
-    let mut start_index = 0;
-    while start_index < model_vertices.len() {
-        let texture_index = model_vertices[start_index].texture_index;
-        let transparent = texture_transparencies
-            .and_then(|transparencies| transparencies.get(&texture_index).copied())
-            .unwrap_or(false);
+    match (global_model_vertices.as_mut(), global_model_indices.as_mut()) {
+        (Some(global_vertices), Some(global_indices)) => {
+            for (&texture_index, faces) in texture_to_faces.iter() {
+                let transparent = texture_transparencies
+                    .and_then(|transparencies| transparencies.get(&texture_index).copied())
+                    .unwrap_or(false);
 
-        let mut end_index = start_index + 1;
-        while end_index < model_vertices.len() && model_vertices[end_index].texture_index == texture_index {
-            end_index += 1;
-        }
+                let index_count = (faces.len() * 3) as u32;
+                let index_offset = global_indices.len() as u32;
 
-        let (vertex_offset, vertex_count) = match global_model_vertices.as_mut() {
-            None => (start_index, end_index - start_index),
-            Some(global_model_vertices) => {
-                let vertex_offset = global_model_vertices.len();
-                let vertex_count = end_index - start_index;
-                global_model_vertices.extend_from_slice(&model_vertices[start_index..end_index]);
-                (vertex_offset, vertex_count)
+                let mut index_mapping = HashMap::new();
+                let base_vertex = global_vertices.len() as i32;
+
+                for &old_index in faces.iter().flatten() {
+                    if !index_mapping.contains_key(&old_index) {
+                        index_mapping.insert(old_index, index_mapping.len() as u32);
+                        global_vertices.push(vertices[old_index as usize]);
+                    }
+                }
+
+                for old_index in faces.iter().flatten() {
+                    global_indices.push(index_mapping[old_index]);
+                }
+
+                submeshes.push(SubMesh {
+                    index_offset,
+                    index_count,
+                    base_vertex,
+                    texture_index,
+                    transparent,
+                });
             }
-        };
+        }
+        _ => {
+            let mut current_index = 0;
 
-        submeshes.push(SubMesh {
-            vertex_offset,
-            vertex_count,
-            texture_index,
-            transparent,
-        });
+            for (&texture_index, faces) in texture_to_faces.iter() {
+                let transparent = texture_transparencies
+                    .and_then(|transparencies| transparencies.get(&texture_index).copied())
+                    .unwrap_or(false);
 
-        start_index = end_index;
+                let index_count = (faces.len() * 3) as u32;
+
+                for (index, &vertex_index) in faces.iter().flatten().enumerate() {
+                    indices[current_index + index] = vertex_index;
+                }
+
+                submeshes.push(SubMesh {
+                    index_offset: current_index as u32,
+                    index_count,
+                    base_vertex: 0,
+                    texture_index,
+                    transparent,
+                });
+
+                current_index += index_count as usize;
+            }
+        }
     }
 
     submeshes

@@ -5,7 +5,7 @@ use smallvec::smallvec_inline;
 
 #[cfg(feature = "debug")]
 use crate::graphics::Color;
-use crate::graphics::{ModelVertex, NativeModelVertex, PickerTarget, TileVertex};
+use crate::graphics::{ModelVertex, NativeModelVertex, PickerTarget, TileVertex, reduce_model_vertices};
 use crate::loaders::{TextureSetBuilder, smooth_ground_normals};
 
 pub const MAP_TILE_SIZE: f32 = 10.0;
@@ -22,7 +22,7 @@ pub fn ground_vertices(
     ground_data: &GroundData,
     water_level: f32,
     texture_set_builder: &mut TextureSetBuilder,
-) -> (Vec<ModelVertex>, Rectangle<f32>, Vec<bool>) {
+) -> (Vec<ModelVertex>, Vec<u32>, Rectangle<f32>, Vec<bool>) {
     let mut native_ground_vertices = Vec::new();
 
     let mut water_bound_min = Point2::from_value(f32::MAX);
@@ -89,12 +89,12 @@ pub fn ground_vertices(
                     let third_texture_coordinates = Vector2::new(ground_surface.u[3], ground_surface.v[3]);
                     let fourth_texture_coordinates = Vector2::new(ground_surface.u[2], ground_surface.v[2]);
 
-                    let neightbor_color = |x_offset, y_offset| {
+                    let neighbor_color = |x_offset, y_offset| {
                         let Some(neighbor_tile) = ground_tiles.get(x + x_offset + (y + y_offset) * width) else {
                             return ground_surface.color.into();
                         };
 
-                        // FIX: It is alomst certainly incorrect to use the top face in all cases.
+                        // FIX: It is almost certainly incorrect to use the top face in all cases.
                         let neighbor_surface_index = tile_surface_index(neighbor_tile, SurfaceType::Top);
                         let Some(neighbor_surface) = ground_data.surfaces.get(neighbor_surface_index as usize) else {
                             return ground_surface.color.into();
@@ -103,9 +103,9 @@ pub fn ground_vertices(
                         neighbor_surface.color.into()
                     };
 
-                    let color_right = neightbor_color(1, 0);
-                    let color_top_right = neightbor_color(1, 1);
-                    let color_top = neightbor_color(0, 1);
+                    let color_right = neighbor_color(1, 0);
+                    let color_top_right = neighbor_color(1, 1);
+                    let color_top = neighbor_color(0, 1);
 
                     native_ground_vertices.push(NativeModelVertex::new(
                         first_position,
@@ -188,8 +188,6 @@ pub fn ground_vertices(
 
     let water_bounds = Rectangle::new(water_bound_min, water_bound_max);
 
-    smooth_ground_normals(&mut native_ground_vertices);
-
     let (ground_texture_mapping, ground_texture_transparencies): (Vec<i32>, Vec<bool>) = ground_data
         .textures
         .iter()
@@ -200,13 +198,19 @@ pub fn ground_vertices(
         .iter_mut()
         .for_each(|vertice| vertice.texture_index = ground_texture_mapping[vertice.texture_index as usize]);
 
-    let vertices = NativeModelVertex::to_vertices(native_ground_vertices);
+    smooth_ground_normals(&mut native_ground_vertices);
+    let vertices = NativeModelVertex::to_model_vertices(native_ground_vertices);
 
-    (vertices, water_bounds, ground_texture_transparencies)
+    let (reduced_vertices, indices) = reduce_model_vertices(&vertices);
+
+    (reduced_vertices, indices, water_bounds, ground_texture_transparencies)
 }
 
-pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<TileVertex>) {
+pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<u32>, Vec<TileVertex>, Vec<u32>) {
     const HALF_TILE_SIZE: f32 = MAP_TILE_SIZE / 2.0;
+
+    #[allow(unused_mut)]
+    let mut tile_picker_indices = Vec::new();
 
     #[allow(unused_mut)]
     let mut tile_vertices = Vec::new();
@@ -309,17 +313,23 @@ pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<
             let fourth_position = Point3::new(offset.x, tile.lower_left_height, offset.y + HALF_TILE_SIZE);
 
             let (_, color) = PickerTarget::Tile { x: x as u16, y: y as u16 }.into();
+
+            let offset = tile_picker_vertices.len() as u32;
+
             tile_picker_vertices.push(TileVertex::new(first_position, color));
             tile_picker_vertices.push(TileVertex::new(second_position, color));
             tile_picker_vertices.push(TileVertex::new(third_position, color));
-
-            tile_picker_vertices.push(TileVertex::new(first_position, color));
-            tile_picker_vertices.push(TileVertex::new(third_position, color));
             tile_picker_vertices.push(TileVertex::new(fourth_position, color));
+
+            // Since the tile position is encoded in the vertex color, vertices of tiles
+            // never share vertices, so we know the correct, minimal indices.
+            tile_picker_indices.extend_from_slice(&[offset, offset + 1, offset + 2, offset, offset + 2, offset + 3]);
         }
     }
 
-    (tile_vertices, tile_picker_vertices)
+    let (reduced_tile_vertices, tile_indices) = reduce_model_vertices(&tile_vertices);
+
+    (reduced_tile_vertices, tile_indices, tile_picker_vertices, tile_picker_indices)
 }
 
 pub fn tile_surface_index(tile: &GroundTile, surface_type: SurfaceType) -> i32 {

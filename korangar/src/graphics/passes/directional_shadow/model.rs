@@ -5,13 +5,13 @@ use wgpu::util::StagingBelt;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
     BufferAddress, BufferBindingType, BufferUsages, CommandEncoder, CompareFunction, DepthBiasState, DepthStencilState, Device,
-    FragmentState, MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass,
+    FragmentState, IndexFormat, MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass,
     RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderStages, StencilState, VertexAttribute, VertexBufferLayout,
     VertexFormat, VertexState, VertexStepMode, include_wgsl,
 };
 
 use crate::graphics::passes::{
-    BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, DirectionalShadowRenderPassContext, DrawIndirectArgs, Drawer,
+    BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, DirectionalShadowRenderPassContext, DrawIndexedIndirectArgs, Drawer,
     ModelBatchDrawData, RenderPassContext,
 };
 use crate::graphics::{BindlessSupport, Buffer, Capabilities, GlobalContext, ModelVertex, Prepare, RenderInstruction, Texture, TextureSet};
@@ -32,13 +32,13 @@ pub(crate) struct DirectionalShadowModelDrawer {
     bindless_support: BindlessSupport,
     instance_data_buffer: Buffer<InstanceData>,
     instance_index_vertex_buffer: Buffer<u32>,
-    command_buffer: Buffer<DrawIndirectArgs>,
+    command_buffer: Buffer<DrawIndexedIndirectArgs>,
     bind_group_layout: BindGroupLayout,
     bind_group: BindGroup,
     pipeline: RenderPipeline,
     instance_data: Vec<InstanceData>,
     instance_indices: Vec<u32>,
-    draw_commands: Vec<DrawIndirectArgs>,
+    draw_commands: Vec<DrawIndexedIndirectArgs>,
 }
 
 impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAttachmentCount::One }> for DirectionalShadowModelDrawer {
@@ -86,7 +86,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
             device,
             format!("{DRAWER_NAME} indirect buffer"),
             BufferUsages::COPY_DST | BufferUsages::INDIRECT,
-            (size_of::<DrawIndirectArgs>() * INITIAL_INSTRUCTION_SIZE) as _,
+            (size_of::<DrawIndexedIndirectArgs>() * INITIAL_INSTRUCTION_SIZE) as _,
         );
 
         let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
@@ -182,13 +182,14 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
                     }
 
                     pass.set_bind_group(3, batch.texture_set.get_bind_group().unwrap(), &[]);
+                    pass.set_index_buffer(batch.index_buffer.slice(..), IndexFormat::Uint32);
                     pass.set_vertex_buffer(0, batch.vertex_buffer.slice(..));
                     pass.set_vertex_buffer(1, self.instance_index_vertex_buffer.slice(..));
 
                     if self.multi_draw_indirect_support {
-                        pass.multi_draw_indirect(
+                        pass.multi_draw_indexed_indirect(
                             self.command_buffer.get_buffer(),
-                            (batch.offset * size_of::<DrawIndirectArgs>()) as BufferAddress,
+                            (batch.offset * size_of::<DrawIndexedIndirectArgs>()) as BufferAddress,
                             batch.count as u32,
                         );
                     } else {
@@ -196,11 +197,15 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
                         let end = start + batch.count;
 
                         for (index, instruction) in draw_data.instructions[start..end].iter().enumerate() {
-                            let vertex_start = instruction.vertex_offset as u32;
-                            let vertex_end = vertex_start + instruction.vertex_count as u32;
-                            let index = (start + index) as u32;
+                            let index_start = instruction.index_offset;
+                            let index_end = index_start + instruction.index_count;
+                            let instance_offset = (start + index) as u32;
 
-                            pass.draw(vertex_start..vertex_end, index..index + 1);
+                            pass.draw_indexed(
+                                index_start..index_end,
+                                instruction.base_vertex,
+                                instance_offset..instance_offset + 1,
+                            );
                         }
                     }
                 }
@@ -211,6 +216,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
                         continue;
                     }
 
+                    pass.set_index_buffer(batch.index_buffer.slice(..), IndexFormat::Uint32);
                     pass.set_vertex_buffer(0, batch.vertex_buffer.slice(..));
                     pass.set_vertex_buffer(1, self.instance_index_vertex_buffer.slice(..));
 
@@ -218,13 +224,17 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
                     let end = start + batch.count;
 
                     for (index, instruction) in draw_data.instructions[start..end].iter().enumerate() {
-                        let vertex_start = instruction.vertex_offset as u32;
-                        let vertex_end = vertex_start + instruction.vertex_count as u32;
-                        let index = (start + index) as u32;
+                        let index_start = instruction.index_offset;
+                        let index_end = index_start + instruction.index_count;
+                        let instance_offset = (start + index) as u32;
                         let texture_bind_group = batch.texture_set.get_texture_bind_group(instruction.texture_index);
 
                         pass.set_bind_group(3, texture_bind_group, &[]);
-                        pass.draw(vertex_start..vertex_end, index..index + 1);
+                        pass.draw_indexed(
+                            index_start..index_end,
+                            instruction.base_vertex,
+                            instance_offset..instance_offset + 1,
+                        );
                     }
                 }
             }
@@ -253,10 +263,11 @@ impl Prepare for DirectionalShadowModelDrawer {
 
             self.instance_indices.push(instance_index as u32);
 
-            self.draw_commands.push(DrawIndirectArgs {
-                vertex_count: instruction.vertex_count as u32,
+            self.draw_commands.push(DrawIndexedIndirectArgs {
+                index_count: instruction.index_count,
                 instance_count: 1,
-                first_vertex: instruction.vertex_offset as u32,
+                first_index: instruction.index_offset,
+                base_vertex: instruction.base_vertex,
                 first_instance: instance_index as u32,
             });
         }

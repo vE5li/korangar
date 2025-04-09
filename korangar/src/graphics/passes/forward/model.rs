@@ -6,15 +6,15 @@ use wgpu::util::StagingBelt;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
     BlendComponent, BlendFactor, BlendOperation, BlendState, BufferAddress, BufferBindingType, BufferUsages, ColorTargetState, ColorWrites,
-    CommandEncoder, CompareFunction, DepthBiasState, DepthStencilState, Device, Face, FragmentState, FrontFace, MultisampleState,
-    PipelineCompilationOptions, PipelineLayout, PipelineLayoutDescriptor, PolygonMode, PrimitiveState, Queue, RenderPass, RenderPipeline,
-    RenderPipelineDescriptor, ShaderModule, ShaderModuleDescriptor, ShaderStages, StencilState, TextureFormat, VertexAttribute,
-    VertexBufferLayout, VertexFormat, VertexState, VertexStepMode, include_wgsl,
+    CommandEncoder, CompareFunction, DepthBiasState, DepthStencilState, Device, Face, FragmentState, FrontFace, IndexFormat,
+    MultisampleState, PipelineCompilationOptions, PipelineLayout, PipelineLayoutDescriptor, PolygonMode, PrimitiveState, Queue, RenderPass,
+    RenderPipeline, RenderPipelineDescriptor, ShaderModule, ShaderModuleDescriptor, ShaderStages, StencilState, TextureFormat,
+    VertexAttribute, VertexBufferLayout, VertexFormat, VertexState, VertexStepMode, include_wgsl,
 };
 
 use crate::graphics::passes::forward::ForwardRenderPassContext;
 use crate::graphics::passes::{
-    BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, DrawIndirectArgs, Drawer, ModelBatchDrawData, RenderPassContext,
+    BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, DrawIndexedIndirectArgs, Drawer, ModelBatchDrawData, RenderPassContext,
 };
 use crate::graphics::{
     BindlessSupport, Buffer, Capabilities, GlobalContext, ModelBatch, ModelVertex, Msaa, Prepare, RenderInstruction, Texture, TextureSet,
@@ -54,7 +54,7 @@ pub(crate) struct ForwardModelDrawer {
     bindless_support: BindlessSupport,
     instance_data_buffer: Buffer<InstanceData>,
     instance_index_vertex_buffer: Buffer<u32>,
-    command_buffer: Buffer<DrawIndirectArgs>,
+    command_buffer: Buffer<DrawIndexedIndirectArgs>,
     bind_group_layout: BindGroupLayout,
     bind_group: BindGroup,
     opaque_pipeline: RenderPipeline,
@@ -64,7 +64,7 @@ pub(crate) struct ForwardModelDrawer {
     wireframe_pipeline: RenderPipeline,
     instance_data: Vec<InstanceData>,
     instance_indices: Vec<u32>,
-    draw_commands: Vec<DrawIndirectArgs>,
+    draw_commands: Vec<DrawIndexedIndirectArgs>,
     opaque_batches: Vec<ModelBatch>,
     transparent_batches: Vec<ModelBatch>,
 }
@@ -117,7 +117,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
             device,
             format!("{DRAWER_NAME} indirect buffer"),
             BufferUsages::COPY_DST | BufferUsages::INDIRECT,
-            (size_of::<DrawIndirectArgs>() * INITIAL_INSTRUCTION_SIZE) as _,
+            (size_of::<DrawIndexedIndirectArgs>() * INITIAL_INSTRUCTION_SIZE) as _,
         );
 
         let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
@@ -255,7 +255,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
             batches: &[ModelBatch],
             draw_data: &ModelBatchDrawData,
             instance_index_vertex_buffer: &Buffer<u32>,
-            command_buffer: &Buffer<DrawIndirectArgs>,
+            command_buffer: &Buffer<DrawIndexedIndirectArgs>,
             multi_draw_indirect_support: bool,
             bindless_support: BindlessSupport,
         ) {
@@ -263,13 +263,14 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
                 BindlessSupport::Full | BindlessSupport::Limited => {
                     for batch in batches {
                         pass.set_bind_group(3, batch.texture_set.get_bind_group().unwrap(), &[]);
+                        pass.set_index_buffer(batch.index_buffer.slice(..), IndexFormat::Uint32);
                         pass.set_vertex_buffer(0, batch.vertex_buffer.slice(..));
                         pass.set_vertex_buffer(1, instance_index_vertex_buffer.slice(..));
 
                         match multi_draw_indirect_support {
-                            true => pass.multi_draw_indirect(
+                            true => pass.multi_draw_indexed_indirect(
                                 command_buffer.get_buffer(),
-                                (batch.offset * size_of::<DrawIndirectArgs>()) as BufferAddress,
+                                (batch.offset * size_of::<DrawIndexedIndirectArgs>()) as BufferAddress,
                                 batch.count as u32,
                             ),
                             false => {
@@ -277,11 +278,15 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
                                 let end = start + batch.count;
 
                                 for (index, instruction) in draw_data.instructions[start..end].iter().enumerate() {
-                                    let vertex_start = instruction.vertex_offset as u32;
-                                    let vertex_end = vertex_start + instruction.vertex_count as u32;
-                                    let index = (start + index) as u32;
+                                    let index_start = instruction.index_offset;
+                                    let index_end = index_start + instruction.index_count;
+                                    let instance_offset = (start + index) as u32;
 
-                                    pass.draw(vertex_start..vertex_end, index..index + 1);
+                                    pass.draw_indexed(
+                                        index_start..index_end,
+                                        instruction.base_vertex,
+                                        instance_offset..instance_offset + 1,
+                                    );
                                 }
                             }
                         }
@@ -289,6 +294,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
                 }
                 BindlessSupport::None => {
                     for batch in batches {
+                        pass.set_index_buffer(batch.index_buffer.slice(..), IndexFormat::Uint32);
                         pass.set_vertex_buffer(0, batch.vertex_buffer.slice(..));
                         pass.set_vertex_buffer(1, instance_index_vertex_buffer.slice(..));
 
@@ -296,13 +302,17 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
                         let end = start + batch.count;
 
                         for (index, instruction) in draw_data.instructions[start..end].iter().enumerate() {
-                            let vertex_start = instruction.vertex_offset as u32;
-                            let vertex_end = vertex_start + instruction.vertex_count as u32;
-                            let index = (start + index) as u32;
+                            let index_start = instruction.index_offset;
+                            let index_end = index_start + instruction.index_count;
+                            let instance_offset = (start + index) as u32;
                             let texture_bind_group = batch.texture_set.get_texture_bind_group(instruction.texture_index);
 
                             pass.set_bind_group(3, texture_bind_group, &[]);
-                            pass.draw(vertex_start..vertex_end, index..index + 1);
+                            pass.draw_indexed(
+                                index_start..index_end,
+                                instruction.base_vertex,
+                                instance_offset..instance_offset + 1,
+                            );
                         }
                     }
                 }
@@ -410,6 +420,7 @@ impl Prepare for ForwardModelDrawer {
                     count: opaque_count,
                     texture_set: batch.texture_set.clone(),
                     vertex_buffer: batch.vertex_buffer.clone(),
+                    index_buffer: batch.index_buffer.clone(),
                 });
 
                 self.transparent_batches.push(ModelBatch {
@@ -417,6 +428,7 @@ impl Prepare for ForwardModelDrawer {
                     count: transparent_count,
                     texture_set: batch.texture_set.clone(),
                     vertex_buffer: batch.vertex_buffer.clone(),
+                    index_buffer: batch.index_buffer.clone(),
                 });
             } else {
                 self.opaque_batches.push(ModelBatch {
@@ -424,6 +436,7 @@ impl Prepare for ForwardModelDrawer {
                     count: batch.count,
                     texture_set: batch.texture_set.clone(),
                     vertex_buffer: batch.vertex_buffer.clone(),
+                    index_buffer: batch.index_buffer.clone(),
                 });
             }
         }
@@ -443,10 +456,11 @@ impl Prepare for ForwardModelDrawer {
 
             self.instance_indices.push(instance_index as u32);
 
-            self.draw_commands.push(DrawIndirectArgs {
-                vertex_count: instruction.vertex_count as u32,
+            self.draw_commands.push(DrawIndexedIndirectArgs {
+                index_count: instruction.index_count,
                 instance_count: 1,
-                first_vertex: instruction.vertex_offset as u32,
+                first_index: instruction.index_offset,
+                base_vertex: instruction.base_vertex,
                 first_instance: instance_index as u32,
             });
         }

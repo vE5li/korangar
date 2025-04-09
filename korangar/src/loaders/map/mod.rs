@@ -79,9 +79,10 @@ impl MapLoader {
         let map_data_clone = map_data.clone();
 
         #[cfg(feature = "debug")]
-        let (mut tile_vertices, tile_picker_vertices) = generate_tile_vertices(&mut gat_data);
+        let (tile_vertices, mut tile_indices, tile_picker_vertices, tile_picker_indices) = generate_tile_vertices(&mut gat_data);
+
         #[cfg(not(feature = "debug"))]
-        let (_, tile_picker_vertices) = generate_tile_vertices(&mut gat_data);
+        let (_, _, tile_picker_vertices, tile_picker_indices) = generate_tile_vertices(&mut gat_data);
 
         let water_level = -map_data
             .water_settings
@@ -89,14 +90,15 @@ impl MapLoader {
             .and_then(|settings| settings.water_level)
             .unwrap_or_default();
 
-        let (mut model_vertices, water_bounds, mut ground_texture_transparencies) =
+        let (mut model_vertices, mut model_indices, water_bounds, mut ground_texture_transparencies) =
             ground_vertices(&ground_data, water_level, &mut texture_set_builder);
 
         let sub_meshes = match self.bindless_support {
             BindlessSupport::Full | BindlessSupport::Limited => {
                 vec![SubMesh {
-                    vertex_offset: 0,
-                    vertex_count: model_vertices.len(),
+                    index_offset: 0,
+                    index_count: model_indices.len() as u32,
+                    base_vertex: 0,
                     texture_index: 0,
                     transparent: false,
                 }]
@@ -107,7 +109,13 @@ impl MapLoader {
                     .enumerate()
                     .map(|(index, transparent)| (index as i32, transparent))
                     .collect();
-                split_mesh_by_texture(&mut model_vertices, None, Some(&ground_texture_transparencies))
+                split_mesh_by_texture(
+                    &model_vertices,
+                    &mut model_indices,
+                    None,
+                    None,
+                    Some(&ground_texture_transparencies),
+                )
             }
         };
 
@@ -132,20 +140,27 @@ impl MapLoader {
         let tile_submeshes = match self.bindless_support {
             BindlessSupport::Full | BindlessSupport::Limited => {
                 vec![SubMesh {
-                    vertex_offset: 0,
-                    vertex_count: tile_vertices.len(),
+                    index_offset: 0,
+                    index_count: tile_indices.len() as u32,
+                    base_vertex: 0,
                     texture_index: 0,
                     transparent: true,
                 }]
             }
-            BindlessSupport::None => split_mesh_by_texture(&mut tile_vertices, None, None),
+            BindlessSupport::None => split_mesh_by_texture(&tile_vertices, &mut tile_indices, None, None, None),
         };
 
         #[cfg(feature = "debug")]
-        let tile_vertex_buffer = Arc::new(self.create_vertex_buffer(&resource_file, "tile", &tile_vertices));
+        let tile_vertex_buffer = Arc::new(self.create_vertex_buffer(&resource_file, "tile vertex", &tile_vertices));
 
-        let tile_picker_vertex_buffer =
-            (!tile_picker_vertices.is_empty()).then(|| self.create_vertex_buffer(&resource_file, "tile picker", &tile_picker_vertices));
+        #[cfg(feature = "debug")]
+        let tile_index_buffer = Arc::new(self.create_index_buffer(&resource_file, "tile index ", &tile_indices));
+
+        let tile_picker_vertex_buffer = (!tile_picker_vertices.is_empty())
+            .then(|| self.create_vertex_buffer(&resource_file, "tile picker vertex", &tile_picker_vertices));
+
+        let tile_picker_index_buffer =
+            (!tile_picker_indices.is_empty()).then(|| self.create_index_buffer(&resource_file, "tile picker index", &tile_picker_indices));
 
         apply_map_offset(&ground_data, &mut map_data.resources);
 
@@ -168,6 +183,7 @@ impl MapLoader {
                                 .load(
                                     &mut texture_set_builder,
                                     &mut model_vertices,
+                                    &mut model_indices,
                                     object_data.model_name.as_str(),
                                     reverse_order,
                                 )
@@ -190,8 +206,8 @@ impl MapLoader {
             .collect();
         let object_kdtree = KDTree::from_objects(&object_bounding_boxes);
 
-        let (vertex_buffer, texture_set, videos) =
-            self.build_vertex_buffer_and_texture_set_and_videos(&resource_file, texture_set_builder, model_vertices);
+        let (vertex_buffer, index_buffer, texture_set, videos) =
+            self.build_buffer_and_texture_set_and_videos(&resource_file, texture_set_builder, model_vertices, model_indices);
 
         let lighting = Lighting::new(map_data.light_settings);
 
@@ -224,6 +240,7 @@ impl MapLoader {
             gat_data.tiles,
             sub_meshes,
             vertex_buffer,
+            index_buffer,
             texture_set,
             water_textures,
             objects,
@@ -232,8 +249,11 @@ impl MapLoader {
             #[cfg(feature = "debug")]
             map_data.resources.effect_sources,
             tile_picker_vertex_buffer.unwrap(),
+            tile_picker_index_buffer.unwrap(),
             #[cfg(feature = "debug")]
             tile_vertex_buffer,
+            #[cfg(feature = "debug")]
+            tile_index_buffer,
             #[cfg(feature = "debug")]
             tile_submeshes,
             object_kdtree,
@@ -250,17 +270,19 @@ impl MapLoader {
         Ok(Box::new(map))
     }
 
-    fn build_vertex_buffer_and_texture_set_and_videos(
+    fn build_buffer_and_texture_set_and_videos(
         &self,
         resource_file: &str,
         texture_set_builder: TextureSetBuilder,
         model_vertices: Vec<ModelVertex>,
-    ) -> (Arc<Buffer<ModelVertex>>, Arc<TextureSet>, Mutex<Vec<Video>>) {
+        model_indices: Vec<u32>,
+    ) -> (Arc<Buffer<ModelVertex>>, Arc<Buffer<u32>>, Arc<TextureSet>, Mutex<Vec<Video>>) {
         let vertex_buffer = Arc::new(self.create_vertex_buffer(resource_file, "map vertices", &model_vertices));
+        let index_buffer = Arc::new(self.create_index_buffer(resource_file, "map indices", &model_indices));
         let (texture_set, videos) = texture_set_builder.build();
         let texture_set = Arc::new(texture_set);
         let videos = Mutex::new(videos);
-        (vertex_buffer, texture_set, videos)
+        (vertex_buffer, index_buffer, texture_set, videos)
     }
 
     fn create_vertex_buffer<T: Pod>(&self, resource: &str, label: &str, vertices: &[T]) -> Buffer<T> {
@@ -270,6 +292,16 @@ impl MapLoader {
             format!("{resource} {label}"),
             BufferUsages::COPY_DST | BufferUsages::VERTEX,
             vertices,
+        )
+    }
+
+    fn create_index_buffer(&self, resource: &str, label: &str, indices: &[u32]) -> Buffer<u32> {
+        Buffer::with_data(
+            &self.device,
+            &self.queue,
+            format!("{resource} {label}"),
+            BufferUsages::COPY_DST | BufferUsages::INDEX,
+            indices,
         )
     }
 }

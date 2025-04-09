@@ -6,7 +6,7 @@ mod tile;
 pub(crate) use entity::PickerEntityDrawer;
 #[cfg(feature = "debug")]
 pub(crate) use marker::PickerMarkerDrawer;
-pub(crate) use tile::PickerTileDrawer;
+pub(crate) use tile::{PickerTileDrawData, PickerTileDrawer};
 use wgpu::{
     BindGroupLayout, CommandEncoder, Device, LoadOp, Operations, Queue, RenderPass, RenderPassColorAttachment,
     RenderPassDepthStencilAttachment, RenderPassDescriptor, StoreOp, TextureFormat,

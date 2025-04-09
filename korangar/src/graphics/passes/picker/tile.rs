@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use wgpu::{
-    ColorTargetState, ColorWrites, CompareFunction, DepthStencilState, Device, FragmentState, MultisampleState, PipelineCompilationOptions,
-    PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor,
-    VertexState, include_wgsl,
+    ColorTargetState, ColorWrites, CompareFunction, DepthStencilState, Device, FragmentState, IndexFormat, MultisampleState,
+    PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor,
+    ShaderModuleDescriptor, VertexState, include_wgsl,
 };
 
 use crate::graphics::passes::{
@@ -15,13 +15,18 @@ use crate::graphics::{Buffer, Capabilities, GlobalContext, TileVertex};
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/tile.wgsl");
 const DRAWER_NAME: &str = "picker tile";
 
+pub(crate) struct PickerTileDrawData<'a> {
+    pub(crate) vertex_buffer: &'a Buffer<TileVertex>,
+    pub(crate) index_buffer: &'a Buffer<u32>,
+}
+
 pub(crate) struct PickerTileDrawer {
     pipeline: RenderPipeline,
 }
 
 impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttachmentCount::One }> for PickerTileDrawer {
     type Context = PickerRenderPassContext;
-    type DrawData<'draw> = &'draw Buffer<TileVertex>;
+    type DrawData<'draw> = PickerTileDrawData<'draw>;
 
     fn new(
         _capabilities: &Capabilities,
@@ -83,12 +88,13 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
     }
 
     fn draw(&mut self, pass: &mut RenderPass<'_>, draw_data: Self::DrawData<'_>) {
-        if draw_data.count() == 0 {
+        if draw_data.index_buffer.count() == 0 {
             return;
         }
 
         pass.set_pipeline(&self.pipeline);
-        pass.set_vertex_buffer(0, draw_data.slice(..));
-        pass.draw(0..draw_data.count(), 0..1);
+        pass.set_index_buffer(draw_data.index_buffer.slice(..), IndexFormat::Uint32);
+        pass.set_vertex_buffer(0, draw_data.vertex_buffer.slice(..));
+        pass.draw_indexed(0..draw_data.index_buffer.count(), 0, 0..1);
     }
 }

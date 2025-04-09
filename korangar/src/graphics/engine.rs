@@ -896,10 +896,15 @@ impl GraphicsEngine {
                         .picker_render_pass_context
                         .create_pass(&mut picker_encoder, &engine_context.global_context, None);
 
-                if let Some(map_picker_tile_vertex_buffer) = instruction.map_picker_tile_vertex_buffer.as_ref() {
-                    engine_context
-                        .picker_tile_drawer
-                        .draw(&mut render_pass, map_picker_tile_vertex_buffer);
+                if let Some(map_picker_tile_vertex_buffer) = instruction.map_picker_tile_vertex_buffer.as_ref()
+                    && let Some(map_picker_tile_index_buffer) = instruction.map_picker_tile_index_buffer
+                {
+                    let draw_data = PickerTileDrawData {
+                        vertex_buffer: map_picker_tile_vertex_buffer,
+                        index_buffer: map_picker_tile_index_buffer,
+                    };
+
+                    engine_context.picker_tile_drawer.draw(&mut render_pass, draw_data);
                 }
 
                 engine_context.picker_entity_drawer.draw(&mut render_pass, instruction.entities);

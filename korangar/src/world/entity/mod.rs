@@ -17,6 +17,8 @@ use wgpu::{BufferUsages, Device, Queue};
 
 use crate::graphics::EntityInstruction;
 #[cfg(feature = "debug")]
+use crate::graphics::reduce_model_vertices;
+#[cfg(feature = "debug")]
 use crate::graphics::{BindlessSupport, DebugRectangleInstruction};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenPosition, ScreenSize};
@@ -68,6 +70,7 @@ pub struct Movement {
 #[cfg(feature = "debug")]
 pub struct Pathing {
     pub vertex_buffer: Arc<Buffer<ModelVertex>>,
+    pub index_buffer: Arc<Buffer<u32>>,
     pub submeshes: Vec<SubMesh>,
 }
 
@@ -612,7 +615,8 @@ impl Common {
         const HALF_TILE_SIZE: f32 = MAP_TILE_SIZE / 2.0;
         const PATHING_MESH_OFFSET: f32 = 0.95;
 
-        let mut native_pathing_vertices = Vec::new();
+        let mut pathing_native_vertices = Vec::new();
+
         let Some(active_movement) = self.active_movement.as_mut() else {
             return;
         };
@@ -653,7 +657,7 @@ impl Common {
 
             let (texture_coordinates, texture_index) = Self::pathing_texture_coordinates(&active_movement.steps, arrival_position, index);
 
-            native_pathing_vertices.push(NativeModelVertex::new(
+            pathing_native_vertices.push(NativeModelVertex::new(
                 first_position,
                 first_normal,
                 texture_coordinates[0],
@@ -662,7 +666,7 @@ impl Common {
                 0.0,
                 smallvec_inline![0; 3],
             ));
-            native_pathing_vertices.push(NativeModelVertex::new(
+            pathing_native_vertices.push(NativeModelVertex::new(
                 second_position,
                 first_normal,
                 texture_coordinates[1],
@@ -671,7 +675,7 @@ impl Common {
                 0.0,
                 smallvec_inline![0; 3],
             ));
-            native_pathing_vertices.push(NativeModelVertex::new(
+            pathing_native_vertices.push(NativeModelVertex::new(
                 third_position,
                 first_normal,
                 texture_coordinates[2],
@@ -681,7 +685,7 @@ impl Common {
                 smallvec_inline![0; 3],
             ));
 
-            native_pathing_vertices.push(NativeModelVertex::new(
+            pathing_native_vertices.push(NativeModelVertex::new(
                 first_position,
                 second_normal,
                 texture_coordinates[0],
@@ -690,7 +694,7 @@ impl Common {
                 0.0,
                 smallvec_inline![0; 3],
             ));
-            native_pathing_vertices.push(NativeModelVertex::new(
+            pathing_native_vertices.push(NativeModelVertex::new(
                 third_position,
                 second_normal,
                 texture_coordinates[2],
@@ -699,7 +703,7 @@ impl Common {
                 0.0,
                 smallvec_inline![0; 3],
             ));
-            native_pathing_vertices.push(NativeModelVertex::new(
+            pathing_native_vertices.push(NativeModelVertex::new(
                 fourth_position,
                 second_normal,
                 texture_coordinates[3],
@@ -710,18 +714,20 @@ impl Common {
             ));
         }
 
-        let mut pathing_vertices = NativeModelVertex::to_vertices(native_pathing_vertices);
+        let pathing_vertices = NativeModelVertex::to_model_vertices(pathing_native_vertices);
+        let (pathing_vertices, mut pathing_indices) = reduce_model_vertices(&pathing_vertices);
 
         let submeshes = match bindless_support {
             BindlessSupport::Full | BindlessSupport::Limited => {
                 vec![SubMesh {
-                    vertex_offset: 0,
-                    vertex_count: pathing_vertices.len(),
+                    index_offset: 0,
+                    index_count: pathing_indices.len() as u32,
+                    base_vertex: 0,
                     texture_index: 0,
                     transparent: true,
                 }]
             }
-            BindlessSupport::None => split_mesh_by_texture(&mut pathing_vertices, None, None),
+            BindlessSupport::None => split_mesh_by_texture(&pathing_vertices, &mut pathing_indices, None, None, None),
         };
 
         if let Some(pathing) = active_movement.pathing.as_mut() {
@@ -736,8 +742,17 @@ impl Common {
                 &pathing_vertices,
             ));
 
+            let pathing_index_buffer = Arc::new(Buffer::with_data(
+                device,
+                queue,
+                "pathing index buffer",
+                BufferUsages::INDEX | BufferUsages::COPY_DST,
+                &pathing_indices,
+            ));
+
             active_movement.pathing = Some(Pathing {
                 vertex_buffer: pathing_vertex_buffer,
+                index_buffer: pathing_index_buffer,
                 submeshes,
             });
         }

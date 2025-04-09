@@ -2148,6 +2148,7 @@ impl Client {
                         count,
                         texture_set: map.get_texture_set().clone(),
                         vertex_buffer: map.get_model_vertex_buffer().clone(),
+                        index_buffer: map.get_model_index_buffer().clone(),
                     });
 
                     #[cfg(feature = "debug")]
@@ -2217,6 +2218,7 @@ impl Client {
                         count,
                         texture_set: map.get_texture_set().clone(),
                         vertex_buffer: map.get_model_vertex_buffer().clone(),
+                        index_buffer: map.get_model_index_buffer().clone(),
                     });
 
                     #[cfg(feature = "debug")]
@@ -2420,6 +2422,7 @@ impl Client {
                     effects: self.effect_renderer.get_instructions(),
                     water: water_instruction,
                     map_picker_tile_vertex_buffer: Some(map.get_tile_picker_vertex_buffer()),
+                    map_picker_tile_index_buffer: Some(map.get_tile_picker_index_buffer()),
                     font_map_texture: Some(self.font_loader.get_font_map()),
                     #[cfg(feature = "debug")]
                     render_settings: *self.render_settings.get(),

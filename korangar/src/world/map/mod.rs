@@ -75,6 +75,7 @@ pub struct Map {
     tiles: Vec<Tile>,
     sub_meshes: Vec<SubMesh>,
     vertex_buffer: Arc<Buffer<ModelVertex>>,
+    index_buffer: Arc<Buffer<u32>>,
     texture_set: Arc<TextureSet>,
     water_textures: Option<Vec<Arc<Texture>>>,
     objects: SimpleSlab<ObjectKey, Object>,
@@ -83,8 +84,11 @@ pub struct Map {
     #[cfg(feature = "debug")]
     effect_sources: Vec<EffectSource>,
     tile_picker_vertex_buffer: Buffer<TileVertex>,
+    tile_picker_index_buffer: Buffer<u32>,
     #[cfg(feature = "debug")]
     tile_vertex_buffer: Arc<Buffer<ModelVertex>>,
+    #[cfg(feature = "debug")]
+    tile_index_buffer: Arc<Buffer<u32>>,
     #[cfg(feature = "debug")]
     tile_submeshes: Vec<SubMesh>,
     object_kdtree: KDTree<ObjectKey, AABB>,
@@ -126,8 +130,16 @@ impl Map {
         &self.vertex_buffer
     }
 
+    pub fn get_model_index_buffer(&self) -> &Arc<Buffer<u32>> {
+        &self.index_buffer
+    }
+
     pub fn get_tile_picker_vertex_buffer(&self) -> &Buffer<TileVertex> {
         &self.tile_picker_vertex_buffer
+    }
+
+    pub fn get_tile_picker_index_buffer(&self) -> &Buffer<u32> {
+        &self.tile_picker_index_buffer
     }
 
     pub fn set_ambient_sound_sources(&self, audio_engine: &AudioEngine<GameFileLoader>) {
@@ -217,8 +229,9 @@ impl Map {
         self.sub_meshes.iter().for_each(|mesh| {
             instructions.push(ModelInstruction {
                 model_matrix: Matrix4::identity(),
-                vertex_offset: mesh.vertex_offset,
-                vertex_count: mesh.vertex_count,
+                index_offset: mesh.index_offset,
+                index_count: mesh.index_count,
+                base_vertex: mesh.base_vertex,
                 texture_index: mesh.texture_index,
                 distance: f32::MAX,
                 transparent: mesh.transparent,
@@ -401,8 +414,9 @@ impl Map {
         self.tile_submeshes.iter().for_each(|mesh| {
             model_instructions.push(ModelInstruction {
                 model_matrix: Matrix4::identity(),
-                vertex_offset: mesh.vertex_offset,
-                vertex_count: mesh.vertex_count,
+                index_offset: mesh.index_offset,
+                index_count: mesh.index_count,
+                base_vertex: mesh.base_vertex,
                 texture_index: mesh.texture_index,
                 distance: f32::MAX,
                 transparent: mesh.transparent,
@@ -414,6 +428,7 @@ impl Map {
             count,
             texture_set: tile_texture_set.clone(),
             vertex_buffer: self.tile_vertex_buffer.clone(),
+            index_buffer: self.tile_index_buffer.clone(),
         });
     }
 
@@ -433,8 +448,9 @@ impl Map {
                 pathing.submeshes.iter().for_each(|mesh| {
                     model_instructions.push(ModelInstruction {
                         model_matrix: Matrix4::identity(),
-                        vertex_offset: mesh.vertex_offset,
-                        vertex_count: mesh.vertex_count,
+                        index_offset: mesh.index_offset,
+                        index_count: mesh.index_count,
+                        base_vertex: mesh.base_vertex,
                         texture_index: mesh.texture_index,
                         distance: f32::MAX,
                         transparent: mesh.transparent,
@@ -446,6 +462,7 @@ impl Map {
                     count: pathing.submeshes.len(),
                     texture_set: path_texture_set.clone(),
                     vertex_buffer: pathing.vertex_buffer.clone(),
+                    index_buffer: pathing.index_buffer.clone(),
                 });
             }
         });

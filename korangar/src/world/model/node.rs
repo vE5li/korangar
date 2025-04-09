@@ -31,8 +31,9 @@ pub struct Node {
 
 #[derive(PrototypeElement)]
 pub struct SubMesh {
-    pub vertex_offset: usize,
-    pub vertex_count: usize,
+    pub index_offset: u32,
+    pub index_count: u32,
+    pub base_vertex: i32,
     pub texture_index: i32,
     pub transparent: bool,
 }
@@ -238,8 +239,9 @@ impl Node {
         self.sub_meshes.iter().for_each(|mesh| {
             instructions.push(ModelInstruction {
                 model_matrix,
-                vertex_offset: mesh.vertex_offset,
-                vertex_count: mesh.vertex_count,
+                index_offset: mesh.index_offset,
+                index_count: mesh.index_count,
+                base_vertex: mesh.base_vertex,
                 texture_index: mesh.texture_index,
                 distance,
                 transparent: mesh.transparent,

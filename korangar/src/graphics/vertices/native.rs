@@ -39,29 +39,13 @@ impl NativeModelVertex {
         )
     }
 
-    pub fn to_vertices(mut native_vertices: Vec<NativeModelVertex>) -> Vec<ModelVertex> {
-        let mut vertices = Vec::new();
-        let mut drain_iterator = native_vertices.drain(..);
-
-        while let Some(mut first_partial) = drain_iterator.next() {
-            let mut second_partial = drain_iterator.next().unwrap();
-            let mut third_partial = drain_iterator.next().unwrap();
-
-            first_partial.normal = first_partial.normal.normalize();
-            second_partial.normal = second_partial.normal.normalize();
-            third_partial.normal = third_partial.normal.normalize();
-
-            vertices.push(first_partial.into_model_vertex());
-            vertices.push(second_partial.into_model_vertex());
-            vertices.push(third_partial.into_model_vertex());
-        }
-
-        vertices
+    pub fn to_model_vertices(mut native_vertices: Vec<NativeModelVertex>) -> Vec<ModelVertex> {
+        native_vertices.drain(..).map(|v| v.into_model_vertex()).collect()
     }
 
     pub fn calculate_normal(first_position: Point3<f32>, second_position: Point3<f32>, third_position: Point3<f32>) -> Vector3<f32> {
         let delta_position_1 = second_position - first_position;
         let delta_position_2 = third_position - first_position;
-        delta_position_1.cross(delta_position_2)
+        delta_position_1.cross(delta_position_2).normalize()
     }
 }

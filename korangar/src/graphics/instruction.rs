@@ -41,6 +41,7 @@ pub struct RenderInstruction<'a> {
     pub effects: &'a [EffectInstruction],
     pub water: Option<WaterInstruction<'a>>,
     pub map_picker_tile_vertex_buffer: Option<&'a Buffer<TileVertex>>,
+    pub map_picker_tile_index_buffer: Option<&'a Buffer<u32>>,
     pub font_map_texture: Option<&'a Texture>,
     #[cfg(feature = "debug")]
     pub render_settings: RenderSettings,
@@ -80,6 +81,7 @@ impl Default for RenderInstruction<'static> {
             effects: &[],
             water: None,
             map_picker_tile_vertex_buffer: None,
+            map_picker_tile_index_buffer: None,
             font_map_texture: None,
             #[cfg(feature = "debug")]
             render_settings: RenderSettings::default(),
@@ -164,6 +166,7 @@ pub struct PointShadowCasterInstruction {
     pub range: f32,
     pub model_texture_set: Arc<TextureSet>,
     pub model_vertex_buffer: Arc<Buffer<ModelVertex>>,
+    pub model_index_buffer: Arc<Buffer<u32>>,
     /// Start point inside the point_shadow_entities.
     pub entity_offset: [usize; 6],
     /// Model count inside the point_shadow_entities.
@@ -272,13 +275,15 @@ pub struct ModelBatch {
     pub count: usize,
     pub texture_set: Arc<TextureSet>,
     pub vertex_buffer: Arc<Buffer<ModelVertex>>,
+    pub index_buffer: Arc<Buffer<u32>>,
 }
 
 #[derive(Clone, Debug)]
 pub struct ModelInstruction {
     pub model_matrix: Matrix4<f32>,
-    pub vertex_offset: usize,
-    pub vertex_count: usize,
+    pub index_offset: u32,
+    pub index_count: u32,
+    pub base_vertex: i32,
     pub texture_index: i32,
     pub distance: f32,
     pub transparent: bool,

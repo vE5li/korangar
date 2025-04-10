@@ -41,6 +41,9 @@ impl ModelLoader {
             false => NativeModelVertex::calculate_normal(vertex_positions[2], vertex_positions[1], vertex_positions[0]),
         };
 
+        // If there are degenerated triangles, we at least set a valid normal value.
+        let normal = normal.unwrap_or_else(Vector3::unit_y);
+
         if reverse_vertices {
             for ((vertex_position, texture_coordinates), target) in vertex_positions
                 .iter()
@@ -256,15 +259,13 @@ impl ModelLoader {
                 .collect(),
         };
 
-        let mut node_native_vertices = Self::make_vertices(current_node, &main_matrix, reverse_order, smooth_normals);
+        let node_texture_mapping: Vec<i32> = node_textures.iter().map(|texture| texture.index).collect();
 
-        node_native_vertices
-            .iter_mut()
-            .for_each(|vertice| vertice.texture_index = node_textures[vertice.texture_index as usize].index);
+        let node_native_vertices = Self::make_vertices(current_node, &main_matrix, reverse_order, smooth_normals);
 
         let centroid = Self::calculate_centroid(&node_native_vertices);
 
-        let node_vertices = NativeModelVertex::to_model_vertices(node_native_vertices);
+        let node_vertices = NativeModelVertex::convert_to_model_vertices(node_native_vertices, Some(&node_texture_mapping));
         let (node_vertices, mut node_indices) = reduce_model_vertices(&node_vertices);
 
         // Apply the frames per second on the keyframes values.

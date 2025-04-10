@@ -657,64 +657,68 @@ impl Common {
 
             let (texture_coordinates, texture_index) = Self::pathing_texture_coordinates(&active_movement.steps, arrival_position, index);
 
-            pathing_native_vertices.push(NativeModelVertex::new(
-                first_position,
-                first_normal,
-                texture_coordinates[0],
-                texture_index,
-                mesh_color,
-                0.0,
-                smallvec_inline![0; 3],
-            ));
-            pathing_native_vertices.push(NativeModelVertex::new(
-                second_position,
-                first_normal,
-                texture_coordinates[1],
-                texture_index,
-                mesh_color,
-                0.0,
-                smallvec_inline![0; 3],
-            ));
-            pathing_native_vertices.push(NativeModelVertex::new(
-                third_position,
-                first_normal,
-                texture_coordinates[2],
-                texture_index,
-                mesh_color,
-                0.0,
-                smallvec_inline![0; 3],
-            ));
+            if let Some(first_normal) = first_normal {
+                pathing_native_vertices.push(NativeModelVertex::new(
+                    first_position,
+                    first_normal,
+                    texture_coordinates[0],
+                    texture_index,
+                    mesh_color,
+                    0.0,
+                    smallvec_inline![0; 3],
+                ));
+                pathing_native_vertices.push(NativeModelVertex::new(
+                    second_position,
+                    first_normal,
+                    texture_coordinates[1],
+                    texture_index,
+                    mesh_color,
+                    0.0,
+                    smallvec_inline![0; 3],
+                ));
+                pathing_native_vertices.push(NativeModelVertex::new(
+                    third_position,
+                    first_normal,
+                    texture_coordinates[2],
+                    texture_index,
+                    mesh_color,
+                    0.0,
+                    smallvec_inline![0; 3],
+                ));
+            }
 
-            pathing_native_vertices.push(NativeModelVertex::new(
-                first_position,
-                second_normal,
-                texture_coordinates[0],
-                texture_index,
-                mesh_color,
-                0.0,
-                smallvec_inline![0; 3],
-            ));
-            pathing_native_vertices.push(NativeModelVertex::new(
-                third_position,
-                second_normal,
-                texture_coordinates[2],
-                texture_index,
-                mesh_color,
-                0.0,
-                smallvec_inline![0; 3],
-            ));
-            pathing_native_vertices.push(NativeModelVertex::new(
-                fourth_position,
-                second_normal,
-                texture_coordinates[3],
-                texture_index,
-                mesh_color,
-                0.0,
-                smallvec_inline![0; 3],
-            ));
+            if let Some(second_normal) = second_normal {
+                pathing_native_vertices.push(NativeModelVertex::new(
+                    first_position,
+                    second_normal,
+                    texture_coordinates[0],
+                    texture_index,
+                    mesh_color,
+                    0.0,
+                    smallvec_inline![0; 3],
+                ));
+                pathing_native_vertices.push(NativeModelVertex::new(
+                    third_position,
+                    second_normal,
+                    texture_coordinates[2],
+                    texture_index,
+                    mesh_color,
+                    0.0,
+                    smallvec_inline![0; 3],
+                ));
+                pathing_native_vertices.push(NativeModelVertex::new(
+                    fourth_position,
+                    second_normal,
+                    texture_coordinates[3],
+                    texture_index,
+                    mesh_color,
+                    0.0,
+                    smallvec_inline![0; 3],
+                ));
+            }
         }
 
-        let pathing_vertices = NativeModelVertex::to_model_vertices(pathing_native_vertices);
+        let pathing_vertices = NativeModelVertex::convert_to_model_vertices(pathing_native_vertices, None);
         let (pathing_vertices, mut pathing_indices) = reduce_model_vertices(&pathing_vertices);
 
         let submeshes = match bindless_support {

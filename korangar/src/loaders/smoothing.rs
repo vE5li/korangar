@@ -39,67 +39,44 @@ impl Hash for VertexPosition {
 }
 
 pub fn smooth_ground_normals(vertices: &mut [NativeModelVertex]) {
-    let threshold_angle = f32::cos(f32::to_radians(45.0));
+    const EPSILON: f32 = 1e-6;
 
-    let mut normal_groups: HashMap<VertexPosition, Vec<Vector3<f32>>> = HashMap::new();
+    // Artificial vertices connect to an edge, which is parallel to the Y axis.
+    // Such edges should only occur in artificial structures like walls.
+    let mut artificial_vertices = vec![false; vertices.len()];
 
-    // First pass: Collect normals into normal groups.
-    for vertex in vertices.iter() {
-        let position = VertexPosition::new(vertex.position);
-        normal_groups.entry(position).or_default().push(vertex.normal);
-    }
+    for (chunk_index, chunk) in vertices.chunks_mut(3).enumerate().filter(|(_, chunk)| chunk.len() == 3) {
+        for vertex_index in 0..3 {
+            let index0 = vertex_index;
+            let index1 = (vertex_index + 1) % 3;
 
-    // Second pass: Split groups by angle and average.
-    let mut smoothed_normals: HashMap<VertexPosition, Vec<Vector3<f32>>> = HashMap::new();
+            let position0 = chunk[index0].position;
+            let position1 = chunk[index1].position;
 
-    for (position, normals) in normal_groups.iter() {
-        let processed = smoothed_normals.entry(*position).or_default();
-        smooth_angle_based(normals, processed, threshold_angle);
-    }
-
-    // Final pass: Assign the closest smoothed normal.
-    for vertex in vertices.iter_mut() {
-        let position = VertexPosition::new(vertex.position);
-        if let Some(normal_groups) = smoothed_normals.get(&position) {
-            vertex.normal = find_best_normal(vertex.normal, normal_groups);
-        }
-    }
-}
-
-fn smooth_angle_based(normals: &[Vector3<f32>], processed: &mut Vec<Vector3<f32>>, threshold_angle: f32) {
-    let mut normal_groups: Vec<Vec<Vector3<f32>>> = Vec::new();
-
-    for &normal in normals.iter() {
-        let mut added = false;
-
-        for group in normal_groups.iter_mut() {
-            if group.iter().all(|&n| normal.dot(n) > threshold_angle) {
-                group.push(normal);
-                added = true;
+            if (position0.x - position1.x).abs() < EPSILON && (position0.z - position1.z).abs() < EPSILON {
+                artificial_vertices[chunk_index * 3 + index0] = true;
+                artificial_vertices[chunk_index * 3 + index1] = true;
             }
         }
+    }
 
-        if !added {
-            normal_groups.push(vec![normal]);
+    let mut normals: HashMap<VertexPosition, Vector3<f32>> = HashMap::new();
+
+    for (vertex, _) in vertices.iter().zip(artificial_vertices).filter(|(_, is_artificial)| !is_artificial) {
+        let position = VertexPosition::new(vertex.position);
+        *normals.entry(position).or_insert_with(Vector3::zero) += vertex.normal;
+    }
+
+    for (_, normals) in normals.iter_mut() {
+        *normals = normals.normalize();
+    }
+
+    for vertex in vertices.iter_mut() {
+        let position = VertexPosition::new(vertex.position);
+        if let Some(&smooth_normal) = normals.get(&position) {
+            vertex.normal = smooth_normal;
         }
     }
-
-    for group in normal_groups {
-        let averaged = group.iter().fold(Vector3::zero(), |acc, n| acc + n).normalize();
-        processed.push(averaged);
-    }
-}
-
-fn find_best_normal(original: Vector3<f32>, candidates: &[Vector3<f32>]) -> Vector3<f32> {
-    candidates
-        .iter()
-        .max_by(|&&a, &&b| {
-            let dot_a = original.dot(a);
-            let dot_b = original.dot(b);
-            dot_a.total_cmp(&dot_b)
-        })
-        .copied()
-        .unwrap_or(original)
 }
 
 pub fn smooth_model_normals(vertices: &mut [NativeModelVertex]) {

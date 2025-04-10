@@ -107,61 +107,65 @@ pub fn ground_vertices(
                     let color_top_right = neighbor_color(1, 1);
                     let color_top = neighbor_color(0, 1);
 
-                    native_ground_vertices.push(NativeModelVertex::new(
-                        first_position,
-                        first_normal,
-                        first_texture_coordinates,
-                        ground_surface.texture_index as i32,
-                        ground_surface.color.into(),
-                        0.0,
-                        smallvec_inline![0;3],
-                    ));
-                    native_ground_vertices.push(NativeModelVertex::new(
-                        second_position,
-                        first_normal,
-                        second_texture_coordinates,
-                        ground_surface.texture_index as i32,
-                        color_right,
-                        0.0,
-                        smallvec_inline![0;3],
-                    ));
-                    native_ground_vertices.push(NativeModelVertex::new(
-                        third_position,
-                        first_normal,
-                        third_texture_coordinates,
-                        ground_surface.texture_index as i32,
-                        color_top_right,
-                        0.0,
-                        smallvec_inline![0;3],
-                    ));
+                    if let Some(first_normal) = first_normal {
+                        native_ground_vertices.push(NativeModelVertex::new(
+                            first_position,
+                            first_normal,
+                            first_texture_coordinates,
+                            ground_surface.texture_index as i32,
+                            ground_surface.color.into(),
+                            0.0,
+                            smallvec_inline![0;3],
+                        ));
+                        native_ground_vertices.push(NativeModelVertex::new(
+                            second_position,
+                            first_normal,
+                            second_texture_coordinates,
+                            ground_surface.texture_index as i32,
+                            color_right,
+                            0.0,
+                            smallvec_inline![0;3],
+                        ));
+                        native_ground_vertices.push(NativeModelVertex::new(
+                            third_position,
+                            first_normal,
+                            third_texture_coordinates,
+                            ground_surface.texture_index as i32,
+                            color_top_right,
+                            0.0,
+                            smallvec_inline![0;3],
+                        ));
+                    }
 
-                    native_ground_vertices.push(NativeModelVertex::new(
-                        first_position,
-                        second_normal,
-                        first_texture_coordinates,
-                        ground_surface.texture_index as i32,
-                        ground_surface.color.into(),
-                        0.0,
-                        smallvec_inline![0;3],
-                    ));
-                    native_ground_vertices.push(NativeModelVertex::new(
-                        third_position,
-                        second_normal,
-                        third_texture_coordinates,
-                        ground_surface.texture_index as i32,
-                        color_top_right,
-                        0.0,
-                        smallvec_inline![0;3],
-                    ));
-                    native_ground_vertices.push(NativeModelVertex::new(
-                        fourth_position,
-                        second_normal,
-                        fourth_texture_coordinates,
-                        ground_surface.texture_index as i32,
-                        color_top,
-                        0.0,
-                        smallvec_inline![0;3],
-                    ));
+                    if let Some(second_normal) = second_normal {
+                        native_ground_vertices.push(NativeModelVertex::new(
+                            first_position,
+                            second_normal,
+                            first_texture_coordinates,
+                            ground_surface.texture_index as i32,
+                            ground_surface.color.into(),
+                            0.0,
+                            smallvec_inline![0;3],
+                        ));
+                        native_ground_vertices.push(NativeModelVertex::new(
+                            third_position,
+                            second_normal,
+                            third_texture_coordinates,
+                            ground_surface.texture_index as i32,
+                            color_top_right,
+                            0.0,
+                            smallvec_inline![0;3],
+                        ));
+                        native_ground_vertices.push(NativeModelVertex::new(
+                            fourth_position,
+                            second_normal,
+                            fourth_texture_coordinates,
+                            ground_surface.texture_index as i32,
+                            color_top,
+                            0.0,
+                            smallvec_inline![0;3],
+                        ));
+                    }
                 }
 
                 if -current_tile.get_lowest_point() < water_level {
@@ -194,12 +198,9 @@ pub fn ground_vertices(
         .map(|texture| texture_set_builder.register(texture))
         .unzip();
 
-    native_ground_vertices
-        .iter_mut()
-        .for_each(|vertice| vertice.texture_index = ground_texture_mapping[vertice.texture_index as usize]);
-
     smooth_ground_normals(&mut native_ground_vertices);
-    let vertices = NativeModelVertex::to_model_vertices(native_ground_vertices);
+
+    let vertices = NativeModelVertex::convert_to_model_vertices(native_ground_vertices, Some(&ground_texture_mapping));
 
     let (reduced_vertices, indices) = reduce_model_vertices(&vertices);
 
@@ -256,55 +257,59 @@ pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<
                 let third_texture_coordinates = Vector2::new(1.0, 1.0);
                 let fourth_texture_coordinates = Vector2::new(1.0, 0.0);
 
-                tile_vertices.push(ModelVertex::new(
-                    first_position,
-                    first_normal,
-                    first_texture_coordinates,
-                    Color::WHITE,
-                    tile_type_index as i32,
-                    0.0,
-                ));
-                tile_vertices.push(ModelVertex::new(
-                    second_position,
-                    first_normal,
-                    second_texture_coordinates,
-                    Color::WHITE,
-                    tile_type_index as i32,
-                    0.0,
-                ));
-                tile_vertices.push(ModelVertex::new(
-                    third_position,
-                    first_normal,
-                    third_texture_coordinates,
-                    Color::WHITE,
-                    tile_type_index as i32,
-                    0.0,
-                ));
+                if let Some(first_normal) = first_normal {
+                    tile_vertices.push(ModelVertex::new(
+                        first_position,
+                        first_normal,
+                        first_texture_coordinates,
+                        Color::WHITE,
+                        tile_type_index as i32,
+                        0.0,
+                    ));
+                    tile_vertices.push(ModelVertex::new(
+                        second_position,
+                        first_normal,
+                        second_texture_coordinates,
+                        Color::WHITE,
+                        tile_type_index as i32,
+                        0.0,
+                    ));
+                    tile_vertices.push(ModelVertex::new(
+                        third_position,
+                        first_normal,
+                        third_texture_coordinates,
+                        Color::WHITE,
+                        tile_type_index as i32,
+                        0.0,
+                    ));
+                }
 
-                tile_vertices.push(ModelVertex::new(
-                    first_position,
-                    second_normal,
-                    first_texture_coordinates,
-                    Color::WHITE,
-                    tile_type_index as i32,
-                    0.0,
-                ));
-                tile_vertices.push(ModelVertex::new(
-                    third_position,
-                    second_normal,
-                    third_texture_coordinates,
-                    Color::WHITE,
-                    tile_type_index as i32,
-                    0.0,
-                ));
-                tile_vertices.push(ModelVertex::new(
-                    fourth_position,
-                    second_normal,
-                    fourth_texture_coordinates,
-                    Color::WHITE,
-                    tile_type_index as i32,
-                    0.0,
-                ));
+                if let Some(second_normal) = second_normal {
+                    tile_vertices.push(ModelVertex::new(
+                        first_position,
+                        second_normal,
+                        first_texture_coordinates,
+                        Color::WHITE,
+                        tile_type_index as i32,
+                        0.0,
+                    ));
+                    tile_vertices.push(ModelVertex::new(
+                        third_position,
+                        second_normal,
+                        third_texture_coordinates,
+                        Color::WHITE,
+                        tile_type_index as i32,
+                        0.0,
+                    ));
+                    tile_vertices.push(ModelVertex::new(
+                        fourth_position,
+                        second_normal,
+                        fourth_texture_coordinates,
+                        Color::WHITE,
+                        tile_type_index as i32,
+                        0.0,
+                    ));
+                }
             }
 
             let first_position = Point3::new(offset.x, tile.upper_left_height, offset.y);

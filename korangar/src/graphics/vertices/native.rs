@@ -39,13 +39,35 @@ impl NativeModelVertex {
         )
     }
 
-    pub fn to_model_vertices(mut native_vertices: Vec<NativeModelVertex>) -> Vec<ModelVertex> {
-        native_vertices.drain(..).map(|v| v.into_model_vertex()).collect()
+    pub fn convert_to_model_vertices(mut native_vertices: Vec<NativeModelVertex>, texture_mapping: Option<&[i32]>) -> Vec<ModelVertex> {
+        match texture_mapping {
+            None => native_vertices.drain(..).map(|vertex| vertex.into_model_vertex()).collect(),
+            Some(texture_mapping) => native_vertices
+                .drain(..)
+                .map(|mut vertex| {
+                    vertex.texture_index = texture_mapping[vertex.texture_index as usize];
+                    vertex.into_model_vertex()
+                })
+                .collect(),
+        }
     }
 
-    pub fn calculate_normal(first_position: Point3<f32>, second_position: Point3<f32>, third_position: Point3<f32>) -> Vector3<f32> {
+    /// Returns `None` if the triangle is degenerated (if the triangle lost one
+    /// or two dimension).
+    pub fn calculate_normal(
+        first_position: Point3<f32>,
+        second_position: Point3<f32>,
+        third_position: Point3<f32>,
+    ) -> Option<Vector3<f32>> {
+        const DEGENERATE_EPSILON: f32 = 1e-5;
+
         let delta_position_1 = second_position - first_position;
         let delta_position_2 = third_position - first_position;
-        delta_position_1.cross(delta_position_2).normalize()
+        let normal = delta_position_1.cross(delta_position_2);
+
+        match normal.magnitude() > DEGENERATE_EPSILON {
+            true => Some(normal.normalize()),
+            false => None,
+        }
     }
 }

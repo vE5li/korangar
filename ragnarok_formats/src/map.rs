@@ -19,7 +19,8 @@ pub struct MapData {
     #[version]
     pub version: Version<MajorFirst>,
     #[version_equals_or_above(2, 5)]
-    pub build_number: Option<i32>,
+    #[build_version]
+    pub build_version: Option<u32>,
     #[version_equals_or_above(2, 2)]
     pub _unknown: Option<u8>,
     #[length(40)]
@@ -342,8 +343,7 @@ pub struct ObjectData {
     pub _animation_speed: Option<f32>,
     #[version_equals_or_above(1, 3)]
     pub _block_type: Option<i32>,
-    // FIX: only if build_version >= 186
-    #[version_equals_or_above(2, 6)]
+    #[version_and_build_version_equals_or_above(2, 6, 186)]
     #[new_default]
     pub _unknown: Option<u8>,
     #[length(80)]

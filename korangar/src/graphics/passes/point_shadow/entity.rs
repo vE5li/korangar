@@ -1,3 +1,5 @@
+use std::num::NonZeroU32;
+
 use bumpalo::Bump;
 use bytemuck::{Pod, Zeroable};
 use hashbrown::HashMap;
@@ -93,7 +95,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
                             view_dimension: TextureViewDimension::D2,
                             multisampled: false,
                         },
-                        count: capabilities.get_max_texture_binding_array_count(),
+                        count: NonZeroU32::new(capabilities.get_max_texture_binding_array_count()),
                     },
                 ],
             })
@@ -140,8 +142,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
             push_constant_ranges: &[],
         });
 
-        let mut constants = std::collections::HashMap::new();
-        constants.insert("near_plane".to_string(), NEAR_PLANE as f64);
+        let constants = &[("near_plane", NEAR_PLANE as f64)];
 
         let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
             label: Some(DRAWER_NAME),
@@ -150,7 +151,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
                 module: &shader_module,
                 entry_point: Some("vs_main"),
                 compilation_options: PipelineCompilationOptions {
-                    constants: &constants,
+                    constants,
                     ..Default::default()
                 },
                 buffers: &[],
@@ -159,7 +160,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
                 module: &shader_module,
                 entry_point: Some("fs_main"),
                 compilation_options: PipelineCompilationOptions {
-                    constants: &constants,
+                    constants,
                     ..Default::default()
                 },
                 targets: &[],

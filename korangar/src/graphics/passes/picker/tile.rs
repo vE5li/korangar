@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use wgpu::{
     ColorTargetState, ColorWrites, CompareFunction, DepthStencilState, Device, FragmentState, IndexFormat, MultisampleState,
     PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor,
@@ -43,8 +41,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
             push_constant_ranges: &[],
         });
 
-        let mut constants = HashMap::new();
-        constants.insert("tile_enum_value".to_owned(), PickerValueType::Tile as u32 as f64);
+        let constants = &[("tile_enum_value", PickerValueType::Tile as u32 as f64)];
 
         let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
             label: Some(DRAWER_NAME),
@@ -53,7 +50,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
                 module: &shader_module,
                 entry_point: Some("vs_main"),
                 compilation_options: PipelineCompilationOptions {
-                    constants: &constants,
+                    constants,
                     ..Default::default()
                 },
                 buffers: &[TileVertex::buffer_layout()],
@@ -62,7 +59,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
                 module: &shader_module,
                 entry_point: Some("fs_main"),
                 compilation_options: PipelineCompilationOptions {
-                    constants: &constants,
+                    constants,
                     ..Default::default()
                 },
                 targets: &[Some(ColorTargetState {

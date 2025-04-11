@@ -10,7 +10,7 @@ use korangar_debug::profile_block;
 use rayon::ThreadPool;
 use wgpu::util::StagingBelt;
 use wgpu::{
-    Adapter, CommandBuffer, CommandEncoder, CommandEncoderDescriptor, Device, Extent3d, Instance, Maintain, Origin3d, Queue,
+    Adapter, CommandBuffer, CommandEncoder, CommandEncoderDescriptor, Device, Extent3d, Instance, Origin3d, PollType, Queue,
     SurfaceTexture, TexelCopyBufferInfo, TexelCopyBufferLayout, TexelCopyTextureInfo, TextureAspect, TextureFormat, TextureViewDescriptor,
 };
 use winit::dpi::PhysicalSize;
@@ -760,7 +760,7 @@ impl GraphicsEngine {
         // is ready to accept the command buffers for the next frame. This is the
         // best time to resolve async operations like reading the piker value that need
         // to be synced with the GPU.
-        self.device.poll(Maintain::Wait);
+        let _ = self.device.poll(PollType::Wait);
         self.queue.submit([
             prepare_command_buffer,
             interface_command_buffer,

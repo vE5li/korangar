@@ -1,4 +1,4 @@
-use std::num::NonZeroU64;
+use std::num::{NonZeroU32, NonZeroU64};
 use std::sync::Arc;
 
 use bumpalo::Bump;
@@ -108,7 +108,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
                             view_dimension: TextureViewDimension::D2,
                             multisampled: false,
                         },
-                        count: capabilities.get_max_texture_binding_array_count(),
+                        count: NonZeroU32::new(capabilities.get_max_texture_binding_array_count()),
                     },
                 ],
             })

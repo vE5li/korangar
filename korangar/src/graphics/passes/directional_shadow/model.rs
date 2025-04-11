@@ -107,7 +107,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
 
         let texture_bind_group = match capabilities.bindless_support() {
             BindlessSupport::Full | BindlessSupport::Limited => {
-                TextureSet::bind_group_layout(device, capabilities.get_max_textures_per_shader_stage())
+                TextureSet::bind_group_layout(device, capabilities.get_max_texture_binding_array_count())
             }
             BindlessSupport::None => Texture::bind_group_layout(device),
         };

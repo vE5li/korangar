@@ -1,12 +1,12 @@
-use std::num::NonZeroU32;
-
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, print_debug};
 use wgpu::{Adapter, Features, Limits, TextureFormat, TextureFormatFeatureFlags};
 
 use crate::graphics::{Msaa, RENDER_TO_TEXTURE_DEPTH_FORMAT, RENDER_TO_TEXTURE_FORMAT};
 
-const MAX_TEXTURES_PER_SHADER_STAGE: u32 = 1024;
+pub const MAX_BINDING_ARRAY_ELEMENTS_PER_SHADER_STAGE: u32 = 1024;
+
+pub const MAX_STORAGE_BUFFER_BINDING_SIZE: u32 = 268435456;
 
 /// The maximum texture size that is guaranteed by the graphic engine to be
 /// available.
@@ -44,7 +44,7 @@ impl Capabilities {
         let supported_msaa = determine_supported_msaa(adapter, &[RENDER_TO_TEXTURE_FORMAT, RENDER_TO_TEXTURE_DEPTH_FORMAT]);
 
         let mut required_limits = Limits::default().using_resolution(adapter.limits());
-        required_limits.max_storage_buffer_binding_size = 268435456;
+        required_limits.max_storage_buffer_binding_size = MAX_STORAGE_BUFFER_BINDING_SIZE;
 
         let mut capabilities = Self {
             supported_msaa,
@@ -65,9 +65,9 @@ impl Capabilities {
         #[cfg(feature = "debug")]
         {
             Self::check_limit(
-                "max_sampled_textures_per_shader_stage",
-                adapter_limits.max_sampled_textures_per_shader_stage,
-                MAX_TEXTURES_PER_SHADER_STAGE,
+                "max_binding_array_elements_per_shader_stage",
+                adapter_limits.max_binding_array_elements_per_shader_stage,
+                MAX_BINDING_ARRAY_ELEMENTS_PER_SHADER_STAGE,
             );
             Self::check_feature(adapter_features, Features::ADDRESS_MODE_CLAMP_TO_BORDER);
             Self::check_feature(adapter_features, Features::ADDRESS_MODE_CLAMP_TO_ZERO);
@@ -85,12 +85,14 @@ impl Capabilities {
 
         if adapter_features
             .contains(Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING | Features::TEXTURE_BINDING_ARRAY)
-            && adapter_limits.max_sampled_textures_per_shader_stage >= MAX_TEXTURES_PER_SHADER_STAGE
+            && adapter_limits.max_binding_array_elements_per_shader_stage >= MAX_BINDING_ARRAY_ELEMENTS_PER_SHADER_STAGE
         {
             capabilities.bindless = BindlessSupport::Limited;
+
             capabilities.required_features |=
                 Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING | Features::TEXTURE_BINDING_ARRAY;
-            capabilities.required_limits.max_sampled_textures_per_shader_stage = MAX_TEXTURES_PER_SHADER_STAGE;
+
+            capabilities.required_limits.max_binding_array_elements_per_shader_stage = MAX_BINDING_ARRAY_ELEMENTS_PER_SHADER_STAGE;
 
             if adapter_features.contains(Features::PARTIALLY_BOUND_BINDING_ARRAY) {
                 capabilities.bindless = BindlessSupport::Full;
@@ -122,10 +124,6 @@ impl Capabilities {
         capabilities
     }
 
-    pub fn get_max_textures_per_shader_stage(&self) -> u32 {
-        MAX_TEXTURES_PER_SHADER_STAGE
-    }
-
     pub fn get_supported_msaa(&self) -> &[Msaa] {
         self.supported_msaa.as_ref()
     }
@@ -144,9 +142,8 @@ impl Capabilities {
     }
 
     /// Returns the maximum count of textures inside a binding array.
-    pub fn get_max_texture_binding_array_count(&self) -> Option<NonZeroU32> {
-        // We need room for 8 textures for the screen bind group.
-        NonZeroU32::new(self.required_limits.max_sampled_textures_per_shader_stage.saturating_sub(8))
+    pub const fn get_max_texture_binding_array_count(&self) -> u32 {
+        MAX_BINDING_ARRAY_ELEMENTS_PER_SHADER_STAGE
     }
 
     /// Returns `true` if the backend supports all features needed for multidraw
@@ -184,16 +181,16 @@ impl Capabilities {
             true => "supported".green(),
             false => "unsupported".yellow(),
         };
-        print_debug!("{:?}: {}", feature, supported);
+        print_debug!("Feature {}: {}", feature, supported);
     }
 
     #[cfg(feature = "debug")]
     fn check_limit(name: &str, actual: u32, required: u32) {
         let status = match actual < required {
             true => format!("{} ({} < {})", "warn".yellow(), actual, required),
-            false => "ok".green().to_string(),
+            false => format!("{} ({})", "ok".green(), actual),
         };
-        print_debug!("Limit({}): {}", name, status);
+        print_debug!("Limit {}: {}", name, status);
     }
 }
 

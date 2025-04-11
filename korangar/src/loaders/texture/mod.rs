@@ -12,8 +12,8 @@ use korangar_util::FileLoader;
 use korangar_util::color::contains_transparent_pixel;
 use korangar_util::container::SimpleCache;
 use wgpu::{
-    Buffer, BufferDescriptor, BufferUsages, CommandEncoderDescriptor, ComputePassDescriptor, Device, Extent3d, Maintain, MaintainResult,
-    MapMode, Queue, TexelCopyBufferLayout, TextureAspect, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
+    Buffer, BufferDescriptor, BufferUsages, CommandEncoderDescriptor, ComputePassDescriptor, Device, Extent3d, MapMode, PollError,
+    PollStatus, PollType, Queue, TexelCopyBufferLayout, TextureAspect, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
     TextureViewDescriptor, TextureViewDimension,
 };
 
@@ -372,7 +372,7 @@ impl TextureLoader {
         }
 
         self.queue.submit([compression_encoder.finish()]);
-        self.device.poll(Maintain::Wait);
+        let _ = self.device.poll(PollType::Wait);
 
         self.download_blocks_data(output_buffer, compressed_data);
     }
@@ -394,7 +394,7 @@ impl TextureLoader {
         download_encoder.copy_buffer_to_buffer(&block_buffer, 0, &staging_buffer, 0, size);
 
         self.queue.submit([download_encoder.finish()]);
-        self.device.poll(Maintain::Wait);
+        let _ = self.device.poll(PollType::Wait);
 
         {
             let buffer_slice = staging_buffer.slice(..);
@@ -403,9 +403,8 @@ impl TextureLoader {
             buffer_slice.map_async(MapMode::Read, move |v| tx.send(v).unwrap());
 
             loop {
-                match self.device.poll(Maintain::Poll) {
-                    MaintainResult::SubmissionQueueEmpty => break,
-                    MaintainResult::Ok => {
+                match self.device.poll(PollType::Poll) {
+                    Ok(PollStatus::Poll | PollStatus::WaitSucceeded) => {
                         // Check if shutdown initiated
                         if SHUTDOWN_SIGNAL.load(Ordering::Relaxed) {
                             staging_buffer.unmap();
@@ -413,6 +412,8 @@ impl TextureLoader {
                         }
                         std::thread::sleep(std::time::Duration::from_millis(100));
                     }
+                    Ok(PollStatus::QueueEmpty) => break,
+                    Err(PollError::Timeout) => panic!("timeout while waiting for blocks data download"),
                 }
             }
 

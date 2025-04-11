@@ -105,8 +105,7 @@ impl PostProcessingBlitterDrawer {
             push_constant_ranges: &[],
         });
 
-        let mut constants = std::collections::HashMap::new();
-        constants.insert("LUMA_IN_ALPHA".to_string(), f64::from(luma_in_alpha));
+        let constants = &[("LUMA_IN_ALPHA", f64::from(luma_in_alpha))];
 
         device.create_render_pipeline(&RenderPipelineDescriptor {
             label: Some(DRAWER_NAME),
@@ -115,7 +114,7 @@ impl PostProcessingBlitterDrawer {
                 module: shader_module,
                 entry_point: Some("vs_main"),
                 compilation_options: PipelineCompilationOptions {
-                    constants: &constants,
+                    constants,
                     ..Default::default()
                 },
                 buffers: &[],
@@ -124,7 +123,7 @@ impl PostProcessingBlitterDrawer {
                 module: shader_module,
                 entry_point: Some("fs_main"),
                 compilation_options: PipelineCompilationOptions {
-                    constants: &constants,
+                    constants,
                     ..Default::default()
                 },
                 targets: &[Some(ColorTargetState {

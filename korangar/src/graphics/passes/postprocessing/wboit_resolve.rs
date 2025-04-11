@@ -59,8 +59,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
             push_constant_ranges: &[],
         });
 
-        let mut constants = std::collections::HashMap::new();
-        constants.insert("MSAA_SAMPLE_COUNT".to_string(), f64::from(global_context.msaa.sample_count()));
+        let constants = &[("MSAA_SAMPLE_COUNT", f64::from(global_context.msaa.sample_count()))];
 
         let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
             label: Some(DRAWER_NAME),
@@ -69,7 +68,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
                 module: &shader_module,
                 entry_point: Some("vs_main"),
                 compilation_options: PipelineCompilationOptions {
-                    constants: &constants,
+                    constants,
                     ..Default::default()
                 },
                 buffers: &[],
@@ -78,7 +77,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
                 module: &shader_module,
                 entry_point: Some("fs_main"),
                 compilation_options: PipelineCompilationOptions {
-                    constants: &constants,
+                    constants,
                     ..Default::default()
                 },
                 targets: &[Some(ColorTargetState {

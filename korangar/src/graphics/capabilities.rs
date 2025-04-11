@@ -7,6 +7,7 @@ use wgpu::{Adapter, Features, Limits, TextureFormat, TextureFormatFeatureFlags};
 use crate::graphics::{Msaa, RENDER_TO_TEXTURE_DEPTH_FORMAT, RENDER_TO_TEXTURE_FORMAT};
 
 const MAX_TEXTURES_PER_SHADER_STAGE: u32 = 1024;
+pub const MAX_BINDING_ARRAY_ELEMENTS_PER_SHADER_STAGE: u32 = 1024;
 
 /// The maximum texture size that is guaranteed by the graphic engine to be
 /// available.
@@ -69,6 +70,11 @@ impl Capabilities {
                 adapter_limits.max_sampled_textures_per_shader_stage,
                 MAX_TEXTURES_PER_SHADER_STAGE,
             );
+            Self::check_limit(
+                "max_binding_array_elements_per_shader_stage",
+                adapter_limits.max_binding_array_elements_per_shader_stage,
+                MAX_BINDING_ARRAY_ELEMENTS_PER_SHADER_STAGE,
+            );
             Self::check_feature(adapter_features, Features::ADDRESS_MODE_CLAMP_TO_BORDER);
             Self::check_feature(adapter_features, Features::ADDRESS_MODE_CLAMP_TO_ZERO);
             Self::check_feature(adapter_features, Features::INDIRECT_FIRST_INSTANCE);
@@ -86,11 +92,15 @@ impl Capabilities {
         if adapter_features
             .contains(Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING | Features::TEXTURE_BINDING_ARRAY)
             && adapter_limits.max_sampled_textures_per_shader_stage >= MAX_TEXTURES_PER_SHADER_STAGE
+            && adapter_limits.max_binding_array_elements_per_shader_stage >= MAX_BINDING_ARRAY_ELEMENTS_PER_SHADER_STAGE
         {
             capabilities.bindless = BindlessSupport::Limited;
+
             capabilities.required_features |=
                 Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING | Features::TEXTURE_BINDING_ARRAY;
+
             capabilities.required_limits.max_sampled_textures_per_shader_stage = MAX_TEXTURES_PER_SHADER_STAGE;
+            capabilities.required_limits.max_binding_array_elements_per_shader_stage = MAX_BINDING_ARRAY_ELEMENTS_PER_SHADER_STAGE;
 
             if adapter_features.contains(Features::PARTIALLY_BOUND_BINDING_ARRAY) {
                 capabilities.bindless = BindlessSupport::Full;
@@ -184,16 +194,16 @@ impl Capabilities {
             true => "supported".green(),
             false => "unsupported".yellow(),
         };
-        print_debug!("{:?}: {}", feature, supported);
+        print_debug!("Feature {}: {}", feature, supported);
     }
 
     #[cfg(feature = "debug")]
     fn check_limit(name: &str, actual: u32, required: u32) {
         let status = match actual < required {
             true => format!("{} ({} < {})", "warn".yellow(), actual, required),
-            false => "ok".green().to_string(),
+            false => format!("{} ({})", "ok".green(), actual),
         };
-        print_debug!("Limit({}): {}", name, status);
+        print_debug!("Limit {}: {}", name, status);
     }
 }
 

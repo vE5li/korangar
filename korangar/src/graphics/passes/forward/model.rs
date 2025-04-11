@@ -568,12 +568,10 @@ impl ForwardModelDrawer {
         let opaque = pass_mode != ModelPassMode::Transparent;
         let alpha_to_coverage_activated = msaa.multisampling_activated() && opaque;
 
-        let mut constants = std::collections::HashMap::new();
-        constants.insert(
-            "ALPHA_TO_COVERAGE_ACTIVATED".to_string(),
-            f64::from(u32::from(alpha_to_coverage_activated)),
-        );
-        constants.insert("PASS_MODE".to_string(), f64::from(pass_mode as u32));
+        let constants = &[
+            ("ALPHA_TO_COVERAGE_ACTIVATED", f64::from(u32::from(alpha_to_coverage_activated))),
+            ("PASS_MODE", f64::from(pass_mode as u32)),
+        ];
 
         device.create_render_pipeline(&RenderPipelineDescriptor {
             label: Some(&format!("{DRAWER_NAME} {pass_mode:?}")),
@@ -582,7 +580,7 @@ impl ForwardModelDrawer {
                 module: shader_module,
                 entry_point: Some("vs_main"),
                 compilation_options: PipelineCompilationOptions {
-                    constants: &constants,
+                    constants,
                     zero_initialize_workgroup_memory: false,
                 },
                 buffers: &[ModelVertex::buffer_layout(), instance_index_buffer_layout],
@@ -591,7 +589,7 @@ impl ForwardModelDrawer {
                 module: shader_module,
                 entry_point: if opaque { Some("opaque_main") } else { Some("transparent_main") },
                 compilation_options: PipelineCompilationOptions {
-                    constants: &constants,
+                    constants,
                     zero_initialize_workgroup_memory: false,
                 },
                 targets: &targets,

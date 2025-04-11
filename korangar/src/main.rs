@@ -74,8 +74,8 @@ use settings::AudioSettings;
 use wgpu::Device;
 use wgpu::util::initialize_adapter_from_env_or_default;
 use wgpu::{
-    BackendOptions, Backends, DeviceDescriptor, Dx12BackendOptions, Dx12Compiler, GlBackendOptions, Gles3MinorVersion, Instance,
-    InstanceDescriptor, InstanceFlags, MemoryHints, Queue,
+    BackendOptions, Backends, DeviceDescriptor, Dx12BackendOptions, Dx12Compiler, GlBackendOptions, GlFenceBehavior, Gles3MinorVersion,
+    Instance, InstanceDescriptor, InstanceFlags, MemoryHints, NoopBackendOptions, Queue, Trace,
 };
 use winit::application::ApplicationHandler;
 use winit::dpi::{LogicalSize, PhysicalSize};
@@ -333,11 +333,13 @@ impl Client {
                 flags: InstanceFlags::from_build_config().with_env(),
                 backend_options: BackendOptions {
                     gl: GlBackendOptions {
-                        gles_minor_version: Gles3MinorVersion::Automatic.with_env(),
+                        gles_minor_version: Gles3MinorVersion::Automatic,
+                        fence_behavior: GlFenceBehavior::Normal,
                     },
                     dx12: Dx12BackendOptions {
                         shader_compiler: Dx12Compiler::StaticDxc.with_env(),
                     },
+                    noop: NoopBackendOptions { enable: false },
                 },
             });
 
@@ -358,15 +360,13 @@ impl Client {
 
             let (device, queue) = pollster::block_on(async {
                 adapter
-                    .request_device(
-                        &DeviceDescriptor {
-                            label: None,
-                            required_features: capabilities.get_required_features(),
-                            required_limits: capabilities.get_required_limits(),
-                            memory_hints: MemoryHints::Performance,
-                        },
-                        std::env::var("WGPU_TRACE").ok().as_ref().map(std::path::Path::new),
-                    )
+                    .request_device(&DeviceDescriptor {
+                        label: None,
+                        required_features: capabilities.get_required_features(),
+                        required_limits: capabilities.get_required_limits(),
+                        memory_hints: MemoryHints::Performance,
+                        trace: Trace::Off,
+                    })
                     .await
                     .unwrap()
             });

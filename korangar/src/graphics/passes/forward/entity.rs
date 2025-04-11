@@ -410,8 +410,7 @@ impl ForwardEntityDrawer {
             ],
         };
 
-        let mut constants = std::collections::HashMap::new();
-        constants.insert("PASS_MODE".to_string(), f64::from(pass_mode as u32));
+        let constants = &[("PASS_MODE", f64::from(pass_mode as u32))];
 
         device.create_render_pipeline(&RenderPipelineDescriptor {
             label: Some(&format!("{DRAWER_NAME} {pass_mode:?}")),
@@ -420,7 +419,7 @@ impl ForwardEntityDrawer {
                 module: shader_module,
                 entry_point: Some("vs_main"),
                 compilation_options: PipelineCompilationOptions {
-                    constants: &constants,
+                    constants,
                     zero_initialize_workgroup_memory: false,
                 },
                 buffers: &[],
@@ -433,7 +432,7 @@ impl ForwardEntityDrawer {
                     Some("transparent_main")
                 },
                 compilation_options: PipelineCompilationOptions {
-                    constants: &constants,
+                    constants,
                     zero_initialize_workgroup_memory: false,
                 },
                 targets: &targets,

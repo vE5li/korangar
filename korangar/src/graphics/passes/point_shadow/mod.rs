@@ -154,7 +154,7 @@ impl Prepare for PointShadowRenderPassContext {
                 view: caster.view_matrices[face_index].into(),
                 inverse_view: caster.view_matrices[face_index].invert().unwrap_or(Matrix4::identity()).into(),
                 light_position: caster.position.to_homogeneous().into(),
-                animation_timer: instructions.uniforms.animation_timer,
+                animation_timer: instructions.uniforms.animation_timer_ms / 1000.0,
                 padding: Default::default(),
             })
         });

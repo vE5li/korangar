@@ -1,14 +1,12 @@
-use cgmath::{Array, Point2, Point3, Vector2};
-use korangar_util::Rectangle;
+use cgmath::{Point3, Vector2};
 use ragnarok_formats::map::{GatData, GroundData, GroundTile, SurfaceType};
 use smallvec::smallvec_inline;
 
 #[cfg(feature = "debug")]
 use crate::graphics::Color;
-use crate::graphics::{ModelVertex, NativeModelVertex, PickerTarget, TileVertex, reduce_model_vertices};
+use crate::graphics::{ModelVertex, NativeModelVertex, PickerTarget, TileVertex, reduce_vertices};
+use crate::loaders::map::{GAT_TILE_SIZE, GROUND_TILE_SIZE};
 use crate::loaders::{TextureSetBuilder, smooth_ground_normals};
-
-pub const MAP_TILE_SIZE: f32 = 10.0;
 
 #[derive(Copy, Clone, Debug)]
 pub enum Heights {
@@ -18,19 +16,13 @@ pub enum Heights {
     LowerRight,
 }
 
-pub fn ground_vertices(
-    ground_data: &GroundData,
-    water_level: f32,
-    texture_set_builder: &mut TextureSetBuilder,
-) -> (Vec<ModelVertex>, Vec<u32>, Rectangle<f32>, Vec<bool>) {
-    let mut native_ground_vertices = Vec::new();
-
-    let mut water_bound_min = Point2::from_value(f32::MAX);
-    let mut water_bound_max = Point2::from_value(f32::MIN);
+pub fn ground_vertices(ground_data: &GroundData, texture_set_builder: &mut TextureSetBuilder) -> (Vec<ModelVertex>, Vec<u32>, Vec<bool>) {
+    let mut ground_vertices = Vec::new();
 
     let width = ground_data.width as usize;
     let height = ground_data.height as usize;
     let ground_tiles = &ground_data.ground_tiles;
+
     for x in 0..width {
         for y in 0..height {
             let current_tile = &ground_tiles[x + y * width];
@@ -50,33 +42,33 @@ pub fn ground_vertices(
                     let (surface_offset, surface_height) = surface_alignment[0];
                     let height = get_tile_height_at(current_tile, surface_height);
                     let first_position = Point3::new(
-                        (x + surface_offset.x) as f32 * MAP_TILE_SIZE,
+                        (x + surface_offset.x) as f32 * GROUND_TILE_SIZE,
                         -height,
-                        (y + surface_offset.y) as f32 * MAP_TILE_SIZE,
+                        (y + surface_offset.y) as f32 * GROUND_TILE_SIZE,
                     );
 
                     let (surface_offset, surface_height) = surface_alignment[1];
                     let height = get_tile_height_at(current_tile, surface_height);
                     let second_position = Point3::new(
-                        (x + surface_offset.x) as f32 * MAP_TILE_SIZE,
+                        (x + surface_offset.x) as f32 * GROUND_TILE_SIZE,
                         -height,
-                        (y + surface_offset.y) as f32 * MAP_TILE_SIZE,
+                        (y + surface_offset.y) as f32 * GROUND_TILE_SIZE,
                     );
 
                     let (surface_offset, surface_height) = surface_alignment[2];
                     let height = get_tile_height_at(neighbor_tile, surface_height);
                     let third_position = Point3::new(
-                        (x + surface_offset.x) as f32 * MAP_TILE_SIZE,
+                        (x + surface_offset.x) as f32 * GROUND_TILE_SIZE,
                         -height,
-                        (y + surface_offset.y) as f32 * MAP_TILE_SIZE,
+                        (y + surface_offset.y) as f32 * GROUND_TILE_SIZE,
                     );
 
                     let (surface_offset, surface_height) = surface_alignment[3];
                     let height = get_tile_height_at(neighbor_tile, surface_height);
                     let fourth_position = Point3::new(
-                        (x + surface_offset.x) as f32 * MAP_TILE_SIZE,
+                        (x + surface_offset.x) as f32 * GROUND_TILE_SIZE,
                         -height,
-                        (y + surface_offset.y) as f32 * MAP_TILE_SIZE,
+                        (y + surface_offset.y) as f32 * GROUND_TILE_SIZE,
                     );
 
                     let first_normal = NativeModelVertex::calculate_normal(first_position, second_position, third_position);
@@ -108,7 +100,7 @@ pub fn ground_vertices(
                     let color_top = neighbor_color(0, 1);
 
                     if let Some(first_normal) = first_normal {
-                        native_ground_vertices.push(NativeModelVertex::new(
+                        ground_vertices.push(NativeModelVertex::new(
                             first_position,
                             first_normal,
                             first_texture_coordinates,
@@ -117,7 +109,7 @@ pub fn ground_vertices(
                             0.0,
                             smallvec_inline![0;3],
                         ));
-                        native_ground_vertices.push(NativeModelVertex::new(
+                        ground_vertices.push(NativeModelVertex::new(
                             second_position,
                             first_normal,
                             second_texture_coordinates,
@@ -126,7 +118,7 @@ pub fn ground_vertices(
                             0.0,
                             smallvec_inline![0;3],
                         ));
-                        native_ground_vertices.push(NativeModelVertex::new(
+                        ground_vertices.push(NativeModelVertex::new(
                             third_position,
                             first_normal,
                             third_texture_coordinates,
@@ -138,7 +130,7 @@ pub fn ground_vertices(
                     }
 
                     if let Some(second_normal) = second_normal {
-                        native_ground_vertices.push(NativeModelVertex::new(
+                        ground_vertices.push(NativeModelVertex::new(
                             first_position,
                             second_normal,
                             first_texture_coordinates,
@@ -147,7 +139,7 @@ pub fn ground_vertices(
                             0.0,
                             smallvec_inline![0;3],
                         ));
-                        native_ground_vertices.push(NativeModelVertex::new(
+                        ground_vertices.push(NativeModelVertex::new(
                             third_position,
                             second_normal,
                             third_texture_coordinates,
@@ -156,7 +148,7 @@ pub fn ground_vertices(
                             0.0,
                             smallvec_inline![0;3],
                         ));
-                        native_ground_vertices.push(NativeModelVertex::new(
+                        ground_vertices.push(NativeModelVertex::new(
                             fourth_position,
                             second_normal,
                             fourth_texture_coordinates,
@@ -167,30 +159,9 @@ pub fn ground_vertices(
                         ));
                     }
                 }
-
-                if -current_tile.get_lowest_point() < water_level {
-                    let first_position = Point2::new(x as f32 * MAP_TILE_SIZE, y as f32 * MAP_TILE_SIZE);
-                    let second_position = Point2::new(MAP_TILE_SIZE + x as f32 * MAP_TILE_SIZE, y as f32 * MAP_TILE_SIZE);
-                    let third_position = Point2::new(
-                        MAP_TILE_SIZE + x as f32 * MAP_TILE_SIZE,
-                        MAP_TILE_SIZE + y as f32 * MAP_TILE_SIZE,
-                    );
-                    let fourth_position = Point2::new(x as f32 * MAP_TILE_SIZE, MAP_TILE_SIZE + y as f32 * MAP_TILE_SIZE);
-
-                    [first_position, second_position, third_position, fourth_position]
-                        .iter()
-                        .for_each(|position| {
-                            water_bound_min.x = f32::min(water_bound_min.x, position.x);
-                            water_bound_min.y = f32::min(water_bound_min.y, position.y);
-                            water_bound_max.x = f32::max(water_bound_max.x, position.x);
-                            water_bound_max.y = f32::max(water_bound_max.y, position.y);
-                        });
-                }
             }
         }
     }
-
-    let water_bounds = Rectangle::new(water_bound_min, water_bound_max);
 
     let (ground_texture_mapping, ground_texture_transparencies): (Vec<i32>, Vec<bool>) = ground_data
         .textures
@@ -198,18 +169,16 @@ pub fn ground_vertices(
         .map(|texture| texture_set_builder.register(texture))
         .unzip();
 
-    smooth_ground_normals(&mut native_ground_vertices);
+    smooth_ground_normals(&mut ground_vertices);
 
-    let vertices = NativeModelVertex::convert_to_model_vertices(native_ground_vertices, Some(&ground_texture_mapping));
+    let vertices = NativeModelVertex::convert_to_model_vertices(ground_vertices, Some(&ground_texture_mapping));
 
-    let (reduced_vertices, indices) = reduce_model_vertices(&vertices);
+    let (reduced_vertices, indices) = reduce_vertices(&vertices);
 
-    (reduced_vertices, indices, water_bounds, ground_texture_transparencies)
+    (reduced_vertices, indices, ground_texture_transparencies)
 }
 
 pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<u32>, Vec<TileVertex>, Vec<u32>) {
-    const HALF_TILE_SIZE: f32 = MAP_TILE_SIZE / 2.0;
-
     #[allow(unused_mut)]
     let mut tile_picker_indices = Vec::new();
 
@@ -232,20 +201,20 @@ pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<
                 continue;
             }
 
-            let offset = Vector2::new(x as f32 * HALF_TILE_SIZE, y as f32 * HALF_TILE_SIZE);
+            let offset = Vector2::new(x as f32 * GAT_TILE_SIZE, y as f32 * GAT_TILE_SIZE);
 
             #[cfg(feature = "debug")]
             {
                 const TILE_MESH_OFFSET: f32 = 0.9;
 
                 let first_position = Point3::new(offset.x, tile.upper_left_height + TILE_MESH_OFFSET, offset.y);
-                let second_position = Point3::new(offset.x + HALF_TILE_SIZE, tile.upper_right_height + TILE_MESH_OFFSET, offset.y);
+                let second_position = Point3::new(offset.x + GAT_TILE_SIZE, tile.upper_right_height + TILE_MESH_OFFSET, offset.y);
                 let third_position = Point3::new(
-                    offset.x + HALF_TILE_SIZE,
+                    offset.x + GAT_TILE_SIZE,
                     tile.lower_right_height + TILE_MESH_OFFSET,
-                    offset.y + HALF_TILE_SIZE,
+                    offset.y + GAT_TILE_SIZE,
                 );
-                let fourth_position = Point3::new(offset.x, tile.lower_left_height + TILE_MESH_OFFSET, offset.y + HALF_TILE_SIZE);
+                let fourth_position = Point3::new(offset.x, tile.lower_left_height + TILE_MESH_OFFSET, offset.y + GAT_TILE_SIZE);
 
                 let first_normal = NativeModelVertex::calculate_normal(first_position, second_position, third_position);
                 let second_normal = NativeModelVertex::calculate_normal(fourth_position, first_position, third_position);
@@ -313,9 +282,9 @@ pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<
             }
 
             let first_position = Point3::new(offset.x, tile.upper_left_height, offset.y);
-            let second_position = Point3::new(offset.x + HALF_TILE_SIZE, tile.upper_right_height, offset.y);
-            let third_position = Point3::new(offset.x + HALF_TILE_SIZE, tile.lower_right_height, offset.y + HALF_TILE_SIZE);
-            let fourth_position = Point3::new(offset.x, tile.lower_left_height, offset.y + HALF_TILE_SIZE);
+            let second_position = Point3::new(offset.x + GAT_TILE_SIZE, tile.upper_right_height, offset.y);
+            let third_position = Point3::new(offset.x + GAT_TILE_SIZE, tile.lower_right_height, offset.y + GAT_TILE_SIZE);
+            let fourth_position = Point3::new(offset.x, tile.lower_left_height, offset.y + GAT_TILE_SIZE);
 
             let (_, color) = PickerTarget::Tile { x: x as u16, y: y as u16 }.into();
 
@@ -332,7 +301,7 @@ pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<
         }
     }
 
-    let (reduced_tile_vertices, tile_indices) = reduce_model_vertices(&tile_vertices);
+    let (reduced_tile_vertices, tile_indices) = reduce_vertices(&tile_vertices);
 
     (reduced_tile_vertices, tile_indices, tile_picker_vertices, tile_picker_indices)
 }
@@ -382,23 +351,5 @@ pub fn neighbor_tile_index(surface_type: SurfaceType) -> Vector2<usize> {
         SurfaceType::Front => Vector2::new(0, 1),
         SurfaceType::Right => Vector2::new(1, 0),
         SurfaceType::Top => Vector2::new(0, 0),
-    }
-}
-
-pub trait GroundTileExt {
-    fn get_lowest_point(&self) -> f32;
-}
-
-impl GroundTileExt for GroundTile {
-    fn get_lowest_point(&self) -> f32 {
-        [
-            self.lower_right_height,
-            self.lower_left_height,
-            self.upper_left_height,
-            self.lower_right_height,
-        ]
-        .into_iter()
-        .reduce(f32::max)
-        .unwrap()
     }
 }

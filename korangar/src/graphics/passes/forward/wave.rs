@@ -5,30 +5,27 @@ use wgpu::util::StagingBelt;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource,
     BindingType, BlendComponent, BlendFactor, BlendOperation, BlendState, BufferBindingType, BufferUsages, ColorTargetState, ColorWrites,
-    CommandEncoder, Device, FragmentState, MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue,
-    RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderStages, TextureSampleType, TextureViewDimension,
-    VertexState, include_wgsl,
+    CommandEncoder, CompareFunction, DepthBiasState, DepthStencilState, Device, FragmentState, MultisampleState,
+    PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor,
+    ShaderModuleDescriptor, ShaderStages, StencilState, TextureSampleType, TextureViewDimension, VertexState, include_wgsl,
 };
 
-use crate::graphics::passes::water::WaterRenderPassContext;
-use crate::graphics::passes::{BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, RenderPassContext};
-use crate::graphics::{AttachmentTexture, Buffer, Capabilities, GlobalContext, Prepare, RenderInstruction, Texture};
+use crate::graphics::passes::{
+    BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, ForwardRenderPassContext, RenderPassContext,
+};
+use crate::graphics::{Buffer, Capabilities, GlobalContext, Prepare, RenderInstruction, Texture, WaterInstruction, WaterVertex};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/wave.wgsl");
-const SHADER_MSAA: ShaderModuleDescriptor = include_wgsl!("shader/wave_msaa.wgsl");
 const DRAWER_NAME: &str = "water wave";
 
 #[derive(Copy, Clone, Default, Pod, Zeroable)]
 #[repr(C)]
 struct WaterWaveUniforms {
-    water_bounds: [f32; 4],
-    texture_repeat: f32,
-    water_level: f32,
-    wave_amplitude: f32,
-    wave_speed: f32,
-    wave_length: f32,
+    texture_repeat_rcp: f32,
+    waveform_phase_shift: f32,
+    waveform_amplitude: f32,
+    waveform_frequency: f32,
     water_opacity: f32,
-    padding: [u32; 2],
 }
 
 pub(crate) struct WaterWaveDrawer {
@@ -39,9 +36,9 @@ pub(crate) struct WaterWaveDrawer {
     pipeline: RenderPipeline,
 }
 
-impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Two }, { DepthAttachmentCount::None }> for WaterWaveDrawer {
-    type Context = WaterRenderPassContext;
-    type DrawData<'data> = &'data AttachmentTexture;
+impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAttachmentCount::One }> for WaterWaveDrawer {
+    type Context = ForwardRenderPassContext;
+    type DrawData<'data> = &'data WaterInstruction<'data>;
 
     fn new(
         _capabilities: &Capabilities,
@@ -50,11 +47,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Two }, { DepthAttac
         global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {
-        let shader_module = if global_context.msaa.multisampling_activated() {
-            device.create_shader_module(SHADER_MSAA)
-        } else {
-            device.create_shader_module(SHADER)
-        };
+        let shader_module = device.create_shader_module(SHADER);
 
         let uniforms_buffer = Buffer::with_data(
             device,
@@ -69,7 +62,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Two }, { DepthAttac
             entries: &[
                 BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: ShaderStages::FRAGMENT,
+                    visibility: ShaderStages::VERTEX_FRAGMENT,
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Uniform,
                         has_dynamic_offset: false,
@@ -101,14 +94,12 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Two }, { DepthAttac
 
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some(DRAWER_NAME),
-            bind_group_layouts: &[
-                pass_bind_group_layouts[0],
-                pass_bind_group_layouts[1],
-                &bind_group_layout,
-                &AttachmentTexture::bind_group_layout(device, TextureSampleType::Depth, global_context.msaa.multisampling_activated()),
-            ],
+            bind_group_layouts: &[pass_bind_group_layouts[0], pass_bind_group_layouts[1], &bind_group_layout],
             push_constant_ranges: &[],
         });
+
+        let color_attachment_formats = render_pass_context.color_attachment_formats();
+        let depth_attachment_formats = render_pass_context.depth_attachment_output_format();
 
         let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
             label: Some(DRAWER_NAME),
@@ -117,7 +108,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Two }, { DepthAttac
                 module: &shader_module,
                 entry_point: Some("vs_main"),
                 compilation_options: PipelineCompilationOptions::default(),
-                buffers: &[],
+                buffers: &[WaterVertex::buffer_layout()],
             },
             fragment: Some(FragmentState {
                 module: &shader_module,
@@ -125,7 +116,12 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Two }, { DepthAttac
                 compilation_options: PipelineCompilationOptions::default(),
                 targets: &[
                     Some(ColorTargetState {
-                        format: render_pass_context.color_attachment_formats()[0],
+                        format: color_attachment_formats[0],
+                        blend: Some(BlendState::PREMULTIPLIED_ALPHA_BLENDING),
+                        write_mask: ColorWrites::empty(),
+                    }),
+                    Some(ColorTargetState {
+                        format: color_attachment_formats[1],
                         blend: Some(BlendState {
                             color: BlendComponent {
                                 src_factor: BlendFactor::One,
@@ -141,7 +137,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Two }, { DepthAttac
                         write_mask: ColorWrites::ALL,
                     }),
                     Some(ColorTargetState {
-                        format: render_pass_context.color_attachment_formats()[1],
+                        format: color_attachment_formats[2],
                         blend: Some(BlendState {
                             color: BlendComponent {
                                 src_factor: BlendFactor::Zero,
@@ -160,7 +156,13 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Two }, { DepthAttac
                 count: global_context.msaa.sample_count(),
                 ..Default::default()
             },
-            depth_stencil: None,
+            depth_stencil: Some(DepthStencilState {
+                format: depth_attachment_formats[0],
+                depth_write_enabled: false,
+                depth_compare: CompareFunction::Greater,
+                stencil: StencilState::default(),
+                bias: DepthBiasState::default(),
+            }),
             cache: None,
         });
 
@@ -174,25 +176,29 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Two }, { DepthAttac
     }
 
     fn draw(&mut self, pass: &mut RenderPass<'_>, draw_data: Self::DrawData<'_>) {
+        if draw_data.water_index_buffer.count() == 0 {
+            return;
+        }
+
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(2, &self.bind_group, &[]);
-        pass.set_bind_group(3, draw_data.get_bind_group(), &[]);
-        pass.draw(0..3, 0..1);
+        pass.set_index_buffer(draw_data.water_index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+        pass.set_vertex_buffer(0, draw_data.water_vertex_buffer.slice(..));
+        pass.draw_indexed(0..draw_data.water_index_buffer.count(), 0, 0..1);
     }
 }
 
 impl Prepare for WaterWaveDrawer {
     fn prepare(&mut self, device: &Device, instructions: &RenderInstruction) {
-        if let Some(instruction) = instructions.water.as_ref() {
+        if let Some(instruction) = instructions.water.as_ref()
+            && instruction.water_index_buffer.count() != 0
+        {
             self.uniforms = WaterWaveUniforms {
-                water_bounds: instruction.water_bounds.into(),
-                texture_repeat: instruction.texture_repeat,
-                water_level: instruction.water_level,
-                wave_amplitude: instruction.wave_amplitude,
-                wave_speed: instruction.wave_speed,
-                wave_length: instruction.wave_length,
+                texture_repeat_rcp: 1.0 / instruction.texture_repeat,
+                waveform_phase_shift: instruction.waveform_phase_shift,
+                waveform_amplitude: instruction.waveform_amplitude,
+                waveform_frequency: instruction.waveform_frequency.0,
                 water_opacity: instruction.water_opacity,
-                padding: Default::default(),
             };
             self.bind_group = Self::create_bind_group(
                 device,

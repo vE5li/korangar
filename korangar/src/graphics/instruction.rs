@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
-use cgmath::{Matrix4, Point3, SquareMatrix, Vector2, Vector3, Vector4, Zero};
-use korangar_util::Rectangle;
+use cgmath::{Deg, Matrix4, Point3, SquareMatrix, Vector2, Vector3, Vector4, Zero};
 use ragnarok_packets::EntityId;
 use wgpu::BlendFactor;
 
@@ -9,7 +8,7 @@ use super::color::Color;
 #[cfg(feature = "debug")]
 use super::settings::RenderSettings;
 use super::vertices::ModelVertex;
-use super::{Buffer, ShadowQuality, Texture, TextureSet, TileVertex};
+use super::{Buffer, ShadowQuality, Texture, TextureSet, TileVertex, WaterVertex};
 use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
@@ -102,7 +101,7 @@ pub struct Uniforms {
     pub view_matrix: Matrix4<f32>,
     pub projection_matrix: Matrix4<f32>,
     pub camera_position: Vector4<f32>,
-    pub animation_timer: f32,
+    pub animation_timer_ms: f32,
     pub day_timer: f32,
     pub ambient_light_color: Color,
     pub enhanced_lighting: bool,
@@ -115,7 +114,7 @@ impl Default for Uniforms {
             view_matrix: Matrix4::identity(),
             projection_matrix: Matrix4::identity(),
             camera_position: Vector4::zero(),
-            animation_timer: 0.0,
+            animation_timer_ms: 0.0,
             day_timer: 0.0,
             ambient_light_color: Color::default(),
             enhanced_lighting: false,
@@ -127,12 +126,12 @@ impl Default for Uniforms {
 #[derive(Clone, Debug)]
 pub struct WaterInstruction<'a> {
     pub water_texture: &'a Texture,
-    pub water_bounds: Rectangle<f32>,
+    pub water_vertex_buffer: &'a Buffer<WaterVertex>,
+    pub water_index_buffer: &'a Buffer<u32>,
     pub texture_repeat: f32,
-    pub water_level: f32,
-    pub wave_amplitude: f32,
-    pub wave_speed: f32,
-    pub wave_length: f32,
+    pub waveform_phase_shift: f32,
+    pub waveform_amplitude: f32,
+    pub waveform_frequency: Deg<f32>,
     pub water_opacity: f32,
 }
 

@@ -17,16 +17,16 @@ use wgpu::{BufferUsages, Device, Queue};
 
 use crate::graphics::EntityInstruction;
 #[cfg(feature = "debug")]
-use crate::graphics::reduce_model_vertices;
+use crate::graphics::reduce_vertices;
 #[cfg(feature = "debug")]
 use crate::graphics::{BindlessSupport, DebugRectangleInstruction};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 use crate::interface::theme::GameTheme;
 use crate::interface::windows::WindowCache;
-use crate::loaders::GameFileLoader;
 #[cfg(feature = "debug")]
 use crate::loaders::split_mesh_by_texture;
+use crate::loaders::{GAT_TILE_SIZE, GameFileLoader};
 use crate::renderer::GameInterfaceRenderer;
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
@@ -610,9 +610,8 @@ impl Common {
 
     #[cfg(feature = "debug")]
     pub fn generate_pathing_mesh(&mut self, device: &Device, queue: &Queue, bindless_support: BindlessSupport, map: &Map) {
-        use crate::{Color, MAP_TILE_SIZE, NativeModelVertex};
+        use crate::{Color, NativeModelVertex};
 
-        const HALF_TILE_SIZE: f32 = MAP_TILE_SIZE / 2.0;
         const PATHING_MESH_OFFSET: f32 = 0.95;
 
         let mut pathing_native_vertices = Vec::new();
@@ -631,26 +630,22 @@ impl Common {
         for (index, Step { arrival_position, .. }) in active_movement.steps.iter().copied().enumerate() {
             let tile = map.get_tile(arrival_position);
             let offset = Vector2::new(
-                arrival_position.x as f32 * HALF_TILE_SIZE,
-                arrival_position.y as f32 * HALF_TILE_SIZE,
+                arrival_position.x as f32 * GAT_TILE_SIZE,
+                arrival_position.y as f32 * GAT_TILE_SIZE,
             );
 
             let first_position = Point3::new(offset.x, tile.upper_left_height + PATHING_MESH_OFFSET, offset.y);
             let second_position = Point3::new(
-                offset.x + HALF_TILE_SIZE,
+                offset.x + GAT_TILE_SIZE,
                 tile.upper_right_height + PATHING_MESH_OFFSET,
                 offset.y,
             );
             let third_position = Point3::new(
-                offset.x + HALF_TILE_SIZE,
+                offset.x + GAT_TILE_SIZE,
                 tile.lower_right_height + PATHING_MESH_OFFSET,
-                offset.y + HALF_TILE_SIZE,
+                offset.y + GAT_TILE_SIZE,
             );
-            let fourth_position = Point3::new(
-                offset.x,
-                tile.lower_left_height + PATHING_MESH_OFFSET,
-                offset.y + HALF_TILE_SIZE,
-            );
+            let fourth_position = Point3::new(offset.x, tile.lower_left_height + PATHING_MESH_OFFSET, offset.y + GAT_TILE_SIZE);
 
             let first_normal = NativeModelVertex::calculate_normal(first_position, second_position, third_position);
             let second_normal = NativeModelVertex::calculate_normal(fourth_position, first_position, third_position);
@@ -719,7 +714,7 @@ impl Common {
         }
 
         let pathing_vertices = NativeModelVertex::convert_to_model_vertices(pathing_native_vertices, None);
-        let (pathing_vertices, mut pathing_indices) = reduce_model_vertices(&pathing_vertices);
+        let (pathing_vertices, mut pathing_indices) = reduce_vertices(&pathing_vertices);
 
         let submeshes = match bindless_support {
             BindlessSupport::Full | BindlessSupport::Limited => {

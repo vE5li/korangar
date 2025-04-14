@@ -9,7 +9,7 @@ pub struct GameTimer {
     accumulate_second: f64,
     frame_counter: usize,
     frames_per_second: usize,
-    animation_timer: f32,
+    animation_timer_ms: f32,
     day_timer: f64,
     last_packet_receive_time: Instant,
     first_tick_received: bool,
@@ -34,7 +34,7 @@ impl GameTimer {
             accumulate_second: Default::default(),
             frame_counter: Default::default(),
             frames_per_second: Default::default(),
-            animation_timer: Default::default(),
+            animation_timer_ms: Default::default(),
             day_timer,
             last_packet_receive_time: Instant::now(),
             first_tick_received: false,
@@ -94,8 +94,8 @@ impl GameTimer {
         self.day_timer as f32
     }
 
-    pub fn get_animation_timer(&self) -> f32 {
-        self.animation_timer
+    pub fn get_animation_timer_ms(&self) -> f32 {
+        self.animation_timer_ms
     }
 
     pub fn update(&mut self) -> f64 {
@@ -105,7 +105,7 @@ impl GameTimer {
         self.frame_counter += 1;
         self.accumulate_second += delta_time;
         self.day_timer = (self.day_timer + (delta_time * GAME_TIME_SCALE)) % GAME_TIME_DAY_CYCLE;
-        self.animation_timer += delta_time as f32;
+        self.animation_timer_ms += 1000.0 * delta_time as f32;
         self.previous_elapsed = new_elapsed;
 
         if self.accumulate_second > 1.0 {
@@ -139,15 +139,15 @@ mod increment {
         let mut game_timer = GameTimer::new();
 
         let day_timer = game_timer.get_day_timer();
-        let animation_timer = game_timer.get_animation_timer();
+        let animation_timer_ms = game_timer.get_animation_timer_ms();
 
         std::thread::sleep(std::time::Duration::from_millis(10));
         game_timer.update();
 
         let updated_day_timer = game_timer.get_day_timer();
-        let updated_animation_timer = game_timer.get_animation_timer();
+        let updated_animation_timer_ms = game_timer.get_animation_timer_ms();
 
         assert!(updated_day_timer > day_timer);
-        assert!(updated_animation_timer > animation_timer);
+        assert!(updated_animation_timer_ms > animation_timer_ms);
     }
 }

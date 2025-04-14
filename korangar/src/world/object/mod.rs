@@ -5,7 +5,6 @@ use korangar_interface::elements::PrototypeElement;
 use korangar_interface::windows::PrototypeWindow;
 use korangar_util::collision::AABB;
 use ragnarok_formats::transform::Transform;
-use ragnarok_packets::ClientTick;
 
 #[cfg(feature = "debug")]
 use super::MarkerIdentifier;
@@ -28,8 +27,9 @@ pub struct Object {
 }
 
 impl Object {
-    pub fn render_geometry(&self, instructions: &mut Vec<ModelInstruction>, client_tick: ClientTick, camera: &dyn Camera) {
-        self.model.render_geometry(instructions, &self.transform, client_tick, camera);
+    pub fn render_geometry(&self, instructions: &mut Vec<ModelInstruction>, animation_timer_ms: f32, camera: &dyn Camera) {
+        self.model
+            .render_geometry(instructions, &self.transform, animation_timer_ms, camera);
     }
 
     pub fn calculate_object_aabb(&self) -> AABB {

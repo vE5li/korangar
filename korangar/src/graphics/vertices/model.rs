@@ -18,10 +18,6 @@ pub struct ModelVertex {
     pub wind_affinity: f32,
 }
 
-impl ModelVertex {
-    const EPSILON: f32 = 1e-6;
-}
-
 impl PartialEq for ModelVertex {
     fn eq(&self, other: &Self) -> bool {
         (self.position[0] - other.position[0]).abs() < Self::EPSILON
@@ -78,6 +74,8 @@ impl Hash for ModelVertex {
 }
 
 impl ModelVertex {
+    const EPSILON: f32 = 1e-6;
+
     pub const fn new(
         position: Point3<f32>,
         normal: Vector3<f32>,
@@ -114,7 +112,7 @@ impl ModelVertex {
     }
 }
 
-pub fn reduce_model_vertices(vertices: &[ModelVertex]) -> (Vec<ModelVertex>, Vec<u32>) {
+pub fn reduce_vertices<T: Pod + Eq + Hash>(vertices: &[T]) -> (Vec<T>, Vec<u32>) {
     let mut vertex_map = HashMap::new();
     let mut reduced_vertices = Vec::new();
     let mut indices = Vec::new();

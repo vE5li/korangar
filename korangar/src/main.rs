@@ -798,7 +798,7 @@ impl Client {
 
         let delta_time = self.game_timer.update();
         let day_timer = self.game_timer.get_day_timer();
-        let animation_timer = self.game_timer.get_animation_timer();
+        let animation_timer_ms = self.game_timer.get_animation_timer_ms();
         let client_tick = self.game_timer.get_client_tick();
 
         #[cfg(feature = "debug")]
@@ -2134,7 +2134,7 @@ impl Client {
                     map.render_objects(
                         &mut self.directional_shadow_model_instructions,
                         &object_set,
-                        client_tick,
+                        animation_timer_ms,
                         &self.directional_shadow_camera,
                     );
 
@@ -2188,7 +2188,7 @@ impl Client {
                         &mut self.point_shadow_object_set_buffer,
                         &mut self.point_shadow_model_instructions,
                         &mut self.point_light_with_shadow_instructions,
-                        client_tick,
+                        animation_timer_ms,
                         #[cfg(feature = "debug")]
                         render_settings,
                     );
@@ -2206,7 +2206,7 @@ impl Client {
                     let offset = self.model_instructions.len();
 
                     #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
-                    map.render_objects(&mut self.model_instructions, &object_set, client_tick, current_camera);
+                    map.render_objects(&mut self.model_instructions, &object_set, animation_timer_ms, current_camera);
 
                     #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
                     map.render_ground(&mut self.model_instructions);
@@ -2249,7 +2249,7 @@ impl Client {
                     }
 
                     #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_water))]
-                    map.render_water(&mut water_instruction, client_tick);
+                    map.render_water(&mut water_instruction, animation_timer_ms);
 
                     #[cfg(feature = "debug")]
                     if render_settings.show_bounding_boxes {
@@ -2274,7 +2274,7 @@ impl Client {
                             current_camera,
                             marker_identifier,
                             &point_light_set,
-                            animation_timer,
+                            animation_timer_ms,
                         );
                     }
 
@@ -2392,7 +2392,7 @@ impl Client {
                         view_matrix,
                         projection_matrix,
                         camera_position,
-                        animation_timer,
+                        animation_timer_ms,
                         day_timer,
                         ambient_light_color,
                         enhanced_lighting: lighting_mode == LightingMode::Enhanced,

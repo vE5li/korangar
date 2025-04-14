@@ -1,10 +1,12 @@
 mod entity;
 mod indicator;
 mod model;
+mod wave;
 
 pub(crate) use entity::{EntityPassMode, ForwardEntityDrawData, ForwardEntityDrawer};
 pub(crate) use indicator::ForwardIndicatorDrawer;
 pub(crate) use model::{ForwardModelDrawData, ForwardModelDrawer, ModelPassMode};
+pub(crate) use wave::WaterWaveDrawer;
 use wgpu::{
     BindGroupLayout, Color, CommandEncoder, Device, LoadOp, Operations, Queue, RenderPass, RenderPassColorAttachment,
     RenderPassDepthStencilAttachment, RenderPassDescriptor, StoreOp, TextureFormat,

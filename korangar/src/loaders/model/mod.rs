@@ -16,7 +16,7 @@ use smallvec::SmallVec;
 
 use super::error::LoadError;
 use super::{FALLBACK_MODEL_FILE, TextureSetBuilder, smooth_model_normals};
-use crate::graphics::{BindlessSupport, Color, ModelVertex, NativeModelVertex, reduce_model_vertices};
+use crate::graphics::{BindlessSupport, Color, ModelVertex, NativeModelVertex, reduce_vertices};
 use crate::loaders::GameFileLoader;
 use crate::world::{Model, Node, SubMesh};
 
@@ -266,7 +266,7 @@ impl ModelLoader {
         let centroid = Self::calculate_centroid(&node_native_vertices);
 
         let node_vertices = NativeModelVertex::convert_to_model_vertices(node_native_vertices, Some(&node_texture_mapping));
-        let (node_vertices, mut node_indices) = reduce_model_vertices(&node_vertices);
+        let (node_vertices, mut node_indices) = reduce_vertices(&node_vertices);
 
         // Apply the frames per second on the keyframes values.
         let animation_length = match version.equals_or_above(2, 2) {

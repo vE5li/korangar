@@ -482,7 +482,7 @@ pub struct WaterSettings {
     #[version_equals_or_above(1, 8)]
     pub wave_pitch: Option<f32>,
     #[version_equals_or_above(1, 9)]
-    pub water_animation_speed: Option<u32>,
+    pub texture_cycling_interval: Option<u32>,
 }
 
 #[derive(Clone, Debug, ByteConvertable)]

@@ -3,7 +3,6 @@ use derive_new::new;
 use korangar_interface::elements::PrototypeElement;
 use ragnarok_formats::model::{RotationKeyframeData, ScaleKeyframeData, TranslationKeyframeData};
 use ragnarok_formats::version::InternalVersion;
-use ragnarok_packets::ClientTick;
 
 use crate::graphics::ModelInstruction;
 use crate::world::Camera;
@@ -42,7 +41,7 @@ impl Node {
     fn interpolate_keyframes<T, U, F>(
         keyframes: &[T],
         animation_length: u32,
-        client_tick: ClientTick,
+        animation_timer_ms: f32,
         get_frame: impl Fn(&T) -> i32,
         get_value: impl Fn(&T) -> U,
         interpolation_function: F,
@@ -51,7 +50,7 @@ impl Node {
         F: FnOnce(U, U, f32) -> U,
     {
         let animation_length = animation_length.max(1);
-        let animation_tick = (client_tick.0 % animation_length) as i32;
+        let animation_tick = (animation_timer_ms as u32 % animation_length) as i32;
 
         let last_keyframe_index = keyframes
             .binary_search_by(|keyframe| get_frame(keyframe).cmp(&animation_tick))
@@ -76,11 +75,11 @@ impl Node {
         interpolation_function(get_value(last_step), get_value(next_step), animation_elapsed)
     }
 
-    fn scale_animation_matrix(&self, client_tick: ClientTick) -> Matrix4<f32> {
+    fn scale_animation_matrix(&self, animation_timer_ms: f32) -> Matrix4<f32> {
         let current_scale = Self::interpolate_keyframes(
             &self.scale_keyframes,
             self.animation_length,
-            client_tick,
+            animation_timer_ms,
             |keyframe| keyframe.frame,
             |keyframe| keyframe.scale,
             |a, b, t| a.lerp(b, t),
@@ -89,11 +88,11 @@ impl Node {
         Matrix4::from_nonuniform_scale(current_scale.x, current_scale.y, current_scale.z)
     }
 
-    fn translation_animation_vector(&self, client_tick: ClientTick) -> Vector4<f32> {
+    fn translation_animation_vector(&self, animation_timer_ms: f32) -> Vector4<f32> {
         let current_translation = Self::interpolate_keyframes(
             &self.translation_keyframes,
             self.animation_length,
-            client_tick,
+            animation_timer_ms,
             |keyframe| keyframe.frame,
             |keyframe| keyframe.translation,
             |a, b, t| a.lerp(b, t),
@@ -102,11 +101,11 @@ impl Node {
         current_translation.extend(0.0)
     }
 
-    fn rotation_animation_matrix(&self, client_tick: ClientTick) -> Matrix4<f32> {
+    fn rotation_animation_matrix(&self, animation_timer_ms: f32) -> Matrix4<f32> {
         let current_rotation = Self::interpolate_keyframes(
             &self.rotation_keyframes,
             self.animation_length,
-            client_tick,
+            animation_timer_ms,
             |keyframe| keyframe.frame,
             |keyframe| keyframe.quaternions,
             |a, b, t| a.nlerp(b, t),
@@ -117,7 +116,7 @@ impl Node {
 
     pub fn world_matrix(
         &self,
-        client_tick: ClientTick,
+        animation_timer_ms: f32,
         parent_matrix: &Matrix4<f32>,
         parent_rotation_matrix: &Matrix4<f32>,
         parent_transform_matrix: &Matrix4<f32>,
@@ -130,11 +129,11 @@ impl Node {
                 true => {
                     let animation_scale_matrix = match self.scale_keyframes.is_empty() {
                         true => Matrix4::identity(),
-                        false => self.scale_animation_matrix(client_tick),
+                        false => self.scale_animation_matrix(animation_timer_ms),
                     };
                     let animation_rotation_matrix = match self.rotation_keyframes.is_empty() {
                         true => Matrix4::identity(),
-                        false => self.rotation_animation_matrix(client_tick),
+                        false => self.rotation_animation_matrix(animation_timer_ms),
                     };
                     (
                         parent_matrix * self.transform_matrix * animation_rotation_matrix * animation_scale_matrix,
@@ -153,17 +152,17 @@ impl Node {
 
                     let animation_translate_vector = match self.translation_keyframes.is_empty() {
                         true => self.parent_rotation_matrix.transpose() * (self.position - parent_vector),
-                        false => self.translation_animation_vector(client_tick),
+                        false => self.translation_animation_vector(animation_timer_ms),
                     };
 
                     let animation_scale_matrix = match self.scale_keyframes.is_empty() {
                         true => Matrix4::identity(),
-                        false => self.scale_animation_matrix(client_tick),
+                        false => self.scale_animation_matrix(animation_timer_ms),
                     };
 
                     let animation_rotation_matrix = match self.rotation_keyframes.is_empty() {
                         true => self.parent_rotation_matrix.transpose() * self.rotation_matrix,
-                        false => self.rotation_animation_matrix(client_tick),
+                        false => self.rotation_animation_matrix(animation_timer_ms),
                     };
 
                     let current_rotation_matrix = animation_rotation_matrix * animation_scale_matrix;
@@ -197,7 +196,7 @@ impl Node {
     pub fn render_geometry(
         &self,
         instructions: &mut Vec<ModelInstruction>,
-        client_tick: ClientTick,
+        animation_timer_ms: f32,
         camera: &dyn Camera,
         node_index: usize,
         parent_matrix: &Matrix4<f32>,
@@ -213,7 +212,7 @@ impl Node {
         // perspective.
         let draw_order_offset = (node_index as f32) * 1.1920929e-4_f32;
         let (model_matrix, transform_matrix, rotation_matrix) = self.world_matrix(
-            client_tick,
+            animation_timer_ms,
             parent_matrix,
             parent_rotation_matrix,
             parent_transform_matrix,
@@ -251,7 +250,7 @@ impl Node {
         self.child_nodes.iter().enumerate().for_each(|(node_index, node)| {
             node.render_geometry(
                 instructions,
-                client_tick,
+                animation_timer_ms,
                 camera,
                 node_index,
                 parent_matrix,

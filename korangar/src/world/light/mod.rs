@@ -3,7 +3,6 @@ use std::sync::Arc;
 use cgmath::{Matrix4, Point3, SquareMatrix, Vector2, Vector3, Zero};
 use korangar_util::collision::Sphere;
 use ragnarok_formats::map::LightSource;
-use ragnarok_packets::ClientTick;
 
 #[cfg(feature = "debug")]
 use crate::graphics::RenderSettings;
@@ -225,7 +224,7 @@ impl PointLightSet<'_> {
         point_shadow_object_set_buffer: &mut ResourceSetBuffer<ObjectKey>,
         point_shadow_model_instructions: &mut Vec<ModelInstruction>,
         point_light_with_shadow_instructions: &mut Vec<PointShadowCasterInstruction>,
-        client_tick: ClientTick,
+        animation_timer_ms: f32,
         #[cfg(feature = "debug")] render_settings: &RenderSettings,
     ) {
         for point_light in self.with_shadow_iterator() {
@@ -257,7 +256,12 @@ impl PointLightSet<'_> {
                 let model_offset = point_shadow_model_instructions.len();
 
                 #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
-                map.render_objects(point_shadow_model_instructions, &object_set, client_tick, point_shadow_camera);
+                map.render_objects(
+                    point_shadow_model_instructions,
+                    &object_set,
+                    animation_timer_ms,
+                    point_shadow_camera,
+                );
 
                 #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
                 map.render_ground(point_shadow_model_instructions);

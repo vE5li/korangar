@@ -142,7 +142,7 @@ impl Prepare for DirectionalShadowRenderPassContext {
                 .invert()
                 .unwrap_or(Matrix4::identity())
                 .into(),
-            animation_timer: instructions.uniforms.animation_timer,
+            animation_timer: instructions.uniforms.animation_timer_ms / 1000.0,
             padding: Default::default(),
         };
     }

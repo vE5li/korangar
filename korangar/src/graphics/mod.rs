@@ -229,7 +229,7 @@ impl Prepare for GlobalContext {
             forward_size: [self.forward_size.width as u32, self.forward_size.height as u32],
             interface_size: [self.interface_size.width as u32, self.interface_size.height as u32],
             pointer_position: [instructions.picker_position.left as u32, instructions.picker_position.top as u32],
-            animation_timer: instructions.uniforms.animation_timer,
+            animation_timer: instructions.uniforms.animation_timer_ms / 1000.0,
             day_timer: instructions.uniforms.day_timer,
             point_light_count: (instructions.point_light_shadow_caster.len() + instructions.point_light.len()) as u32,
             enhanced_lighting: instructions.uniforms.enhanced_lighting as u32,

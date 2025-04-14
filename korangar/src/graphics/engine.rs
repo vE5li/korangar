@@ -78,7 +78,6 @@ struct EngineContext {
     point_shadow_pass_context: PointShadowRenderPassContext,
     light_culling_pass_context: LightCullingPassContext,
     forward_pass_context: ForwardRenderPassContext,
-    water_pass_context: WaterRenderPassContext,
     post_processing_pass_context: PostProcessingRenderPassContext,
     screen_blit_pass_context: ScreenBlitRenderPassContext,
 
@@ -225,8 +224,6 @@ impl GraphicsEngine {
                         let light_culling_pass_context = LightCullingPassContext::new(&self.device, &self.queue, &global_context);
                         let forward_pass_context =
                             ForwardRenderPassContext::new(&self.device, &self.queue, &self.texture_loader, &global_context);
-                        let water_pass_context =
-                            WaterRenderPassContext::new(&self.device, &self.queue, &self.texture_loader, &global_context);
                         let post_processing_pass_context =
                             PostProcessingRenderPassContext::new(&self.device, &self.queue, &self.texture_loader, &global_context);
                         let screen_blit_pass_context =
@@ -320,7 +317,7 @@ impl GraphicsEngine {
                             &self.device,
                             &self.queue,
                             &global_context,
-                            &water_pass_context,
+                            &forward_pass_context,
                         );
                         let PostProcessingResources {
                             post_processing_effect_drawer,
@@ -368,7 +365,6 @@ impl GraphicsEngine {
                         point_shadow_pass_context,
                         light_culling_pass_context,
                         forward_pass_context,
-                        water_pass_context,
                         post_processing_pass_context,
                         screen_blit_pass_context,
                         interface_rectangle_drawer,
@@ -560,7 +556,7 @@ impl GraphicsEngine {
                 &self.device,
                 &self.queue,
                 &engine_context.global_context,
-                &engine_context.water_pass_context,
+                &engine_context.forward_pass_context,
             );
 
             #[cfg(feature = "debug")]
@@ -1072,17 +1068,8 @@ impl GraphicsEngine {
                     pass_mode: ModelPassMode::Transparent,
                 });
 
-                if instruction.water.is_some() {
-                    drop(render_pass);
-
-                    let mut render_pass =
-                        engine_context
-                            .water_pass_context
-                            .create_pass(&mut forward_encoder, &engine_context.global_context, None);
-
-                    engine_context
-                        .water_wave_drawer
-                        .draw(&mut render_pass, &engine_context.global_context.forward_depth_texture);
+                if let Some(water_instruction) = instruction.water.as_ref() {
+                    engine_context.water_wave_drawer.draw(&mut render_pass, water_instruction);
                 }
             });
 

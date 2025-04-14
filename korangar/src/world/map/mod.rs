@@ -4,25 +4,24 @@ mod lighting;
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
-use cgmath::{Matrix4, Point3, SquareMatrix, Vector2, Vector3};
+use cgmath::{Deg, Matrix4, Point3, SquareMatrix, Vector2, Vector3};
 use derive_new::new;
 use korangar_audio::AudioEngine;
 #[cfg(feature = "debug")]
 use korangar_interface::windows::PrototypeWindow;
 use korangar_util::collision::{AABB, Frustum, KDTree, Sphere};
 use korangar_util::container::{SimpleKey, SimpleSlab};
+use korangar_util::create_simple_key;
 use korangar_util::pathing::Traversable;
-use korangar_util::{Rectangle, create_simple_key};
 #[cfg(feature = "debug")]
 use option_ext::OptionExt;
 #[cfg(feature = "debug")]
 use ragnarok_formats::map::EffectSource;
 #[cfg(feature = "debug")]
 use ragnarok_formats::map::MapData;
-use ragnarok_formats::map::{LightSource, SoundSource, Tile, TileFlags, WaterSettings};
+use ragnarok_formats::map::{LightSource, SoundSource, Tile, TileFlags};
 #[cfg(feature = "debug")]
 use ragnarok_formats::transform::Transform;
-use ragnarok_packets::ClientTick;
 use wgpu::Queue;
 
 pub use self::lighting::Lighting;
@@ -35,15 +34,16 @@ use crate::graphics::ModelBatch;
 use crate::graphics::RenderSettings;
 #[cfg(feature = "debug")]
 use crate::graphics::{DebugAabbInstruction, DebugCircleInstruction, DebugRectangleInstruction};
-use crate::graphics::{EntityInstruction, IndicatorInstruction, ModelInstruction, Texture, TextureSet, WaterInstruction};
+use crate::graphics::{EntityInstruction, IndicatorInstruction, ModelInstruction, Texture, TextureSet, WaterInstruction, WaterVertex};
 #[cfg(feature = "debug")]
 use crate::interface::application::InterfaceSettings;
 #[cfg(feature = "debug")]
 use crate::interface::layout::{ScreenPosition, ScreenSize};
+use crate::loaders::GAT_TILE_SIZE;
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
 use crate::settings::LightingMode;
-use crate::{Buffer, Color, GameFileLoader, MAP_TILE_SIZE, ModelVertex, TileVertex};
+use crate::{Buffer, Color, GameFileLoader, ModelVertex, TileVertex};
 
 create_simple_key!(ObjectKey, "Key to an object inside the map");
 create_simple_key!(LightSourceKey, "Key to an light source inside the map");
@@ -66,18 +66,29 @@ impl MarkerIdentifier {
 }
 
 #[derive(new)]
+pub struct WaterPlane {
+    water_opacity: f32,
+    wave_height: f32,
+    wave_speed: Deg<f32>,
+    wave_pitch: Deg<f32>,
+    texture_cycling_interval: u32,
+    texture_repeat: f32,
+    water_textures: Vec<Arc<Texture>>,
+    vertex_buffer: Arc<Buffer<WaterVertex>>,
+    index_buffer: Arc<Buffer<u32>>,
+}
+
+#[derive(new)]
 pub struct Map {
     width: usize,
     height: usize,
     lighting: Lighting,
-    water_settings: Option<WaterSettings>,
-    water_bounds: Rectangle<f32>,
+    water_plane: Option<WaterPlane>,
     tiles: Vec<Tile>,
     sub_meshes: Vec<SubMesh>,
     vertex_buffer: Arc<Buffer<ModelVertex>>,
     index_buffer: Arc<Buffer<u32>>,
     texture_set: Arc<TextureSet>,
-    water_textures: Option<Vec<Arc<Texture>>>,
     objects: SimpleSlab<ObjectKey, Object>,
     light_sources: SimpleSlab<LightSourceKey, LightSource>,
     sound_sources: Vec<SoundSource>,
@@ -100,17 +111,17 @@ pub struct Map {
 }
 
 impl Map {
-    pub fn water_bounds(&self) -> Rectangle<f32> {
-        self.water_bounds
-    }
-
     fn average_tile_height(tile: &Tile) -> f32 {
         (tile.upper_left_height + tile.upper_right_height + tile.lower_left_height + tile.lower_right_height) / 4.0
     }
 
     pub fn get_world_position(&self, position: Vector2<usize>) -> Point3<f32> {
         let height = Self::average_tile_height(self.get_tile(position));
-        Point3::new(position.x as f32 * 5.0 + 2.5, height, position.y as f32 * 5.0 + 2.5)
+        Point3::new(
+            position.x as f32 * GAT_TILE_SIZE + (GAT_TILE_SIZE / 2.0),
+            height,
+            position.y as f32 * GAT_TILE_SIZE + (GAT_TILE_SIZE / 2.0),
+        )
     }
 
     // TODO: Make this private once path finding is properly implemented
@@ -214,12 +225,12 @@ impl Map {
         &self,
         instructions: &mut Vec<ModelInstruction>,
         object_set: &ResourceSet<ObjectKey>,
-        client_tick: ClientTick,
+        animation_timer_ms: f32,
         camera: &dyn Camera,
     ) {
         for object_key in object_set.iterate_visible().copied() {
             if let Some(object) = self.objects.get(object_key) {
-                object.render_geometry(instructions, client_tick, camera);
+                object.render_geometry(instructions, animation_timer_ms, camera);
             }
         }
     }
@@ -240,38 +251,25 @@ impl Map {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn render_water<'a>(&'a self, water_instruction: &mut Option<WaterInstruction<'a>>, client_tick: ClientTick) {
-        if let Some(water_textures) = self.water_textures.as_ref()
-            && let Some(water_settings) = self.water_settings.as_ref()
-        {
-            let water_type = water_settings.water_type.unwrap_or_default();
-            let water_animation_speed = water_settings.water_animation_speed.unwrap_or_default();
-            let water_level = water_settings.water_level.unwrap_or_default();
-            let wave_speed = water_settings.wave_speed.unwrap_or_default();
-            let wave_amplitude = water_settings.wave_height.unwrap_or_default();
-            let wave_length = water_settings.wave_pitch.unwrap_or_default();
+    pub fn render_water<'a>(&'a self, water_instruction: &mut Option<WaterInstruction<'a>>, animation_timer_ms: f32) {
+        if let Some(water_plane) = self.water_plane.as_ref() {
+            let frame = animation_timer_ms / (1000.0 / 60.0);
 
-            let water_opacity = match water_type {
-                4 | 6 => 1.0,
-                _ => 144.0 / 255.0,
-            };
+            let waveform_phase_shift = frame * water_plane.wave_speed.0;
+            let waveform_amplitude = water_plane.wave_height;
+            let waveform_frequency = water_plane.wave_pitch;
+            let water_opacity = water_plane.water_opacity;
 
-            let texture_repeat = match water_type {
-                4 | 6 => 16.0,
-                _ => 4.0,
-            };
-
-            let frame = client_tick.0 / (1000 / 60);
-            let water_texture_index = (frame / water_animation_speed) % water_textures.len() as u32;
+            let water_texture_index = (frame as u32 / water_plane.texture_cycling_interval) % water_plane.water_textures.len() as u32;
 
             *water_instruction = Some(WaterInstruction {
-                water_texture: &water_textures[water_texture_index as usize],
-                water_bounds: self.water_bounds(),
-                texture_repeat,
-                water_level,
-                wave_amplitude,
-                wave_speed,
-                wave_length,
+                water_texture: &water_plane.water_textures[water_texture_index as usize],
+                water_vertex_buffer: &water_plane.vertex_buffer,
+                water_index_buffer: &water_plane.index_buffer,
+                texture_repeat: water_plane.texture_repeat,
+                waveform_phase_shift,
+                waveform_amplitude,
+                waveform_frequency,
                 water_opacity,
             });
         }
@@ -325,7 +323,6 @@ impl Map {
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn render_walk_indicator(&self, instruction: &mut Option<IndicatorInstruction>, color: Color, position: Vector2<usize>) {
-        const HALF_TILE_SIZE: f32 = MAP_TILE_SIZE / 2.0;
         const OFFSET: f32 = 1.0;
 
         // Since the picker buffer is always one frame behind the current scene, a map
@@ -338,17 +335,13 @@ impl Map {
         let tile = self.get_tile(position);
 
         if tile.flags.contains(TileFlags::WALKABLE) {
-            let base_x = position.x as f32 * HALF_TILE_SIZE;
-            let base_y = position.y as f32 * HALF_TILE_SIZE;
+            let base_x = position.x as f32 * GAT_TILE_SIZE;
+            let base_y = position.y as f32 * GAT_TILE_SIZE;
 
             let upper_left = Point3::new(base_x, tile.upper_left_height + OFFSET, base_y);
-            let upper_right = Point3::new(base_x + HALF_TILE_SIZE, tile.upper_right_height + OFFSET, base_y);
-            let lower_left = Point3::new(base_x, tile.lower_left_height + OFFSET, base_y + HALF_TILE_SIZE);
-            let lower_right = Point3::new(
-                base_x + HALF_TILE_SIZE,
-                tile.lower_right_height + OFFSET,
-                base_y + HALF_TILE_SIZE,
-            );
+            let upper_right = Point3::new(base_x + GAT_TILE_SIZE, tile.upper_right_height + OFFSET, base_y);
+            let lower_left = Point3::new(base_x, tile.lower_left_height + OFFSET, base_y + GAT_TILE_SIZE);
+            let lower_right = Point3::new(base_x + GAT_TILE_SIZE, tile.lower_right_height + OFFSET, base_y + GAT_TILE_SIZE);
 
             *instruction = Some(IndicatorInstruction {
                 upper_left,
@@ -590,9 +583,10 @@ impl Map {
         camera: &dyn Camera,
         marker_identifier: MarkerIdentifier,
         point_light_set: &PointLightSet,
-        animation_time: f32,
+        animation_timer_ms: f32,
     ) {
-        let offset = (f32::sin(animation_time * 5.0) + 0.5).clamp(0.0, 1.0);
+        let animation_seconds = animation_timer_ms / 1000.0;
+        let offset = (f32::sin(animation_seconds * 5.0) + 0.5).clamp(0.0, 1.0);
         let overlay_color = Color::rgb(1.0, offset, 1.0 - offset);
 
         match marker_identifier {

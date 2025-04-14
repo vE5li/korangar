@@ -21,7 +21,7 @@ pub use self::r#async::*;
 pub use self::effect::EffectLoader;
 pub use self::font::{FontLoader, FontSize, GlyphInstruction, Scaling};
 pub use self::gamefile::*;
-pub use self::map::{MAP_TILE_SIZE, MapLoader};
+pub use self::map::{GAT_TILE_SIZE, MapLoader};
 pub use self::model::*;
 pub use self::server::{ClientInfo, ServiceId, load_client_info};
 pub use self::smoothing::{smooth_ground_normals, smooth_model_normals};

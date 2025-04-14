@@ -1,9 +1,10 @@
 mod vertices;
+mod water_plane;
 
 use std::sync::{Arc, Mutex};
 
 use bytemuck::Pod;
-use cgmath::{Array, Point2, Vector3};
+use cgmath::Vector3;
 use derive_new::new;
 use hashbrown::HashMap;
 use korangar_audio::AudioEngine;
@@ -17,15 +18,16 @@ use ragnarok_formats::map::{GatData, GroundData, MapData, MapResources};
 use ragnarok_formats::version::InternalVersion;
 use wgpu::{BufferUsages, Device, Queue};
 
-pub use self::vertices::MAP_TILE_SIZE;
 use self::vertices::{generate_tile_vertices, ground_vertices};
+use self::water_plane::generate_water_plane;
 use super::error::LoadError;
-use crate::graphics::{BindlessSupport, Buffer, ModelVertex, Texture, TextureSet};
-use crate::loaders::{GameFileLoader, ImageType, ModelLoader, TextureLoader, TextureSetBuilder, VideoLoader, split_mesh_by_texture};
+use crate::graphics::{BindlessSupport, Buffer, ModelVertex, TextureSet};
+use crate::loaders::{GameFileLoader, ModelLoader, TextureLoader, TextureSetBuilder, VideoLoader, split_mesh_by_texture};
 use crate::world::{Library, LightSourceKey, Lighting, Model, SubMesh, Video};
 use crate::{EffectSourceExt, LightSourceExt, Map, Object, ObjectKey, SoundSourceExt};
 
-const MAP_OFFSET: f32 = 5.0;
+pub const GROUND_TILE_SIZE: f32 = 10.0;
+pub const GAT_TILE_SIZE: f32 = 5.0;
 
 #[cfg(feature = "debug")]
 fn assert_byte_reader_empty<Meta>(mut byte_reader: ByteReader<Meta>, file_name: &str) {
@@ -84,14 +86,18 @@ impl MapLoader {
         #[cfg(not(feature = "debug"))]
         let (_, _, tile_picker_vertices, tile_picker_indices) = generate_tile_vertices(&mut gat_data);
 
-        let water_level = -map_data
-            .water_settings
-            .as_ref()
-            .and_then(|settings| settings.water_level)
-            .unwrap_or_default();
+        let (mut model_vertices, mut model_indices, mut ground_texture_transparencies) =
+            ground_vertices(&ground_data, &mut texture_set_builder);
 
-        let (mut model_vertices, mut model_indices, water_bounds, mut ground_texture_transparencies) =
-            ground_vertices(&ground_data, water_level, &mut texture_set_builder);
+        // TODO: NHA Support reading water planes from GND files (version >= 2.6).
+        let water_plane = generate_water_plane(
+            &self.device,
+            &self.queue,
+            &resource_file,
+            &texture_loader,
+            &ground_data,
+            map_data.water_settings.as_ref(),
+        );
 
         let sub_meshes = match self.bindless_support {
             BindlessSupport::Full | BindlessSupport::Limited => {
@@ -119,23 +125,6 @@ impl MapLoader {
             }
         };
 
-        let water_textures: Option<Vec<Arc<Texture>>> =
-            map_data
-                .water_settings
-                .as_ref()
-                .and_then(|settings| settings.water_type)
-                .map(|water_type| {
-                    let water_paths = get_water_texture_paths(water_type);
-                    water_paths
-                        .iter()
-                        .map(|path| {
-                            texture_loader
-                                .get_or_load(path, ImageType::Color)
-                                .expect("Can't load water texture")
-                        })
-                        .collect()
-                });
-
         #[cfg(feature = "debug")]
         let tile_submeshes = match self.bindless_support {
             BindlessSupport::Full | BindlessSupport::Limited => {
@@ -151,16 +140,42 @@ impl MapLoader {
         };
 
         #[cfg(feature = "debug")]
-        let tile_vertex_buffer = Arc::new(self.create_vertex_buffer(&resource_file, "tile vertex", &tile_vertices));
+        let tile_vertex_buffer = Arc::new(create_vertex_buffer(
+            &self.device,
+            &self.queue,
+            &resource_file,
+            "tile vertex",
+            &tile_vertices,
+        ));
 
         #[cfg(feature = "debug")]
-        let tile_index_buffer = Arc::new(self.create_index_buffer(&resource_file, "tile index ", &tile_indices));
+        let tile_index_buffer = Arc::new(create_index_buffer(
+            &self.device,
+            &self.queue,
+            &resource_file,
+            "tile index ",
+            &tile_indices,
+        ));
 
-        let tile_picker_vertex_buffer = (!tile_picker_vertices.is_empty())
-            .then(|| self.create_vertex_buffer(&resource_file, "tile picker vertex", &tile_picker_vertices));
+        let tile_picker_vertex_buffer = (!tile_picker_vertices.is_empty()).then(|| {
+            create_vertex_buffer(
+                &self.device,
+                &self.queue,
+                &resource_file,
+                "tile picker vertex",
+                &tile_picker_vertices,
+            )
+        });
 
-        let tile_picker_index_buffer =
-            (!tile_picker_indices.is_empty()).then(|| self.create_index_buffer(&resource_file, "tile picker index", &tile_picker_indices));
+        let tile_picker_index_buffer = (!tile_picker_indices.is_empty()).then(|| {
+            create_index_buffer(
+                &self.device,
+                &self.queue,
+                &resource_file,
+                "tile picker index",
+                &tile_picker_indices,
+            )
+        });
 
         apply_map_offset(&ground_data, &mut map_data.resources);
 
@@ -225,24 +240,16 @@ impl MapLoader {
         let light_sources_kdtree = KDTree::from_objects(&light_source_spheres);
         let background_music_track_name = self.audio_engine.get_track_for_map(&map_file_name);
 
-        // There are maps that don't have water tiles but have water settings. In such
-        // cases we will set the water settings to `None`
-        let water_settings = map_data
-            .water_settings
-            .filter(|_| !(water_bounds.min == Point2::from_value(f32::MAX) && water_bounds.max == Point2::from_value(f32::MIN)));
-
         let map = Map::new(
             gat_data.map_width as usize,
             gat_data.map_height as usize,
             lighting,
-            water_settings,
-            water_bounds,
+            water_plane,
             gat_data.tiles,
             sub_meshes,
             vertex_buffer,
             index_buffer,
             texture_set,
-            water_textures,
             objects,
             light_sources,
             map_data.resources.sound_sources,
@@ -277,40 +284,34 @@ impl MapLoader {
         model_vertices: Vec<ModelVertex>,
         model_indices: Vec<u32>,
     ) -> (Arc<Buffer<ModelVertex>>, Arc<Buffer<u32>>, Arc<TextureSet>, Mutex<Vec<Video>>) {
-        let vertex_buffer = Arc::new(self.create_vertex_buffer(resource_file, "map vertices", &model_vertices));
-        let index_buffer = Arc::new(self.create_index_buffer(resource_file, "map indices", &model_indices));
+        let vertex_buffer = Arc::new(create_vertex_buffer(
+            &self.device,
+            &self.queue,
+            resource_file,
+            "map vertices",
+            &model_vertices,
+        ));
+        let index_buffer = Arc::new(create_index_buffer(
+            &self.device,
+            &self.queue,
+            resource_file,
+            "map indices",
+            &model_indices,
+        ));
         let (texture_set, videos) = texture_set_builder.build();
         let texture_set = Arc::new(texture_set);
         let videos = Mutex::new(videos);
         (vertex_buffer, index_buffer, texture_set, videos)
     }
-
-    fn create_vertex_buffer<T: Pod>(&self, resource: &str, label: &str, vertices: &[T]) -> Buffer<T> {
-        Buffer::with_data(
-            &self.device,
-            &self.queue,
-            format!("{resource} {label}"),
-            BufferUsages::COPY_DST | BufferUsages::VERTEX,
-            vertices,
-        )
-    }
-
-    fn create_index_buffer(&self, resource: &str, label: &str, indices: &[u32]) -> Buffer<u32> {
-        Buffer::with_data(
-            &self.device,
-            &self.queue,
-            format!("{resource} {label}"),
-            BufferUsages::COPY_DST | BufferUsages::INDEX,
-            indices,
-        )
-    }
 }
 
+/// We shift the map resources, so that the world coordinate system's origin has
+/// the same origin as the tile grids.
 fn apply_map_offset(ground_data: &GroundData, resources: &mut MapResources) {
     let offset = Vector3::new(
-        ground_data.width as f32 * MAP_OFFSET,
+        (ground_data.width as f32 * GROUND_TILE_SIZE) / 2.0,
         0.0,
-        ground_data.height as f32 * MAP_OFFSET,
+        (ground_data.height as f32 * GROUND_TILE_SIZE) / 2.0,
     );
 
     resources.objects.iter_mut().for_each(|object| object.transform.position += offset);
@@ -340,11 +341,22 @@ fn parse_generic_data<Data: FromBytes>(resource_file: &str, game_file_loader: &G
     Ok(data)
 }
 
-fn get_water_texture_paths(water_type: i32) -> Vec<String> {
-    let mut paths = Vec::with_capacity(32);
-    for i in 0..32 {
-        let filename = format!("워터\\water{}{:02}.jpg", water_type, i);
-        paths.push(filename);
-    }
-    paths
+fn create_vertex_buffer<T: Pod>(device: &Device, queue: &Queue, resource: &str, label: &str, vertices: &[T]) -> Buffer<T> {
+    Buffer::with_data(
+        device,
+        queue,
+        format!("{resource} {label}"),
+        BufferUsages::COPY_DST | BufferUsages::VERTEX,
+        vertices,
+    )
+}
+
+fn create_index_buffer(device: &Device, queue: &Queue, resource: &str, label: &str, indices: &[u32]) -> Buffer<u32> {
+    Buffer::with_data(
+        device,
+        queue,
+        format!("{resource} {label}"),
+        BufferUsages::COPY_DST | BufferUsages::INDEX,
+        indices,
+    )
 }

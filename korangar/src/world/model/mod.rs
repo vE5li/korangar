@@ -10,7 +10,6 @@ use korangar_util::collision::AABB;
 use ragnarok_formats::model::ModelData;
 use ragnarok_formats::transform::Transform;
 use ragnarok_formats::version::InternalVersion;
-use ragnarok_packets::ClientTick;
 
 pub use self::node::{Node, SubMesh};
 #[cfg(feature = "debug")]
@@ -47,14 +46,14 @@ impl Model {
         &self,
         instructions: &mut Vec<ModelInstruction>,
         transform: &Transform,
-        client_tick: ClientTick,
+        animation_timer_ms: f32,
         camera: &dyn Camera,
     ) {
         self.root_nodes.iter().enumerate().for_each(|(node_index, node)| {
             let model_matrix = &self.get_model_matrix(transform);
             node.render_geometry(
                 instructions,
-                client_tick,
+                animation_timer_ms,
                 camera,
                 node_index,
                 model_matrix,

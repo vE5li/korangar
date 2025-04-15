@@ -1,10 +1,10 @@
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, print_debug};
-use wgpu::{Adapter, Features, Limits, TextureFormat, TextureFormatFeatureFlags};
+use wgpu::{Adapter, Backend, Features, Limits, TextureFormat, TextureFormatFeatureFlags};
 
 use crate::graphics::{Msaa, RENDER_TO_TEXTURE_DEPTH_FORMAT, RENDER_TO_TEXTURE_FORMAT};
 
-pub const MAX_BINDING_ARRAY_ELEMENTS_PER_SHADER_STAGE: u32 = 1024;
+pub const MAX_BINDING_ARRAY_ELEMENTS_PER_SHADER_STAGE: u32 = 10240;
 
 pub const MAX_STORAGE_BUFFER_BINDING_SIZE: u32 = 268435456;
 
@@ -119,6 +119,11 @@ impl Capabilities {
         if adapter_features.contains(Features::POLYGON_MODE_LINE) {
             capabilities.polygon_mode_line = true;
             capabilities.required_features |= Features::POLYGON_MODE_LINE;
+        }
+
+        // Workaround until this WGPU issue is fixed: https://github.com/gfx-rs/wgpu/issues/7525
+        if adapter.get_info().backend == Backend::Vulkan && capabilities.bindless == BindlessSupport::Full {
+            capabilities.bindless = BindlessSupport::Limited;
         }
 
         capabilities

@@ -112,7 +112,7 @@ pub struct Map {
 
 impl Map {
     fn average_tile_height(tile: &Tile) -> f32 {
-        (tile.upper_left_height + tile.upper_right_height + tile.lower_left_height + tile.lower_right_height) / 4.0
+        (tile.southwest_corner_height + tile.southeast_corner_height + tile.northwest_corner_height + tile.northeast_corner_height) / 4.0
     }
 
     pub fn get_world_position(&self, position: Vector2<usize>) -> Point3<f32> {
@@ -338,10 +338,14 @@ impl Map {
             let base_x = position.x as f32 * GAT_TILE_SIZE;
             let base_y = position.y as f32 * GAT_TILE_SIZE;
 
-            let upper_left = Point3::new(base_x, tile.upper_left_height + OFFSET, base_y);
-            let upper_right = Point3::new(base_x + GAT_TILE_SIZE, tile.upper_right_height + OFFSET, base_y);
-            let lower_left = Point3::new(base_x, tile.lower_left_height + OFFSET, base_y + GAT_TILE_SIZE);
-            let lower_right = Point3::new(base_x + GAT_TILE_SIZE, tile.lower_right_height + OFFSET, base_y + GAT_TILE_SIZE);
+            let upper_left = Point3::new(base_x, tile.southwest_corner_height + OFFSET, base_y);
+            let upper_right = Point3::new(base_x + GAT_TILE_SIZE, tile.southeast_corner_height + OFFSET, base_y);
+            let lower_left = Point3::new(base_x, tile.northwest_corner_height + OFFSET, base_y + GAT_TILE_SIZE);
+            let lower_right = Point3::new(
+                base_x + GAT_TILE_SIZE,
+                tile.northeast_corner_height + OFFSET,
+                base_y + GAT_TILE_SIZE,
+            );
 
             *instruction = Some(IndicatorInstruction {
                 upper_left,

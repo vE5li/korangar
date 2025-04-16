@@ -26,13 +26,9 @@ pub fn generate_water_plane(
     let wave_pitch = Deg(water_settings.wave_pitch.unwrap_or(50.0));
     let texture_cycling_interval = water_settings.texture_cycling_interval.unwrap_or(3);
 
-    let width = ground_data.width as usize;
-    let height = ground_data.height as usize;
-    let ground_tiles = &ground_data.ground_tiles;
-
     let max_water_height = water_level + wave_height;
 
-    let (water_vertices, water_indices) = generate_vertices(ground_tiles, width, height, water_level, max_water_height);
+    let (water_vertices, water_indices) = generate_vertices(&ground_data.ground_tiles, ground_data.width, water_level, max_water_height);
 
     if water_vertices.is_empty() {
         return None;
@@ -64,11 +60,11 @@ pub fn generate_water_plane(
         _ => 4.0,
     };
 
-    let textures: Vec<Arc<Texture>> = get_water_texture_paths(water_type)
-        .iter()
+    let textures: Vec<Arc<Texture>> = (0..32)
+        .map(|index| format!("워터\\water{}{:02}.jpg", water_type, index))
         .map(|path| {
             texture_loader
-                .get_or_load(path, ImageType::Color)
+                .get_or_load(&path, ImageType::Color)
                 .expect("Can't load water texture")
         })
         .collect();
@@ -86,74 +82,60 @@ pub fn generate_water_plane(
     ))
 }
 
-fn generate_vertices(
-    ground_tiles: &[GroundTile],
-    width: usize,
-    height: usize,
-    water_level: f32,
-    max_water_height: f32,
-) -> (Vec<WaterVertex>, Vec<u32>) {
+fn generate_vertices(ground_tiles: &[GroundTile], width: i32, water_level: f32, max_water_height: f32) -> (Vec<WaterVertex>, Vec<u32>) {
     let mut vertices = Vec::new();
-    let mut indices = Vec::new();
 
-    for grid_u in 0..width as i32 {
-        for grid_v in 0..height as i32 {
-            let current_tile = &ground_tiles[grid_u as usize + grid_v as usize * width];
+    let indices = ground_tiles
+        .iter()
+        .enumerate()
+        // We only generated vertices if the lowest point of the tile is submerged.
+        .filter(|(_, current_tile)| current_tile.lowest_point() < max_water_height)
+        .flat_map(|(index, _)| {
+            let grid_u = index as i32 % width;
+            let grid_v = index as i32 / width;
 
-            // We only generated vertices if the lowest point of the tile is submerged.
-            if current_tile.normalized_lowest_point() < max_water_height {
-                let south_west = Point3::new(grid_u as f32 * GROUND_TILE_SIZE, water_level, grid_v as f32 * GROUND_TILE_SIZE);
-                let south_east = Point3::new(
-                    (grid_u + 1) as f32 * GROUND_TILE_SIZE,
-                    water_level,
-                    grid_v as f32 * GROUND_TILE_SIZE,
-                );
-                let north_west = Point3::new(
-                    grid_u as f32 * GROUND_TILE_SIZE,
-                    water_level,
-                    (grid_v + 1) as f32 * GROUND_TILE_SIZE,
-                );
-                let north_east = Point3::new(
-                    (grid_u + 1) as f32 * GROUND_TILE_SIZE,
-                    water_level,
-                    (grid_v + 1) as f32 * GROUND_TILE_SIZE,
-                );
+            let south_west = Point3::new(grid_u as f32 * GROUND_TILE_SIZE, water_level, grid_v as f32 * GROUND_TILE_SIZE);
+            let south_east = Point3::new(
+                (grid_u + 1) as f32 * GROUND_TILE_SIZE,
+                water_level,
+                grid_v as f32 * GROUND_TILE_SIZE,
+            );
+            let north_west = Point3::new(
+                grid_u as f32 * GROUND_TILE_SIZE,
+                water_level,
+                (grid_v + 1) as f32 * GROUND_TILE_SIZE,
+            );
+            let north_east = Point3::new(
+                (grid_u + 1) as f32 * GROUND_TILE_SIZE,
+                water_level,
+                (grid_v + 1) as f32 * GROUND_TILE_SIZE,
+            );
 
-                let index = vertices.len() as u32;
+            let index = vertices.len() as u32;
 
-                vertices.push(WaterVertex::new(south_west, grid_u, grid_v));
-                vertices.push(WaterVertex::new(south_east, grid_u, grid_v));
-                vertices.push(WaterVertex::new(north_west, grid_u, grid_v));
-                vertices.push(WaterVertex::new(north_east, grid_u, grid_v));
+            vertices.push(WaterVertex::new(south_west, grid_u, grid_v));
+            vertices.push(WaterVertex::new(south_east, grid_u, grid_v));
+            vertices.push(WaterVertex::new(north_west, grid_u, grid_v));
+            vertices.push(WaterVertex::new(north_east, grid_u, grid_v));
 
-                indices.extend_from_slice(&[index, index + 1, index + 2, index + 1, index + 3, index + 2]);
-            }
-        }
-    }
+            [index, index + 1, index + 2, index + 1, index + 3, index + 2]
+        })
+        .collect();
 
     (vertices, indices)
 }
 
-fn get_water_texture_paths(water_type: i32) -> Vec<String> {
-    let mut paths = Vec::with_capacity(32);
-    for i in 0..32 {
-        let filename = format!("워터\\water{}{:02}.jpg", water_type, i);
-        paths.push(filename);
-    }
-    paths
-}
-
 pub trait GroundTileExt {
-    fn normalized_lowest_point(&self) -> f32;
+    fn lowest_point(&self) -> f32;
 }
 
 impl GroundTileExt for GroundTile {
-    fn normalized_lowest_point(&self) -> f32 {
+    fn lowest_point(&self) -> f32 {
         [
-            -self.lower_right_height,
-            -self.lower_left_height,
-            -self.upper_right_height,
-            -self.upper_left_height,
+            -self.southeast_corner_height,
+            -self.southwest_corner_height,
+            -self.northeast_corner_height,
+            -self.northwest_corner_height,
         ]
         .into_iter()
         .reduce(f32::min)

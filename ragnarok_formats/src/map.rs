@@ -183,10 +183,10 @@ impl ToBytes for TileFlags {
 
 #[derive(Debug, ByteConvertable)]
 pub struct Tile {
-    pub upper_left_height: f32,
-    pub upper_right_height: f32,
-    pub lower_left_height: f32,
-    pub lower_right_height: f32,
+    pub southwest_corner_height: f32,
+    pub southeast_corner_height: f32,
+    pub northwest_corner_height: f32,
+    pub northeast_corner_height: f32,
     pub flags: TileFlags,
     #[new_default]
     pub unused: [u8; 3],
@@ -240,21 +240,21 @@ pub struct GroundData {
 }
 
 pub struct GroundTile {
-    pub upper_left_height: f32,
-    pub upper_right_height: f32,
-    pub lower_left_height: f32,
-    pub lower_right_height: f32,
+    pub southwest_corner_height: f32,
+    pub southeast_corner_height: f32,
+    pub northwest_corner_height: f32,
+    pub northeast_corner_height: f32,
     pub top_surface_index: i32,
-    pub front_surface_index: i32,
-    pub right_surface_index: i32,
+    pub north_surface_index: i32,
+    pub east_surface_index: i32,
 }
 
 impl FromBytes for GroundTile {
     fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
-        let upper_left_height = f32::from_bytes(byte_reader).trace::<Self>()?;
-        let upper_right_height = f32::from_bytes(byte_reader).trace::<Self>()?;
-        let lower_left_height = f32::from_bytes(byte_reader).trace::<Self>()?;
-        let lower_right_height = f32::from_bytes(byte_reader).trace::<Self>()?;
+        let southwest_corner_height = f32::from_bytes(byte_reader).trace::<Self>()?;
+        let southeast_corner_height = f32::from_bytes(byte_reader).trace::<Self>()?;
+        let northwest_corner_height = f32::from_bytes(byte_reader).trace::<Self>()?;
+        let northeast_corner_height = f32::from_bytes(byte_reader).trace::<Self>()?;
 
         let version = byte_reader
             .get_metadata::<Self, Option<InternalVersion>>()?
@@ -265,24 +265,24 @@ impl FromBytes for GroundTile {
             false => i16::from_bytes(byte_reader).trace::<Self>()? as i32,
         };
 
-        let front_surface_index = match version.equals_or_above(1, 7) {
+        let north_surface_index = match version.equals_or_above(1, 7) {
             true => i32::from_bytes(byte_reader).trace::<Self>()?,
             false => i16::from_bytes(byte_reader).trace::<Self>()? as i32,
         };
 
-        let right_surface_index = match version.equals_or_above(1, 7) {
+        let east_surface_index = match version.equals_or_above(1, 7) {
             true => i32::from_bytes(byte_reader).trace::<Self>()?,
             false => i16::from_bytes(byte_reader).trace::<Self>()? as i32,
         };
 
         Ok(Self {
-            upper_left_height,
-            upper_right_height,
-            lower_left_height,
-            lower_right_height,
+            southwest_corner_height,
+            southeast_corner_height,
+            northwest_corner_height,
+            northeast_corner_height,
             top_surface_index,
-            front_surface_index,
-            right_surface_index,
+            north_surface_index,
+            east_surface_index,
         })
     }
 }
@@ -295,8 +295,8 @@ impl ToBytes for GroundTile {
 
 #[derive(Copy, Clone, Debug)]
 pub enum SurfaceType {
-    Front,
-    Right,
+    North,
+    East,
     Top,
 }
 

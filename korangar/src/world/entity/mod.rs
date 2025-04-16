@@ -522,8 +522,8 @@ impl Common {
                 [
                     Vector2::new(0.0, 1.0),
                     Vector2::new(1.0, 1.0),
-                    Vector2::new(1.0, 0.0),
                     Vector2::new(0.0, 0.0),
+                    Vector2::new(1.0, 0.0),
                 ],
                 0,
             );
@@ -536,8 +536,8 @@ impl Common {
                 [
                     Vector2::new(0.0, 0.0),
                     Vector2::new(1.0, 0.0),
-                    Vector2::new(1.0, 1.0),
                     Vector2::new(0.0, 1.0),
+                    Vector2::new(1.0, 1.0),
                 ],
                 1,
             ),
@@ -545,8 +545,8 @@ impl Common {
                 [
                     Vector2::new(1.0, 0.0),
                     Vector2::new(0.0, 0.0),
-                    Vector2::new(0.0, 1.0),
                     Vector2::new(1.0, 1.0),
+                    Vector2::new(0.0, 1.0),
                 ],
                 1,
             ),
@@ -554,8 +554,8 @@ impl Common {
                 [
                     Vector2::new(0.0, 0.0),
                     Vector2::new(0.0, 1.0),
-                    Vector2::new(1.0, 1.0),
                     Vector2::new(1.0, 0.0),
+                    Vector2::new(1.0, 1.0),
                 ],
                 1,
             ),
@@ -563,8 +563,8 @@ impl Common {
                 [
                     Vector2::new(1.0, 0.0),
                     Vector2::new(1.0, 1.0),
-                    Vector2::new(0.0, 1.0),
                     Vector2::new(0.0, 0.0),
+                    Vector2::new(0.0, 1.0),
                 ],
                 1,
             ),
@@ -572,8 +572,8 @@ impl Common {
                 [
                     Vector2::new(0.0, 1.0),
                     Vector2::new(0.0, 0.0),
-                    Vector2::new(1.0, 0.0),
                     Vector2::new(1.0, 1.0),
+                    Vector2::new(1.0, 0.0),
                 ],
                 2,
             ),
@@ -581,8 +581,8 @@ impl Common {
                 [
                     Vector2::new(0.0, 0.0),
                     Vector2::new(0.0, 1.0),
-                    Vector2::new(1.0, 1.0),
                     Vector2::new(1.0, 0.0),
+                    Vector2::new(1.0, 1.0),
                 ],
                 2,
             ),
@@ -590,8 +590,8 @@ impl Common {
                 [
                     Vector2::new(1.0, 1.0),
                     Vector2::new(1.0, 0.0),
-                    Vector2::new(0.0, 0.0),
                     Vector2::new(0.0, 1.0),
+                    Vector2::new(0.0, 0.0),
                 ],
                 2,
             ),
@@ -599,8 +599,8 @@ impl Common {
                 [
                     Vector2::new(1.0, 0.0),
                     Vector2::new(1.0, 1.0),
-                    Vector2::new(0.0, 1.0),
                     Vector2::new(0.0, 0.0),
+                    Vector2::new(0.0, 1.0),
                 ],
                 2,
             ),
@@ -634,21 +634,25 @@ impl Common {
                 arrival_position.y as f32 * GAT_TILE_SIZE,
             );
 
-            let first_position = Point3::new(offset.x, tile.upper_left_height + PATHING_MESH_OFFSET, offset.y);
+            let first_position = Point3::new(offset.x, tile.southwest_corner_height + PATHING_MESH_OFFSET, offset.y);
             let second_position = Point3::new(
                 offset.x + GAT_TILE_SIZE,
-                tile.upper_right_height + PATHING_MESH_OFFSET,
+                tile.southeast_corner_height + PATHING_MESH_OFFSET,
                 offset.y,
             );
             let third_position = Point3::new(
-                offset.x + GAT_TILE_SIZE,
-                tile.lower_right_height + PATHING_MESH_OFFSET,
+                offset.x,
+                tile.northwest_corner_height + PATHING_MESH_OFFSET,
                 offset.y + GAT_TILE_SIZE,
             );
-            let fourth_position = Point3::new(offset.x, tile.lower_left_height + PATHING_MESH_OFFSET, offset.y + GAT_TILE_SIZE);
+            let fourth_position = Point3::new(
+                offset.x + GAT_TILE_SIZE,
+                tile.northeast_corner_height + PATHING_MESH_OFFSET,
+                offset.y + GAT_TILE_SIZE,
+            );
 
             let first_normal = NativeModelVertex::calculate_normal(first_position, second_position, third_position);
-            let second_normal = NativeModelVertex::calculate_normal(fourth_position, first_position, third_position);
+            let second_normal = NativeModelVertex::calculate_normal(third_position, second_position, fourth_position);
 
             let (texture_coordinates, texture_index) = Self::pathing_texture_coordinates(&active_movement.steps, arrival_position, index);
 
@@ -684,18 +688,18 @@ impl Common {
 
             if let Some(second_normal) = second_normal {
                 pathing_native_vertices.push(NativeModelVertex::new(
-                    first_position,
+                    third_position,
                     second_normal,
-                    texture_coordinates[0],
+                    texture_coordinates[2],
                     texture_index,
                     mesh_color,
                     0.0,
                     smallvec_inline![0; 3],
                 ));
                 pathing_native_vertices.push(NativeModelVertex::new(
-                    third_position,
+                    second_position,
                     second_normal,
-                    texture_coordinates[2],
+                    texture_coordinates[1],
                     texture_index,
                     mesh_color,
                     0.0,

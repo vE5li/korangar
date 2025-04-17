@@ -86,8 +86,7 @@ impl MapLoader {
         #[cfg(not(feature = "debug"))]
         let (_, _, tile_picker_vertices, tile_picker_indices) = generate_tile_vertices(&mut gat_data);
 
-        let (mut model_vertices, mut model_indices, mut ground_texture_transparencies) =
-            ground_vertices(&ground_data, &mut texture_set_builder);
+        let (mut model_vertices, mut model_indices, ground_textures) = ground_vertices(&ground_data, &mut texture_set_builder);
 
         // TODO: NHA Support reading water planes from GND files (version >= 2.6).
         let water_plane = generate_water_plane(
@@ -110,10 +109,9 @@ impl MapLoader {
                 }]
             }
             BindlessSupport::None => {
-                let ground_texture_transparencies = ground_texture_transparencies
-                    .drain(..)
-                    .enumerate()
-                    .map(|(index, transparent)| (index as i32, transparent))
+                let ground_texture_transparencies = ground_textures
+                    .iter()
+                    .map(|textures| (textures.index, textures.is_transparent))
                     .collect();
                 split_mesh_by_texture(
                     &model_vertices,

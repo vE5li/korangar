@@ -15,7 +15,7 @@ use ragnarok_formats::version::InternalVersion;
 use smallvec::SmallVec;
 
 use super::error::LoadError;
-use super::{FALLBACK_MODEL_FILE, TextureSetBuilder, smooth_model_normals};
+use super::{FALLBACK_MODEL_FILE, TextureSetBuilder, TextureSetTexture, smooth_model_normals};
 use crate::graphics::{BindlessSupport, Color, ModelVertex, NativeModelVertex, reduce_vertices};
 use crate::loaders::GameFileLoader;
 use crate::world::{Model, Node, SubMesh};
@@ -246,7 +246,7 @@ impl ModelLoader {
             })
             .collect();
 
-        let node_textures: Vec<ModelTexture> = match texture_mapping {
+        let node_textures: Vec<TextureSetTexture> = match texture_mapping {
             TextureMapping::PreVersion2_3(vector_texture) => current_node
                 .texture_indices
                 .iter()
@@ -259,13 +259,11 @@ impl ModelLoader {
                 .collect(),
         };
 
-        let node_texture_mapping: Vec<i32> = node_textures.iter().map(|texture| texture.index).collect();
-
         let node_native_vertices = Self::make_vertices(current_node, &main_matrix, reverse_order, smooth_normals);
 
         let centroid = Self::calculate_centroid(&node_native_vertices);
 
-        let node_vertices = NativeModelVertex::convert_to_model_vertices(node_native_vertices, Some(&node_texture_mapping));
+        let node_vertices = NativeModelVertex::convert_to_model_vertices(node_native_vertices, Some(&node_textures));
         let (node_vertices, mut node_indices) = reduce_vertices(&node_vertices);
 
         // Apply the frames per second on the keyframes values.
@@ -328,7 +326,7 @@ impl ModelLoader {
                         index_count,
                         base_vertex,
                         texture_index: 0,
-                        transparent: node_textures.iter().any(|texture| texture.transparent),
+                        transparent: node_textures.iter().any(|texture| texture.is_transparent),
                     }],
                     child_nodes,
                     animation_length,
@@ -338,8 +336,10 @@ impl ModelLoader {
                 )
             }
             BindlessSupport::None => {
-                let texture_transparencies: HashMap<i32, bool> =
-                    node_textures.iter().map(|texture| (texture.index, texture.transparent)).collect();
+                let texture_transparencies: HashMap<i32, bool> = node_textures
+                    .iter()
+                    .map(|texture| (texture.index, texture.is_transparent))
+                    .collect();
 
                 let submeshes = split_mesh_by_texture(
                     &node_vertices,
@@ -518,18 +518,15 @@ impl ModelLoader {
 
         let texture_names = ModelLoader::collect_versioned_texture_names(&version, &model_data);
 
-        let model_textures: Vec<ModelTexture> = texture_names
+        let model_textures: Vec<TextureSetTexture> = texture_names
             .iter()
-            .map(|texture_name| {
-                let (index, transparent) = texture_set_builder.register(texture_name.as_ref());
-                ModelTexture { index, transparent }
-            })
+            .map(|texture_name| texture_set_builder.register(texture_name.as_ref()))
             .collect();
 
         let texture_mapping = match version.equals_or_above(2, 3) {
             true => {
                 let model_textures =
-                    HashMap::<String, ModelTexture>::from_iter(texture_names.into_iter().zip(model_textures.iter().copied()));
+                    HashMap::<String, TextureSetTexture>::from_iter(texture_names.into_iter().zip(model_textures.iter().copied()));
                 TextureMapping::PostVersion2_3(model_textures)
             }
             false => TextureMapping::PreVersion2_3(model_textures),
@@ -695,13 +692,7 @@ pub fn split_mesh_by_texture(
     submeshes
 }
 
-#[derive(Copy, Clone)]
-struct ModelTexture {
-    index: i32,
-    transparent: bool,
-}
-
 enum TextureMapping {
-    PreVersion2_3(Vec<ModelTexture>),
-    PostVersion2_3(HashMap<String, ModelTexture>),
+    PreVersion2_3(Vec<TextureSetTexture>),
+    PostVersion2_3(HashMap<String, TextureSetTexture>),
 }

@@ -3,6 +3,7 @@ use derive_new::new;
 use smallvec::{SmallVec, smallvec_inline};
 
 use crate::graphics::{Color, ModelVertex};
+use crate::loaders::TextureSetTexture;
 
 #[derive(Clone, new)]
 pub struct NativeModelVertex {
@@ -39,13 +40,16 @@ impl NativeModelVertex {
         )
     }
 
-    pub fn convert_to_model_vertices(mut native_vertices: Vec<NativeModelVertex>, texture_mapping: Option<&[i32]>) -> Vec<ModelVertex> {
+    pub fn convert_to_model_vertices(
+        mut native_vertices: Vec<NativeModelVertex>,
+        texture_mapping: Option<&[TextureSetTexture]>,
+    ) -> Vec<ModelVertex> {
         match texture_mapping {
             None => native_vertices.drain(..).map(|vertex| vertex.into_model_vertex()).collect(),
             Some(texture_mapping) => native_vertices
                 .drain(..)
                 .map(|mut vertex| {
-                    vertex.texture_index = texture_mapping[vertex.texture_index as usize];
+                    vertex.texture_index = texture_mapping[vertex.texture_index as usize].index;
                     vertex.into_model_vertex()
                 })
                 .collect(),

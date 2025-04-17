@@ -798,10 +798,20 @@ impl TextureSetBuilder {
     }
 
     #[must_use]
-    pub fn register(&mut self, path: &str) -> (i32, bool) {
+    pub fn register(&mut self, path: &str) -> TextureSetTexture {
         if let Some(index) = self.lookup.get(path).copied() {
-            let is_transparent = self.textures[index as usize].is_transparent();
-            return (index, is_transparent);
+            let texture = &self.textures[index as usize];
+            let size = texture.get_size();
+            let width = size.width;
+            let height = size.height;
+            let is_transparent = texture.is_transparent();
+
+            return TextureSetTexture {
+                index,
+                width,
+                height,
+                is_transparent,
+            };
         }
 
         let texture;
@@ -818,13 +828,29 @@ impl TextureSetBuilder {
         }
 
         let index = i32::try_from(self.textures.len()).expect("texture set is full");
+        let size = texture.get_size();
+        let width = size.width;
+        let height = size.height;
         let is_transparent = texture.is_transparent();
 
         self.textures.push(texture);
         self.lookup.insert(path.to_string(), index);
 
-        (index, is_transparent)
+        TextureSetTexture {
+            index,
+            width,
+            height,
+            is_transparent,
+        }
     }
+}
+
+#[derive(Clone, Copy)]
+pub struct TextureSetTexture {
+    pub index: i32,
+    pub width: u32,
+    pub height: u32,
+    pub is_transparent: bool,
 }
 
 /// This function can be used for both uncompressed and compressed textures.

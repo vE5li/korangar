@@ -26,7 +26,7 @@ pub use self::model::*;
 pub use self::server::{ClientInfo, ServiceId, load_client_info};
 pub use self::smoothing::{smooth_ground_normals, smooth_model_normals};
 pub use self::sprite::*;
-pub use self::texture::{ImageType, TextureLoader, TextureSetBuilder};
+pub use self::texture::{ImageType, TextureLoader, TextureSetBuilder, TextureSetTexture};
 pub use self::video::VideoLoader;
 
 pub const FALLBACK_BMP_FILE: &str = "missing.bmp";

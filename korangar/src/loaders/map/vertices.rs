@@ -1,12 +1,12 @@
 use cgmath::{Point3, Vector2};
-use ragnarok_formats::map::{GatData, GroundData, GroundTile, SurfaceType};
+use ragnarok_formats::map::{GatData, GroundData, GroundTile, Surface, SurfaceType};
 use smallvec::smallvec_inline;
 
 #[cfg(feature = "debug")]
 use crate::graphics::Color;
 use crate::graphics::{ModelVertex, NativeModelVertex, PickerTarget, TileVertex, reduce_vertices};
 use crate::loaders::map::{GAT_TILE_SIZE, GROUND_TILE_SIZE};
-use crate::loaders::{TextureSetBuilder, smooth_ground_normals};
+use crate::loaders::{TextureSetBuilder, TextureSetTexture, smooth_ground_normals};
 
 #[derive(Copy, Clone, Debug)]
 pub enum Heights {
@@ -16,7 +16,16 @@ pub enum Heights {
     NorthEast,
 }
 
-pub fn ground_vertices(ground_data: &GroundData, texture_set_builder: &mut TextureSetBuilder) -> (Vec<ModelVertex>, Vec<u32>, Vec<bool>) {
+pub fn ground_vertices(
+    ground_data: &GroundData,
+    texture_set_builder: &mut TextureSetBuilder,
+) -> (Vec<ModelVertex>, Vec<u32>, Vec<TextureSetTexture>) {
+    let ground_textures: Vec<TextureSetTexture> = ground_data
+        .textures
+        .iter()
+        .map(|texture| texture_set_builder.register(texture))
+        .collect();
+
     let mut ground_vertices = Vec::new();
 
     let width = ground_data.width as usize;
@@ -76,10 +85,8 @@ pub fn ground_vertices(ground_data: &GroundData, texture_set_builder: &mut Textu
 
             let ground_surface = &ground_data.surfaces[surface_index as usize];
 
-            let first_texture_coordinates = Vector2::new(ground_surface.u[0], ground_surface.v[0]);
-            let second_texture_coordinates = Vector2::new(ground_surface.u[1], ground_surface.v[1]);
-            let third_texture_coordinates = Vector2::new(ground_surface.u[2], ground_surface.v[2]);
-            let fourth_texture_coordinates = Vector2::new(ground_surface.u[3], ground_surface.v[3]);
+            let (first_texture_coordinates, second_texture_coordinates, third_texture_coordinates, fourth_texture_coordinates) =
+                map_texture_coordinates(&ground_textures, ground_surface);
 
             let neighbor_color = |x_offset: usize, y_offset: usize| {
                 let Some(neighbor_tile) = ground_tiles.get(tile_x + x_offset + (tile_y + y_offset) * width) else {
@@ -161,19 +168,49 @@ pub fn ground_vertices(ground_data: &GroundData, texture_set_builder: &mut Textu
         }
     }
 
-    let (ground_texture_mapping, ground_texture_transparencies): (Vec<i32>, Vec<bool>) = ground_data
-        .textures
-        .iter()
-        .map(|texture| texture_set_builder.register(texture))
-        .unzip();
-
     smooth_ground_normals(&mut ground_vertices);
 
-    let vertices = NativeModelVertex::convert_to_model_vertices(ground_vertices, Some(&ground_texture_mapping));
+    let vertices = NativeModelVertex::convert_to_model_vertices(ground_vertices, Some(&ground_textures));
 
     let (reduced_vertices, indices) = reduce_vertices(&vertices);
 
-    (reduced_vertices, indices, ground_texture_transparencies)
+    (reduced_vertices, indices, ground_textures)
+}
+
+/// Linear mapping to inset texture coordinates by half a pixel on each edge to
+/// counter texture bleeding.
+fn map_texture_coordinates(
+    ground_textures: &[TextureSetTexture],
+    ground_surface: &Surface,
+) -> (Vector2<f32>, Vector2<f32>, Vector2<f32>, Vector2<f32>) {
+    let texture = ground_textures[ground_surface.texture_index as usize];
+
+    let half_pixel_width = 0.5 / texture.width as f32;
+    let half_pixel_height = 0.5 / texture.height as f32;
+
+    let first_texture_coordinates = Vector2::new(
+        half_pixel_width + ground_surface.u[0] * (1.0 - 2.0 * half_pixel_width),
+        half_pixel_height + ground_surface.v[0] * (1.0 - 2.0 * half_pixel_height),
+    );
+    let second_texture_coordinates = Vector2::new(
+        half_pixel_width + ground_surface.u[1] * (1.0 - 2.0 * half_pixel_width),
+        half_pixel_height + ground_surface.v[1] * (1.0 - 2.0 * half_pixel_height),
+    );
+    let third_texture_coordinates = Vector2::new(
+        half_pixel_width + ground_surface.u[2] * (1.0 - 2.0 * half_pixel_width),
+        half_pixel_height + ground_surface.v[2] * (1.0 - 2.0 * half_pixel_height),
+    );
+    let fourth_texture_coordinates = Vector2::new(
+        half_pixel_width + ground_surface.u[3] * (1.0 - 2.0 * half_pixel_width),
+        half_pixel_height + ground_surface.v[3] * (1.0 - 2.0 * half_pixel_height),
+    );
+
+    (
+        first_texture_coordinates,
+        second_texture_coordinates,
+        third_texture_coordinates,
+        fourth_texture_coordinates,
+    )
 }
 
 pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<u32>, Vec<TileVertex>, Vec<u32>) {

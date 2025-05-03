@@ -73,9 +73,12 @@ use ragnarok_packets::{
     SellItemsResult, SkillId, SkillType, TilePosition, UnitId, WorldPosition,
 };
 use renderer::InterfaceRenderer;
-use rust_state::{Context, RustState};
+use rust_state::{Context, Path, RustState};
 use settings::{AudioSettings, AudioSettingsPathExt, GraphicsSettingsPathExt};
-use state::{ClientState, ClientStatePathExt, ClientStateRootExt, ClientTheme, DefaultGame, DefaultMenu, LoginWindowState, ThemeDefault};
+use state::{
+    ClientState, ClientStatePathExt, ClientStateRootExt, ClientTheme, DefaultGame, DefaultMenu, LoginWindowState, ThemeDefault,
+    client_state,
+};
 #[cfg(feature = "debug")]
 use wgpu::Device;
 use wgpu::util::initialize_adapter_from_env_or_default;
@@ -217,6 +220,10 @@ mod state {
     use crate::settings::LoginSettings;
     use crate::world::ResourceMetadata;
     use crate::{AudioSettings, ChatMessage, GraphicsSettings};
+
+    pub(super) fn client_state() -> impl Path<ClientState, ClientState> {
+        ClientState::path()
+    }
 
     // TODO: Make all of these private and load them internally
     #[derive(RustState)]
@@ -455,7 +462,7 @@ mod state {
         type ThemeType = ClientThemeType;
 
         // fn get_scaling_path() -> impl Path<Self, Scaling> {
-        //     ClientState::path().interface_scale()
+        //     client_state().interface_scale()
         // }
 
         fn set_current_theme_type(theme: ClientThemeType) {
@@ -1178,7 +1185,7 @@ impl Client {
         // TODO: NHA We want to have an event or a remote setting that the scaling
         //       changed.
 
-        let scaling = *self.client_state.get(&ClientState::path().interface_scale());
+        let scaling = *self.client_state.get(&client_state().interface_scale());
         self.bottom_interface_renderer.update_scaling(scaling);
         self.middle_interface_renderer.update_scaling(scaling);
         self.top_interface_renderer.update_scaling(scaling);
@@ -1237,13 +1244,11 @@ impl Client {
                     self.saved_login_data = Some(login_data);
 
                     self.client_state
-                        .update_value(ClientState::path().character_servers(), character_servers);
+                        .update_value(client_state().character_servers(), character_servers);
 
                     self.interface.close_all_windows_except();
-                    self.interface.open_window(
-                        &self.client_state,
-                        SelectServerWindow::new(ClientState::path().character_servers()),
-                    );
+                    self.interface
+                        .open_window(&self.client_state, SelectServerWindow::new(client_state().character_servers()));
                 }
                 NetworkEvent::LoginServerConnectionFailed { message, .. } => {
                     self.networking_system.disconnect_from_login_server();
@@ -1262,8 +1267,7 @@ impl Client {
                     }
                 }
                 NetworkEvent::CharacterServerConnected { normal_slot_count } => {
-                    self.client_state
-                        .update_value(ClientState::path().saved_slot_count(), normal_slot_count);
+                    self.client_state.update_value(client_state().saved_slot_count(), normal_slot_count);
                     let _ = self.networking_system.request_character_list();
                 }
                 NetworkEvent::CharacterServerConnectionFailed { message, .. } => {
@@ -1324,7 +1328,7 @@ impl Client {
                 NetworkEvent::CharacterList { characters } => {
                     self.audio_engine.play_sound_effect(self.main_menu_click_sound_effect);
 
-                    self.client_state.update_value(ClientState::path().saved_characters(), characters);
+                    self.client_state.update_value(client_state().saved_characters(), characters);
 
                     // TODO: this will do one unnecessary restore_focus. check
                     // if that will be problematic
@@ -1332,9 +1336,9 @@ impl Client {
                     self.interface.open_window(
                         &self.client_state,
                         CharacterSelectionWindow::new(
-                            ClientState::path().saved_characters(),
-                            ClientState::path().move_request(),
-                            ClientState::path().saved_slot_count(),
+                            client_state().saved_characters(),
+                            client_state().move_request(),
+                            client_state().saved_slot_count(),
                         ),
                     );
                 }
@@ -1363,7 +1367,7 @@ impl Client {
 
                     let character_information = self
                         .client_state
-                        .get(&ClientState::path().saved_characters())
+                        .get(&client_state().saved_characters())
                         .iter()
                         .find(|character| character.character_id == login_data.character_id)
                         .cloned()
@@ -1397,7 +1401,7 @@ impl Client {
                     // self.interface.open_window(
                     //     &self.client_state,
                     //     &mut self.focus_state,
-                    //     &ChatWindow::new(ClientState::path().chat_messages(),
+                    //     &ChatWindow::new(client_state().chat_messages(),
                     // self.font_loader.clone()), );
                     // self.interface.open_window(
                     //     &self.client_state,
@@ -1521,7 +1525,7 @@ impl Client {
                 }
                 NetworkEvent::ChatMessage { text, color } => {
                     self.client_state
-                        .vec_push(ClientState::path().chat_messages(), ChatMessage { text, color });
+                        .vec_push(client_state().chat_messages(), ChatMessage { text, color });
                 }
                 NetworkEvent::UpdateEntityDetails(entity_id, name) => {
                     let entity = self.entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id);
@@ -1794,7 +1798,7 @@ impl Client {
                         // BuyCartWindow::WINDOW_CLASS);
                     }
                     BuyShopItemsResult::Error => {
-                        self.client_state.vec_push(ClientState::path().chat_messages(), ChatMessage {
+                        self.client_state.vec_push(client_state().chat_messages(), ChatMessage {
                             text: "Failed to buy items".to_owned(),
                             color: MessageColor::Error,
                         });
@@ -1842,7 +1846,7 @@ impl Client {
                     // cart.clone()), );
                     // self.interface
                     //     .open_prototype_window(&self.client_state,
-                    // ClientState::path().sell_cart());
+                    // client_state().sell_cart());
                 }
                 NetworkEvent::SellingCompleted { result } => match result {
                     SellItemsResult::Success => {
@@ -1853,7 +1857,7 @@ impl Client {
                         // self.focus_state, "sell_cart");
                     }
                     SellItemsResult::Error => {
-                        self.client_state.vec_push(ClientState::path().chat_messages(), ChatMessage {
+                        self.client_state.vec_push(client_state().chat_messages(), ChatMessage {
                             text: "Failed to sell items".to_owned(),
                             color: MessageColor::Error,
                         });
@@ -1877,7 +1881,7 @@ impl Client {
                     username,
                     password,
                 } => {
-                    let client_info_path = ClientState::path().client_info().services();
+                    let client_info_path = client_state().client_info().services();
                     let service = self
                         .client_state
                         .get(&client_info_path)
@@ -1958,12 +1962,11 @@ impl Client {
                 }
                 UserEvent::OpenGraphicsSettingsWindow => self.interface.open_window(
                     &self.client_state,
-                    GraphicsSettingsWindow::new(ClientState::path().graphics_settings()),
+                    GraphicsSettingsWindow::new(client_state().graphics_settings()),
                 ),
-                UserEvent::OpenAudioSettingsWindow => self.interface.open_window(
-                    &self.client_state,
-                    AudioSettingsWindow::new(ClientState::path().audio_settings()),
-                ),
+                UserEvent::OpenAudioSettingsWindow => self
+                    .interface
+                    .open_window(&self.client_state, AudioSettingsWindow::new(client_state().audio_settings())),
                 UserEvent::OpenFriendsWindow => {
                     // self.interface.open_window(
                     //     &self.client_state,
@@ -2425,9 +2428,9 @@ impl Client {
                 #[cfg(feature = "debug")]
                 let update_shadow_camera_measurement = Profiler::start_measurement("update directional shadow camera");
 
-                let lighting_mode = *self.client_state.get(&ClientState::path().graphics_settings().lighting_mode());
-                let shadow_detail = *self.client_state.get(&ClientState::path().graphics_settings().shadow_detail());
-                let shadow_quality = *self.client_state.get(&ClientState::path().graphics_settings().shadow_quality());
+                let lighting_mode = *self.client_state.get(&client_state().graphics_settings().lighting_mode());
+                let shadow_detail = *self.client_state.get(&client_state().graphics_settings().shadow_detail());
+                let shadow_quality = *self.client_state.get(&client_state().graphics_settings().shadow_quality());
 
                 let shadow_map_size = shadow_detail.directional_shadow_resolution();
                 let ambient_light_color = map.ambient_light_color(lighting_mode, day_timer);
@@ -2469,7 +2472,7 @@ impl Client {
 
                 #[cfg(feature = "debug")]
                 let render_settings = &*self.render_settings.get();
-                let walk_indicator_color = *self.client_state.get(&ClientState::path().game_theme_2().indicator().walking());
+                let walk_indicator_color = *self.client_state.get(&client_state().game_theme_2().indicator().walking());
 
                 #[cfg(feature = "debug")]
                 let hovered_marker_identifier = match mouse_target {
@@ -2716,7 +2719,7 @@ impl Client {
                             entity.render_status(
                                 &self.middle_interface_renderer,
                                 current_camera,
-                                self.client_state.get(&ClientState::path().game_theme_2()),
+                                self.client_state.get(&client_state().game_theme_2()),
                                 screen_size,
                             );
 
@@ -2746,7 +2749,7 @@ impl Client {
                         self.entities[0].render_status(
                             &self.middle_interface_renderer,
                             current_camera,
-                            self.client_state.get(&ClientState::path().game_theme_2()),
+                            self.client_state.get(&client_state().game_theme_2()),
                             screen_size,
                         );
                     }
@@ -2771,8 +2774,8 @@ impl Client {
                             &self.top_interface_renderer,
                             mouse_position,
                             self.input_system.get_mouse_mode().grabbed(),
-                            *self.client_state.get(&ClientState::path().game_theme_2().cursor().color()),
-                            self.client_state.get(&ClientState::path().interface_scale()).get_factor(),
+                            *self.client_state.get(&client_state().game_theme_2().cursor().color()),
+                            self.client_state.get(&client_state().interface_scale()).get_factor(),
                         );
                     }
                 }
@@ -2863,7 +2866,7 @@ impl Client {
         // For some reason the interface buffer becomes messed up when
         // recreating the surface, so we need to render it again.
 
-        let graphics_settings = self.client_state.get(&ClientState::path().graphics_settings());
+        let graphics_settings = self.client_state.get(&client_state().graphics_settings());
 
         // if self.vsync.consume_changed() {
         //     self.graphics_engine.set_vsync(*self.vsync.get());
@@ -2944,7 +2947,7 @@ impl ApplicationHandler for Client {
         // Android devices need to drop the surface on suspend, so we might need to
         // re-create it.
         if let Some(window) = self.window.as_ref() {
-            let path = ClientState::path().graphics_settings();
+            let path = client_state().graphics_settings();
             let graphics_settings = self.client_state.get(&path);
 
             self.graphics_engine.on_resume(
@@ -2963,7 +2966,7 @@ impl ApplicationHandler for Client {
             window.set_visible(true);
         }
 
-        if *self.client_state.get(&ClientState::path().audio_settings().mute_on_focus_loss()) {
+        if *self.client_state.get(&client_state().audio_settings().mute_on_focus_loss()) {
             self.audio_engine.mute(false);
         }
     }
@@ -2993,7 +2996,7 @@ impl ApplicationHandler for Client {
                     // self.focus_state.remove_focus();
                 }
 
-                if *self.client_state.get(&ClientState::path().audio_settings().mute_on_focus_loss()) {
+                if *self.client_state.get(&client_state().audio_settings().mute_on_focus_loss()) {
                     self.audio_engine.mute(!focused);
                 }
             }
@@ -3033,7 +3036,7 @@ impl ApplicationHandler for Client {
             window.set_visible(false);
         }
 
-        if *self.client_state.get(&ClientState::path().audio_settings().mute_on_focus_loss()) {
+        if *self.client_state.get(&client_state().audio_settings().mute_on_focus_loss()) {
             self.audio_engine.mute(true);
         }
     }

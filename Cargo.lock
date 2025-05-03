@@ -2020,6 +2020,7 @@ dependencies = [
 [[package]]
 name = "macros"
 version = "0.1.0"
+source = "git+https://github.com/vE5li/rust_state#eb3da1b560a4c0c0fd3a223f662dd5fed40f3699"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3333,6 +3334,7 @@ checksum = "ad8388ea1a9e0ea807e442e8263a699e7edcb320ecbcd21b4fa8ff859acce3ba"
 [[package]]
 name = "rust_state"
 version = "0.1.0"
+source = "git+https://github.com/vE5li/rust_state#eb3da1b560a4c0c0fd3a223f662dd5fed40f3699"
 dependencies = [
  "macros",
 ]

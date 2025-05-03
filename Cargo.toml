@@ -50,8 +50,7 @@ rav1d = { version = "1", git = "https://github.com/memorysafety/rav1d", rev = "f
 rayon = "1"
 reqwest = "0.12"
 ron = "0.9"
-# rust_state = { git = "https://github.com/vE5li/rust_state" }
-rust_state = { path = "/home/lucas/projects/rust_state" }
+rust_state = { git = "https://github.com/vE5li/rust_state" }
 serde = "1"
 sevenz-rust2 = { version = "0.13", default-features = false }
 smallvec = "1"

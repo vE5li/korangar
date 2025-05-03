@@ -1387,7 +1387,12 @@ impl Client {
                     self.entities.push(player);
 
                     // TODO: Don't hardcode
-                    self.interface.close_window_with_class("character_selection");
+                    // FIX: Use this
+                    // self.interface.close_window_with_class("character_selection");
+
+                    // FIX: Remove
+                    self.interface.close_all_windows_except();
+
                     self.interface.open_window(&self.client_state, CharacterOverviewWindow::new());
                     // self.interface.open_window(
                     //     &self.client_state,

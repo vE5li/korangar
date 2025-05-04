@@ -792,6 +792,8 @@ pub struct Player {
     pub activity_points: usize,
     pub maximum_spell_points: usize,
     pub maximum_activity_points: usize,
+    pub base_level: usize,
+    pub job_level: usize,
 }
 
 impl Player {
@@ -804,6 +806,8 @@ impl Player {
         let activity_points = 0;
         let maximum_spell_points = character_information.maximum_spell_points as usize;
         let maximum_activity_points = 0;
+        let base_level = character_information.level as usize;
+        let job_level = character_information.job_level as usize;
 
         let entity_data = EntityData::from_character(account_id, character_information, WorldPosition::origin());
         let grid_position = Vector2::zero();
@@ -818,6 +822,8 @@ impl Player {
             activity_points,
             maximum_spell_points,
             maximum_activity_points,
+            base_level,
+            job_level,
         }
     }
 

@@ -3,7 +3,7 @@
 // mod hotbar;
 // mod inventory;
 mod overview;
-// mod respawn;
+mod respawn;
 mod selection;
 // mod skill_tree;
 
@@ -12,6 +12,6 @@ mod selection;
 // pub use self::hotbar::HotbarWindow;
 // pub use self::inventory::InventoryWindow;
 pub use self::overview::CharacterOverviewWindow;
-// pub use self::respawn::RespawnWindow;
+pub use self::respawn::RespawnWindow;
 pub use self::selection::CharacterSelectionWindow;
 // pub use self::skill_tree::SkillTreeWindow;

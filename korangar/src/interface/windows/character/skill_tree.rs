@@ -25,7 +25,7 @@ impl SkillTreeWindow {
 
 impl PrototypeWindow<InterfaceSettings> for SkillTreeWindow {
     fn window_class(&self) -> Option<&str> {
-        Self::WINDOW_CLASS.into()
+        Some(Self::WINDOW_CLASS)
     }
 
     fn to_window(

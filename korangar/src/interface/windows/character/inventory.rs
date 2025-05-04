@@ -22,7 +22,7 @@ impl InventoryWindow {
 
 impl PrototypeWindow<InterfaceSettings> for InventoryWindow {
     fn window_class(&self) -> Option<&str> {
-        Self::WINDOW_CLASS.into()
+        Some(Self::WINDOW_CLASS)
     }
 
     fn to_window(

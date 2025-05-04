@@ -23,7 +23,7 @@ impl BuyWindow {
 
 impl PrototypeWindow<InterfaceSettings> for BuyWindow {
     fn window_class(&self) -> Option<&str> {
-        Self::WINDOW_CLASS.into()
+        Some(Self::WINDOW_CLASS)
     }
 
     fn to_window(

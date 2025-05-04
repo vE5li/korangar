@@ -25,7 +25,7 @@ where
     P: Path<ClientState, AudioSettings>,
 {
     fn window_class() -> Option<&'static str> {
-        Self::WINDOW_CLASS.into()
+        Some(Self::WINDOW_CLASS)
     }
 
     fn to_window<'a>(

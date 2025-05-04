@@ -18,7 +18,7 @@ impl CommandsWindow {
 
 impl PrototypeWindow<InterfaceSettings> for CommandsWindow {
     fn window_class(&self) -> Option<&str> {
-        Self::WINDOW_CLASS.into()
+        Some(Self::WINDOW_CLASS)
     }
 
     fn to_window(

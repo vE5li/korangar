@@ -2499,12 +2499,8 @@ impl Client {
                         .for_each(|entity| entity.update(&self.audio_engine, map, current_camera, client_tick));
                 }
 
-                match self.client_state.try_follow(this_player()).is_none() {
+                match self.client_state.try_follow(this_player()).is_some() {
                     true => {
-                        self.directional_shadow_camera
-                            .set_focus_point(self.start_camera.focus_point(), self.start_camera.view_direction());
-                    }
-                    false => {
                         // SAFETY
                         // `manually_asserted` is safe because we are in the branch where `this_player`
                         // is not `None`.
@@ -2512,6 +2508,10 @@ impl Client {
                         self.player_camera.set_smoothed_focus_point(player_position);
                         self.directional_shadow_camera
                             .set_focus_point(self.player_camera.focus_point(), self.player_camera.view_direction());
+                    }
+                    false => {
+                        self.directional_shadow_camera
+                            .set_focus_point(self.start_camera.focus_point(), self.start_camera.view_direction());
                     }
                 }
 

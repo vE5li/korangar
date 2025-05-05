@@ -50,6 +50,7 @@ use graphics::RenderSettings;
 use image::{EncodableLayout, ImageFormat, ImageReader};
 use interface::layout::CornerRadius;
 use interface::theme::{CursorThemePathExt, GameTheme, GameThemePathExt, IndicatorThemePathExt};
+use inventory::HotbarPathExt;
 use korangar_audio::{AudioEngine, SoundEffectKey};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, print_debug};
@@ -135,6 +136,8 @@ static ICON_DATA: &[u8] = include_bytes!("../archive/data/icon.png");
 /// CTR+C was sent, and the client is supposed to close.
 pub static SHUTDOWN_SIGNAL: LazyLock<AtomicBool> = LazyLock::new(|| AtomicBool::new(false));
 
+const DEBUG_WINDOWS: &[WindowClass] = &[];
+
 // Create the `threads` module.
 #[cfg(feature = "debug")]
 korangar_debug::create_profiler_threads!(threads, {
@@ -215,7 +218,8 @@ mod state {
     use crate::input::UserEvent;
     use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
     use crate::interface::theme::GameTheme;
-    use crate::interface::windows::WindowCache;
+    use crate::interface::windows::{WindowCache, WindowClass};
+    use crate::inventory::Hotbar;
     use crate::loaders::{ClientInfo, FontSize, Scaling, ServiceId};
     use crate::settings::LoginSettings;
     use crate::world::{Entity, Player, ResourceMetadata};
@@ -315,6 +319,8 @@ mod state {
         pub saved_slot_count: usize,
 
         pub entities: Vec<Entity>,
+
+        pub hotbar: Hotbar,
 
         pub audio_settings: AudioSettings,
         pub graphics_settings: GraphicsSettings,
@@ -518,6 +524,7 @@ mod state {
         type Size = ScreenSize;
         type ThemeGetter = ClientThemeGetter;
         type ThemeType = ClientThemeType;
+        type WindowClass = WindowClass;
 
         // fn get_scaling_path() -> impl Path<Self, Scaling> {
         //     client_state().interface_scale()
@@ -699,7 +706,6 @@ struct Client {
     effect_holder: EffectHolder,
     player_inventory: Inventory,
     player_skill_tree: SkillTree,
-    hotbar: Hotbar,
     path_finder: PathFinder,
 
     point_light_set_buffer: ResourceSetBuffer<LightSourceKey>,
@@ -1078,6 +1084,8 @@ impl Client {
 
             entities: Vec::new(),
 
+            hotbar,
+
             audio_settings,
 
             graphics_settings,
@@ -1149,7 +1157,6 @@ impl Client {
             effect_holder,
             player_inventory,
             player_skill_tree,
-            hotbar,
             path_finder,
             point_light_set_buffer,
             directional_shadow_object_set_buffer,
@@ -1292,7 +1299,7 @@ impl Client {
                     self.client_state
                         .update_value(client_state().character_servers(), character_servers);
 
-                    self.interface.close_all_windows_except();
+                    self.interface.close_all_windows_except(DEBUG_WINDOWS);
                     self.interface
                         .open_window(&self.client_state, SelectServerWindow::new(client_state().character_servers()));
                 }
@@ -1352,7 +1359,7 @@ impl Client {
 
                     self.audio_engine.play_background_music_track(None);
 
-                    self.interface.close_all_windows_except();
+                    self.interface.close_all_windows_except(DEBUG_WINDOWS);
 
                     self.async_loader
                         .request_map_load(DEFAULT_MAP.to_string(), Some(TilePosition::new(0, 0)));
@@ -1364,7 +1371,7 @@ impl Client {
                         .try_get(&this_entity())
                         .is_some_and(|player| player.get_entity_id() == entity_id)
                     {
-                        self.interface.close_window_with_class(RespawnWindow::WINDOW_CLASS);
+                        self.interface.close_window_with_class(WindowClass::Respawn);
                     }
                 }
                 NetworkEvent::PlayerStandUp { entity_id } => {
@@ -1385,7 +1392,7 @@ impl Client {
 
                     // TODO: this will do one unnecessary restore_focus. check
                     // if that will be problematic
-                    self.interface.close_all_windows_except();
+                    self.interface.close_all_windows_except(DEBUG_WINDOWS);
                     self.interface.open_window(
                         &self.client_state,
                         CharacterSelectionWindow::new(
@@ -1444,13 +1451,7 @@ impl Client {
 
                     self.client_state.vec_push(client_state().entities(), player);
 
-                    // TODO: Don't hardcode
-                    // FIX: Use this
-                    // self.interface.close_window_with_class("character_selection");
-
-                    // FIX: Remove
-                    self.interface.close_all_windows_except();
-
+                    self.interface.close_window_with_class(WindowClass::CharacterSelection);
                     self.interface.open_window(
                         &self.client_state,
                         CharacterOverviewWindow::new(
@@ -1468,11 +1469,8 @@ impl Client {
                     //     &mut self.focus_state,
                     //     &ChatWindow::new(client_state().chat_messages(),
                     // self.font_loader.clone()), );
-                    // self.interface.open_window(
-                    //     &self.client_state,
-                    //     &mut self.focus_state,
-                    //     &HotbarWindow::new(self.hotbar.get_skills()),
-                    // );
+                    self.interface
+                        .open_window(&self.client_state, HotbarWindow::new(client_state().hotbar().skills()));
 
                     // Put the dialog system in a well-defined state.
                     // self.dialog_system.close_dialog();
@@ -1847,14 +1845,21 @@ impl Client {
                         match hotkey {
                             HotkeyState::Bound(hotkey) => {
                                 let Some(mut skill) = self.player_skill_tree.find_skill(SkillId(hotkey.skill_id as u16)) else {
-                                    self.hotbar.clear_slot(&mut self.networking_system, HotbarSlot(index as u16));
+                                    self.client_state
+                                        .follow_mut(client_state().hotbar())
+                                        .clear_slot(&mut self.networking_system, HotbarSlot(index as u16));
                                     continue;
                                 };
 
                                 skill.skill_level = hotkey.quantity_or_skill_level;
-                                self.hotbar.set_slot(HotbarSlot(index as u16), skill);
+                                self.client_state
+                                    .follow_mut(client_state().hotbar())
+                                    .set_slot(HotbarSlot(index as u16), skill);
                             }
-                            HotkeyState::Unbound => self.hotbar.unset_slot(HotbarSlot(index as u16)),
+                            HotkeyState::Unbound => self
+                                .client_state
+                                .follow_mut(client_state().hotbar())
+                                .unset_slot(HotbarSlot(index as u16)),
                         }
                     }
                 }
@@ -2181,16 +2186,22 @@ impl Client {
                         skill,
                     } => match (source, destination) {
                         (SkillSource::SkillTree, SkillSource::Hotbar { slot }) => {
-                            self.hotbar.update_slot(&mut self.networking_system, slot, skill);
+                            self.client_state
+                                .follow_mut(client_state().hotbar())
+                                .update_slot(&mut self.networking_system, slot, skill);
                         }
                         (SkillSource::Hotbar { slot: source_slot }, SkillSource::Hotbar { slot: destination_slot }) => {
-                            self.hotbar.swap_slot(&mut self.networking_system, source_slot, destination_slot);
+                            self.client_state.follow_mut(client_state().hotbar()).swap_slot(
+                                &mut self.networking_system,
+                                source_slot,
+                                destination_slot,
+                            );
                         }
                         _ => {}
                     },
                 },
                 UserEvent::CastSkill(slot) => {
-                    if let Some(skill) = self.hotbar.get_skill_in_slot(slot).as_ref() {
+                    if let Some(skill) = self.client_state.follow(client_state().hotbar()).get_skill_in_slot(slot).as_ref() {
                         match skill.skill_type {
                             SkillType::Passive => {}
                             SkillType::Attack => {
@@ -2236,7 +2247,7 @@ impl Client {
                     }
                 }
                 UserEvent::StopSkill(slot) => {
-                    if let Some(skill) = self.hotbar.get_skill_in_slot(slot).as_ref() {
+                    if let Some(skill) = self.client_state.follow(client_state().hotbar()).get_skill_in_slot(slot).as_ref() {
                         if skill.skill_id == ROLLING_CUTTER_ID {
                             let _ = self.networking_system.stop_channeling_skill(skill.skill_id);
                         }
@@ -2892,6 +2903,10 @@ impl Client {
                     };
 
                     built_ui.render(&self.interface_renderer);
+
+                    if let Some(delta) = self.input_system.get_drag() {
+                        self.interface.handle_drag(delta);
+                    }
 
                     #[cfg(feature = "debug")]
                     if render_settings.show_frames_per_second {

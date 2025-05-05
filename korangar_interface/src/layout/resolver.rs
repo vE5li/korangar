@@ -33,6 +33,10 @@ impl Resolver {
         }
     }
 
+    pub fn available_width(&self) -> f32 {
+        self.available_area.width
+    }
+
     pub fn with_height(&mut self, height: f32) -> Area {
         self.push_gaps();
 

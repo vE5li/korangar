@@ -454,6 +454,40 @@ pub mod collapsable {
     }
 }
 
+pub mod split {
+    use rust_state::Context;
+
+    use crate::application::Appli;
+    use crate::element::id::ElementIdGenerator;
+    use crate::element::store::{ElementStore, Persistent, PersistentExt};
+    use crate::element::{Element, ElementSet};
+    use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
+    use crate::layout::area::Area;
+    use crate::layout::{Layout, Resolver};
+
+    pub struct Split<Children> {
+        pub children: Children,
+    }
+
+    impl<App, Children> Element<App> for Split<Children>
+    where
+        App: Appli,
+        Children: ElementSet<App>,
+    {
+        fn get_height(&self, state: &Context<App>, store: &ElementStore, generator: &mut ElementIdGenerator, resolver: &mut Resolver) {}
+
+        fn create_layout<'a>(
+            &'a self,
+            state: &'a Context<App>,
+            store: &'a ElementStore,
+            generator: &mut ElementIdGenerator,
+            resolver: &mut Resolver,
+            layout: &mut Layout<'a, App>,
+        ) {
+        }
+    }
+}
+
 pub mod scroll_view {
     use std::cell::RefCell;
 

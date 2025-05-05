@@ -7,7 +7,7 @@ use std::sync::Arc;
 use korangar_networking::{InventoryItem, InventoryItemDetails, NoMetadata};
 use ragnarok_packets::{EquipPosition, InventoryIndex, ItemId};
 
-pub use self::hotbar::Hotbar;
+pub use self::hotbar::{Hotbar, HotbarPathExt};
 pub use self::skills::{Skill, SkillTree};
 use crate::graphics::Texture;
 use crate::loaders::AsyncLoader;

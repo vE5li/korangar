@@ -4,19 +4,15 @@ use rust_state::Context;
 
 use crate::input::UserEvent;
 use crate::interface::layout::ScreenSize;
-use crate::interface::windows::WindowCache;
+use crate::interface::windows::{WindowCache, WindowClass};
 use crate::state::{ClientState, ClientThemeType};
 
 #[derive(Default)]
 pub struct RespawnWindow;
 
-impl RespawnWindow {
-    pub const WINDOW_CLASS: &'static str = "respawn";
-}
-
 impl CustomWindow<ClientState> for RespawnWindow {
-    fn window_class() -> Option<&'static str> {
-        Some(Self::WINDOW_CLASS)
+    fn window_class() -> Option<WindowClass> {
+        Some(WindowClass::Respawn)
     }
 
     fn to_window<'a>(
@@ -27,7 +23,7 @@ impl CustomWindow<ClientState> for RespawnWindow {
     ) -> impl WindowTrait<ClientState> + 'a {
         window! {
             title: "Respawn Menu",
-            window_id: 0,
+            class: Some(WindowClass::Respawn),
             theme: ClientThemeType::Game,
             elements: (
                 button! {

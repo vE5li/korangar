@@ -3,10 +3,11 @@ use std::cell::Ref;
 use korangar_networking::NetworkingSystem;
 use ragnarok_packets::handler::PacketCallback;
 use ragnarok_packets::{HotbarSlot, HotbarTab, HotkeyData};
+use rust_state::RustState;
 
 use super::Skill;
 
-#[derive(Default)]
+#[derive(Default, RustState)]
 pub struct Hotbar {
     skills: [Option<Skill>; 10],
 }

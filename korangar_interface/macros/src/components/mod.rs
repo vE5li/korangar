@@ -101,8 +101,8 @@ pub fn window(token_stream: proc_macro::TokenStream) -> proc_macro::TokenStream 
             "corner_radius",
             Some(parse_quote!(korangar_interface::theme::theme().window().corner_radius())),
         ),
+        ("class", Some(parse_quote!(None))),
         ("theme", None),
-        ("window_id", None),
         ("elements", None),
     ]);
 

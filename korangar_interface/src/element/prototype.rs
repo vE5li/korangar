@@ -338,6 +338,10 @@ where
             T: PrototypeElement<App> + 'static,
             P: Path<App, Vec<T>>,
         {
+            fn get_element_count(&self) -> usize {
+                unimplemented!("We need to take the state, store, genertor, and resolver here too to give the number of elements")
+            }
+
             fn get_height(&self, state: &Context<App>, store: &ElementStore, generator: &mut ElementIdGenerator, resolver: &mut Resolver) {
                 let vector = state.get(&self.self_path);
                 let item_boxes = unsafe { &mut *self.item_boxes.get() };

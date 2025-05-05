@@ -8,7 +8,7 @@ use crate::graphics::{
     LimitFramerate, Msaa, PresentModeInfo, ScreenSpaceAntiAliasing, ShadowDetail, ShadowQuality, Ssaa, TextureSamplerType,
 };
 use crate::interface::layout::ScreenSize;
-use crate::interface::windows::WindowCache;
+use crate::interface::windows::{WindowCache, WindowClass};
 use crate::settings::{GraphicsSettingsPathExt, LightingMode};
 use crate::state::{ClientState, ClientThemeType};
 
@@ -17,8 +17,6 @@ pub struct GraphicsSettingsWindow<P> {
 }
 
 impl<P> GraphicsSettingsWindow<P> {
-    pub const WINDOW_CLASS: &'static str = "graphics_settings";
-
     pub fn new(path: P) -> Self {
         Self { path }
     }
@@ -28,8 +26,8 @@ impl<P> CustomWindow<ClientState> for GraphicsSettingsWindow<P>
 where
     P: Path<ClientState, GraphicsSettings>,
 {
-    fn window_class() -> Option<&'static str> {
-        Some(Self::WINDOW_CLASS)
+    fn window_class() -> Option<WindowClass> {
+        Some(WindowClass::GraphicsSettings)
     }
 
     fn to_window<'a>(
@@ -187,8 +185,8 @@ where
 
         window! {
             title: "Graphics Settings",
+            class: Some(WindowClass::GraphicsSettings),
             theme: ClientThemeType::Menu,
-            window_id: 0,
             elements: elements,
         }
     }

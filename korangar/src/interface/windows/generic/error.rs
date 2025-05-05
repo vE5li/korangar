@@ -24,7 +24,6 @@ impl CustomWindow<ClientState> for ErrorWindow {
         window! {
             title: "Error",
             theme: ClientThemeType::Menu,
-            window_id: 0,
             elements: (text! {
                 text: self.message,
                 color: Color::rgb_u8(220, 100, 100)

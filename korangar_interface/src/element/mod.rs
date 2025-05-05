@@ -135,6 +135,8 @@ pub trait Element<App: Appli> {
 }
 
 pub trait ElementSet<App: Appli> {
+    fn get_element_count(&self) -> usize;
+
     fn get_height(&self, state: &Context<App>, store: &ElementStore, generator: &mut ElementIdGenerator, resolver: &mut Resolver);
 
     fn create_layout<'a>(
@@ -151,6 +153,10 @@ impl<App> ElementSet<App> for ()
 where
     App: Appli,
 {
+    fn get_element_count(&self) -> usize {
+        0
+    }
+
     fn get_height(&self, _: &Context<App>, _: &ElementStore, _: &mut ElementIdGenerator, _: &mut Resolver) {}
 
     fn create_layout<'a>(
@@ -169,6 +175,10 @@ where
     App: Appli,
     T: Element<App>,
 {
+    fn get_element_count(&self) -> usize {
+        N
+    }
+
     fn get_height(&self, state: &Context<App>, store: &ElementStore, generator: &mut ElementIdGenerator, resolver: &mut Resolver) {
         for index in 0..N {
             self[index].get_height(state, store.child_store(index as u64, generator), generator, resolver);
@@ -208,6 +218,10 @@ fn impl_element_set(up_to: usize) {
                 App: Appli,
                 {{bounds}}
             {
+                fn get_element_count(&self) -> usize {
+                    {{up_to}}
+                }
+
                 fn get_height(
                     &self,
                     state: &Context<App>,

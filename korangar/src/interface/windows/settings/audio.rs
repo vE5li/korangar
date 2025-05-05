@@ -3,7 +3,7 @@ use korangar_interface::window::{CustomWindow, PrototypeWindow, Window, WindowTr
 use rust_state::{Context, Path};
 
 use crate::interface::layout::ScreenSize;
-use crate::interface::windows::WindowCache;
+use crate::interface::windows::{WindowCache, WindowClass};
 use crate::settings::{AudioSettings, AudioSettingsPathExt};
 use crate::state::{ClientState, ClientThemeType};
 
@@ -13,8 +13,6 @@ pub struct AudioSettingsWindow<P> {
 }
 
 impl<P> AudioSettingsWindow<P> {
-    pub const WINDOW_CLASS: &'static str = "audio_settings";
-
     pub fn new(path: P) -> Self {
         Self { path }
     }
@@ -24,8 +22,8 @@ impl<P> CustomWindow<ClientState> for AudioSettingsWindow<P>
 where
     P: Path<ClientState, AudioSettings>,
 {
-    fn window_class() -> Option<&'static str> {
-        Some(Self::WINDOW_CLASS)
+    fn window_class() -> Option<WindowClass> {
+        Some(WindowClass::AudioSettings)
     }
 
     fn to_window<'a>(
@@ -38,8 +36,8 @@ where
 
         window! {
             title: "Audio Settings",
+            class: Some(WindowClass::AudioSettings),
             theme: ClientThemeType::Game,
-            window_id: 0,
             elements: (
                 state_button! {
                     text: "Mute audio on focus loss",

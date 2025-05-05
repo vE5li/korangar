@@ -3,19 +3,15 @@ use rust_state::Context;
 
 use crate::input::UserEvent;
 use crate::interface::layout::ScreenSize;
-use crate::interface::windows::WindowCache;
+use crate::interface::windows::{WindowCache, WindowClass};
 use crate::state::{ClientState, ClientThemeType};
 
 #[derive(Default)]
 pub struct MenuWindow;
 
-impl MenuWindow {
-    pub const WINDOW_CLASS: &'static str = "menu";
-}
-
 impl CustomWindow<ClientState> for MenuWindow {
-    fn window_class() -> Option<&'static str> {
-        Some(Self::WINDOW_CLASS)
+    fn window_class() -> Option<WindowClass> {
+        Some(WindowClass::Menu)
     }
 
     fn to_window<'a>(
@@ -103,7 +99,7 @@ impl CustomWindow<ClientState> for MenuWindow {
 
         window! {
             title: "Menu",
-            window_id: 0,
+            class: Some(WindowClass::Menu),
             theme: ClientThemeType::Game,
             elements: elements,
         }

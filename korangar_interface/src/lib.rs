@@ -29,7 +29,7 @@ use layout::Layout;
 use option_ext::OptionExt;
 use rust_state::Context;
 use window::store::WindowStore;
-use window::{CustomWindow, PrototypeWindow, WindowTrait};
+use window::{CustomWindow, PrototypeWindow, WindowData, WindowTrait};
 
 pub mod prelude {
     pub use interface_macros::{button, collapsable, scroll_view, state_button, text, text_box, window};
@@ -45,18 +45,28 @@ pub mod prelude {
     pub use crate::window::WindowThemePathExt;
 }
 
+// TODO: This will likely be renamed + Moved
+pub enum MouseMode {
+    Default,
+    MovingWindow { window_id: u64 },
+    ResizingWindow { window_id: u64 },
+}
+
 pub struct Interface<App>
 where
     App: Appli,
 {
-    windows: Vec<Box<dyn WindowTrait<App>>>,
+    windows: Vec<(Box<dyn WindowTrait<App>>, WindowData<App>)>,
     window_cache: App::Cache,
     available_space: App::Size,
 
     generator: ElementIdGenerator,
     window_store: WindowStore,
     focused_element: Option<ElementId>,
+    mouse_mode: MouseMode,
     event_queue: EventQueue<App>,
+
+    next_window_id: u64,
 }
 
 impl<App> Interface<App>
@@ -70,10 +80,14 @@ where
             windows: Vec::new(),
             window_cache,
             available_space,
+
             generator: ElementIdGenerator::new(),
             window_store: WindowStore::default(),
             focused_element: None,
+            mouse_mode: MouseMode::Default,
             event_queue: EventQueue::new(),
+
+            next_window_id: 0,
         }
     }
 
@@ -234,20 +248,29 @@ where
     // }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn move_window(&mut self, window_index: usize, offset: App::Position) {
-        if let Some((window_class, anchor)) = self.windows[window_index].offset(self.available_space, offset) {
-            self.window_cache.update_anchor(window_class, anchor);
-        }
-    }
+    pub fn handle_drag(&mut self, delta: App::Size) {
+        match self.mouse_mode {
+            MouseMode::Default => {}
+            MouseMode::MovingWindow { window_id } => {
+                if let Some((_, window_data)) = self.windows.iter_mut().find(|window| window.1.id == window_id) {
+                    window_data.position = App::Position::new(
+                        window_data.position.left() + delta.width(),
+                        window_data.position.top() + delta.height(),
+                    );
 
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn resize_window(&mut self, application: &App, window_index: usize, growth: App::Size) {
-        let window = &mut self.windows[window_index];
+                    // TODO: Update the window cache.
+                }
+            }
+            MouseMode::ResizingWindow { window_id } => {
+                if let Some((_, window_data)) = self.windows.iter_mut().find(|window| window.1.id == window_id) {
+                    window_data.size = App::Size::new(
+                        window_data.size.width() + delta.width(),
+                        window_data.size.height() + delta.height(),
+                    );
 
-        let (window_class, new_size) = window.resize(self.available_space, growth);
-
-        if let Some(window_class) = window_class {
-            self.window_cache.update_size(window_class, new_size);
+                    // TODO: Update the window cache.
+                }
+            }
         }
     }
 
@@ -283,12 +306,12 @@ where
     // }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile("check window exists"))]
-    fn window_exists(&self, window_class: Option<&str>) -> bool {
+    fn window_exists(&self, window_class: Option<App::WindowClass>) -> bool {
         match window_class {
             Some(window_class) => self
                 .windows
                 .iter()
-                .any(|window| window.get_window_class().is_some_and(|class| class == window_class)),
+                .any(|window| window.0.get_window_class().is_some_and(|class| class == window_class)),
             None => false,
         }
     }
@@ -297,11 +320,19 @@ where
         // TODO: `get_window_class` is already implemented on the prototype window,
         // should we really re-implement it for the Window trait too?
         if let Some(window_class) = window.get_window_class() {
-            let (anchor, size) = window.get_layout();
-            self.window_cache.register_window(window_class, anchor, size);
+            // let (anchor, size) = window.get_layout();
+            // self.window_cache.register_window(window_class, anchor, size);
         }
 
-        self.windows.push(Box::new(window));
+        let id = self.next_window_id;
+        // TODO: Actual logic to wrap around and adjust all window IDs.
+        self.next_window_id = self.next_window_id.wrapping_add(1);
+
+        self.windows.push((Box::new(window), WindowData {
+            id,
+            position: App::Position::new(200.0, 200.0),
+            size: App::Size::new(400.0, 500.0),
+        }));
         // focus_state.set_focused_window(self.windows.len() - 1);
     }
 
@@ -357,12 +388,12 @@ where
     // }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn close_window_with_class(&mut self, window_class: &str) {
+    pub fn close_window_with_class(&mut self, window_class: App::WindowClass) {
         if let Some(index_from_back) = self
             .windows
             .iter()
             .rev()
-            .map(|window| window.get_window_class())
+            .map(|(window, _)| window.get_window_class())
             .position(|class_option| class_option.contains(&window_class))
         {
             let index = self.windows.len() - 1 - index_from_back;
@@ -372,11 +403,12 @@ where
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn close_all_windows_except(&mut self) {
+    pub fn close_all_windows_except(&mut self, exceptions: &[App::WindowClass]) {
         for index in (0..self.windows.len()).rev() {
             if self.windows[index]
+                .0
                 .get_window_class()
-                .map(|class| class != "theme_viewer" && class != "profiler" && class != "network") // HACK: don't hardcode
+                .map(|class| !exceptions.contains(&class))
                 .unwrap_or(true)
             {
                 self.close_window(index);
@@ -391,16 +423,10 @@ where
         let layouts = self
             .windows
             .iter()
-            .map(|window| {
+            .map(|(window, window_data)| {
                 let mut layout = Layout::new(mouse_position, self.focused_element, !is_ui_hovered);
 
-                window.do_layout(
-                    state,
-                    &self.window_store,
-                    &mut self.generator,
-                    &mut layout,
-                    App::Position::new(100.0, 200.0),
-                );
+                window.do_layout(state, &self.window_store, window_data, &mut self.generator, &mut layout);
 
                 is_ui_hovered |= layout.is_hovered();
 
@@ -411,6 +437,7 @@ where
         BuiltUi {
             layouts,
             focused_element: &mut self.focused_element,
+            mouse_mode: &mut self.mouse_mode,
             event_queue: &mut self.event_queue,
         }
     }
@@ -471,6 +498,7 @@ where
 pub struct BuiltUi<'a, App: Appli> {
     layouts: Vec<Layout<'a, App>>,
     focused_element: &'a mut Option<ElementId>,
+    mouse_mode: &'a mut MouseMode,
     event_queue: &'a mut EventQueue<App>,
 }
 
@@ -489,7 +517,7 @@ impl<App: Appli> BuiltUi<'_, App> {
         let mut ui_clicked = false;
 
         for layout in &self.layouts {
-            if layout.do_click(state, self.event_queue, self.focused_element, click_position) {
+            if layout.do_click(state, self.event_queue, self.focused_element, self.mouse_mode, click_position) {
                 ui_clicked = true;
                 break;
             }

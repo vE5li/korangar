@@ -26,7 +26,7 @@ pub fn derive_prototype_window_struct(
     if let Some(impl_for) = impl_for {
         return quote! {
             impl #impl_generics korangar_interface::window::PrototypeWindow<#impl_for> for #name #type_generics #where_clause {
-                fn window_class() -> Option<&'static str> {
+                fn window_class() -> Option<<#impl_for as korangar_interface::application::Appli>::WindowClass> {
                     #window_class_ref_option
                 }
 
@@ -40,7 +40,6 @@ pub fn derive_prototype_window_struct(
                     window! {
                         title: #window_title.to_string(),
                         theme: <#impl_for as korangar_interface::application::Appli>::ThemeType::default(),
-                        window_id: 0,
                         elements: (scroll_view! { children: (#(#initializers,)*), height_bound: HeightBound::WithMax, }, )
                     }
                 }
@@ -51,7 +50,7 @@ pub fn derive_prototype_window_struct(
 
     quote! {
         impl<App: korangar_interface::application::Appli> #impl_generics korangar_interface::window::PrototypeWindow<App> for #name #type_generics #where_clause {
-            fn window_class() -> Option<&'static str> {
+            fn window_class() -> Option<App::WindowClass> {
                 #window_class_ref_option
             }
 
@@ -61,7 +60,6 @@ pub fn derive_prototype_window_struct(
                 window! {
                     title: #window_title.to_string(),
                     theme: App::ThemeType::default(),
-                    window_id: 0,
                     elements: (scroll_view! { children: (#(#initializers,)*), height_bound: HeightBound::WithMax, }, )
                 }
             }

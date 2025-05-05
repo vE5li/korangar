@@ -7,6 +7,7 @@ use korangar_interface::window::Anchor;
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 
+use super::WindowClass;
 use crate::interface::layout::ScreenSize;
 use crate::state::ClientState;
 
@@ -18,7 +19,7 @@ pub struct WindowState {
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct WindowCache {
-    entries: HashMap<String, WindowState>,
+    entries: HashMap<WindowClass, WindowState>,
 }
 
 impl WindowCache {
@@ -56,30 +57,30 @@ impl korangar_interface::application::WindowCache<ClientState> for WindowCache {
         })
     }
 
-    fn register_window(&mut self, identifier: &str, anchor: Anchor<ClientState>, size: ScreenSize) {
-        if let Some(entry) = self.entries.get_mut(identifier) {
+    fn register_window(&mut self, class: WindowClass, anchor: Anchor<ClientState>, size: ScreenSize) {
+        if let Some(entry) = self.entries.get_mut(&class) {
             entry.anchor = anchor;
             entry.size = size;
         } else {
             let entry = WindowState::new(anchor, size);
-            self.entries.insert(identifier.to_string(), entry);
+            self.entries.insert(class, entry);
         }
     }
 
-    fn update_anchor(&mut self, identifier: &str, anchor: Anchor<ClientState>) {
-        if let Some(entry) = self.entries.get_mut(identifier) {
+    fn update_anchor(&mut self, class: WindowClass, anchor: Anchor<ClientState>) {
+        if let Some(entry) = self.entries.get_mut(&class) {
             entry.anchor = anchor;
         }
     }
 
-    fn update_size(&mut self, identifier: &str, size: ScreenSize) {
-        if let Some(entry) = self.entries.get_mut(identifier) {
+    fn update_size(&mut self, class: WindowClass, size: ScreenSize) {
+        if let Some(entry) = self.entries.get_mut(&class) {
             entry.size = size;
         }
     }
 
-    fn get_window_state(&self, identifier: &str) -> Option<(Anchor<ClientState>, ScreenSize)> {
-        self.entries.get(identifier).map(|entry| (entry.anchor.clone(), entry.size))
+    fn get_window_state(&self, class: WindowClass) -> Option<(Anchor<ClientState>, ScreenSize)> {
+        self.entries.get(&class).map(|entry| (entry.anchor.clone(), entry.size))
     }
 }
 

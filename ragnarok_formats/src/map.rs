@@ -15,7 +15,7 @@ use crate::version::{InternalVersion, MajorFirst, Version};
 )]
 #[cfg_attr(feature = "interface", derive(korangar_interface::window::PrototypeWindow))]
 #[cfg_attr(feature = "interface", window_title("Map Viewer"))]
-#[cfg_attr(feature = "interface", window_class("map_viewer"))]
+// #[cfg_attr(feature = "interface", window_class("map_viewer"))]
 pub struct MapData {
     #[new_default]
     pub signature: Signature<b"GRSW">,

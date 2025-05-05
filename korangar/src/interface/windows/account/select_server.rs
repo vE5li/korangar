@@ -14,7 +14,7 @@ use rust_state::{Context, Path};
 
 use crate::input::UserEvent;
 use crate::interface::layout::ScreenSize;
-use crate::interface::windows::WindowCache;
+use crate::interface::windows::{WindowCache, WindowClass};
 use crate::loaders::ServiceId;
 use crate::state::{ClientState, ClientThemeType};
 
@@ -23,8 +23,6 @@ pub struct SelectServerWindow<P> {
 }
 
 impl<P> SelectServerWindow<P> {
-    pub const WINDOW_CLASS: &'static str = "service_server";
-
     pub fn new(path: P) -> Self {
         Self { path }
     }
@@ -34,8 +32,8 @@ impl<P> CustomWindow<ClientState> for SelectServerWindow<P>
 where
     P: Path<ClientState, Vec<CharacterServerInformation>>,
 {
-    fn window_class() -> Option<&'static str> {
-        Some(Self::WINDOW_CLASS)
+    fn window_class() -> Option<WindowClass> {
+        Some(WindowClass::SelectServer)
     }
 
     fn to_window<'a>(
@@ -94,6 +92,10 @@ where
         where
             P: Path<ClientState, Vec<CharacterServerInformation>>,
         {
+            fn get_element_count(&self) -> usize {
+                unimplemented!()
+            }
+
             fn get_height(
                 &self,
                 state: &Context<ClientState>,
@@ -138,7 +140,7 @@ where
 
         window! {
             title: "Select Server",
-            window_id: 0,
+            class: Some(WindowClass::SelectServer),
             theme: ClientThemeType::Menu,
             elements: ServerWrapper::new(self.path),
         }

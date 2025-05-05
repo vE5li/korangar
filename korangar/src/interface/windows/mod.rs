@@ -8,6 +8,8 @@ mod generic;
 mod settings;
 // mod shop;
 
+use serde::{Deserialize, Serialize};
+
 pub use self::account::*;
 pub use self::cache::WindowCache;
 pub use self::character::*;
@@ -17,3 +19,16 @@ pub use self::debug::*;
 pub use self::generic::*;
 pub use self::settings::*;
 // pub use self::shop::*;
+
+#[derive(Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
+pub enum WindowClass {
+    AudioSettings,
+    CharacterOverview,
+    CharacterSelection,
+    GraphicsSettings,
+    Hotbar,
+    Login,
+    Menu,
+    Respawn,
+    SelectServer,
+}

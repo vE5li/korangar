@@ -152,7 +152,6 @@ where
         window! {
             title: "Render Settings",
             theme: ClientThemeType::Game,
-            window_id: 0,
             elements: (scroll_view! { children: elements, height_bound: HeightBound::WithMax, }, )
         }
     }

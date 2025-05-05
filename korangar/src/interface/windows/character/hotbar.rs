@@ -1,42 +1,47 @@
-use derive_new::new;
-use korangar_interface::element::ElementWrap;
-use korangar_interface::size_bound;
-use korangar_interface::state::PlainRemote;
-use korangar_interface::window::{PrototypeWindow, Window, WindowBuilder};
+use korangar_interface::window::{CustomWindow, PrototypeWindow, Window, WindowTrait};
+use rust_state::{Context, Path};
 
-use crate::interface::application::InterfaceSettings;
-use crate::interface::elements::HotbarContainer;
+// use crate::interface::elements::HotbarContainer;
 use crate::interface::layout::ScreenSize;
-use crate::interface::windows::WindowCache;
+use crate::interface::windows::{WindowCache, WindowClass};
 use crate::inventory::Skill;
+use crate::state::{ClientState, ClientThemeType};
 
-#[derive(new)]
-pub struct HotbarWindow {
-    skills: PlainRemote<[Option<Skill>; 10]>,
+pub struct HotbarWindow<P, const N: usize> {
+    path: P,
 }
 
-impl HotbarWindow {
-    pub const WINDOW_CLASS: &'static str = "hotbar";
+impl<P, const N: usize> HotbarWindow<P, N> {
+    pub fn new(path: P) -> Self {
+        Self { path }
+    }
 }
 
-impl PrototypeWindow<InterfaceSettings> for HotbarWindow {
-    fn window_class(&self) -> Option<&str> {
-        Some(Self::WINDOW_CLASS)
+impl<P, const N: usize> CustomWindow<ClientState> for HotbarWindow<P, N>
+where
+    P: Path<ClientState, [Option<Skill>; N]>,
+{
+    fn window_class() -> Option<WindowClass> {
+        Some(WindowClass::Hotbar)
     }
 
-    fn to_window(
-        &self,
+    fn to_window<'a>(
+        self,
+        state: &Context<ClientState>,
         window_cache: &WindowCache,
-        application: &InterfaceSettings,
         available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
-        let elements = vec![HotbarContainer::new(self.skills.clone()).wrap()];
+    ) -> impl WindowTrait<ClientState> + 'a {
+        use korangar_interface::prelude::*;
 
-        WindowBuilder::new()
-            .with_title("Hotbar".to_string())
-            .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size_bound(size_bound!(300 > 400 < 500, ?))
-            .with_elements(elements)
-            .build(window_cache, application, available_space)
+        let elements = (text! {
+            text: "Fancy Hotbar",
+        },);
+
+        window! {
+            title: "Hotbar",
+            class: Some(WindowClass::Hotbar),
+            theme: ClientThemeType::Game,
+            elements: elements,
+        }
     }
 }

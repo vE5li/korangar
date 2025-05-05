@@ -1,6 +1,6 @@
 // mod creation;
 // mod equipment;
-// mod hotbar;
+mod hotbar;
 // mod inventory;
 mod overview;
 mod respawn;
@@ -9,7 +9,7 @@ mod selection;
 
 // pub use self::creation::CharacterCreationWindow;
 // pub use self::equipment::EquipmentWindow;
-// pub use self::hotbar::HotbarWindow;
+pub use self::hotbar::HotbarWindow;
 // pub use self::inventory::InventoryWindow;
 pub use self::overview::CharacterOverviewWindow;
 pub use self::respawn::RespawnWindow;

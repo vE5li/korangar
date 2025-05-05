@@ -7,7 +7,7 @@ use rust_state::{Context, Path, Selector};
 
 use crate::input::UserEvent;
 use crate::interface::layout::ScreenSize;
-use crate::interface::windows::WindowCache;
+use crate::interface::windows::{WindowCache, WindowClass};
 use crate::state::{ClientState, ClientThemeType};
 
 // TODO: Make this more generic and put it into korangar_interface.
@@ -57,8 +57,6 @@ pub struct CharacterOverviewWindow<P, L, J> {
 }
 
 impl<P, L, J> CharacterOverviewWindow<P, L, J> {
-    pub const WINDOW_CLASS: &'static str = "character_overview";
-
     pub fn new(player_name: P, base_level: L, job_level: J) -> Self {
         Self {
             player_name,
@@ -74,8 +72,8 @@ where
     L: Path<ClientState, usize>,
     J: Path<ClientState, usize>,
 {
-    fn window_class() -> Option<&'static str> {
-        Some(Self::WINDOW_CLASS)
+    fn window_class() -> Option<WindowClass> {
+        Some(WindowClass::CharacterOverview)
     }
 
     fn to_window<'a>(
@@ -120,8 +118,8 @@ where
 
         window! {
             title: "Character Overview",
+            class: Some(WindowClass::CharacterOverview),
             theme: ClientThemeType::Game,
-            window_id: 0,
             elements: elements,
         }
     }

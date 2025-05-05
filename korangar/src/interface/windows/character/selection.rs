@@ -12,7 +12,7 @@ use rust_state::{Context, Path, Selector};
 
 use crate::input::UserEvent;
 use crate::interface::layout::ScreenSize;
-use crate::interface::windows::WindowCache;
+use crate::interface::windows::{WindowCache, WindowClass};
 use crate::state::{ClientState, ClientThemeType};
 
 pub struct CharacterSelectionWindow<C, M, S> {
@@ -22,8 +22,6 @@ pub struct CharacterSelectionWindow<C, M, S> {
 }
 
 impl<C, M, S> CharacterSelectionWindow<C, M, S> {
-    pub const WINDOW_CLASS: &'static str = "character_selection";
-
     pub fn new(characters: C, move_request: M, slot_count: S) -> Self {
         Self {
             characters,
@@ -39,8 +37,8 @@ where
     M: Path<ClientState, Option<usize>>,
     S: Path<ClientState, usize>,
 {
-    fn window_class() -> Option<&'static str> {
-        Some(Self::WINDOW_CLASS)
+    fn window_class() -> Option<WindowClass> {
+        Some(WindowClass::CharacterSelection)
     }
 
     fn to_window<'a>(
@@ -143,6 +141,10 @@ where
             M: Path<ClientState, Option<usize>>,
             S: Path<ClientState, usize>,
         {
+            fn get_element_count(&self) -> usize {
+                unimplemented!()
+            }
+
             fn get_height(
                 &self,
                 state: &Context<ClientState>,
@@ -187,7 +189,7 @@ where
 
         window! {
             title: "Select Character",
-            window_id: 0,
+            class: Some(WindowClass::CharacterSelection),
             theme: ClientThemeType::Menu,
             elements: CharacterWrapper::new(self.characters, self.move_request, self.slot_count),
         }

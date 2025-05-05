@@ -19,6 +19,7 @@ pub trait Appli: Sized + 'static {
     type Position: PositionTrait;
     type Size: SizeTrait;
     type Clip: ClipTrait;
+    type WindowClass: PartialEq + Copy;
 
     type Event: Clone;
 
@@ -160,17 +161,7 @@ pub trait CornerRadiusTrait: Copy {
 // }
 
 // TODO: Rename
-#[cfg(not(feature = "serde"))]
 pub trait PositionTrait: Copy {
-    fn new(left: f32, top: f32) -> Self;
-
-    fn left(&self) -> f32;
-
-    fn top(&self) -> f32;
-}
-
-#[cfg(feature = "serde")]
-pub trait PositionTrait: Copy + serde::Serialize + for<'a> serde::Deserialize<'a> {
     fn new(left: f32, top: f32) -> Self;
 
     fn left(&self) -> f32;
@@ -258,17 +249,8 @@ pub trait PositionTrait: Copy + serde::Serialize + for<'a> serde::Deserialize<'a
 //     }
 // }
 
-#[cfg(not(feature = "serde"))]
+// TODO: Rename
 pub trait SizeTrait: Copy {
-    fn new(width: f32, height: f32) -> Self;
-
-    fn width(&self) -> f32;
-
-    fn height(&self) -> f32;
-}
-
-#[cfg(feature = "serde")]
-pub trait SizeTrait: Copy + serde::Serialize + for<'a> serde::Deserialize<'a> {
     fn new(width: f32, height: f32) -> Self;
 
     fn width(&self) -> f32;
@@ -419,13 +401,13 @@ where
 {
     fn create() -> Self;
 
-    fn register_window(&mut self, window_class: &str, anchor: Anchor<App>, size: App::Size);
+    fn register_window(&mut self, window_class: App::WindowClass, anchor: Anchor<App>, size: App::Size);
 
-    fn update_anchor(&mut self, window_class: &str, anchor: Anchor<App>);
+    fn update_anchor(&mut self, window_class: App::WindowClass, anchor: Anchor<App>);
 
-    fn update_size(&mut self, window_class: &str, size: App::Size);
+    fn update_size(&mut self, window_class: App::WindowClass, size: App::Size);
 
-    fn get_window_state(&self, window_class: &str) -> Option<(Anchor<App>, App::Size)>;
+    fn get_window_state(&self, window_class: App::WindowClass) -> Option<(Anchor<App>, App::Size)>;
 }
 
 // pub struct FocusState<App>

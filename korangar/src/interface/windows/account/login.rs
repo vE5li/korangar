@@ -8,12 +8,11 @@ use rust_state::{Context, ManuallyAssertExt, MapLookupExt, Path};
 use crate::graphics::Color;
 use crate::input::UserEvent;
 use crate::interface::layout::ScreenSize;
-use crate::interface::windows::WindowCache;
+use crate::interface::windows::{WindowCache, WindowClass};
 use crate::loaders::{ClientInfo, ClientInfoPathExt};
 use crate::settings::{LoginSettings, LoginSettingsPathExt, ServiceSettings, ServiceSettingsPathExt};
 use crate::state::{ClientState, ClientThemeType, LoginWindowState, LoginWindowStatePathExt};
 
-#[derive(new)]
 pub struct LoginWindow<P, S, C> {
     window_state_path: P,
     service_settings_path: S,
@@ -21,7 +20,13 @@ pub struct LoginWindow<P, S, C> {
 }
 
 impl<P, S, C> LoginWindow<P, S, C> {
-    pub const WINDOW_CLASS: &'static str = "login";
+    pub fn new(window_state_path: P, service_settings_path: S, client_info_path: C) -> Self {
+        Self {
+            window_state_path,
+            service_settings_path,
+            client_info_path,
+        }
+    }
 }
 
 impl<P, S, C> CustomWindow<ClientState> for LoginWindow<P, S, C>
@@ -30,8 +35,8 @@ where
     S: Path<ClientState, LoginSettings>,
     C: Path<ClientState, ClientInfo>,
 {
-    fn window_class() -> Option<&'static str> {
-        Some(Self::WINDOW_CLASS)
+    fn window_class() -> Option<WindowClass> {
+        Some(WindowClass::Login)
     }
 
     fn to_window<'a>(
@@ -138,7 +143,7 @@ where
 
         window! {
             title: "Log In",
-            window_id: 0,
+            class: Some(WindowClass::Login),
             theme: ClientThemeType::Menu,
             elements: (
                 text! { text: "Select service" },

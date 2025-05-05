@@ -8,6 +8,7 @@ use num::Signed;
 use rust_state::Context;
 
 pub use self::resolver::{HeightBound, Resolver};
+use crate::MouseMode;
 use crate::application::{Appli, ClipTrait, PositionTrait, RenderLayer, SizeTrait};
 use crate::element::id::ElementId;
 use crate::event::{ClickAction, EventQueue};
@@ -89,6 +90,12 @@ struct ClickArea<'a, App> {
     action: &'a dyn ClickAction<App>,
 }
 
+struct WindowArea {
+    clip_layer: ClipLayerId,
+    area: Area,
+    window_id: u64,
+}
+
 struct ScrollArea<'a> {
     clip_layer: ClipLayerId,
     area: Area,
@@ -118,6 +125,8 @@ struct LayoutLayer<'a, App: Appli> {
     texts: Vec<TextInstruction<'a, App>>,
     checkboxes: Vec<CheckboxInstruction<App>>,
     click_areas: Vec<ClickArea<'a, App>>,
+    window_move_areas: Vec<WindowArea>,
+    window_resize_areas: Vec<WindowArea>,
     scroll_areas: Vec<ScrollArea<'a>>,
     toggles: Vec<ToggleInstruction<'a>>,
     focus_areas: Vec<FocusArea>,
@@ -131,6 +140,8 @@ impl<App: Appli> Default for LayoutLayer<'_, App> {
             texts: Default::default(),
             checkboxes: Default::default(),
             click_areas: Default::default(),
+            window_move_areas: Default::default(),
+            window_resize_areas: Default::default(),
             scroll_areas: Default::default(),
             toggles: Default::default(),
             focus_areas: Default::default(),
@@ -204,7 +215,8 @@ impl<'a, App: Appli> Layout<'a, App> {
         self.can_hover = false;
     }
 
-    // TODO: Rename
+    // TODO: Just expose `can_hover` as `mouse_free` or something hand have the
+    // caller combine these themselves.
     pub fn is_area_hovered_and_active(&self, area: Area) -> bool {
         self.can_hover
             && self.mouse_position.left() >= area.x
@@ -275,6 +287,26 @@ impl<'a, App: Appli> Layout<'a, App> {
         self.layers[self.current_layer]
             .click_areas
             .push(ClickArea { clip_layer, area, action });
+    }
+
+    pub fn add_window_move_area(&mut self, area: Area, window_id: u64) {
+        let clip_layer = self.active_clip_layers.last().copied().unwrap();
+
+        self.layers[self.current_layer].window_move_areas.push(WindowArea {
+            clip_layer,
+            area,
+            window_id,
+        });
+    }
+
+    pub fn add_window_resize_area(&mut self, area: Area, window_id: u64) {
+        let clip_layer = self.active_clip_layers.last().copied().unwrap();
+
+        self.layers[self.current_layer].window_resize_areas.push(WindowArea {
+            clip_layer,
+            area,
+            window_id,
+        });
     }
 
     pub fn add_scroll_area(&mut self, area: Area, max_scroll: f32, cell: &'a RefCell<f32>) {
@@ -468,6 +500,7 @@ impl<'a, App: Appli> Layout<'a, App> {
         state: &Context<App>,
         queue: &mut EventQueue<App>,
         focused_element: &mut Option<ElementId>,
+        mouse_mode: &mut MouseMode,
         click_position: App::Position,
     ) -> bool {
         let mut clicked = false;
@@ -494,6 +527,36 @@ impl<'a, App: Appli> Layout<'a, App> {
                 {
                     let mut reference = toggle.cell.borrow_mut();
                     *reference = !*reference;
+                    clicked = true;
+                }
+            }
+
+            for window_move_area in &layer.window_move_areas {
+                // TODO: Check clip layer as well
+
+                if click_position.left() >= window_move_area.area.x
+                    && click_position.left() <= window_move_area.area.x + window_move_area.area.width
+                    && click_position.top() >= window_move_area.area.y
+                    && click_position.top() <= window_move_area.area.y + window_move_area.area.height
+                {
+                    *mouse_mode = MouseMode::MovingWindow {
+                        window_id: window_move_area.window_id,
+                    };
+                    clicked = true;
+                }
+            }
+
+            for window_resize_area in &layer.window_resize_areas {
+                // TODO: Check clip layer as well
+
+                if click_position.left() >= window_resize_area.area.x
+                    && click_position.left() <= window_resize_area.area.x + window_resize_area.area.width
+                    && click_position.top() >= window_resize_area.area.y
+                    && click_position.top() <= window_resize_area.area.y + window_resize_area.area.height
+                {
+                    *mouse_mode = MouseMode::ResizingWindow {
+                        window_id: window_resize_area.window_id,
+                    };
                     clicked = true;
                 }
             }

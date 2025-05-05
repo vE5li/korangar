@@ -8,7 +8,7 @@ pub trait PrototypeWindow<App>
 where
     App: Appli,
 {
-    fn window_class() -> Option<&'static str> {
+    fn window_class() -> Option<App::WindowClass> {
         None
     }
 
@@ -26,7 +26,7 @@ pub trait CustomWindow<App>
 where
     App: Appli,
 {
-    fn window_class() -> Option<&'static str> {
+    fn window_class() -> Option<App::WindowClass> {
         None
     }
 

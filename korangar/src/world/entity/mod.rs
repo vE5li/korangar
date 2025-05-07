@@ -844,6 +844,8 @@ impl Player {
             StatusType::ActivityPoints(value) => self.activity_points = value as usize,
             StatusType::MaximumActivityPoints(value) => self.maximum_activity_points = value as usize,
             StatusType::MovementSpeed(value) => self.common.movement_speed = value as usize,
+            StatusType::BaseLevel(value) => self.base_level = value as usize,
+            StatusType::JobLevel(value) => self.job_level = value as usize,
             _ => {}
         }
     }

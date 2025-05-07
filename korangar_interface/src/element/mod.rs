@@ -134,17 +134,27 @@ pub trait Element<App: Appli> {
     );
 }
 
+pub trait ResolverSet {
+    fn with_index(&mut self, index: usize, f: impl FnMut(&mut Resolver));
+}
+
+impl ResolverSet for &mut Resolver {
+    fn with_index(&mut self, _: usize, mut f: impl FnMut(&mut Resolver)) {
+        f(*self)
+    }
+}
+
 pub trait ElementSet<App: Appli> {
     fn get_element_count(&self) -> usize;
 
-    fn get_height(&self, state: &Context<App>, store: &ElementStore, generator: &mut ElementIdGenerator, resolver: &mut Resolver);
+    fn get_height(&self, state: &Context<App>, store: &ElementStore, generator: &mut ElementIdGenerator, resolver_set: impl ResolverSet);
 
     fn create_layout<'a>(
         &'a self,
         state: &'a Context<App>,
         store: &'a ElementStore,
         generator: &mut ElementIdGenerator,
-        resolver: &mut Resolver,
+        resolver_set: impl ResolverSet,
         layout: &mut Layout<'a, App>,
     );
 }
@@ -157,14 +167,14 @@ where
         0
     }
 
-    fn get_height(&self, _: &Context<App>, _: &ElementStore, _: &mut ElementIdGenerator, _: &mut Resolver) {}
+    fn get_height(&self, _: &Context<App>, _: &ElementStore, _: &mut ElementIdGenerator, _: impl ResolverSet) {}
 
     fn create_layout<'a>(
         &'a self,
         _: &'a Context<App>,
         _: &'a ElementStore,
         _: &mut ElementIdGenerator,
-        _: &mut Resolver,
+        _: impl ResolverSet,
         _: &mut Layout<'a, App>,
     ) {
     }
@@ -179,9 +189,17 @@ where
         N
     }
 
-    fn get_height(&self, state: &Context<App>, store: &ElementStore, generator: &mut ElementIdGenerator, resolver: &mut Resolver) {
+    fn get_height(
+        &self,
+        state: &Context<App>,
+        store: &ElementStore,
+        generator: &mut ElementIdGenerator,
+        mut resolver_set: impl ResolverSet,
+    ) {
         for index in 0..N {
-            self[index].get_height(state, store.child_store(index as u64, generator), generator, resolver);
+            resolver_set.with_index(index, |resolver| {
+                self[index].get_height(state, store.child_store(index as u64, generator), generator, resolver);
+            });
         }
     }
 
@@ -190,11 +208,13 @@ where
         state: &'a Context<App>,
         store: &'a ElementStore,
         generator: &mut ElementIdGenerator,
-        resolver: &mut Resolver,
+        mut resolver_set: impl ResolverSet,
         layout: &mut Layout<'a, App>,
     ) {
         for index in 0..N {
-            self[index].create_layout(state, store.child_store(index as u64, generator), generator, resolver, layout);
+            resolver_set.with_index(index, |resolver| {
+                self[index].create_layout(state, store.child_store(index as u64, generator), generator, resolver, layout);
+            });
         }
     }
 }
@@ -206,10 +226,24 @@ fn impl_element_set(up_to: usize) {
         let element_list: String = elements.clone().map(|element| format!("{element}, ")).collect();
         let bounds: String = elements.map(|element| format!("{element}: Element<App>, ")).collect();
         let get_heights: String = (0..number_of_elements)
-            .map(|index| format!("self.{index}.get_height(state, store.child_store({index}, generator), generator, resolver);"))
+            .map(|index| {
+                format!(
+                    "
+                    resolver_set.with_index({index}, |resolver| {{
+                        self.{index}.get_height(state, store.child_store({index}, generator), generator, resolver);
+                    }});"
+                )
+            })
             .collect();
         let create_layouts: String = (0..number_of_elements)
-            .map(|index| format!("self.{index}.create_layout(state, store.child_store({index}, generator), generator, resolver, layout);"))
+            .map(|index| {
+                format!(
+                    "
+                    resolver_set.with_index({index}, |resolver| {{
+                        self.{index}.create_layout(state, store.child_store({index}, generator), generator, resolver, layout);
+                    }});"
+                )
+            })
             .collect();
 
         crabtime::output! {
@@ -219,7 +253,7 @@ fn impl_element_set(up_to: usize) {
                 {{bounds}}
             {
                 fn get_element_count(&self) -> usize {
-                    {{up_to}}
+                    {{number_of_elements}}
                 }
 
                 fn get_height(
@@ -227,7 +261,7 @@ fn impl_element_set(up_to: usize) {
                     state: &Context<App>,
                     store: &ElementStore,
                     generator: &mut ElementIdGenerator,
-                    resolver: &mut Resolver,
+                    mut resolver_set: impl ResolverSet,
                 ) {
                     {{get_heights}}
                 }
@@ -237,7 +271,7 @@ fn impl_element_set(up_to: usize) {
                     state: &'a Context<App>,
                     store: &'a ElementStore,
                     generator: &mut ElementIdGenerator,
-                    resolver: &mut Resolver,
+                    mut resolver_set: impl ResolverSet,
                     layout: &mut Layout<'a, App>,
                 ) {
                     {{create_layouts}}

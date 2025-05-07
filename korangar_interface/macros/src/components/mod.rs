@@ -101,6 +101,7 @@ pub fn window(token_stream: proc_macro::TokenStream) -> proc_macro::TokenStream 
             "corner_radius",
             Some(parse_quote!(korangar_interface::theme::theme().window().corner_radius())),
         ),
+        ("closable", Some(parse_quote!(false))),
         ("class", Some(parse_quote!(None))),
         ("theme", None),
         ("elements", None),
@@ -293,12 +294,23 @@ pub fn collapsable(token_stream: proc_macro::TokenStream) -> proc_macro::TokenSt
             "text_alignment",
             Some(parse_quote!(korangar_interface::theme::theme().collapsable().text_alignment())),
         ),
+        ("initially_expanded", Some(parse_quote!(false))),
         ("children", None),
     ]);
 
     generic_macro_stuff(
         token_stream,
         parse_quote!(korangar_interface::components::collapsable::Collapsable),
+        &parameters,
+    )
+}
+
+pub fn split(token_stream: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let parameters = HashMap::from([("children", None)]);
+
+    generic_macro_stuff(
+        token_stream,
+        parse_quote!(korangar_interface::components::split::Split),
         &parameters,
     )
 }

@@ -38,6 +38,7 @@ where
             title: "Audio Settings",
             class: Some(WindowClass::AudioSettings),
             theme: ClientThemeType::Game,
+            closable: true,
             elements: (
                 state_button! {
                     text: "Mute audio on focus loss",

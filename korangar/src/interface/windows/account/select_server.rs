@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use derive_new::new;
 use korangar_interface::element::id::ElementIdGenerator;
 use korangar_interface::element::store::ElementStore;
-use korangar_interface::element::{Element, ElementSet};
+use korangar_interface::element::{Element, ElementSet, ResolverSet};
 use korangar_interface::event::EventQueue;
 use korangar_interface::layout::{Layout, Resolver};
 use korangar_interface::window::{CustomWindow, PrototypeWindow, Window, WindowTrait};
@@ -101,15 +101,18 @@ where
                 state: &Context<ClientState>,
                 store: &ElementStore,
                 generator: &mut ElementIdGenerator,
-                resolver: &mut Resolver,
+                mut resolver_set: impl ResolverSet,
             ) {
                 self.correct_element_size(state);
                 let item_boxes = unsafe { &mut *self.item_boxes.get() };
 
-                resolver.with_derived(2.0, 4.0, |resolver| {
-                    for (index, item_box) in item_boxes.iter().enumerate() {
-                        item_box.get_height(state, store.child_store(index as u64, generator), generator, resolver);
-                    }
+                // FIX: Make this right. Maybe with_derived should expect a resolver set as well
+                resolver_set.with_index(0, |resolver| {
+                    resolver.with_derived(2.0, 4.0, |resolver| {
+                        for (index, item_box) in item_boxes.iter().enumerate() {
+                            item_box.get_height(state, store.child_store(index as u64, generator), generator, resolver);
+                        }
+                    });
                 });
             }
 
@@ -118,22 +121,25 @@ where
                 state: &'a Context<ClientState>,
                 store: &'a ElementStore,
                 generator: &mut ElementIdGenerator,
-                resolver: &mut Resolver,
+                mut resolver_set: impl ResolverSet,
                 layout: &mut Layout<'a, ClientState>,
             ) {
                 self.correct_element_size(state);
                 let item_boxes = unsafe { &mut *self.item_boxes.get() };
 
-                resolver.with_derived(2.0, 4.0, |resolver| {
-                    // TODO: Very much temp
-                    layout.push_layer();
+                // FIX: Make this right. Maybe with_derived should expect a resolver set as well
+                resolver_set.with_index(0, |resolver| {
+                    resolver.with_derived(2.0, 4.0, |resolver| {
+                        // TODO: Very much temp
+                        layout.push_layer();
 
-                    for (index, item_box) in item_boxes.iter().enumerate() {
-                        item_box.create_layout(state, store.child_store(index as u64, generator), generator, resolver, layout);
-                    }
+                        for (index, item_box) in item_boxes.iter().enumerate() {
+                            item_box.create_layout(state, store.child_store(index as u64, generator), generator, resolver, layout);
+                        }
 
-                    // TODO: Very much temp
-                    layout.pop_layer();
+                        // TODO: Very much temp
+                        layout.pop_layer();
+                    });
                 });
             }
         }

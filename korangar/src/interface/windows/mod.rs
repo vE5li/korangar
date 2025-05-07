@@ -31,4 +31,16 @@ pub enum WindowClass {
     Menu,
     Respawn,
     SelectServer,
+    #[cfg(feature = "debug")]
+    Time,
+    #[cfg(feature = "debug")]
+    Maps,
+    #[cfg(feature = "debug")]
+    Packets,
+    #[cfg(feature = "debug")]
+    RenderSettings,
+    #[cfg(feature = "debug")]
+    Commands,
+    #[cfg(feature = "debug")]
+    Profiler,
 }

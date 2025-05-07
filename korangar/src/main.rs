@@ -67,6 +67,7 @@ use korangar_networking::{
     ShopItem,
 };
 use korangar_util::pathing::PathFinder;
+use ragnarok_packets::handler::NoPacketCallback;
 #[cfg(not(feature = "debug"))]
 use ragnarok_packets::handler::NoPacketCallback;
 use ragnarok_packets::{
@@ -98,8 +99,8 @@ use crate::graphics::*;
 use crate::input::{InputSystem, UserEvent};
 use crate::interface::cursor::{MouseCursor, MouseCursorState};
 // use crate::interface::dialog::DialogSystem;
-#[cfg(feature = "debug")]
-use crate::interface::elements::PacketHistoryCallback;
+// #[cfg(feature = "debug")]
+// use crate::interface::elements::PacketHistoryCallback;
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 use crate::interface::linked::LinkedElement;
 use crate::interface::resource::{ItemSource, Move, SkillSource};
@@ -136,7 +137,13 @@ static ICON_DATA: &[u8] = include_bytes!("../archive/data/icon.png");
 /// CTR+C was sent, and the client is supposed to close.
 pub static SHUTDOWN_SIGNAL: LazyLock<AtomicBool> = LazyLock::new(|| AtomicBool::new(false));
 
-const DEBUG_WINDOWS: &[WindowClass] = &[];
+#[cfg(feature = "debug")]
+const DEBUG_WINDOWS: &[WindowClass] = &[
+    WindowClass::Time,
+    WindowClass::Packets,
+    WindowClass::RenderSettings,
+    WindowClass::Profiler,
+];
 
 // Create the `threads` module.
 #[cfg(feature = "debug")]
@@ -198,6 +205,13 @@ pub struct ChatMessage {
     pub color: MessageColor,
 }
 
+// TODO: Move
+#[derive(RustState)]
+pub struct PacketState {
+    update: bool,
+    show_pings: bool,
+}
+
 mod state {
     use korangar_interface::application::{Appli, RenderLayer};
     use korangar_interface::components::button::ButtonTheme;
@@ -223,7 +237,7 @@ mod state {
     use crate::loaders::{ClientInfo, FontSize, Scaling, ServiceId};
     use crate::settings::LoginSettings;
     use crate::world::{Entity, Player, ResourceMetadata};
-    use crate::{AudioSettings, ChatMessage, GraphicsSettings};
+    use crate::{AudioSettings, ChatMessage, GraphicsSettings, PacketState};
 
     pub(super) fn client_state() -> impl Path<ClientState, ClientState> {
         ClientState::path()
@@ -326,6 +340,10 @@ mod state {
         pub graphics_settings: GraphicsSettings,
         #[cfg(feature = "debug")]
         pub render_settings: RenderSettings,
+        #[cfg(feature = "debug")]
+        pub profiler_visible_thread: crate::threads::Enum,
+        #[cfg(feature = "debug")]
+        pub packet_state: PacketState,
     }
 
     #[derive(RustState)]
@@ -338,13 +356,19 @@ mod state {
     }
 
     #[derive(RustState)]
+    pub struct DebugButtonTheme {
+        foreground_color: Color,
+    }
+
+    #[derive(RustState)]
     pub struct ClientTheme {
-        pub window_theme: WindowTheme<ClientState>,
-        pub text_theme: TextTheme<ClientState>,
-        pub button_theme: ButtonTheme<ClientState>,
-        pub state_button_theme: StateButtonTheme<ClientState>,
-        pub text_box_theme: TextBoxTheme<ClientState>,
-        pub collapsable_theme: CollapsableTheme<ClientState>,
+        pub window: WindowTheme<ClientState>,
+        pub text: TextTheme<ClientState>,
+        pub button: ButtonTheme<ClientState>,
+        pub state_button: StateButtonTheme<ClientState>,
+        pub text_box: TextBoxTheme<ClientState>,
+        pub collapsable: CollapsableTheme<ClientState>,
+        pub debug_button: DebugButtonTheme,
     }
 
     /// Marker trait to specialize the [`ThemeDefault`] trait.
@@ -365,28 +389,28 @@ mod state {
     impl ThemeDefault<DefaultMenu> for ClientTheme {
         fn default() -> Self {
             Self {
-                window_theme: WindowTheme {
+                window: WindowTheme {
                     title_color: Color::rgb_u8(200, 150, 150),
                     hovered_title_color: Color::rgb_u8(250, 200, 200),
                     background_color: Color::monochrome_u8(30),
                     gaps: 15.0,
                     border: 20.0,
                     corner_radius: CornerRadius::uniform(20.0),
-                    title_height: 25.0,
+                    title_height: 45.0,
                     font_size: FontSize(20.0),
                     text_alignment: HorizontalAlignment::Center { offset: 0.0 },
                     vertical_alignment: VerticalAlignment::Center { offset: 0.0 },
                     anchor_color: Color::WHITE,
                     closest_anchor_color: Color::WHITE,
                 },
-                text_theme: TextTheme {
+                text: TextTheme {
                     color: Color::monochrome_u8(220),
                     height: 15.0,
                     font_size: FontSize(14.0),
                     horizontal_alignment: HorizontalAlignment::Left { offset: 0.0 },
                     vertical_alignment: VerticalAlignment::Center { offset: 0.0 },
                 },
-                button_theme: ButtonTheme {
+                button: ButtonTheme {
                     background_color: Color::monochrome_u8(80),
                     foreground_color: Color::monochrome_u8(180),
                     hovered_background_color: Color::monochrome_u8(120),
@@ -397,7 +421,7 @@ mod state {
                     text_alignment: HorizontalAlignment::Center { offset: 0.0 },
                     vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
                 },
-                state_button_theme: StateButtonTheme {
+                state_button: StateButtonTheme {
                     background_color: Color::monochrome_u8(80),
                     foreground_color: Color::monochrome_u8(180),
                     hovered_background_color: Color::monochrome_u8(120),
@@ -409,7 +433,7 @@ mod state {
                     text_alignment: HorizontalAlignment::Center { offset: 0.0 },
                     vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
                 },
-                text_box_theme: TextBoxTheme {
+                text_box: TextBoxTheme {
                     background_color: Color::monochrome_u8(80),
                     foreground_color: Color::monochrome_u8(180),
                     hovered_background_color: Color::monochrome_u8(120),
@@ -420,7 +444,7 @@ mod state {
                     text_alignment: HorizontalAlignment::Center { offset: 0.0 },
                     vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
                 },
-                collapsable_theme: CollapsableTheme {
+                collapsable: CollapsableTheme {
                     background_color: Color::monochrome_u8(50),
                     foreground_color: Color::monochrome_u8(200),
                     hovered_foreground_color: Color::rgb_u8(250, 200, 200),
@@ -432,6 +456,9 @@ mod state {
                     text_alignment: HorizontalAlignment::Left { offset: 20.0 },
                     vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
                 },
+                debug_button: DebugButtonTheme {
+                    foreground_color: Color::rgb_u8(255, 100, 255),
+                },
             }
         }
     }
@@ -439,28 +466,28 @@ mod state {
     impl ThemeDefault<DefaultGame> for ClientTheme {
         fn default() -> Self {
             Self {
-                window_theme: WindowTheme {
+                window: WindowTheme {
                     title_color: Color::rgb_u8(200, 150, 150),
                     hovered_title_color: Color::rgb_u8(250, 200, 200),
                     background_color: Color::monochrome_u8(50),
                     gaps: 8.0,
                     border: 15.0,
                     corner_radius: CornerRadius::uniform(14.0),
-                    title_height: 14.0,
+                    title_height: 25.0,
                     font_size: FontSize(14.0),
                     text_alignment: HorizontalAlignment::Center { offset: 0.0 },
                     vertical_alignment: VerticalAlignment::Center { offset: 0.0 },
                     anchor_color: Color::WHITE,
                     closest_anchor_color: Color::WHITE,
                 },
-                text_theme: TextTheme {
+                text: TextTheme {
                     color: Color::monochrome_u8(220),
-                    height: 15.0,
+                    height: 12.0,
                     font_size: FontSize(14.0),
                     horizontal_alignment: HorizontalAlignment::Left { offset: 0.0 },
                     vertical_alignment: VerticalAlignment::Center { offset: 0.0 },
                 },
-                button_theme: ButtonTheme {
+                button: ButtonTheme {
                     background_color: Color::monochrome_u8(120),
                     foreground_color: Color::monochrome_u8(220),
                     hovered_background_color: Color::monochrome_u8(150),
@@ -471,7 +498,7 @@ mod state {
                     text_alignment: HorizontalAlignment::Center { offset: 0.0 },
                     vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
                 },
-                state_button_theme: StateButtonTheme {
+                state_button: StateButtonTheme {
                     background_color: Color::monochrome_u8(120),
                     foreground_color: Color::monochrome_u8(220),
                     hovered_background_color: Color::monochrome_u8(150),
@@ -483,7 +510,7 @@ mod state {
                     text_alignment: HorizontalAlignment::Center { offset: 0.0 },
                     vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
                 },
-                text_box_theme: TextBoxTheme {
+                text_box: TextBoxTheme {
                     background_color: Color::monochrome_u8(120),
                     foreground_color: Color::monochrome_u8(220),
                     hovered_background_color: Color::monochrome_u8(150),
@@ -494,7 +521,7 @@ mod state {
                     text_alignment: HorizontalAlignment::Center { offset: 0.0 },
                     vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
                 },
-                collapsable_theme: CollapsableTheme {
+                collapsable: CollapsableTheme {
                     background_color: Color::monochrome_u8(80),
                     foreground_color: Color::monochrome_u8(200),
                     hovered_foreground_color: Color::rgb_u8(250, 200, 200),
@@ -505,6 +532,9 @@ mod state {
                     font_size: FontSize(14.0),
                     text_alignment: HorizontalAlignment::Left { offset: 15.0 },
                     vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
+                },
+                debug_button: DebugButtonTheme {
+                    foreground_color: Color::rgb_u8(255, 100, 255),
                 },
             }
         }
@@ -582,6 +612,10 @@ mod state {
         }
     }
 
+    pub fn client_theme() -> impl Path<ClientState, ClientTheme> {
+        ThemePath
+    }
+
     #[derive(Clone, Copy)]
     pub struct ClientThemeGetter;
 
@@ -591,27 +625,27 @@ mod state {
         }
 
         fn window(self) -> impl Path<ClientState, WindowTheme<ClientState>> {
-            ThemePath.window_theme()
+            ThemePath.window()
         }
 
         fn text(self) -> impl Path<ClientState, TextTheme<ClientState>> {
-            ThemePath.text_theme()
+            ThemePath.text()
         }
 
         fn button(self) -> impl Path<ClientState, ButtonTheme<ClientState>> {
-            ThemePath.button_theme()
+            ThemePath.button()
         }
 
         fn state_button(self) -> impl Path<ClientState, StateButtonTheme<ClientState>> {
-            ThemePath.state_button_theme()
+            ThemePath.state_button()
         }
 
         fn text_box(self) -> impl Path<ClientState, TextBoxTheme<ClientState>> {
-            ThemePath.text_box_theme()
+            ThemePath.text_box()
         }
 
         fn collapsable(self) -> impl Path<ClientState, CollapsableTheme<ClientState>> {
-            ThemePath.collapsable_theme()
+            ThemePath.collapsable()
         }
     }
 
@@ -696,7 +730,6 @@ struct Client {
     network_event_buffer: NetworkEventBuffer,
     saved_login_data: Option<LoginServerLoginData>,
     saved_character_server: Option<CharacterServerInformation>,
-    currently_deleting: Option<CharacterId>,
     saved_login_server_address: Option<SocketAddr>,
     saved_password: String,
     saved_username: String,
@@ -724,13 +757,16 @@ struct Client {
 
     map: Option<Box<Map>>,
 
-    #[cfg(feature = "debug")]
-    packet_history_callback: PacketHistoryCallback,
-    #[cfg(feature = "debug")]
-    networking_system: NetworkingSystem<PacketHistoryCallback>,
-    #[cfg(not(feature = "debug"))]
+    // #[cfg(feature = "debug")]
+    // packet_history_callback: PacketHistoryCallback,
+    // #[cfg(feature = "debug")]
+    // networking_system: NetworkingSystem<PacketHistoryCallback>,
+    // #[cfg(not(feature = "debug"))]
     networking_system: NetworkingSystem<NoPacketCallback>,
     audio_engine: Arc<AudioEngine<GameFileLoader>>,
+    // TODO: One possible solution: store this and check the fields for eq, if they mismatch
+    // propagate and update the active field.
+    // active_graphics_settings: GraphicsSettings,
     graphics_engine: GraphicsEngine,
     queue: Arc<Queue>,
     #[cfg(feature = "debug")]
@@ -987,12 +1023,15 @@ impl Client {
         time_phase!("initialize networking", {
             let client_info = load_client_info(&game_file_loader);
 
-            #[cfg(not(feature = "debug"))]
+            // #[cfg(not(feature = "debug"))]
             let (networking_system, network_event_buffer) = NetworkingSystem::spawn();
-            #[cfg(feature = "debug")]
-            let packet_history_callback = PacketHistoryCallback::get_static_instance();
-            #[cfg(feature = "debug")]
-            let (networking_system, network_event_buffer) = NetworkingSystem::spawn_with_callback(packet_history_callback.clone());
+            // #[cfg(feature = "debug")]
+            // let packet_history_callback =
+            // PacketHistoryCallback::get_static_instance();
+            // #[cfg(feature = "debug")]
+            // let (networking_system, network_event_buffer) =
+            // NetworkingSystem::spawn_with_callback(packet_history_callback.
+            // clone());
         });
 
         let login_settings = settings::LoginSettings::new();
@@ -1091,6 +1130,13 @@ impl Client {
             graphics_settings,
             #[cfg(feature = "debug")]
             render_settings,
+            #[cfg(feature = "debug")]
+            profiler_visible_thread: crate::threads::Enum::Main,
+            #[cfg(feature = "debug")]
+            packet_state: PacketState {
+                update: true,
+                show_pings: false,
+            },
         });
 
         interface.open_window(
@@ -1148,7 +1194,6 @@ impl Client {
             network_event_buffer,
             saved_login_data,
             saved_character_server,
-            currently_deleting,
             saved_login_server_address,
             saved_password,
             saved_username,
@@ -1170,8 +1215,8 @@ impl Client {
             tile_texture_set,
             main_menu_click_sound_effect,
             map: Some(map),
-            #[cfg(feature = "debug")]
-            packet_history_callback,
+            // #[cfg(feature = "debug")]
+            // packet_history_callback,
             networking_system,
             audio_engine,
             graphics_engine,
@@ -1233,7 +1278,7 @@ impl Client {
         // TODO: NHA We want to have an event or a remote setting that the scaling
         //       changed.
 
-        let scaling = *self.client_state.get(&client_state().interface_scale());
+        let scaling = *self.client_state.follow(client_state().interface_scale());
         self.bottom_interface_renderer.update_scaling(scaling);
         self.middle_interface_renderer.update_scaling(scaling);
         self.top_interface_renderer.update_scaling(scaling);
@@ -1296,8 +1341,7 @@ impl Client {
 
                     self.saved_login_data = Some(login_data);
 
-                    self.client_state
-                        .update_value(client_state().character_servers(), character_servers);
+                    *self.client_state.follow_mut(client_state().character_servers()) = character_servers;
 
                     self.interface.close_all_windows_except(DEBUG_WINDOWS);
                     self.interface
@@ -1320,7 +1364,7 @@ impl Client {
                     }
                 }
                 NetworkEvent::CharacterServerConnected { normal_slot_count } => {
-                    self.client_state.update_value(client_state().saved_slot_count(), normal_slot_count);
+                    *self.client_state.follow_mut(client_state().saved_slot_count()) = normal_slot_count;
                     let _ = self.networking_system.request_character_list();
                 }
                 NetworkEvent::CharacterServerConnectionFailed { message, .. } => {
@@ -1355,7 +1399,7 @@ impl Client {
                     self.point_light_manager.clear();
                     self.audio_engine.clear_ambient_sound();
 
-                    self.client_state.update_value_with(client_state().entities(), Vec::clear);
+                    self.client_state.follow_mut(client_state().entities()).clear();
 
                     self.audio_engine.play_background_music_track(None);
 
@@ -1368,7 +1412,7 @@ impl Client {
                     // If the resurrected player is us, close the resurrect window.
                     if self
                         .client_state
-                        .try_get(&this_entity())
+                        .try_follow(this_entity())
                         .is_some_and(|player| player.get_entity_id() == entity_id)
                     {
                         self.interface.close_window_with_class(WindowClass::Respawn);
@@ -1388,7 +1432,7 @@ impl Client {
                 NetworkEvent::CharacterList { characters } => {
                     self.audio_engine.play_sound_effect(self.main_menu_click_sound_effect);
 
-                    self.client_state.update_value(client_state().saved_characters(), characters);
+                    *self.client_state.follow_mut(client_state().saved_characters()) = characters;
 
                     // TODO: this will do one unnecessary restore_focus. check
                     // if that will be problematic
@@ -1406,13 +1450,14 @@ impl Client {
                     self.interface.open_window(&self.client_state, ErrorWindow::new(message.to_owned()))
                 }
                 NetworkEvent::CharacterDeleted => {
-                    // let character_id =
-                    // self.currently_deleting.take().unwrap();
-                    // self.saved_characters.retain(|character|
-                    // character.character_id != character_id);
+                    if let Some(character_id) = self.client_state.follow_mut(client_state().currently_deleting()).take() {
+                        self.client_state
+                            .follow_mut(client_state().saved_characters())
+                            .retain(|character| character.character_id != character_id);
+                    }
                 }
                 NetworkEvent::CharacterDeletionFailed { message, .. } => {
-                    self.currently_deleting = None;
+                    *self.client_state.follow_mut(client_state().currently_deleting()) = None;
                     self.interface.open_window(&self.client_state, ErrorWindow::new(message.to_owned()))
                 }
                 NetworkEvent::CharacterSelected { login_data, .. } => {
@@ -1427,7 +1472,7 @@ impl Client {
 
                     let character_information = self
                         .client_state
-                        .get(&client_state().saved_characters())
+                        .follow(client_state().saved_characters())
                         .iter()
                         .find(|character| character.character_id == login_data.character_id)
                         .cloned()
@@ -1435,8 +1480,7 @@ impl Client {
 
                     let mut player = Entity::Player(Player::new(saved_login_data.account_id, &character_information, client_tick));
 
-                    self.client_state
-                        .update_value(client_state().player_name(), character_information.name);
+                    *self.client_state.follow_mut(client_state().player_name()) = character_information.name;
 
                     let entity_id = player.get_entity_id();
                     let entity_type = player.get_entity_type();
@@ -1449,7 +1493,7 @@ impl Client {
                         player.set_animation_data(animation_data);
                     }
 
-                    self.client_state.vec_push(client_state().entities(), player);
+                    self.client_state.follow_mut(client_state().entities()).push(player);
 
                     self.interface.close_window_with_class(WindowClass::CharacterSelection);
                     self.interface.open_window(
@@ -1482,7 +1526,10 @@ impl Client {
                     self.audio_engine.clear_ambient_sound();
                 }
                 NetworkEvent::CharacterCreated { character_information } => {
-                    // self.saved_characters.push(character_information);
+                    self.client_state
+                        .follow_mut(client_state().saved_characters())
+                        .push(character_information);
+
                     // self.interface
                     //     .close_window_with_class(&mut self.focus_state,
                     // CharacterCreationWindow::WINDOW_CLASS);
@@ -1522,7 +1569,7 @@ impl Client {
                         #[cfg(feature = "debug")]
                         npc.generate_pathing_mesh(&self.device, &self.queue, self.graphics_engine.bindless_support(), map);
 
-                        self.client_state.vec_push(client_state().entities(), npc);
+                        self.client_state.follow_mut(client_state().entities()).push(npc);
                     }
                 }
                 NetworkEvent::RemoveEntity { entity_id, reason } => {
@@ -1546,7 +1593,7 @@ impl Client {
                                 entity.set_dead(client_tick);
 
                                 // If the player is us, we need to open the respawn window.
-                                if entity_id == self.client_state.get(&client_state().entities())[0].get_entity_id() {
+                                if entity_id == self.client_state.follow(client_state().entities())[0].get_entity_id() {
                                     self.interface.open_window(&self.client_state, RespawnWindow);
                                 }
                             }
@@ -1595,9 +1642,7 @@ impl Client {
                     self.audio_engine.clear_ambient_sound();
 
                     // Only the player must stay alive between map changes.
-                    self.client_state.update_value_with(client_state().entities(), |entities| {
-                        entities.truncate(1);
-                    });
+                    self.client_state.follow_mut(client_state().entities()).truncate(1);
 
                     self.async_loader.request_map_load(map_name, Some(player_position));
                 }
@@ -1606,7 +1651,8 @@ impl Client {
                 }
                 NetworkEvent::ChatMessage { text, color } => {
                     self.client_state
-                        .vec_push(client_state().chat_messages(), ChatMessage { text, color });
+                        .follow_mut(client_state().chat_messages())
+                        .push(ChatMessage { text, color });
                 }
                 NetworkEvent::UpdateEntityDetails(entity_id, name) => {
                     let entity = self
@@ -1748,12 +1794,12 @@ impl Client {
                     // self.focus_state, &FriendRequestWindow::new(requestee))
                 }
                 NetworkEvent::FriendRemoved { account_id, character_id } => {
-                    // self.friend_list
-                    //     .retain(|(friend, _)| !(friend.account_id ==
-                    // account_id && friend.character_id == character_id));
+                    self.client_state
+                        .follow_mut(client_state().friend_list())
+                        .retain(|friend| !(friend.account_id == account_id && friend.character_id == character_id));
                 }
                 NetworkEvent::FriendAdded { friend } => {
-                    // self.friend_list.push((friend, LinkedElement::new()));
+                    self.client_state.follow_mut(client_state().friend_list()).push(friend);
                 }
                 NetworkEvent::VisualEffect(path, entity_id) => {
                     let effect = self.effect_loader.get_or_load(path, &self.texture_loader).unwrap();
@@ -1829,10 +1875,7 @@ impl Client {
                     self.effect_holder.remove_unit(entity_id);
                 }
                 NetworkEvent::SetFriendList { friends } => {
-                    // self.friend_list.mutate(|friend_list| {
-                    //     *friend_list = friends.into_iter().map(|friend|
-                    // (friend, LinkedElement::new())).collect();
-                    // });
+                    *self.client_state.follow_mut(client_state().friend_list()) = friends;
                 }
                 NetworkEvent::SetHotkeyData { tab, hotkeys } => {
                     // FIX: Since we only have one hotbar at the moment, we ignore
@@ -1898,7 +1941,7 @@ impl Client {
                         // BuyCartWindow::WINDOW_CLASS);
                     }
                     BuyShopItemsResult::Error => {
-                        self.client_state.vec_push(client_state().chat_messages(), ChatMessage {
+                        self.client_state.follow_mut(client_state().chat_messages()).push(ChatMessage {
                             text: "Failed to buy items".to_owned(),
                             color: MessageColor::Error,
                         });
@@ -1957,7 +2000,7 @@ impl Client {
                         // self.focus_state, "sell_cart");
                     }
                     SellItemsResult::Error => {
-                        self.client_state.vec_push(client_state().chat_messages(), ChatMessage {
+                        self.client_state.follow_mut(client_state().chat_messages()).push(ChatMessage {
                             text: "Failed to sell items".to_owned(),
                             color: MessageColor::Error,
                         });
@@ -1968,9 +2011,6 @@ impl Client {
 
         #[cfg(feature = "debug")]
         network_event_measurement.stop();
-
-        // Apply the game state after all the network events were processed.
-        self.client_state.apply();
 
         #[cfg(feature = "debug")]
         let user_event_measurement = Profiler::start_measurement("process user events");
@@ -1984,10 +2024,9 @@ impl Client {
                     username,
                     password,
                 } => {
-                    let client_info_path = client_state().client_info().services();
                     let service = self
                         .client_state
-                        .get(&client_info_path)
+                        .follow(client_state().client_info().services())
                         .iter()
                         .find(|service| service.service_id() == service_id)
                         .unwrap();
@@ -2032,12 +2071,12 @@ impl Client {
                 UserEvent::CameraRotate(factor) => self.player_camera.soft_rotate(factor),
                 UserEvent::CameraResetRotation => self.player_camera.reset_rotation(),
                 UserEvent::OpenMenuWindow => {
-                    if self.client_state.try_get(&this_entity()).is_some() {
+                    if self.client_state.try_follow(this_entity()).is_some() {
                         self.interface.open_window(&self.client_state, MenuWindow)
                     }
                 }
                 UserEvent::OpenInventoryWindow => {
-                    if self.client_state.try_get(&this_entity()).is_some() {
+                    if self.client_state.try_follow(this_entity()).is_some() {
                         // self.interface.open_window(
                         //     &self.client_state,
                         //     &mut self.focus_state,
@@ -2046,7 +2085,7 @@ impl Client {
                     }
                 }
                 UserEvent::OpenEquipmentWindow => {
-                    if self.client_state.try_get(&this_entity()).is_some() {
+                    if self.client_state.try_follow(this_entity()).is_some() {
                         // self.interface.open_window(
                         //     &self.client_state,
                         //     &mut self.focus_state,
@@ -2055,7 +2094,7 @@ impl Client {
                     }
                 }
                 UserEvent::OpenSkillTreeWindow => {
-                    if self.client_state.try_get(&this_entity()).is_some() {
+                    if self.client_state.try_follow(this_entity()).is_some() {
                         // self.interface.open_window(
                         //     &self.client_state,
                         //     &mut self.focus_state,
@@ -2094,9 +2133,9 @@ impl Client {
                     let _ = self.networking_system.create_character(character_slot, name);
                 }
                 UserEvent::DeleteCharacter(character_id) => {
-                    if self.currently_deleting.is_none() {
+                    if self.client_state.follow(client_state().currently_deleting()).is_none() {
                         let _ = self.networking_system.delete_character(character_id);
-                        self.currently_deleting = Some(character_id);
+                        *self.client_state.follow_mut(client_state().currently_deleting()) = Some(character_id);
                     }
                 }
                 UserEvent::RequestSwitchCharacterSlot(origin_slot) => {} //self.move_request.set(Some(origin_slot)),
@@ -2108,7 +2147,7 @@ impl Client {
                     // unwrap(), destination_slot);
                 }
                 UserEvent::RequestPlayerMove(destination) => {
-                    if self.client_state.try_get(&this_entity()).is_some() {
+                    if self.client_state.try_follow(this_entity()).is_some() {
                         let _ = self.networking_system.player_move(WorldPosition {
                             x: destination.x,
                             y: destination.y,
@@ -2143,15 +2182,17 @@ impl Client {
                     let _ = self.networking_system.warp_to_map(map_name, position);
                 }
                 UserEvent::SendMessage(message) => {
-                    // let _ = self.networking_system.send_chat_message(&self.
-                    // saved_player_name, &message);
+                    let _ = self
+                        .networking_system
+                        .send_chat_message(&self.client_state.follow(client_state().player_name()), &message);
                     // TODO: maybe find a better solution for unfocusing the
                     // message box if this becomes
-                    // problematic self.focus_state.
-                    // remove_focus();
+                    // problematic
+                    //
+                    // self.focus_state. remove_focus();
                 }
                 UserEvent::NextDialog(npc_id) => {
-                    // let _ = self.networking_system.next_dialog(npc_id);
+                    let _ = self.networking_system.next_dialog(npc_id);
                 }
                 UserEvent::CloseDialog(npc_id) => {
                     let _ = self.networking_system.close_dialog(npc_id);
@@ -2221,14 +2262,14 @@ impl Client {
                                     let _ = self.networking_system.cast_channeling_skill(
                                         skill.skill_id,
                                         skill.skill_level,
-                                        self.client_state.get(&this_entity().manually_asserted()).get_entity_id(),
+                                        self.client_state.follow(this_entity().manually_asserted()).get_entity_id(),
                                     );
                                 }
                                 false => {
                                     let _ = self.networking_system.cast_skill(
                                         skill.skill_id,
                                         skill.skill_level,
-                                        self.client_state.get(&this_entity().manually_asserted()).get_entity_id(),
+                                        self.client_state.follow(this_entity().manually_asserted()).get_entity_id(),
                                     );
                                 }
                             },
@@ -2239,7 +2280,7 @@ impl Client {
                                     let _ = self.networking_system.cast_skill(
                                         skill.skill_id,
                                         skill.skill_level,
-                                        self.client_state.get(&this_entity().manually_asserted()).get_entity_id(),
+                                        self.client_state.follow(this_entity().manually_asserted()).get_entity_id(),
                                     );
                                 }
                             }
@@ -2311,20 +2352,22 @@ impl Client {
                 #[cfg(feature = "debug")]
                 UserEvent::OpenMarkerDetails(marker_identifier) => {
                     if let Some(map) = self.map.as_ref() {
-                        self.interface.open_window(
-                            &self.client_state,
-                            map.resolve_marker(self.client_state.get(&client_state().entities()), marker_identifier),
-                        );
+                        // self.interface.open_window(
+                        //     &self.client_state,
+                        //     map.resolve_marker(self.client_state.
+                        // follow(client_state().entities()),
+                        // marker_identifier), );
                     }
                 }
                 #[cfg(feature = "debug")]
                 UserEvent::OpenRenderSettingsWindow => self
                     .interface
-                    .open_window(&self.client_state, RenderSettingsWindow::new(self.render_settings.clone())),
+                    .open_window(&self.client_state, RenderSettingsWindow::new(client_state().render_settings())),
                 #[cfg(feature = "debug")]
                 UserEvent::OpenMapDataWindow => {
                     if let Some(map) = self.map.as_ref() {
-                        self.interface.open_window(&self.client_state, map.to_prototype_window());
+                        // self.interface.open_window(&self.client_state,
+                        // map.to_prototype_window());
                     }
                 }
                 #[cfg(feature = "debug")]
@@ -2342,16 +2385,18 @@ impl Client {
                 #[cfg(feature = "debug")]
                 UserEvent::SetMidnight => self.game_timer.set_day_timer(24.0 * 3600.0),
                 #[cfg(feature = "debug")]
-                UserEvent::OpenThemeViewerWindow => self.interface.open_window(&self.client_state, self.client_state.theme_window()),
+                UserEvent::OpenThemeViewerWindow => {} //self.interface.open_window(&self.client_state, self.client_state.theme_window()),
                 #[cfg(feature = "debug")]
-                UserEvent::OpenProfilerWindow => self.interface.open_window(&self.client_state, ProfilerWindow::new()),
-                #[cfg(feature = "debug")]
-                UserEvent::OpenPacketWindow => self.interface.open_window(
+                UserEvent::OpenProfilerWindow => self.interface.open_window(
                     &self.client_state,
-                    PacketWindow::new(self.packet_history_callback.remote(), PlainTrackedState::default()),
+                    ProfilerWindow::new(client_state().profiler_visible_thread()),
                 ),
                 #[cfg(feature = "debug")]
-                UserEvent::ClearPacketHistory => self.packet_history_callback.clear_all(),
+                UserEvent::OpenPacketWindow => self
+                    .interface
+                    .open_window(&self.client_state, PacketWindow::new(client_state().packet_state())),
+                #[cfg(feature = "debug")]
+                UserEvent::ClearPacketHistory => {} //self.packet_history_callback.clear_all(),
                 #[cfg(feature = "debug")]
                 UserEvent::CameraLookAround(offset) => self.debug_camera.look_around(offset),
                 #[cfg(feature = "debug")]
@@ -2373,9 +2418,6 @@ impl Client {
 
         #[cfg(feature = "debug")]
         user_event_measurement.stop();
-
-        // Apply the game state after all the user events were processed.
-        self.client_state.apply();
 
         #[cfg(feature = "debug")]
         let loads_measurement = Profiler::start_measurement("complete async loads");
@@ -2469,7 +2511,7 @@ impl Client {
                 let window_size = self.graphics_engine.get_window_size();
                 let screen_size: ScreenSize = window_size.into();
 
-                if self.client_state.try_get(&this_entity()).is_some() {
+                if self.client_state.try_follow(this_entity()).is_some() {
                     self.player_camera.update(delta_time);
                     self.player_camera.generate_view_projection(window_size);
                 } else {
@@ -2478,7 +2520,10 @@ impl Client {
                 }
 
                 #[cfg(feature = "debug")]
-                if self.render_settings.get().use_debug_camera {
+                let render_settings = *self.client_state.follow(client_state().render_settings());
+
+                #[cfg(feature = "debug")]
+                if render_settings.use_debug_camera {
                     self.debug_camera.generate_view_projection(window_size);
                 }
 
@@ -2499,7 +2544,7 @@ impl Client {
                 {
                     let current_camera: &(dyn Camera + Send + Sync) = match self.client_state.try_follow(this_player()).is_none() {
                         #[cfg(feature = "debug")]
-                        _ if self.render_settings.get().use_debug_camera => &self.debug_camera,
+                        _ if render_settings.use_debug_camera => &self.debug_camera,
                         true => &self.start_camera,
                         false => &self.player_camera,
                     };
@@ -2528,7 +2573,7 @@ impl Client {
 
                 let current_camera: &(dyn Camera + Send + Sync) = match self.client_state.try_follow(this_player()).is_none() {
                     #[cfg(feature = "debug")]
-                    _ if self.render_settings.get().use_debug_camera => &self.debug_camera,
+                    _ if render_settings.use_debug_camera => &self.debug_camera,
                     true => &self.start_camera,
                     false => &self.player_camera,
                 };
@@ -2542,9 +2587,9 @@ impl Client {
                 #[cfg(feature = "debug")]
                 let update_shadow_camera_measurement = Profiler::start_measurement("update directional shadow camera");
 
-                let lighting_mode = *self.client_state.get(&client_state().graphics_settings().lighting_mode());
-                let shadow_detail = *self.client_state.get(&client_state().graphics_settings().shadow_detail());
-                let shadow_quality = *self.client_state.get(&client_state().graphics_settings().shadow_quality());
+                let lighting_mode = *self.client_state.follow(client_state().graphics_settings().lighting_mode());
+                let shadow_detail = *self.client_state.follow(client_state().graphics_settings().shadow_detail());
+                let shadow_quality = *self.client_state.follow(client_state().graphics_settings().shadow_quality());
 
                 let shadow_map_size = shadow_detail.directional_shadow_resolution();
                 let ambient_light_color = map.ambient_light_color(lighting_mode, day_timer);
@@ -2581,13 +2626,11 @@ impl Client {
 
                 self.particle_holder.update(delta_time as f32);
                 self.effect_holder
-                    .update(&self.client_state.get(&client_state().entities()), delta_time as f32);
+                    .update(&self.client_state.follow(client_state().entities()), delta_time as f32);
 
                 self.mouse_cursor.update(client_tick);
 
-                #[cfg(feature = "debug")]
-                let render_settings = &*self.render_settings.get();
-                let walk_indicator_color = *self.client_state.get(&client_state().game_theme_2().indicator().walking());
+                let walk_indicator_color = *self.client_state.follow(client_state().game_theme_2().indicator().walking());
 
                 #[cfg(feature = "debug")]
                 let hovered_marker_identifier = match mouse_target {
@@ -2634,8 +2677,8 @@ impl Client {
                     map.render_markers(
                         &mut self.debug_marker_renderer,
                         current_camera,
-                        render_settings,
-                        self.client_state.get(&client_state().entities()),
+                        &render_settings,
+                        self.client_state.follow(client_state().entities()),
                         &point_light_set,
                         hovered_marker_identifier,
                     );
@@ -2644,8 +2687,8 @@ impl Client {
                     map.render_markers(
                         &mut self.middle_interface_renderer,
                         current_camera,
-                        render_settings,
-                        self.client_state.get(&client_state().entities()),
+                        &render_settings,
+                        self.client_state.follow(client_state().entities()),
                         &point_light_set,
                         hovered_marker_identifier,
                     );
@@ -2721,7 +2764,7 @@ impl Client {
                         &mut self.point_light_with_shadow_instructions,
                         client_tick,
                         #[cfg(feature = "debug")]
-                        render_settings,
+                        &render_settings,
                     );
                 }
 
@@ -2766,7 +2809,7 @@ impl Client {
 
                     let entity_camera = match true {
                         #[cfg(feature = "debug")]
-                        _ if self.render_settings.get().show_entities_paper => &self.player_camera,
+                        _ if *self.client_state.follow(client_state().render_settings().show_entities_paper()) => &self.player_camera,
                         _ => current_camera,
                     };
 
@@ -2846,7 +2889,7 @@ impl Client {
                             entity.render_status(
                                 &self.middle_interface_renderer,
                                 current_camera,
-                                self.client_state.get(&client_state().game_theme_2()),
+                                self.client_state.follow(client_state().game_theme_2()),
                                 screen_size,
                             );
 
@@ -2869,14 +2912,14 @@ impl Client {
                         }
                     }
 
-                    if let Some(player) = self.client_state.try_get(&this_entity()) {
+                    if let Some(player) = self.client_state.try_follow(this_entity()) {
                         #[cfg(feature = "debug")]
                         profile_block!("render player status");
 
                         player.render_status(
                             &self.middle_interface_renderer,
                             current_camera,
-                            self.client_state.get(&client_state().game_theme_2()),
+                            self.client_state.follow(client_state().game_theme_2()),
                             screen_size,
                         );
                     }
@@ -2908,26 +2951,26 @@ impl Client {
                         self.interface.handle_drag(delta);
                     }
 
-                    #[cfg(feature = "debug")]
-                    if render_settings.show_frames_per_second {
-                        let game_theme = self.client_state.get_game_theme();
-
-                        self.top_interface_renderer.render_text(
-                            &self.game_timer.last_frames_per_second().to_string(),
-                            game_theme.overlay.text_offset.get(),
-                            game_theme.overlay.foreground_color.get(),
-                            game_theme.overlay.font_size.get(),
-                            AlignHorizontal::Left,
-                        );
-                    }
+                    // #[cfg(feature = "debug")]
+                    // if render_settings.show_frames_per_second {
+                    //     let game_theme = self.client_state .get_game_theme();
+                    //
+                    //     self.top_interface_renderer.render_text(
+                    //         &self.game_timer.last_frames_per_second().to_string(),
+                    //         game_theme.overlay.text_offset.get(),
+                    //         game_theme.overlay.foreground_color.get(),
+                    //         game_theme.overlay.font_size.get(),
+                    //         AlignHorizontal::Left,
+                    //     );
+                    // }
 
                     if self.show_interface {
                         self.mouse_cursor.render(
                             &self.top_interface_renderer,
                             mouse_position,
                             self.input_system.get_mouse_mode().grabbed(),
-                            *self.client_state.get(&client_state().game_theme_2().cursor().color()),
-                            self.client_state.get(&client_state().interface_scale()).get_factor(),
+                            *self.client_state.follow(client_state().game_theme_2().cursor().color()),
+                            self.client_state.follow(client_state().interface_scale()).get_factor(),
                         );
                     }
                 }
@@ -2982,7 +3025,7 @@ impl Client {
                     map_picker_tile_vertex_buffer: Some(map.get_tile_picker_vertex_buffer()),
                     font_map_texture: Some(self.font_loader.get_font_map()),
                     #[cfg(feature = "debug")]
-                    render_settings: *self.render_settings.get(),
+                    render_settings,
                     #[cfg(feature = "debug")]
                     aabb: &self.aabb_instructions,
                     #[cfg(feature = "debug")]
@@ -3015,10 +3058,7 @@ impl Client {
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     fn update_graphic_settings(&mut self) {
-        // For some reason the interface buffer becomes messed up when
-        // recreating the surface, so we need to render it again.
-
-        let graphics_settings = self.client_state.get(&client_state().graphics_settings());
+        let graphics_settings = self.client_state.follow(client_state().graphics_settings());
 
         // if self.vsync.consume_changed() {
         //     self.graphics_engine.set_vsync(*self.vsync.get());
@@ -3100,7 +3140,7 @@ impl ApplicationHandler for Client {
         // re-create it.
         if let Some(window) = self.window.as_ref() {
             let path = client_state().graphics_settings();
-            let graphics_settings = self.client_state.get(&path);
+            let graphics_settings = self.client_state.follow(path);
 
             self.graphics_engine.on_resume(
                 window.clone(),
@@ -3118,7 +3158,7 @@ impl ApplicationHandler for Client {
             window.set_visible(true);
         }
 
-        if *self.client_state.get(&client_state().audio_settings().mute_on_focus_loss()) {
+        if *self.client_state.follow(client_state().audio_settings().mute_on_focus_loss()) {
             self.audio_engine.mute(false);
         }
     }
@@ -3148,7 +3188,7 @@ impl ApplicationHandler for Client {
                     // self.focus_state.remove_focus();
                 }
 
-                if *self.client_state.get(&client_state().audio_settings().mute_on_focus_loss()) {
+                if *self.client_state.follow(client_state().audio_settings().mute_on_focus_loss()) {
                     self.audio_engine.mute(!focused);
                 }
             }
@@ -3188,7 +3228,7 @@ impl ApplicationHandler for Client {
             window.set_visible(false);
         }
 
-        if *self.client_state.get(&client_state().audio_settings().mute_on_focus_loss()) {
+        if *self.client_state.follow(client_state().audio_settings().mute_on_focus_loss()) {
             self.audio_engine.mute(true);
         }
     }

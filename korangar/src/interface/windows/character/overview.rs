@@ -5,6 +5,7 @@ use derive_new::new;
 use korangar_interface::window::{CustomWindow, PrototypeWindow, Window, WindowTrait};
 use rust_state::{Context, Path, Selector};
 
+use crate::graphics::Color;
 use crate::input::UserEvent;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::{WindowCache, WindowClass};
@@ -85,14 +86,41 @@ where
         use korangar_interface::prelude::*;
 
         let elements = (
-            text! {
-                text: self.player_name,
+            split! {
+                children: (
+                    text! {
+                        text: "Name",
+                    },
+                    text! {
+                        text: self.player_name,
+                        color: Color::rgb_u8(255, 144, 13),
+                        horizontal_alignment: HorizontalAlignment::Right { offset: 0.0 },
+                    },
+                ),
             },
-            text! {
-                text: PartialEqDisplaySelector::new(self.base_level),
+            split! {
+                children: (
+                    text! {
+                        text: "Base level",
+                    },
+                    text! {
+                        text: PartialEqDisplaySelector::new(self.base_level),
+                        color: Color::rgb_u8(13, 231, 255),
+                        horizontal_alignment: HorizontalAlignment::Right { offset: 0.0 },
+                    },
+                ),
             },
-            text! {
-                text: PartialEqDisplaySelector::new(self.job_level),
+            split! {
+                children: (
+                    text! {
+                        text: "Job level",
+                    },
+                    text! {
+                        text: PartialEqDisplaySelector::new(self.job_level),
+                        color: Color::rgb_u8(13, 231, 255),
+                        horizontal_alignment: HorizontalAlignment::Right { offset: 0.0 },
+                    },
+                ),
             },
             button! {
                 text: "Inventory",

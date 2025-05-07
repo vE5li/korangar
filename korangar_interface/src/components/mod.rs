@@ -318,7 +318,7 @@ pub mod collapsable {
 
     use crate::application::Appli;
     use crate::element::id::ElementIdGenerator;
-    use crate::element::store::{ElementStore, Persistent, PersistentExt};
+    use crate::element::store::{ElementStore, Persistent, PersistentData, PersistentExt};
     use crate::element::{Element, ElementSet};
     use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
     use crate::layout::area::Area;
@@ -342,13 +342,21 @@ pub mod collapsable {
         pub vertical_alignment: VerticalAlignment,
     }
 
-    #[derive(Default)]
     pub struct CollapsableData {
         expanded: RefCell<bool>,
-        // animation_state: AnimationState,
     }
 
-    pub struct Collapsable<Text, A, B, C, D, E, F, G, H, I, J, Children> {
+    impl PersistentData for CollapsableData {
+        type Inputs = bool;
+
+        fn new(inputs: Self::Inputs) -> Self {
+            Self {
+                expanded: RefCell::new(inputs),
+            }
+        }
+    }
+
+    pub struct Collapsable<Text, A, B, C, D, E, F, G, H, I, J, K, Children> {
         pub text_marker: PhantomData<Text>,
         pub text: A,
         pub foreground_color: B,
@@ -360,14 +368,15 @@ pub mod collapsable {
         pub title_height: H,
         pub font_size: I,
         pub text_alignment: J,
+        pub initially_expanded: K,
         pub children: Children,
     }
 
-    impl<Text, A, B, C, D, E, F, G, H, I, J, Children> Persistent for Collapsable<Text, A, B, C, D, E, F, G, H, I, J, Children> {
+    impl<Text, A, B, C, D, E, F, G, H, I, J, K, Children> Persistent for Collapsable<Text, A, B, C, D, E, F, G, H, I, J, K, Children> {
         type Data = CollapsableData;
     }
 
-    impl<App, Text, A, B, C, D, E, F, G, H, I, J, Children> Element<App> for Collapsable<Text, A, B, C, D, E, F, G, H, I, J, Children>
+    impl<App, Text, A, B, C, D, E, F, G, H, I, J, K, Children> Element<App> for Collapsable<Text, A, B, C, D, E, F, G, H, I, J, K, Children>
     where
         App: Appli,
         Text: AsRef<str>,
@@ -381,10 +390,11 @@ pub mod collapsable {
         H: Selector<App, f32>,
         I: Selector<App, App::FontSize>,
         J: Selector<App, HorizontalAlignment>,
+        K: Selector<App, bool>,
         Children: ElementSet<App>,
     {
         fn get_height(&self, state: &Context<App>, store: &ElementStore, generator: &mut ElementIdGenerator, resolver: &mut Resolver) {
-            let persistent = self.get_persistent_data(store, ());
+            let persistent = self.get_persistent_data(store, *state.get(&self.initially_expanded));
 
             let title_height = *state.get(&self.title_height);
             match *persistent.expanded.borrow() {
@@ -404,7 +414,7 @@ pub mod collapsable {
             resolver: &mut Resolver,
             layout: &mut Layout<'a, App>,
         ) {
-            let persistent = self.get_persistent_data(store, ());
+            let persistent = self.get_persistent_data(store, *state.get(&self.initially_expanded));
 
             let title_height = *state.get(&self.title_height);
             let area = match *persistent.expanded.borrow() {
@@ -459,14 +469,44 @@ pub mod split {
 
     use crate::application::Appli;
     use crate::element::id::ElementIdGenerator;
-    use crate::element::store::{ElementStore, Persistent, PersistentExt};
-    use crate::element::{Element, ElementSet};
-    use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
-    use crate::layout::area::Area;
+    use crate::element::store::ElementStore;
+    use crate::element::{Element, ElementSet, ResolverSet};
+    use crate::layout::area::{Area, PartialArea};
     use crate::layout::{Layout, Resolver};
 
     pub struct Split<Children> {
         pub children: Children,
+    }
+
+    struct CellResolverSet<'a> {
+        resolver: &'a mut Resolver,
+        initial_available_area: PartialArea,
+        cell_size: f32,
+    }
+
+    impl<'a> CellResolverSet<'a> {
+        pub fn new(resolver: &'a mut Resolver, cell_size: f32) -> Self {
+            let initial_available_area = resolver.push_available_area();
+
+            Self {
+                resolver,
+                initial_available_area,
+                cell_size,
+            }
+        }
+    }
+
+    impl ResolverSet for CellResolverSet<'_> {
+        fn with_index(&mut self, index: usize, f: impl FnMut(&mut Resolver)) {
+            let cell_area = PartialArea {
+                x: self.initial_available_area.x + self.cell_size * index as f32,
+                y: self.initial_available_area.y,
+                width: self.cell_size,
+                height: self.initial_available_area.height,
+            };
+
+            self.resolver.with_derived_custom(cell_area, f);
+        }
     }
 
     impl<App, Children> Element<App> for Split<Children>
@@ -474,7 +514,12 @@ pub mod split {
         App: Appli,
         Children: ElementSet<App>,
     {
-        fn get_height(&self, state: &Context<App>, store: &ElementStore, generator: &mut ElementIdGenerator, resolver: &mut Resolver) {}
+        fn get_height(&self, state: &Context<App>, store: &ElementStore, generator: &mut ElementIdGenerator, resolver: &mut Resolver) {
+            let cell_size = resolver.push_available_area().width / self.children.get_element_count() as f32;
+            let resolver_set = CellResolverSet::new(resolver, cell_size);
+
+            self.children.get_height(state, store, generator, resolver_set);
+        }
 
         fn create_layout<'a>(
             &'a self,
@@ -484,6 +529,10 @@ pub mod split {
             resolver: &mut Resolver,
             layout: &mut Layout<'a, App>,
         ) {
+            let cell_size = resolver.push_available_area().width / self.children.get_element_count() as f32;
+            let resolver_set = CellResolverSet::new(resolver, cell_size);
+
+            self.children.create_layout(state, store, generator, resolver_set, layout);
         }
     }
 }

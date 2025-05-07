@@ -1,37 +1,38 @@
 use korangar_debug::profiling::FrameMeasurement;
-use korangar_interface::element::ElementWrap;
-use korangar_interface::size_bound;
-use korangar_interface::window::{PrototypeWindow, Window, WindowBuilder};
+use korangar_interface::window::{CustomWindow, PrototypeWindow, Window, WindowTrait};
+use rust_state::{Context, Path};
 
-use crate::interface::application::InterfaceSettings;
-use crate::interface::elements::FrameInspectorView;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
+use crate::state::{ClientState, ClientThemeType};
 
-pub struct FrameInspectorWindow {
-    frame_measurement: FrameMeasurement,
+pub struct FrameInspectorWindow<P> {
+    path: P,
 }
 
-impl FrameInspectorWindow {
-    pub fn new(frame_measurement: FrameMeasurement) -> Self {
-        Self { frame_measurement }
+impl<P> FrameInspectorWindow<P> {
+    pub fn new(path: P) -> Self {
+        Self { path }
     }
 }
 
-impl PrototypeWindow<InterfaceSettings> for FrameInspectorWindow {
-    fn to_window(
-        &self,
+impl<P> CustomWindow<ClientState> for FrameInspectorWindow<P>
+where
+    P: Path<ClientState, FrameMeasurement>,
+{
+    fn to_window<'a>(
+        self,
+        state: &Context<ClientState>,
         window_cache: &WindowCache,
-        application: &InterfaceSettings,
         available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
-        let elements = vec![FrameInspectorView::new(self.frame_measurement.clone()).wrap()];
+    ) -> impl WindowTrait<ClientState> + 'a {
+        use korangar_interface::prelude::*;
 
-        WindowBuilder::new()
-            .with_title("Frame Inspector".to_string())
-            .with_size_bound(size_bound!(200 > 500 < 900, ?))
-            .with_elements(elements)
-            .closable()
-            .build(window_cache, application, available_space)
+        window! {
+            title: "Frame Inspector",
+            theme: ClientThemeType::Game,
+            closable: true,
+            elements: (),
+        }
     }
 }

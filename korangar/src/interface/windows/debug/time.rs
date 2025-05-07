@@ -1,60 +1,49 @@
-use korangar_interface::element::{ButtonBuilder, ElementWrap};
-use korangar_interface::size_bound;
-use korangar_interface::window::{PrototypeWindow, Window, WindowBuilder};
+use korangar_interface::window::{CustomWindow, PrototypeWindow, Window, WindowTrait};
+use rust_state::Context;
 
 use crate::input::UserEvent;
-use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
-use crate::interface::windows::WindowCache;
+use crate::interface::windows::{WindowCache, WindowClass};
+use crate::state::{ClientState, ClientThemeType};
 
-#[derive(Default)]
 pub struct TimeWindow;
 
-impl TimeWindow {
-    pub const WINDOW_CLASS: &'static str = "time";
-}
-
-impl PrototypeWindow<InterfaceSettings> for TimeWindow {
-    fn window_class(&self) -> Option<&str> {
-        Some(Self::WINDOW_CLASS)
+impl CustomWindow<ClientState> for TimeWindow {
+    fn window_class() -> Option<WindowClass> {
+        Some(WindowClass::Time)
     }
 
-    fn to_window(
-        &self,
+    fn to_window<'a>(
+        self,
+        state: &Context<ClientState>,
         window_cache: &WindowCache,
-        application: &InterfaceSettings,
         available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
-        // TODO: Unify Set* events into one that takes a specific time
-        let elements = vec![
-            ButtonBuilder::new()
-                .with_text("Set dawn")
-                .with_event(UserEvent::SetDawn)
-                .build()
-                .wrap(),
-            ButtonBuilder::new()
-                .with_text("Set noon")
-                .with_event(UserEvent::SetNoon)
-                .build()
-                .wrap(),
-            ButtonBuilder::new()
-                .with_text("Set dusk")
-                .with_event(UserEvent::SetDusk)
-                .build()
-                .wrap(),
-            ButtonBuilder::new()
-                .with_text("Set midnight")
-                .with_event(UserEvent::SetMidnight)
-                .build()
-                .wrap(),
-        ];
+    ) -> impl WindowTrait<ClientState> + 'a {
+        use korangar_interface::prelude::*;
 
-        WindowBuilder::new()
-            .with_title("Time".to_string())
-            .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size_bound(size_bound!(200 > 300 < 400, ?))
-            .with_elements(elements)
-            .closable()
-            .build(window_cache, application, available_space)
+        window! {
+            title: "Graphics Settings",
+            class: Some(WindowClass::Time),
+            theme: ClientThemeType::Game,
+            closable: true,
+            elements: (
+                button! {
+                    text: "Set dawn",
+                    event: UserEvent::SetDawn,
+                },
+                button! {
+                    text: "Set noon",
+                    event: UserEvent::SetNoon,
+                },
+                button! {
+                    text: "Set dusk",
+                    event: UserEvent::SetDusk,
+                },
+                button! {
+                    text: "Set midnight",
+                    event: UserEvent::SetMidnight,
+                },
+            ),
+        }
     }
 }

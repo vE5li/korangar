@@ -180,13 +180,16 @@ where
         let elements = (state_button! {
             text: "TripleBuffering",
             state: self.path.triple_buffering(),
+            // TODO: Also mark the state to rebuild the graphics engine. This could be done by
+            // setting a variable in the state or by storing a `Rc<RefCell<bool>>` on the window.
             event: Toggle(self.path.triple_buffering()),
         },);
 
         window! {
             title: "Graphics Settings",
             class: Some(WindowClass::GraphicsSettings),
-            theme: ClientThemeType::Menu,
+            theme: ClientThemeType::Game,
+            closable: true,
             elements: elements,
         }
     }

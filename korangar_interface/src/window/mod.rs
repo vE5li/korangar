@@ -83,7 +83,7 @@ where
     pub size: App::Size,
 }
 
-pub struct Window<App, Title, A, B, C, D, E, F, G, H, I, Elements>
+pub struct Window<App, Title, A, B, C, D, E, F, G, H, I, J, Elements>
 where
     App: Appli,
 {
@@ -97,12 +97,13 @@ where
     pub gaps: G,
     pub border: H,
     pub corner_radius: I,
+    pub closable: J,
     pub theme: App::ThemeType,
     pub class: Option<App::WindowClass>,
     pub elements: Elements,
 }
 
-impl<App, Title, A, B, C, D, E, F, G, H, I, Elements> WindowTrait<App> for Window<App, Title, A, B, C, D, E, F, G, H, I, Elements>
+impl<App, Title, A, B, C, D, E, F, G, H, I, J, Elements> WindowTrait<App> for Window<App, Title, A, B, C, D, E, F, G, H, I, J, Elements>
 where
     App: Appli,
     Title: AsRef<str>,
@@ -115,6 +116,7 @@ where
     G: Selector<App, f32>,
     H: Selector<App, f32>,
     I: Selector<App, App::CornerRadius>,
+    J: Selector<App, bool>,
     Elements: ElementSet<App>,
 {
     fn get_window_class(&self) -> Option<App::WindowClass> {
@@ -144,18 +146,11 @@ where
 
         let mut resolver = Resolver::new(available_area, 0.0);
 
-        let mut title_area = Area {
-            x: 0.0,
-            y: 0.0,
-            width: 0.0,
-            height: 0.0,
-        };
+        let title_height = *state.get(&self.title_height);
+        let title_area = resolver.with_height(title_height);
 
         let area = layout.with_clip_layer(|layout| {
             resolver.with_derived(*state.get(&self.gaps), *state.get(&self.border), |resolver| {
-                let title_height = *state.get(&self.title_height);
-                title_area = resolver.with_height(title_height);
-
                 // TODO: Very much temp
                 layout.push_layer();
 
@@ -166,14 +161,35 @@ where
             })
         });
 
-        {
-            let title_bottom = title_area.y + title_area.height;
+        let window_area = Area {
+            x: title_area.x,
+            y: title_area.y,
+            width: title_area.width,
+            height: title_area.height + area.height,
+        };
 
-            title_area.x = area.x;
-            title_area.width = area.width;
-            title_area.y = area.y;
-            title_area.height = title_bottom - area.y;
-        }
+        let close_button = if *state.get(&self.closable) {
+            let close_button_area = Area {
+                x: title_area.x + title_area.width - 40.0,
+                y: title_area.y,
+                width: 30.0,
+                height: title_area.height,
+            };
+
+            let close_button_color = match layout.is_area_hovered_and_active(close_button_area) {
+                true => {
+                    layout.add_window_close_area(close_button_area, data.id);
+                    layout.mark_hovered();
+
+                    *state.get(&self.hovered_title_color)
+                }
+                false => *state.get(&self.title_color),
+            };
+
+            Some((close_button_area, close_button_color))
+        } else {
+            None
+        };
 
         let title_color = match layout.is_area_hovered_and_active(title_area) {
             true => *state.get(&self.hovered_title_color),
@@ -194,12 +210,12 @@ where
             layout.mark_hovered();
         }
 
-        layout.add_rectangle(area, *state.get(&self.corner_radius), *state.get(&self.background_color));
+        layout.add_rectangle(window_area, *state.get(&self.corner_radius), *state.get(&self.background_color));
 
         // TODO: Compute this better.
         let resize_area = Area {
-            x: area.x + area.width - 14.0,
-            y: area.y + area.height - 14.0,
+            x: window_area.x + window_area.width - 14.0,
+            y: window_area.y + window_area.height - 14.0,
             width: 14.0,
             height: 14.0,
         };
@@ -211,12 +227,30 @@ where
             *state.get(&self.title_color),
         );
 
+        if let Some((close_button_area, close_button_color)) = close_button {
+            layout.add_rectangle(
+                close_button_area,
+                App::CornerRadius::new(0.0, 0.0, 0.0, 0.0),
+                close_button_color,
+            );
+
+            // TODO: Use own values
+            layout.add_text(
+                close_button_area,
+                "X",
+                *state.get(&self.font_size),
+                *state.get(&self.background_color),
+                HorizontalAlignment::Center { offset: 0.0 },
+                VerticalAlignment::Center { offset: 0.0 },
+            );
+        }
+
         if layout.is_area_hovered_and_active(resize_area) {
             layout.add_window_resize_area(resize_area, data.id);
             layout.mark_hovered();
         }
 
-        if layout.is_area_hovered_and_active(area) {
+        if layout.is_area_hovered_and_active(window_area) {
             layout.mark_hovered();
         }
     }

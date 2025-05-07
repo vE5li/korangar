@@ -15,6 +15,7 @@ mod queue {
         FocusNext,
         FocusPrevious,
         Application(App::Event),
+        CloseWindow { window_id: u64 },
     }
 
     impl<App: Appli> Clone for Event<App> {
@@ -23,6 +24,7 @@ mod queue {
                 Self::FocusNext => Self::FocusNext,
                 Self::FocusPrevious => Self::FocusPrevious,
                 Self::Application(event) => Self::Application(event.clone()),
+                Self::CloseWindow { window_id } => Self::CloseWindow { window_id: *window_id },
             }
         }
     }

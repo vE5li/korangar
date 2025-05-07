@@ -1,32 +1,29 @@
-use korangar_interface::element::{ButtonBuilder, ElementWrap};
-use korangar_interface::size_bound;
-use korangar_interface::window::{PrototypeWindow, Window, WindowBuilder};
+use korangar_interface::window::{CustomWindow, PrototypeWindow, Window, WindowTrait};
 use ragnarok_packets::TilePosition;
+use rust_state::Context;
 
 use crate::input::UserEvent;
-use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
-use crate::interface::windows::WindowCache;
+use crate::interface::windows::{WindowCache, WindowClass};
+use crate::state::{ClientState, ClientThemeType};
 
-#[derive(Default)]
 pub struct MapsWindow;
 
-impl MapsWindow {
-    pub const WINDOW_CLASS: &'static str = "maps";
-}
-
-impl PrototypeWindow<InterfaceSettings> for MapsWindow {
-    fn window_class(&self) -> Option<&str> {
-        Some(Self::WINDOW_CLASS)
+impl CustomWindow<ClientState> for MapsWindow {
+    fn window_class() -> Option<WindowClass> {
+        Some(WindowClass::Maps)
     }
 
-    fn to_window(
-        &self,
+    fn to_window<'a>(
+        self,
+        state: &Context<ClientState>,
         window_cache: &WindowCache,
-        application: &InterfaceSettings,
         available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
-        let map_warps = [
+    ) -> impl WindowTrait<ClientState> + 'a {
+        use korangar_interface::prelude::*;
+
+        const MAP_COUNT: usize = 23;
+        const MAP_WARPS: [(&'static str, TilePosition); MAP_COUNT] = [
             ("geffen", TilePosition { x: 119, y: 59 }),
             ("alberta", TilePosition { x: 28, y: 234 }),
             ("aldebaran", TilePosition { x: 140, y: 131 }),
@@ -52,23 +49,19 @@ impl PrototypeWindow<InterfaceSettings> for MapsWindow {
             ("mid_camp", TilePosition { x: 180, y: 240 }),
         ];
 
-        let elements = map_warps
-            .into_iter()
-            .map(|(name, position)| {
-                ButtonBuilder::new()
-                    .with_text(name.to_owned())
-                    .with_event(UserEvent::RequestWarpToMap(format!("{name}.gat"), position))
-                    .build()
-                    .wrap()
-            })
-            .collect();
+        window! {
+            title: "Maps",
+            class: Some(WindowClass::Maps),
+            theme: ClientThemeType::Game,
+            closable: true,
+            elements: std::array::from_fn::<_, MAP_COUNT, _>(|index| {
+                let warp = MAP_WARPS[index];
 
-        WindowBuilder::new()
-            .with_title("Maps".to_string())
-            .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size_bound(size_bound!(200 > 300 < 400, ?))
-            .with_elements(elements)
-            .closable()
-            .build(window_cache, application, available_space)
+                button! {
+                    text: warp.0,
+                    event: UserEvent::RequestWarpToMap(format!("{}.gat", warp.0), warp.1)
+                }
+            }),
+        }
     }
 }

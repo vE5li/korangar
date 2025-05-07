@@ -32,15 +32,17 @@ use window::store::WindowStore;
 use window::{CustomWindow, PrototypeWindow, WindowData, WindowTrait};
 
 pub mod prelude {
-    pub use interface_macros::{button, collapsable, scroll_view, state_button, text, text_box, window};
+    pub use interface_macros::{button, collapsable, scroll_view, split, state_button, text, text_box, window};
 
     pub use crate::components::button::ButtonThemePathExt;
     pub use crate::components::collapsable::CollapsableThemePathExt;
     pub use crate::components::state_button::StateButtonThemePathExt;
     pub use crate::components::text::TextThemePathExt;
     pub use crate::components::text_box::TextBoxThemePathExt;
+    pub use crate::event::Toggle;
     // TODO: Should this really be here?
     pub use crate::layout::HeightBound;
+    pub use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
     pub use crate::theme::ThemePathGetter;
     pub use crate::window::WindowThemePathExt;
 }
@@ -91,77 +93,8 @@ where
         }
     }
 
-    // #[cfg_attr(feature = "debug", korangar_debug::profile("update user
-    // interface"))] pub fn update(&mut self, application: &App, font_loader:
-    // App::FontLoader, focus_state: &mut FocusState<App>) -> (bool, bool) {
-    //     for (window, post_update) in &mut self.windows {
-    //         #[cfg(feature = "debug")]
-    //         profile_block!("update window");
-    //
-    //         if let Some(change_event) = window.update() {
-    //             Self::handle_change_event(&mut self.post_update, post_update,
-    // change_event);         }
-    //     }
-    //
-    //     let mut restore_focus = false;
-    //
-    //     for (window_index, (window, post_update)) in
-    // self.windows.iter_mut().enumerate() {         if
-    // self.post_update.needs_resolve() || post_update.take_resolve() {
-    //             #[cfg(feature = "debug")]
-    //             profile_block!("resolve window");
-    //
-    //             let (_position, previous_size) = window.get_area();
-    //             let kind = window.get_theme_kind();
-    //             let theme = application.get_theme(kind);
-    //
-    //             let new_size = window.resolve(font_loader.clone(), application,
-    // theme, self.available_space);
-    //
-    //             // should only ever be the last window
-    //             if let Some(focused_index) = focus_state.focused_window()
-    //                 && focused_index == window_index
-    //             {
-    //                 restore_focus = true;
-    //             }
-    //
-    //             // If the window got smaller, we need to re-render the entire
-    // interface.             // If it got bigger, we can just draw over the
-    // previous frame.             match previous_size.width() >
-    // new_size.width() || previous_size.height() > new_size.height() {
-    //                 true => self.post_update.render(),
-    //                 false => post_update.render(),
-    //             }
-    //         }
-    //     }
-    //
-    //     if restore_focus {
-    //         self.restore_focus(focus_state);
-    //     }
-    //
-    //     if self.post_update.take_resolve() {
-    //         self.post_update.render();
-    //     }
-    //
-    //     if !self.post_update.needs_render() {
-    //         // We profile this block rather than the flag function itself because
-    // it calls         // itself recursively
-    //         #[cfg(feature = "debug")]
-    //         profile_block!("flag render windows");
-    //
-    //         self.flag_render_windows(application, 0, None);
-    //     }
-    //
-    //     let render_interface = self.post_update.needs_render();
-    //     let render_window = self.post_update.needs_render() |
-    // self.windows.iter().any(|(_window, post_update)| post_update.needs_render());
-    //
-    //     (render_interface, render_window)
-    // }
-
     pub fn update_window_size(&mut self, screen_size: App::Size) {
         self.available_space = screen_size;
-        // self.post_update.resolve();
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
@@ -378,11 +311,6 @@ where
     //     entry.1.render();
     // }
 
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn close_window(&mut self, window_index: usize) {
-        self.windows.remove(window_index);
-    }
-
     // pub fn get_window(&self, window_index: usize) -> &dyn Window<App> {
     //     &self.windows[window_index].0
     // }
@@ -398,9 +326,16 @@ where
         {
             let index = self.windows.len() - 1 - index_from_back;
 
-            self.close_window(index);
+            self.windows.remove(index);
         }
     }
+
+    // #[cfg_attr(feature = "debug", korangar_debug::profile)]
+    // pub fn close_window_with_id(&mut self, window_id: u64) {
+    //     if let Some(index) = self.windows.iter().position(|(_, window_data)|
+    // window_data.id == window_id) {         self.close_window(index);
+    //     }
+    // }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn close_all_windows_except(&mut self, exceptions: &[App::WindowClass]) {
@@ -411,7 +346,7 @@ where
                 .map(|class| !exceptions.contains(&class))
                 .unwrap_or(true)
             {
-                self.close_window(index);
+                self.windows.remove(index);
             }
         }
     }
@@ -451,6 +386,11 @@ where
                 event::Event::FocusNext => todo!(),
                 event::Event::FocusPrevious => todo!(),
                 event::Event::Application(application_event) => application_events.push(application_event),
+                event::Event::CloseWindow { window_id } => {
+                    if let Some(index) = self.windows.iter().position(|(_, window_data)| window_data.id == window_id) {
+                        self.windows.remove(index);
+                    }
+                }
             }
         }
 

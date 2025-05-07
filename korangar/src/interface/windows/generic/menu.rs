@@ -4,7 +4,7 @@ use rust_state::Context;
 use crate::input::UserEvent;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::{WindowCache, WindowClass};
-use crate::state::{ClientState, ClientThemeType};
+use crate::state::{ClientState, ClientThemePathExt, ClientThemeType, DebugButtonThemePathExt, client_theme};
 
 #[derive(Default)]
 pub struct MenuWindow;
@@ -22,86 +22,77 @@ impl CustomWindow<ClientState> for MenuWindow {
     ) -> impl WindowTrait<ClientState> + 'a {
         use korangar_interface::prelude::*;
 
-        let elements = (
-            button! {
-                text: "Graphics settings",
-                event: UserEvent::OpenGraphicsSettingsWindow,
-            },
-            button! {
-                text: "Audio settings",
-                event: UserEvent::OpenAudioSettingsWindow,
-            },
-            #[cfg(feature = "debug")]
-            button! {
-                text: "Render settings",
-                event: UserEvent::OpenRenderSettingsWindow,
-                // TODO: debug_foreground_color
-                foreground_color: theme().button().foreground_color(),
-            },
-            #[cfg(feature = "debug")]
-            button! {
-                text: "Map viewer",
-                event: UserEvent::OpenMapDataWindow,
-                // TODO: debug_foreground_color
-                foreground_color: theme().button().foreground_color(),
-            },
-            #[cfg(feature = "debug")]
-            button! {
-                text: "Maps",
-                event: UserEvent::OpenMapsWindow,
-                // TODO: debug_foreground_color
-                foreground_color: theme().button().foreground_color(),
-            },
-            #[cfg(feature = "debug")]
-            button! {
-                text: "Commands",
-                event: UserEvent::OpenCommandsWindow,
-                // TODO: debug_foreground_color
-                foreground_color: theme().button().foreground_color(),
-            },
-            #[cfg(feature = "debug")]
-            button! {
-                text: "Time",
-                event: UserEvent::OpenTimeWindow,
-                // TODO: debug_foreground_color
-                foreground_color: theme().button().foreground_color(),
-            },
-            #[cfg(feature = "debug")]
-            button! {
-                text: "Theme viewer",
-                event: UserEvent::OpenThemeViewerWindow,
-                // TODO: debug_foreground_color
-                foreground_color: theme().button().foreground_color(),
-            },
-            #[cfg(feature = "debug")]
-            button! {
-                text: "Profiler",
-                event: UserEvent::OpenProfilerWindow,
-                // TODO: debug_foreground_color
-                foreground_color: theme().button().foreground_color(),
-            },
-            #[cfg(feature = "debug")]
-            button! {
-                text: "Packets",
-                event: UserEvent::OpenPacketWindow,
-                // TODO: debug_foreground_color
-                foreground_color: theme().button().foreground_color(),
-            },
-            button! {
-                text: "Log out",
-                event: UserEvent::LogOut,
-            },
-            button! {
-                text: "Exit",
-                event: UserEvent::Exit,
-            },
-        );
-
         window! {
             title: "Menu",
             class: Some(WindowClass::Menu),
             theme: ClientThemeType::Game,
-            elements: elements,
+            closable: true,
+            elements: (
+                button! {
+                    text: "Graphics settings",
+                    event: UserEvent::OpenGraphicsSettingsWindow,
+                },
+                button! {
+                    text: "Audio settings",
+                    event: UserEvent::OpenAudioSettingsWindow,
+                },
+                #[cfg(feature = "debug")]
+                button! {
+                    text: "Render settings",
+                    event: UserEvent::OpenRenderSettingsWindow,
+                    foreground_color: client_theme().debug_button().foreground_color(),
+                },
+                #[cfg(feature = "debug")]
+                button! {
+                    text: "Map viewer",
+                    event: UserEvent::OpenMapDataWindow,
+                    foreground_color: client_theme().debug_button().foreground_color(),
+                },
+                #[cfg(feature = "debug")]
+                button! {
+                    text: "Maps",
+                    event: UserEvent::OpenMapsWindow,
+                    foreground_color: client_theme().debug_button().foreground_color(),
+                },
+                #[cfg(feature = "debug")]
+                button! {
+                    text: "Commands",
+                    event: UserEvent::OpenCommandsWindow,
+                    foreground_color: client_theme().debug_button().foreground_color(),
+                },
+                #[cfg(feature = "debug")]
+                button! {
+                    text: "Time",
+                    event: UserEvent::OpenTimeWindow,
+                    foreground_color: client_theme().debug_button().foreground_color(),
+                },
+                #[cfg(feature = "debug")]
+                button! {
+                    text: "Theme viewer",
+                    event: UserEvent::OpenThemeViewerWindow,
+                    foreground_color: client_theme().debug_button().foreground_color(),
+                },
+                #[cfg(feature = "debug")]
+                button! {
+                    text: "Profiler",
+                    event: UserEvent::OpenProfilerWindow,
+                    foreground_color: client_theme().debug_button().foreground_color(),
+                },
+                #[cfg(feature = "debug")]
+                button! {
+                    text: "Packets",
+                    event: UserEvent::OpenPacketWindow,
+                    foreground_color: client_theme().debug_button().foreground_color(),
+                },
+                button! {
+                    text: "Log out",
+                    event: UserEvent::LogOut,
+                },
+                button! {
+                    text: "Exit",
+                    event: UserEvent::Exit,
+                },
+            ),
         }
     }
 }

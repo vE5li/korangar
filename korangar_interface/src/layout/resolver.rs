@@ -33,8 +33,10 @@ impl Resolver {
         }
     }
 
-    pub fn available_width(&self) -> f32 {
-        self.available_area.width
+    pub fn push_available_area(&mut self) -> PartialArea {
+        self.push_gaps();
+
+        self.available_area
     }
 
     pub fn with_height(&mut self, height: f32) -> Area {
@@ -143,5 +145,28 @@ impl Resolver {
         }
 
         (returned, children_height)
+    }
+
+    pub fn with_derived_custom(&mut self, available_area: PartialArea, f: impl FnOnce(&mut Resolver)) {
+        let mut inner = Resolver {
+            available_area,
+            used_height: 0.0,
+            gaps: self.gaps,
+        };
+
+        f(&mut inner);
+
+        let delta = inner.available_area.y - self.available_area.y;
+        if delta > 0.0 {
+            self.available_area.y = inner.available_area.y;
+            self.used_height += delta;
+        }
+
+        // TODO: Really bad. Shouldn't unwrap probably
+        // self.available_area.height = self
+        //     .available_area
+        //     .height
+        //     .map(|height| height.min(other.available_area.height.unwrap()))
+        //     .or(other.available_area.height);
     }
 }

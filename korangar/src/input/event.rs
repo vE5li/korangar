@@ -106,6 +106,7 @@ pub enum UserEvent {
     OpenCommandsWindow,
     #[cfg(feature = "debug")]
     OpenTimeWindow,
+    // TODO: Unify Set* events into one that takes a specific time
     #[cfg(feature = "debug")]
     SetDawn,
     #[cfg(feature = "debug")]

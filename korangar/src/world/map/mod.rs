@@ -37,12 +37,12 @@ use crate::graphics::RenderSettings;
 use crate::graphics::{DebugAabbInstruction, DebugCircleInstruction, DebugRectangleInstruction};
 use crate::graphics::{EntityInstruction, IndicatorInstruction, ModelInstruction, Texture, TextureSet, WaterInstruction};
 #[cfg(feature = "debug")]
-use crate::interface::application::InterfaceSettings;
-#[cfg(feature = "debug")]
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
 use crate::settings::LightingMode;
+#[cfg(feature = "debug")]
+use crate::state::ClientState;
 use crate::{Buffer, Color, GameFileLoader, MAP_TILE_SIZE, ModelVertex, TileVertex};
 
 create_simple_key!(ObjectKey, "Key to an object inside the map");
@@ -382,10 +382,10 @@ impl Map {
         }
     }
 
-    #[cfg(feature = "debug")]
-    pub fn to_prototype_window(&self) -> &dyn PrototypeWindow<InterfaceSettings> {
-        &self.map_data
-    }
+    // #[cfg(feature = "debug")]
+    // pub fn to_prototype_window(&self) -> &dyn PrototypeWindow<InterfaceSettings>
+    // {     &self.map_data
+    // }
 
     #[cfg(feature = "debug")]
     #[korangar_debug::profile]
@@ -451,22 +451,25 @@ impl Map {
         });
     }
 
-    #[cfg(feature = "debug")]
-    pub fn resolve_marker<'a>(
-        &'a self,
-        entities: &'a [Entity],
-        marker_identifier: MarkerIdentifier,
-    ) -> &'a dyn PrototypeWindow<InterfaceSettings> {
-        match marker_identifier {
-            MarkerIdentifier::Object(key) => self.objects.get(ObjectKey::new(key)).unwrap(),
-            MarkerIdentifier::LightSource(key) => self.light_sources.get(LightSourceKey::new(key)).unwrap(),
-            MarkerIdentifier::SoundSource(index) => &self.sound_sources[index as usize],
-            MarkerIdentifier::EffectSource(index) => &self.effect_sources[index as usize],
-            MarkerIdentifier::Particle(..) => todo!(),
-            MarkerIdentifier::Entity(index) => &entities[index as usize],
-            MarkerIdentifier::Shadow(..) => todo!(),
-        }
-    }
+    // #[cfg(feature = "debug")]
+    // pub fn resolve_marker<'a>(
+    //     &'a self,
+    //     entities: &'a [Entity],
+    //     marker_identifier: MarkerIdentifier,
+    // ) -> &'a dyn PrototypeWindow<ClientState> {
+    //     match marker_identifier {
+    //         MarkerIdentifier::Object(key) =>
+    // self.objects.get(ObjectKey::new(key)).unwrap(),
+    //         MarkerIdentifier::LightSource(key) =>
+    // self.light_sources.get(LightSourceKey::new(key)).unwrap(),
+    //         MarkerIdentifier::SoundSource(index) => &self.sound_sources[index as
+    // usize],         MarkerIdentifier::EffectSource(index) =>
+    // &self.effect_sources[index as usize],
+    //         MarkerIdentifier::Particle(..) => todo!(),
+    //         MarkerIdentifier::Entity(index) => &entities[index as usize],
+    //         MarkerIdentifier::Shadow(..) => todo!(),
+    //     }
+    // }
 
     #[cfg(feature = "debug")]
     #[korangar_debug::profile]

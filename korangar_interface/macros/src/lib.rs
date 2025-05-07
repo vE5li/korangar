@@ -39,6 +39,11 @@ pub fn collapsable(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
 }
 
 #[proc_macro]
+pub fn split(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
+    components::split(token_stream)
+}
+
+#[proc_macro]
 pub fn scroll_view(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
     components::scroll_view(token_stream)
 }

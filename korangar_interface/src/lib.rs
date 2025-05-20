@@ -6,6 +6,7 @@
 // #![feature(type_changing_struct_update)]
 #![feature(macro_metavar_expr)]
 #![feature(impl_trait_in_bindings)]
+#![feature(unsafe_cell_access)]
 
 pub mod application;
 pub mod components;
@@ -21,8 +22,6 @@ extern crate self as korangar_interface;
 use application::{Appli, PositionTrait, SizeTrait, WindowCache};
 use element::id::{ElementId, ElementIdGenerator};
 use event::EventQueue;
-// Re-export proc macros.
-pub use interface_macros::{button, collapsable};
 #[cfg(feature = "debug")]
 use korangar_debug::profile_block;
 use layout::Layout;
@@ -32,7 +31,9 @@ use window::store::WindowStore;
 use window::{CustomWindow, PrototypeWindow, WindowData, WindowTrait};
 
 pub mod prelude {
-    pub use interface_macros::{button, collapsable, scroll_view, split, state_button, text, text_box, window};
+    // Re-export proc macros.
+    pub use interface_component_macros::create_component_macro;
+    pub use interface_components::*;
 
     pub use crate::components::button::ButtonThemePathExt;
     pub use crate::components::collapsable::CollapsableThemePathExt;
@@ -45,6 +46,56 @@ pub mod prelude {
     pub use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
     pub use crate::theme::ThemePathGetter;
     pub use crate::window::WindowThemePathExt;
+}
+
+// TODO: Move
+pub mod selector_helpers {
+    use std::cell::UnsafeCell;
+    use std::fmt::Display;
+
+    use rust_state::{Path, Selector};
+
+    use crate::application::Appli;
+
+    pub struct PartialEqDisplaySelector<P, T> {
+        path: P,
+        last_value: UnsafeCell<Option<T>>,
+        text: UnsafeCell<String>,
+    }
+
+    impl<P, T> PartialEqDisplaySelector<P, T> {
+        pub fn new(path: P) -> Self {
+            Self {
+                path,
+                last_value: UnsafeCell::default(),
+                text: UnsafeCell::default(),
+            }
+        }
+    }
+
+    impl<App, P, T> Selector<App, String> for PartialEqDisplaySelector<P, T>
+    where
+        App: Appli,
+        P: Path<App, T>,
+        T: Clone + PartialEq + Display + 'static,
+    {
+        fn select<'a>(&'a self, state: &'a App) -> Option<&'a String> {
+            // SAFETY
+            // `unnwrap` is safe here because the bound of `P` specifies a safe path.
+            let value = self.path.follow(state).unwrap();
+
+            unsafe {
+                let last_value = &mut *self.last_value.get();
+
+                if last_value.is_none() || last_value.as_ref().is_some_and(|last| last != value) {
+                    *self.text.get() = value.to_string();
+                    *last_value = Some(value.clone());
+                }
+            }
+
+            unsafe { Some(self.text.as_ref_unchecked()) }
+        }
+    }
 }
 
 // TODO: This will likely be renamed + Moved

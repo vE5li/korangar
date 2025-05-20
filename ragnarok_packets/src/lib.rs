@@ -703,8 +703,7 @@ pub struct CharacterInformation {
     pub head: i16,
     pub body: i16,
     pub weapon: i16,
-    // TODO: Rename to base_level
-    pub level: i16,
+    pub base_level: i16,
     pub sp_point: i16,
     pub accessory: i16,
     pub shield: i16,

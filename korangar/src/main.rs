@@ -45,6 +45,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock};
 
 use cgmath::{Point3, Vector2, Vector3};
+use character_slots::CharacterSlots;
 #[cfg(feature = "debug")]
 use graphics::RenderSettings;
 use image::{EncodableLayout, ImageFormat, ImageReader};
@@ -152,6 +153,126 @@ korangar_debug::create_profiler_threads!(threads, {
     Loader,
 });
 
+mod character_slots {
+    use ragnarok_packets::{CharacterId, CharacterInformation};
+    use rust_state::{Path, Selector};
+
+    use crate::state::ClientState;
+
+    pub struct CharacterSlots {
+        slots: Vec<Option<CharacterInformation>>,
+    }
+
+    impl CharacterSlots {
+        pub fn new() -> Self {
+            Self { slots: Vec::new() }
+        }
+
+        pub fn set_slot_count(&mut self, slot_count: usize) {
+            self.slots.resize(slot_count, None);
+        }
+
+        pub fn get_slot_count(&self) -> usize {
+            self.slots.len()
+        }
+
+        pub fn add_character(&mut self, character_information: CharacterInformation) {
+            let Some(slot) = self.slots.get_mut(character_information.character_number as usize) else {
+                panic!("attempted to add character to a slot that doesn't exist");
+            };
+
+            assert!(slot.is_none(), "attempted to add a character to an occupied slot");
+
+            *slot = Some(character_information);
+        }
+
+        pub fn remove_with_id(&mut self, character_id: CharacterId) {
+            self.slots.iter_mut().for_each(|slot| {
+                if slot
+                    .as_ref()
+                    .is_some_and(|character_information| character_information.character_id == character_id)
+                {
+                    *slot = None;
+                }
+            })
+        }
+
+        pub fn with_id(&self, character_id: CharacterId) -> Option<&CharacterInformation> {
+            self.slots
+                .iter()
+                .find(|slot| {
+                    slot.as_ref()
+                        .is_some_and(|character_information| character_information.character_id == character_id)
+                })
+                .and_then(|slot| slot.as_ref())
+        }
+
+        pub fn set_characters(&mut self, characters: Vec<CharacterInformation>) {
+            // Clear the character list.
+            self.slots.iter_mut().for_each(|slot| *slot = None);
+
+            characters
+                .into_iter()
+                .for_each(|character_information| self.add_character(character_information));
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    struct SlotPath<P>
+    where
+        P: Copy,
+    {
+        path: P,
+        slot: usize,
+    }
+
+    impl<P> Path<ClientState, CharacterInformation, false> for SlotPath<P>
+    where
+        P: Path<ClientState, CharacterSlots>,
+    {
+        fn follow<'a>(&self, state: &'a ClientState) -> Option<&'a CharacterInformation> {
+            // SAFETY
+            // Unwrapping is fine here since it's guaranteed to be `Some` from the trait
+            // bounds.
+            self.path.follow(state).unwrap().slots.get(self.slot).and_then(|slot| slot.as_ref())
+        }
+
+        fn follow_mut<'a>(&self, state: &'a mut ClientState) -> Option<&'a mut CharacterInformation> {
+            // SAFETY
+            // Unwrapping is fine here since it's guaranteed to be `Some` from the trait
+            // bounds.
+            self.path
+                .follow_mut(state)
+                .unwrap()
+                .slots
+                .get_mut(self.slot)
+                .and_then(|slot| slot.as_mut())
+        }
+    }
+
+    impl<P> Selector<ClientState, CharacterInformation, false> for SlotPath<P>
+    where
+        P: Path<ClientState, CharacterSlots>,
+    {
+        fn select<'a>(&'a self, state: &'a ClientState) -> Option<&'a CharacterInformation> {
+            self.follow(state)
+        }
+    }
+
+    pub trait CharacterSlotsExt {
+        fn in_slot(self, slot: usize) -> impl Path<ClientState, CharacterInformation, false>;
+    }
+
+    impl<P> CharacterSlotsExt for P
+    where
+        P: Path<ClientState, CharacterSlots>,
+    {
+        fn in_slot(self, slot: usize) -> impl Path<ClientState, CharacterInformation, false> {
+            SlotPath { path: self, slot }
+        }
+    }
+}
+
 pub fn init_tls_rand() {
     use std::random::*;
     let mut seed = [0; 32];
@@ -226,6 +347,7 @@ mod state {
     use ragnarok_packets::{CharacterId, CharacterInformation, CharacterServerInformation, Friend};
     use rust_state::{Path, RustState, Selector};
 
+    use crate::character_slots::CharacterSlots;
     use crate::graphics::Color;
     #[cfg(feature = "debug")]
     use crate::graphics::RenderSettings;
@@ -321,8 +443,8 @@ mod state {
         pub friend_list: Vec<Friend>,
         // saved_login_data: Option<LoginServerLoginData>,
         // saved_character_server: Option<CharacterServerInformation>,
-        // TODO: This should be a UniqueVec or something.
-        pub saved_characters: Vec<CharacterInformation>,
+        pub character_slots: CharacterSlots,
+        // pub saved_characters: Vec<CharacterInformation>,
         // TODO: This should be a UniqueVec or something.
         pub shop_items: Vec<ShopItem<ResourceMetadata>>,
         // TODO: This should be a UniqueVec or something.
@@ -330,7 +452,6 @@ mod state {
         pub currently_deleting: Option<CharacterId>,
         pub player_name: String,
         pub move_request: Option<usize>,
-        pub saved_slot_count: usize,
 
         pub entities: Vec<Entity>,
 
@@ -1000,7 +1121,7 @@ impl Client {
         let friend_list: Vec<Friend> = Vec::default();
         let saved_login_data: Option<LoginServerLoginData> = None;
         let saved_character_server: Option<CharacterServerInformation> = None;
-        let saved_characters: Vec<CharacterInformation> = Vec::default();
+        let character_slots = CharacterSlots::new();
         let shop_items: Vec<ShopItem<ResourceMetadata>> = Vec::default();
         let sell_items: Vec<SellItem<(ResourceMetadata, u16)>> = Vec::default();
         let currently_deleting: Option<CharacterId> = None;
@@ -1009,7 +1130,6 @@ impl Client {
         let saved_login_server_address = None;
         let saved_password = String::new();
         let saved_username = String::new();
-        let saved_slot_count = 0;
 
         let welcome_string = format!(
             "Welcome to ^ff8800Korangar^000000 version ^ff8800{}^000000!",
@@ -1035,13 +1155,17 @@ impl Client {
         });
 
         let login_settings = settings::LoginSettings::new();
-        // TODO: Obviously rework
+
+        // FIX: This will fail if not services are present.
+        let selected_service = login_settings.recent_service_id.unwrap_or(client_info.services[0].service_id());
+        let service_settings = login_settings.service_settings.get(&selected_service).cloned().unwrap_or_default();
+
         let login_window = LoginWindowState {
-            username: String::new(),
-            password: String::new(),
-            remember_username: true,
-            remember_password: true,
-            selected_service: client_info.services[0].service_id(),
+            username: service_settings.username,
+            password: service_settings.password,
+            remember_username: service_settings.remember_username,
+            remember_password: service_settings.remember_password,
+            selected_service,
         };
 
         time_phase!("create resources", {
@@ -1113,13 +1237,12 @@ impl Client {
 
             chat_messages,
             friend_list,
-            saved_characters,
+            character_slots,
             shop_items,
             sell_items,
             currently_deleting,
             player_name,
             move_request: None,
-            saved_slot_count,
 
             entities: Vec::new(),
 
@@ -1275,9 +1398,6 @@ impl Client {
         // function results in surface configuration errors under DX12.
         self.update_graphic_settings();
 
-        // TODO: NHA We want to have an event or a remote setting that the scaling
-        //       changed.
-
         let scaling = *self.client_state.follow(client_state().interface_scale());
         self.bottom_interface_renderer.update_scaling(scaling);
         self.middle_interface_renderer.update_scaling(scaling);
@@ -1364,7 +1484,10 @@ impl Client {
                     }
                 }
                 NetworkEvent::CharacterServerConnected { normal_slot_count } => {
-                    *self.client_state.follow_mut(client_state().saved_slot_count()) = normal_slot_count;
+                    self.client_state
+                        .follow_mut(client_state().character_slots())
+                        .set_slot_count(normal_slot_count);
+
                     let _ = self.networking_system.request_character_list();
                 }
                 NetworkEvent::CharacterServerConnectionFailed { message, .. } => {
@@ -1432,18 +1555,16 @@ impl Client {
                 NetworkEvent::CharacterList { characters } => {
                     self.audio_engine.play_sound_effect(self.main_menu_click_sound_effect);
 
-                    *self.client_state.follow_mut(client_state().saved_characters()) = characters;
+                    self.client_state
+                        .follow_mut(client_state().character_slots())
+                        .set_characters(characters);
 
                     // TODO: this will do one unnecessary restore_focus. check
                     // if that will be problematic
                     self.interface.close_all_windows_except(DEBUG_WINDOWS);
                     self.interface.open_window(
                         &self.client_state,
-                        CharacterSelectionWindow::new(
-                            client_state().saved_characters(),
-                            client_state().move_request(),
-                            client_state().saved_slot_count(),
-                        ),
+                        CharacterSelectionWindow::new(client_state().character_slots(), client_state().move_request()),
                     );
                 }
                 NetworkEvent::CharacterSelectionFailed { message, .. } => {
@@ -1452,8 +1573,8 @@ impl Client {
                 NetworkEvent::CharacterDeleted => {
                     if let Some(character_id) = self.client_state.follow_mut(client_state().currently_deleting()).take() {
                         self.client_state
-                            .follow_mut(client_state().saved_characters())
-                            .retain(|character| character.character_id != character_id);
+                            .follow_mut(client_state().character_slots())
+                            .remove_with_id(character_id);
                     }
                 }
                 NetworkEvent::CharacterDeletionFailed { message, .. } => {
@@ -1472,9 +1593,8 @@ impl Client {
 
                     let character_information = self
                         .client_state
-                        .follow(client_state().saved_characters())
-                        .iter()
-                        .find(|character| character.character_id == login_data.character_id)
+                        .follow(client_state().character_slots())
+                        .with_id(login_data.character_id)
                         .cloned()
                         .unwrap();
 
@@ -1527,8 +1647,8 @@ impl Client {
                 }
                 NetworkEvent::CharacterCreated { character_information } => {
                     self.client_state
-                        .follow_mut(client_state().saved_characters())
-                        .push(character_information);
+                        .follow_mut(client_state().character_slots())
+                        .add_character(character_information);
 
                     // self.interface
                     //     .close_window_with_class(&mut self.focus_state,
@@ -2461,11 +2581,7 @@ impl Client {
 
                             self.interface.open_window(
                                 &self.client_state,
-                                CharacterSelectionWindow::new(
-                                    client_state().saved_characters(),
-                                    client_state().move_request(),
-                                    client_state().saved_slot_count(),
-                                ),
+                                CharacterSelectionWindow::new(client_state().character_slots(), client_state().move_request()),
                             );
 
                             self.start_camera.set_focus_point(START_CAMERA_FOCUS_POINT);

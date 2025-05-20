@@ -1,6 +1,7 @@
 use std::ops::Not;
 
 use derive_new::new;
+use korangar_interface::components::text_box::DefaultHandler;
 use korangar_interface::event::{ClickAction, Event, EventQueue, Toggle};
 use korangar_interface::window::{CustomWindow, PrototypeWindow, Window, WindowTrait};
 use rust_state::{Context, ManuallyAssertExt, MapLookupExt, Path};
@@ -152,14 +153,14 @@ where
                 text_box! {
                     text: "Username",
                     state: self.window_state_path.username(),
-                    input_handler: korangar_interface::components::text_box::DefaultHandler(self.window_state_path.username()),
+                    input_handler: DefaultHandler(self.window_state_path.username()),
                     // event: username_action,
                     // length: 24,
                 },
                 text_box! {
                     text: "Password",
                     state: self.window_state_path.password(),
-                    input_handler: korangar_interface::components::text_box::DefaultHandler(self.window_state_path.password()),
+                    input_handler: DefaultHandler(self.window_state_path.password()),
                     // event: password_action,
                     // length: 24,
                     // hidden: true,

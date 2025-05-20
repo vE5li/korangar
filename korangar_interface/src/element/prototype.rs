@@ -5,7 +5,7 @@ use std::fmt::Display;
 use std::marker::PhantomData;
 use std::rc::Rc;
 
-use interface_macros::{button, collapsable};
+use interface_components::{button, collapsable};
 use rust_state::{ArrayLookupExt, Context, ManuallyAssertExt, Path};
 
 use super::Element;

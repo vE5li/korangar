@@ -806,7 +806,7 @@ impl Player {
         let activity_points = 0;
         let maximum_spell_points = character_information.maximum_spell_points as usize;
         let maximum_activity_points = 0;
-        let base_level = character_information.level as usize;
+        let base_level = character_information.base_level as usize;
         let job_level = character_information.job_level as usize;
 
         let entity_data = EntityData::from_character(account_id, character_information, WorldPosition::origin());

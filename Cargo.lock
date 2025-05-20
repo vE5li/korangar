@@ -1593,6 +1593,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "interface_component_macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.100",
+]
+
+[[package]]
+name = "interface_components"
+version = "0.1.0"
+dependencies = [
+ "interface_component_macros",
+ "proc-macro2",
+ "syn 2.0.100",
+]
+
+[[package]]
 name = "interface_macros"
 version = "0.1.0"
 dependencies = [
@@ -1763,6 +1781,7 @@ dependencies = [
  "hashbrown",
  "image",
  "korangar_audio",
+ "korangar_components",
  "korangar_debug",
  "korangar_interface",
  "korangar_networking",
@@ -1804,6 +1823,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "korangar_components"
+version = "0.1.0"
+dependencies = [
+ "korangar_interface",
+ "proc-macro2",
+ "syn 2.0.100",
+]
+
+[[package]]
 name = "korangar_debug"
 version = "0.1.0"
 dependencies = [
@@ -1818,6 +1846,8 @@ dependencies = [
  "bitflags 2.9.0",
  "cgmath",
  "crabtime",
+ "interface_component_macros",
+ "interface_components",
  "interface_macros",
  "korangar_debug",
  "num",

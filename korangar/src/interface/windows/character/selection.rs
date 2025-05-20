@@ -1,41 +1,37 @@
 use std::cell::UnsafeCell;
-use std::cmp::Ordering;
 
+use korangar_components::character_slot_preview;
 use korangar_interface::element::id::ElementIdGenerator;
 use korangar_interface::element::store::ElementStore;
 use korangar_interface::element::{Element, ElementSet, ResolverSet};
-use korangar_interface::event::EventQueue;
-use korangar_interface::layout::{Layout, Resolver};
-use korangar_interface::window::{CustomWindow, PrototypeWindow, Window, WindowTrait};
-use ragnarok_packets::{CharacterInformation, CharacterServerInformation};
-use rust_state::{Context, Path, Selector};
+use korangar_interface::layout::Layout;
+use korangar_interface::window::{CustomWindow, WindowTrait};
+use rust_state::{Context, Path};
 
-use crate::input::UserEvent;
+use crate::character_slots::{CharacterSlots, CharacterSlotsExt};
+use crate::interface::components::character_slot_preview::CharacterSlotPreviewHandler;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::{WindowCache, WindowClass};
 use crate::state::{ClientState, ClientThemeType};
 
-pub struct CharacterSelectionWindow<C, M, S> {
-    characters: C,
+pub struct CharacterSelectionWindow<C, M> {
+    character_slots: C,
     move_request: M,
-    slot_count: S,
 }
 
-impl<C, M, S> CharacterSelectionWindow<C, M, S> {
-    pub fn new(characters: C, move_request: M, slot_count: S) -> Self {
+impl<C, M> CharacterSelectionWindow<C, M> {
+    pub fn new(characters: C, move_request: M) -> Self {
         Self {
-            characters,
+            character_slots: characters,
             move_request,
-            slot_count,
         }
     }
 }
 
-impl<C, M, S> CustomWindow<ClientState> for CharacterSelectionWindow<C, M, S>
+impl<C, M> CustomWindow<ClientState> for CharacterSelectionWindow<C, M>
 where
-    C: Path<ClientState, Vec<CharacterInformation>>,
+    C: Path<ClientState, CharacterSlots>,
     M: Path<ClientState, Option<usize>>,
-    S: Path<ClientState, usize>,
 {
     fn window_class() -> Option<WindowClass> {
         Some(WindowClass::CharacterSelection)
@@ -48,98 +44,77 @@ where
         available_space: ScreenSize,
     ) -> impl WindowTrait<ClientState> + 'a {
         use korangar_interface::prelude::*;
-        use rust_state::{ManuallyAssertExt, VecIndexExt};
 
-        // TODO: Remove, just temporary
-        struct ButtonText<P> {
-            path: P,
-            slot: usize,
-            final_string: UnsafeCell<String>,
-        }
-
-        impl<P> Selector<ClientState, String> for ButtonText<P>
-        where
-            P: Path<ClientState, Vec<CharacterInformation>>,
-        {
-            fn select<'a>(&'a self, state: &'a ClientState) -> Option<&'a String> {
-                let name = self
-                    .path
-                    .follow(state)
-                    .unwrap()
-                    .iter()
-                    .find(|character| character.character_number as usize == self.slot)
-                    .map(|character| character.name.clone())
-                    .unwrap_or("<Free>".to_owned());
-                let slot = self.slot;
-
-                unsafe {
-                    *self.final_string.get() = format!("#{slot}: {name}");
-                }
-
-                unsafe { Some(self.final_string.as_ref_unchecked()) }
-            }
-        }
-
-        struct CharacterWrapper<C, M, S> {
-            characters: C,
+        struct CharacterWrapper<C, M> {
+            character_slots: C,
             move_request: M,
-            slot_count: S,
             item_boxes: UnsafeCell<Vec<Box<dyn Element<ClientState>>>>,
         }
 
-        impl<C, M, S> CharacterWrapper<C, M, S>
+        impl<C, M> CharacterWrapper<C, M>
         where
-            C: Path<ClientState, Vec<CharacterInformation>>,
+            C: Path<ClientState, CharacterSlots>,
             M: Path<ClientState, Option<usize>>,
-            S: Path<ClientState, usize>,
         {
-            fn new(characters: C, move_request: M, slot_count: S) -> Self {
+            fn new(character_slots: C, move_request: M) -> Self {
                 Self {
-                    characters,
+                    character_slots,
                     move_request,
-                    slot_count,
                     item_boxes: UnsafeCell::new(Vec::new()),
                 }
             }
 
             fn correct_element_size(&self, state: &Context<ClientState>) {
-                let character_information = state.get(&self.characters);
+                let character_slots = state.get(&self.character_slots);
                 let item_boxes = unsafe { &mut *self.item_boxes.get() };
-                let slot_count = *state.get(&self.slot_count);
+                let slot_count = character_slots.get_slot_count();
 
-                match item_boxes.len().cmp(&slot_count) {
-                    Ordering::Greater => {
-                        // Delete excess elements.
-                        item_boxes.truncate(character_information.len());
-                    }
-                    Ordering::Less => {
-                        // Add new elements.
-                        for slot in item_boxes.len()..slot_count {
-                            let path = self.characters;
+                // FIX: Very broken check
+                if item_boxes.len() != slot_count / 5 {
+                    item_boxes.clear();
 
-                            item_boxes.push(Box::new(button! {
-                                text: ButtonText {
-                                    path,
-                                    slot,
-                                    final_string: UnsafeCell::new(String::new()),
+                    for row in 0..slot_count / 5 {
+                        let slot = row * 5;
+                        let path = self.character_slots;
+
+                        item_boxes.push(Box::new(split! {
+                            children: (
+                                character_slot_preview! {
+                                    path: path.in_slot(slot),
+                                    click_handler: CharacterSlotPreviewHandler::new(slot),
+                                    slot: slot,
                                 },
-                                event: move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
-                                    let character_information = state.get(&path).clone();
-                                    queue.queue(UserEvent::SelectCharacter { slot });
+                                character_slot_preview! {
+                                    path: path.in_slot(slot + 1),
+                                    click_handler: CharacterSlotPreviewHandler::new(slot + 1),
+                                    slot: slot + 1,
                                 },
-                            }));
-                        }
+                                character_slot_preview! {
+                                    path: path.in_slot(slot + 2),
+                                    click_handler: CharacterSlotPreviewHandler::new(slot + 2),
+                                    slot: slot + 2,
+                                },
+                                character_slot_preview! {
+                                    path: path.in_slot(slot + 3),
+                                    click_handler: CharacterSlotPreviewHandler::new(slot + 3),
+                                    slot: slot + 3,
+                                },
+                                character_slot_preview! {
+                                    path: path.in_slot(slot + 4),
+                                    click_handler: CharacterSlotPreviewHandler::new(slot + 4),
+                                    slot: slot + 4,
+                                },
+                            )
+                        }));
                     }
-                    Ordering::Equal => {}
                 }
             }
         }
 
-        impl<C, M, S> ElementSet<ClientState> for CharacterWrapper<C, M, S>
+        impl<C, M> ElementSet<ClientState> for CharacterWrapper<C, M>
         where
-            C: Path<ClientState, Vec<CharacterInformation>>,
+            C: Path<ClientState, CharacterSlots>,
             M: Path<ClientState, Option<usize>>,
-            S: Path<ClientState, usize>,
         {
             fn get_element_count(&self) -> usize {
                 unimplemented!()
@@ -197,7 +172,7 @@ where
             title: "Select Character",
             class: Some(WindowClass::CharacterSelection),
             theme: ClientThemeType::Menu,
-            elements: CharacterWrapper::new(self.characters, self.move_request, self.slot_count),
+            elements: CharacterWrapper::new(self.character_slots, self.move_request),
         }
     }
 }

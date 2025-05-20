@@ -39,7 +39,7 @@ where
 
         window! {
             title: "Hotbar",
-            class: Some(WindowClass::Hotbar),
+            class: Self::window_class(),
             theme: ClientThemeType::Game,
             elements: elements,
         }

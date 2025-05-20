@@ -36,7 +36,7 @@ where
 
         window! {
             title: "Audio Settings",
-            class: Some(WindowClass::AudioSettings),
+            class: Self::window_class(),
             theme: ClientThemeType::Game,
             closable: true,
             elements: (

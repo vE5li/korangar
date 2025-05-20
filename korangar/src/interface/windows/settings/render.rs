@@ -154,7 +154,7 @@ where
 
         window! {
             title: "Render Settings",
-            class: Some(WindowClass::RenderSettings),
+            class: Self::window_class(),
             theme: ClientThemeType::Game,
             closable: true,
             elements: (scroll_view! { children: elements, height_bound: HeightBound::WithMax, }, )

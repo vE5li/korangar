@@ -131,6 +131,11 @@ pub mod components {
                         HorizontalAlignment::Right { offset: 5.0 },
                         VerticalAlignment::Top { offset: 86.0 },
                     );
+
+                    if is_hoverered {
+                        layout.add_click_area(area, &self.click_handler.select_character);
+                        layout.mark_hovered();
+                    }
                 } else {
                     layout.add_text(
                         area,
@@ -140,11 +145,11 @@ pub mod components {
                         HorizontalAlignment::Center { offset: 0.0 },
                         VerticalAlignment::Center { offset: 0.0 },
                     );
-                }
 
-                if is_hoverered {
-                    layout.add_click_area(area, &self.click_handler.on_click);
-                    layout.mark_hovered();
+                    if is_hoverered {
+                        layout.add_click_area(area, &self.click_handler.create_character);
+                        layout.mark_hovered();
+                    }
                 }
             }
         }
@@ -188,18 +193,29 @@ pub mod components {
             }
         }
 
-        struct OnClick {
+        struct SelectCharacter {
             slot: usize,
         }
 
-        impl ClickAction<ClientState> for OnClick {
+        impl ClickAction<ClientState> for SelectCharacter {
             fn execute(&self, _: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
                 queue.queue(UserEvent::SelectCharacter { slot: self.slot });
             }
         }
 
+        struct CreateCharacter {
+            slot: usize,
+        }
+
+        impl ClickAction<ClientState> for CreateCharacter {
+            fn execute(&self, _: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
+                queue.queue(UserEvent::OpenCharacterCreationWindow { slot: self.slot });
+            }
+        }
+
         pub struct CharacterSlotPreviewHandler {
-            on_click: OnClick,
+            select_character: SelectCharacter,
+            create_character: CreateCharacter,
             base_level_str: PartialEqDisplayStr<i16>,
             job_level_str: PartialEqDisplayStr<i32>,
         }
@@ -207,7 +223,8 @@ pub mod components {
         impl CharacterSlotPreviewHandler {
             pub fn new(slot: usize) -> Self {
                 Self {
-                    on_click: OnClick { slot },
+                    select_character: SelectCharacter { slot },
+                    create_character: CreateCharacter { slot },
                     base_level_str: PartialEqDisplayStr::new(),
                     job_level_str: PartialEqDisplayStr::new(),
                 }

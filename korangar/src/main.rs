@@ -159,15 +159,12 @@ mod character_slots {
 
     use crate::state::ClientState;
 
+    #[derive(Default)]
     pub struct CharacterSlots {
         slots: Vec<Option<CharacterInformation>>,
     }
 
     impl CharacterSlots {
-        pub fn new() -> Self {
-            Self { slots: Vec::new() }
-        }
-
         pub fn set_slot_count(&mut self, slot_count: usize) {
             self.slots.resize(slot_count, None);
         }
@@ -465,6 +462,8 @@ mod state {
         pub profiler_visible_thread: crate::threads::Enum,
         #[cfg(feature = "debug")]
         pub packet_state: PacketState,
+
+        pub create_character_name: String,
     }
 
     #[derive(RustState)]
@@ -1121,7 +1120,7 @@ impl Client {
         let friend_list: Vec<Friend> = Vec::default();
         let saved_login_data: Option<LoginServerLoginData> = None;
         let saved_character_server: Option<CharacterServerInformation> = None;
-        let character_slots = CharacterSlots::new();
+        let character_slots = CharacterSlots::default();
         let shop_items: Vec<ShopItem<ResourceMetadata>> = Vec::default();
         let sell_items: Vec<SellItem<(ResourceMetadata, u16)>> = Vec::default();
         let currently_deleting: Option<CharacterId> = None;
@@ -1260,6 +1259,8 @@ impl Client {
                 update: true,
                 show_pings: false,
             },
+
+            create_character_name: String::new(),
         });
 
         interface.open_window(
@@ -1650,9 +1651,7 @@ impl Client {
                         .follow_mut(client_state().character_slots())
                         .add_character(character_information);
 
-                    // self.interface
-                    //     .close_window_with_class(&mut self.focus_state,
-                    // CharacterCreationWindow::WINDOW_CLASS);
+                    self.interface.close_window_with_class(WindowClass::CharacterCreation);
                 }
                 NetworkEvent::CharacterCreationFailed { message, .. } => {
                     self.interface.open_window(&self.client_state, ErrorWindow::new(message.to_owned()));
@@ -2243,14 +2242,17 @@ impl Client {
                 UserEvent::SelectCharacter { slot } => {
                     let _ = self.networking_system.select_character(slot);
                 }
-                UserEvent::OpenCharacterCreationWindow(slot) => {}
-                //     self.interface.open_window(
-                //     &self.client_state,
-                //     &mut self.focus_state,
-                //     &CharacterCreationWindow::new(character_slot),
-                // ),
-                UserEvent::CreateCharacter(character_slot, name) => {
-                    let _ = self.networking_system.create_character(character_slot, name);
+                UserEvent::OpenCharacterCreationWindow { slot } => {
+                    // Clear the name before opening the window.
+                    self.client_state.follow_mut(client_state().create_character_name()).clear();
+
+                    self.interface.open_window(
+                        &self.client_state,
+                        CharacterCreationWindow::new(client_state().create_character_name(), slot),
+                    )
+                }
+                UserEvent::CreateCharacter { slot, name } => {
+                    let _ = self.networking_system.create_character(slot, name);
                 }
                 UserEvent::DeleteCharacter(character_id) => {
                     if self.client_state.follow(client_state().currently_deleting()).is_none() {

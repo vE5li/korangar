@@ -23,7 +23,7 @@ impl CustomWindow<ClientState> for TimeWindow {
 
         window! {
             title: "Graphics Settings",
-            class: Some(WindowClass::Time),
+            class: Self::window_class(),
             theme: ClientThemeType::Game,
             closable: true,
             elements: (

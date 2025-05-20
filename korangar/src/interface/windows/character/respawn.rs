@@ -23,7 +23,7 @@ impl CustomWindow<ClientState> for RespawnWindow {
     ) -> impl WindowTrait<ClientState> + 'a {
         window! {
             title: "Respawn Menu",
-            class: Some(WindowClass::Respawn),
+            class: Self::window_class(),
             theme: ClientThemeType::Game,
             elements: (
                 button! {

@@ -170,7 +170,7 @@ where
 
         window! {
             title: "Select Character",
-            class: Some(WindowClass::CharacterSelection),
+            class: Self::window_class(),
             theme: ClientThemeType::Menu,
             elements: CharacterWrapper::new(self.character_slots, self.move_request),
         }

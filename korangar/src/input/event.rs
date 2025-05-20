@@ -53,8 +53,13 @@ pub enum UserEvent {
     SelectCharacter {
         slot: usize,
     },
-    OpenCharacterCreationWindow(usize),
-    CreateCharacter(usize, String),
+    OpenCharacterCreationWindow {
+        slot: usize,
+    },
+    CreateCharacter {
+        slot: usize,
+        name: String,
+    },
     DeleteCharacter(CharacterId),
     RequestSwitchCharacterSlot(usize),
     CancelSwitchCharacterSlot,

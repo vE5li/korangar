@@ -144,7 +144,7 @@ where
 
         window! {
             title: "Log In",
-            class: Some(WindowClass::Login),
+            class: Self::window_class(),
             theme: ClientThemeType::Menu,
             elements: (
                 text! { text: "Select service" },

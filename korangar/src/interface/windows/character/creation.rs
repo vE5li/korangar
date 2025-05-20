@@ -1,79 +1,62 @@
-use derive_new::new;
-use korangar_interface::element::{ButtonBuilder, ElementWrap, FocusMode, InputFieldBuilder};
-use korangar_interface::event::ClickAction;
-use korangar_interface::state::{PlainTrackedState, TrackedState, TrackedStateClone};
-use korangar_interface::window::{PrototypeWindow, Window, WindowBuilder};
-use korangar_interface::{dimension_bound, size_bound};
+use korangar_interface::components::text_box::DefaultHandler;
+use korangar_interface::event::EventQueue;
+use korangar_interface::window::{CustomWindow, WindowTrait};
+use rust_state::{Context, Path};
 
 use crate::input::UserEvent;
-use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
-use crate::interface::theme::InterfaceThemeKind;
-use crate::interface::windows::WindowCache;
+use crate::interface::windows::{WindowCache, WindowClass};
+use crate::state::{ClientState, ClientThemeType};
 
 const MINIMUM_NAME_LENGTH: usize = 4;
 const MAXIMUM_NAME_LENGTH: usize = 24;
 
-#[derive(new)]
-pub struct CharacterCreationWindow {
+pub struct CharacterCreationWindow<P> {
+    path: P,
     slot: usize,
 }
 
-impl CharacterCreationWindow {
-    pub const WINDOW_CLASS: &'static str = "character_creation";
+impl<P> CharacterCreationWindow<P> {
+    pub fn new(path: P, slot: usize) -> Self {
+        Self { path, slot }
+    }
 }
 
-impl PrototypeWindow<InterfaceSettings> for CharacterCreationWindow {
-    fn window_class(&self) -> Option<&str> {
-        Some(Self::WINDOW_CLASS)
+impl<P> CustomWindow<ClientState> for CharacterCreationWindow<P>
+where
+    P: Path<ClientState, String>,
+{
+    fn window_class() -> Option<WindowClass> {
+        Some(WindowClass::CharacterCreation)
     }
 
-    fn to_window(
-        &self,
+    fn to_window<'a>(
+        self,
+        state: &Context<ClientState>,
         window_cache: &WindowCache,
-        application: &InterfaceSettings,
         available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
-        let name = PlainTrackedState::<String>::default();
+    ) -> impl WindowTrait<ClientState> + 'a {
+        use korangar_interface::prelude::*;
 
-        let selector = {
-            let name = name.clone();
-            move || name.get().len() >= MINIMUM_NAME_LENGTH
-        };
-
-        let action = {
-            let slot = self.slot;
-            let name = name.clone();
-
-            move || vec![ClickAction::Custom(UserEvent::CreateCharacter(slot, name.cloned()))]
-        };
-
-        let input_action = Box::new(move || vec![ClickAction::FocusNext(FocusMode::FocusNext)]);
-
-        let elements = vec![
-            InputFieldBuilder::new()
-                .with_state(name)
-                .with_ghost_text("Character name")
-                .with_enter_action(input_action)
-                .with_length(MAXIMUM_NAME_LENGTH)
-                .build()
-                .wrap(),
-            ButtonBuilder::new()
-                .with_text("done")
-                .with_disabled_selector(selector)
-                .with_event(Box::new(action))
-                .with_width_bound(dimension_bound!(50%))
-                .build()
-                .wrap(),
-        ];
-
-        WindowBuilder::new()
-            .with_title("Create Character".to_string())
-            .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size_bound(size_bound!(200 > 300 < 400, ?))
-            .with_elements(elements)
-            .closable()
-            .with_theme_kind(InterfaceThemeKind::Menu)
-            .build(window_cache, application, available_space)
+        window! {
+            title: "Create Character",
+            class: Self::window_class(),
+            theme: ClientThemeType::Menu,
+            closable: true,
+            elements: (
+                text_box! {
+                    text: "Character name",
+                    state: self.path,
+                    input_handler: DefaultHandler(self.path),
+                },
+                button! {
+                    text: "Create",
+                    event: move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
+                        let name = state.get(&self.path).clone();
+                        queue.queue(UserEvent::CreateCharacter { slot: self.slot, name });
+                    }
+                }
+            ),
+        }
     }
 }

@@ -34,7 +34,7 @@ where
 
         window! {
             title: "Profiler",
-            class: Some(WindowClass::Profiler),
+            class: Self::window_class(),
             theme: ClientThemeType::Game,
             closable: true,
             elements: (),

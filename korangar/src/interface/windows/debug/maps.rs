@@ -51,7 +51,7 @@ impl CustomWindow<ClientState> for MapsWindow {
 
         window! {
             title: "Maps",
-            class: Some(WindowClass::Maps),
+            class: Self::window_class(),
             theme: ClientThemeType::Game,
             closable: true,
             elements: std::array::from_fn::<_, MAP_COUNT, _>(|index| {

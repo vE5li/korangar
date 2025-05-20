@@ -126,7 +126,7 @@ pub fn text_box(token_stream: TokenStream) -> TokenStream {
         text_marker: { const std::marker::PhantomData },
         text: !,
         state: !,
-        input_handler: { korangar_interface::components::text_box::DefaultHandler },
+        input_handler: !,
         disabled: { false },
         foreground_color: { korangar_interface::theme::theme().text_box().foreground_color() },
         background_color: { korangar_interface::theme::theme().text_box().background_color() },

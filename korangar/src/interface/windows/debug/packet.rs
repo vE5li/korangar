@@ -36,7 +36,7 @@ where
 
         window! {
             title: "Network Packets",
-            class: Some(WindowClass::Packets),
+            class: Self::window_class(),
             theme: ClientThemeType::Game,
             closable: true,
             elements: (

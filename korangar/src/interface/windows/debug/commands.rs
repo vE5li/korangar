@@ -24,7 +24,7 @@ impl CustomWindow<ClientState> for CommandsWindow {
 
         window! {
             title: "Commands",
-            class: Some(WindowClass::Commands),
+            class: Self::window_class(),
             theme: ClientThemeType::Game,
             closable: true,
             elements: (

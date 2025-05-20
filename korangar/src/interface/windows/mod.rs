@@ -23,6 +23,7 @@ pub use self::settings::*;
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum WindowClass {
     AudioSettings,
+    CharacterCreation,
     CharacterOverview,
     CharacterSelection,
     GraphicsSettings,

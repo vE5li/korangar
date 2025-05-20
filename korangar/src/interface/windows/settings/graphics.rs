@@ -187,7 +187,7 @@ where
 
         window! {
             title: "Graphics Settings",
-            class: Some(WindowClass::GraphicsSettings),
+            class: Self::window_class(),
             theme: ClientThemeType::Game,
             closable: true,
             elements: elements,

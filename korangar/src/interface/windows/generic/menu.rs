@@ -24,7 +24,7 @@ impl CustomWindow<ClientState> for MenuWindow {
 
         window! {
             title: "Menu",
-            class: Some(WindowClass::Menu),
+            class: Self::window_class(),
             theme: ClientThemeType::Game,
             closable: true,
             elements: (

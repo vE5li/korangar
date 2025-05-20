@@ -146,7 +146,7 @@ where
 
         window! {
             title: "Select Server",
-            class: Some(WindowClass::SelectServer),
+            class: Self::window_class(),
             theme: ClientThemeType::Menu,
             elements: ServerWrapper::new(self.path),
         }

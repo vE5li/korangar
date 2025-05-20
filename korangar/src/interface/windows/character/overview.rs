@@ -107,7 +107,7 @@ where
 
         window! {
             title: "Character Overview",
-            class: Some(WindowClass::CharacterOverview),
+            class: Self::window_class(),
             theme: ClientThemeType::Game,
             elements: elements,
         }

@@ -60,10 +60,13 @@ pub enum UserEvent {
         slot: usize,
         name: String,
     },
-    DeleteCharacter(CharacterId),
-    RequestSwitchCharacterSlot(usize),
-    CancelSwitchCharacterSlot,
-    SwitchCharacterSlot(usize),
+    DeleteCharacter {
+        character_id: CharacterId,
+    },
+    SwitchCharacterSlot {
+        origin_slot: usize,
+        destination_slot: usize,
+    },
     RequestPlayerMove(Vector2<usize>),
     RequestPlayerInteract(EntityId),
     RequestWarpToMap(String, TilePosition),

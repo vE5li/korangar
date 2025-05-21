@@ -20,7 +20,7 @@ use crate::renderer::InterfaceRenderer;
 // TODO: rework all of this
 pub struct CharacterPreview {
     characters: PlainRemote<Vec<CharacterInformation>>,
-    move_request: PlainRemote<Option<usize>>,
+    switch_request: PlainRemote<Option<usize>>,
     slot: usize,
     state: ContainerState<InterfaceSettings>,
 }
@@ -28,10 +28,10 @@ pub struct CharacterPreview {
 impl CharacterPreview {
     fn get_elements(
         characters: &PlainRemote<Vec<CharacterInformation>>,
-        move_request: &PlainRemote<Option<usize>>,
+        switch_request: &PlainRemote<Option<usize>>,
         slot: usize,
     ) -> Vec<ElementCell<InterfaceSettings>> {
-        if let Some(origin_slot) = *move_request.get() {
+        if let Some(origin_slot) = *switch_request.get() {
             let text = match origin_slot == slot {
                 true => "Click to cancel",
                 false => "Switch",
@@ -81,13 +81,13 @@ impl CharacterPreview {
         ]
     }
 
-    pub fn new(characters: PlainRemote<Vec<CharacterInformation>>, move_request: PlainRemote<Option<usize>>, slot: usize) -> Self {
-        let elements = Self::get_elements(&characters, &move_request, slot);
+    pub fn new(characters: PlainRemote<Vec<CharacterInformation>>, switch_request: PlainRemote<Option<usize>>, slot: usize) -> Self {
+        let elements = Self::get_elements(&characters, &switch_request, slot);
         let state = ContainerState::new(elements);
 
         Self {
             characters,
-            move_request,
+            switch_request,
             slot,
             state,
         }
@@ -141,13 +141,13 @@ impl Element<InterfaceSettings> for CharacterPreview {
 
     fn update(&mut self) -> Option<ChangeEvent> {
         let characters_changed = self.characters.consume_changed();
-        let move_request_changed = self.move_request.consume_changed();
+        let switch_request_changed = self.switch_request.consume_changed();
 
-        if characters_changed || move_request_changed {
+        if characters_changed || switch_request_changed {
             let weak_self = self.state.state.self_element.take().unwrap();
             let weak_parent = self.state.state.parent_element.clone();
 
-            *self = Self::new(self.characters.clone(), self.move_request.clone(), self.slot);
+            *self = Self::new(self.characters.clone(), self.switch_request.clone(), self.slot);
 
             // important: link back after creating elements, otherwise focus navigation and
             // scrolling would break
@@ -160,7 +160,7 @@ impl Element<InterfaceSettings> for CharacterPreview {
     }
 
     fn left_click(&mut self, _update: &mut bool) -> Vec<ClickAction<InterfaceSettings>> {
-        if let Some(origin_slot) = *self.move_request.get() {
+        if let Some(origin_slot) = *self.switch_request.get() {
             let event = match origin_slot == self.slot {
                 true => UserEvent::CancelSwitchCharacterSlot,
                 false => UserEvent::SwitchCharacterSlot(self.slot),

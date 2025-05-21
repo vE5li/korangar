@@ -289,15 +289,10 @@ where
     //     }
     // }
 
-    #[cfg_attr(feature = "debug", korangar_debug::profile("check window exists"))]
-    fn window_exists(&self, window_class: Option<App::WindowClass>) -> bool {
-        match window_class {
-            Some(window_class) => self
-                .windows
-                .iter()
-                .any(|window| window.0.get_window_class().is_some_and(|class| class == window_class)),
-            None => false,
-        }
+    pub fn is_window_with_class_open(&self, window_class: App::WindowClass) -> bool {
+        self.windows
+            .iter()
+            .any(|window| window.0.get_window_class().is_some_and(|class| class == window_class))
     }
 
     fn open_new_window(&mut self, window: impl WindowTrait<App> + 'static) {
@@ -325,7 +320,7 @@ where
     where
         T: CustomWindow<App> + 'static,
     {
-        if !self.window_exists(T::window_class()) {
+        if !T::window_class().is_some_and(|window_class| self.is_window_with_class_open(window_class)) {
             let window = window.to_window(state, &self.window_cache, self.available_space);
             self.open_new_window(window);
         }
@@ -336,7 +331,7 @@ where
     where
         T: PrototypeWindow<App>,
     {
-        if !self.window_exists(T::window_class()) {
+        if !T::window_class().is_some_and(|window_class| self.is_window_with_class_open(window_class)) {
             let window = T::to_window(window_path, &self.window_cache, application, self.available_space);
             self.open_new_window(window);
         }

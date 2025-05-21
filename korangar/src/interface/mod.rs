@@ -19,6 +19,7 @@ pub mod components {
         use korangar_interface::element::store::ElementStore;
         use korangar_interface::event::{ClickAction, EventQueue};
         use korangar_interface::layout::alignment::{HorizontalAlignment, VerticalAlignment};
+        use korangar_interface::layout::area::Area;
         use korangar_interface::layout::{Layout, Resolver};
         use ragnarok_packets::{CharacterInformation, CharacterInformationPathExt};
         use rust_state::{Context, ManuallyAssertExt, Path, RustState, Selector};
@@ -34,17 +35,20 @@ pub mod components {
             pub background_color: ClientState,
         }
 
-        pub struct CharacterSlotPreview<P, A> {
-            pub path: P,
+        pub struct CharacterSlotPreview<P, M, A, B> {
+            pub character_information: P,
+            pub switch_request: M,
             pub background_color: A,
-            pub click_handler: CharacterSlotPreviewHandler,
+            pub click_handler: CharacterSlotPreviewHandler<B, P>,
             pub slot: usize,
         }
 
-        impl<P, A> Element<ClientState> for CharacterSlotPreview<P, A>
+        impl<P, M, A, B> Element<ClientState> for CharacterSlotPreview<P, M, A, B>
         where
             P: Path<ClientState, CharacterInformation, false>,
+            M: Path<ClientState, Option<usize>>,
             A: Selector<ClientState, Color>,
+            B: Path<ClientState, Option<usize>>,
         {
             fn get_height(&self, state: &Context<ClientState>, _: &ElementStore, _: &mut ElementIdGenerator, resolver: &mut Resolver) {
                 resolver.with_height(180.0);
@@ -60,11 +64,93 @@ pub mod components {
             ) {
                 let area = resolver.with_height(180.0);
 
-                let is_hoverered = layout.is_area_hovered_and_active(area);
+                if let Some(switch_request) = state.get(&self.switch_request) {
+                    let is_hoverered = layout.is_area_hovered_and_active(area);
 
-                layout.add_rectangle(area, CornerRadius::uniform(2.0), *state.get(&self.background_color));
+                    let background_color = match is_hoverered {
+                        true => Color::monochrome_u8(95),
+                        false => *state.get(&self.background_color),
+                    };
+                    layout.add_rectangle(area, CornerRadius::uniform(25.0), background_color);
 
-                if let Some(character_information) = state.try_get(&self.path) {
+                    if *switch_request == self.slot {
+                        layout.add_text(
+                            area,
+                            "Cancel",
+                            FontSize(14.0),
+                            Color::WHITE,
+                            HorizontalAlignment::Center { offset: 0.0 },
+                            VerticalAlignment::Center { offset: 0.0 },
+                        );
+
+                        if is_hoverered {
+                            layout.add_click_area(area, &self.click_handler.cancel_switch);
+                        }
+                    } else {
+                        layout.add_text(
+                            area,
+                            "Switch slots",
+                            FontSize(14.0),
+                            Color::WHITE,
+                            HorizontalAlignment::Center { offset: 0.0 },
+                            VerticalAlignment::Center { offset: 0.0 },
+                        );
+
+                        if is_hoverered {
+                            layout.add_click_area(area, &self.click_handler.request_switch);
+                        }
+                    }
+
+                    return;
+                }
+
+                if let Some(character_information) = state.try_get(&self.character_information) {
+                    let switch_area = Area {
+                        x: area.x,
+                        y: area.y + area.height - 40.0,
+                        width: 50.0,
+                        height: 30.0,
+                    };
+
+                    let is_switch_hoverered = layout.is_area_hovered_and_active(switch_area);
+                    if is_switch_hoverered {
+                        layout.mark_hovered();
+                        layout.add_click_area(area, &self.click_handler.start_switch);
+                    }
+
+                    let delete_area = Area {
+                        x: area.x + area.width - 50.0,
+                        y: area.y + area.height - 40.0,
+                        width: 50.0,
+                        height: 30.0,
+                    };
+
+                    let is_delete_hoverered = layout.is_area_hovered_and_active(delete_area);
+                    if is_delete_hoverered {
+                        layout.mark_hovered();
+                        layout.add_click_area(area, &self.click_handler.delete_character);
+                    }
+
+                    let is_hoverered = layout.is_area_hovered_and_active(area);
+
+                    let background_color = match is_hoverered {
+                        true => Color::monochrome_u8(95),
+                        false => *state.get(&self.background_color),
+                    };
+                    layout.add_rectangle(area, CornerRadius::uniform(25.0), background_color);
+
+                    let background_color = match is_switch_hoverered {
+                        true => Color::monochrome_u8(180),
+                        false => Color::monochrome_u8(150),
+                    };
+                    layout.add_rectangle(switch_area, CornerRadius::uniform(25.0), background_color);
+
+                    let background_color = match is_delete_hoverered {
+                        true => Color::rgb_u8(255, 70, 70),
+                        false => Color::rgb_u8(180, 50, 50),
+                    };
+                    layout.add_rectangle(delete_area, CornerRadius::uniform(25.0), background_color);
+
                     layout.add_text(
                         area,
                         &character_information.name,
@@ -87,7 +173,7 @@ pub mod components {
                         area,
                         self.click_handler
                             .base_level_str
-                            .get_str(self.path.manually_asserted().base_level(), state),
+                            .get_str(self.character_information.manually_asserted().base_level(), state),
                         FontSize(14.0),
                         Color::rgb_u8(200, 200, 150),
                         HorizontalAlignment::Right { offset: 5.0 },
@@ -107,7 +193,7 @@ pub mod components {
                         area,
                         self.click_handler
                             .job_level_str
-                            .get_str(self.path.manually_asserted().job_level(), state),
+                            .get_str(self.character_information.manually_asserted().job_level(), state),
                         FontSize(14.0),
                         Color::rgb_u8(200, 200, 150),
                         HorizontalAlignment::Right { offset: 5.0 },
@@ -137,6 +223,14 @@ pub mod components {
                         layout.mark_hovered();
                     }
                 } else {
+                    let is_hoverered = layout.is_area_hovered_and_active(area);
+
+                    let background_color = match is_hoverered {
+                        true => Color::monochrome_u8(95),
+                        false => *state.get(&self.background_color),
+                    };
+                    layout.add_rectangle(area, CornerRadius::uniform(25.0), background_color);
+
                     layout.add_text(
                         area,
                         "Create Character",
@@ -213,18 +307,98 @@ pub mod components {
             }
         }
 
-        pub struct CharacterSlotPreviewHandler {
+        struct StartSwitch<P> {
+            switch_request: P,
+            slot: usize,
+        }
+
+        impl<P> ClickAction<ClientState> for StartSwitch<P>
+        where
+            P: Path<ClientState, Option<usize>>,
+        {
+            fn execute(&self, state: &Context<ClientState>, _: &mut EventQueue<ClientState>) {
+                state.update_value(self.switch_request, Some(self.slot));
+            }
+        }
+
+        struct CancelSwitch<P> {
+            switch_request: P,
+        }
+
+        impl<P> ClickAction<ClientState> for CancelSwitch<P>
+        where
+            P: Path<ClientState, Option<usize>>,
+        {
+            fn execute(&self, state: &Context<ClientState>, _: &mut EventQueue<ClientState>) {
+                state.update_value(self.switch_request, None);
+            }
+        }
+
+        struct RequestSwitch<P> {
+            switch_request: P,
+            slot: usize,
+        }
+
+        impl<P> ClickAction<ClientState> for RequestSwitch<P>
+        where
+            P: Path<ClientState, Option<usize>>,
+        {
+            fn execute(&self, state: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
+                // SAFETY
+                // We should not be able to get here if there is no switch request, so it's
+                // fine to unwrap.
+                let origin_slot = state.get(&self.switch_request).unwrap();
+
+                queue.queue(UserEvent::SwitchCharacterSlot {
+                    origin_slot,
+                    destination_slot: self.slot,
+                });
+            }
+        }
+
+        struct DeleteCharacter<P> {
+            character_information: P,
+        }
+
+        impl<P> ClickAction<ClientState> for DeleteCharacter<P>
+        where
+            P: Path<ClientState, CharacterInformation, false>,
+        {
+            fn execute(&self, state: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
+                // SAFETY
+                // We should not be able to get here if the character is not present, so it's
+                // fine to unwrap.
+                let character_information = state.try_get(&self.character_information).unwrap();
+                let character_id = character_information.character_id;
+
+                queue.queue(UserEvent::DeleteCharacter { character_id });
+            }
+        }
+
+        pub struct CharacterSlotPreviewHandler<P, D> {
             select_character: SelectCharacter,
             create_character: CreateCharacter,
+            start_switch: StartSwitch<P>,
+            cancel_switch: CancelSwitch<P>,
+            request_switch: RequestSwitch<P>,
+            delete_character: DeleteCharacter<D>,
             base_level_str: PartialEqDisplayStr<i16>,
             job_level_str: PartialEqDisplayStr<i32>,
         }
 
-        impl CharacterSlotPreviewHandler {
-            pub fn new(slot: usize) -> Self {
+        impl<P, D> CharacterSlotPreviewHandler<P, D>
+        where
+            P: Path<ClientState, Option<usize>>,
+            D: Path<ClientState, CharacterInformation, false>,
+        {
+            pub fn new(switch_request: P, character_information: D, slot: usize) -> Self {
                 Self {
                     select_character: SelectCharacter { slot },
                     create_character: CreateCharacter { slot },
+                    start_switch: StartSwitch { switch_request, slot },
+                    cancel_switch: CancelSwitch { switch_request },
+                    request_switch: RequestSwitch { switch_request, slot },
+                    delete_character: DeleteCharacter { character_information },
                     base_level_str: PartialEqDisplayStr::new(),
                     job_level_str: PartialEqDisplayStr::new(),
                 }

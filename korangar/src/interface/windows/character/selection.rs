@@ -16,14 +16,14 @@ use crate::state::{ClientState, ClientThemeType};
 
 pub struct CharacterSelectionWindow<C, M> {
     character_slots: C,
-    move_request: M,
+    switch_request: M,
 }
 
 impl<C, M> CharacterSelectionWindow<C, M> {
-    pub fn new(characters: C, move_request: M) -> Self {
+    pub fn new(characters: C, switch_request: M) -> Self {
         Self {
             character_slots: characters,
-            move_request,
+            switch_request,
         }
     }
 }
@@ -47,7 +47,7 @@ where
 
         struct CharacterWrapper<C, M> {
             character_slots: C,
-            move_request: M,
+            switch_request: M,
             item_boxes: UnsafeCell<Vec<Box<dyn Element<ClientState>>>>,
         }
 
@@ -56,10 +56,10 @@ where
             C: Path<ClientState, CharacterSlots>,
             M: Path<ClientState, Option<usize>>,
         {
-            fn new(character_slots: C, move_request: M) -> Self {
+            fn new(character_slots: C, switch_request: M) -> Self {
                 Self {
                     character_slots,
-                    move_request,
+                    switch_request,
                     item_boxes: UnsafeCell::new(Vec::new()),
                 }
             }
@@ -80,28 +80,33 @@ where
                         item_boxes.push(Box::new(split! {
                             children: (
                                 character_slot_preview! {
-                                    path: path.in_slot(slot),
-                                    click_handler: CharacterSlotPreviewHandler::new(slot),
+                                    character_information: path.in_slot(slot),
+                                    switch_request: self.switch_request,
+                                    click_handler: CharacterSlotPreviewHandler::new(self.switch_request, path.in_slot(slot), slot),
                                     slot: slot,
                                 },
                                 character_slot_preview! {
-                                    path: path.in_slot(slot + 1),
-                                    click_handler: CharacterSlotPreviewHandler::new(slot + 1),
+                                    character_information: path.in_slot(slot + 1),
+                                    switch_request: self.switch_request,
+                                    click_handler: CharacterSlotPreviewHandler::new(self.switch_request, path.in_slot(slot + 1), slot + 1),
                                     slot: slot + 1,
                                 },
                                 character_slot_preview! {
-                                    path: path.in_slot(slot + 2),
-                                    click_handler: CharacterSlotPreviewHandler::new(slot + 2),
+                                    character_information: path.in_slot(slot + 2),
+                                    switch_request: self.switch_request,
+                                    click_handler: CharacterSlotPreviewHandler::new(self.switch_request, path.in_slot(slot + 2), slot + 2),
                                     slot: slot + 2,
                                 },
                                 character_slot_preview! {
-                                    path: path.in_slot(slot + 3),
-                                    click_handler: CharacterSlotPreviewHandler::new(slot + 3),
+                                    character_information: path.in_slot(slot + 3),
+                                    switch_request: self.switch_request,
+                                    click_handler: CharacterSlotPreviewHandler::new(self.switch_request, path.in_slot(slot + 3), slot + 3),
                                     slot: slot + 3,
                                 },
                                 character_slot_preview! {
-                                    path: path.in_slot(slot + 4),
-                                    click_handler: CharacterSlotPreviewHandler::new(slot + 4),
+                                    character_information: path.in_slot(slot + 4),
+                                    switch_request: self.switch_request,
+                                    click_handler: CharacterSlotPreviewHandler::new(self.switch_request, path.in_slot(slot + 4), slot + 4),
                                     slot: slot + 4,
                                 },
                             )
@@ -172,7 +177,7 @@ where
             title: "Select Character",
             class: Self::window_class(),
             theme: ClientThemeType::Menu,
-            elements: CharacterWrapper::new(self.character_slots, self.move_request),
+            elements: CharacterWrapper::new(self.character_slots, self.switch_request),
         }
     }
 }

@@ -448,7 +448,7 @@ mod state {
         pub sell_items: Vec<SellItem<(ResourceMetadata, u16)>>,
         pub currently_deleting: Option<CharacterId>,
         pub player_name: String,
-        pub move_request: Option<usize>,
+        pub switch_request: Option<usize>,
 
         pub entities: Vec<Entity>,
 
@@ -1125,7 +1125,7 @@ impl Client {
         let sell_items: Vec<SellItem<(ResourceMetadata, u16)>> = Vec::default();
         let currently_deleting: Option<CharacterId> = None;
         let player_name = String::new();
-        let move_request: Option<usize> = None;
+        let switch_request: Option<usize> = None;
         let saved_login_server_address = None;
         let saved_password = String::new();
         let saved_username = String::new();
@@ -1241,7 +1241,7 @@ impl Client {
             sell_items,
             currently_deleting,
             player_name,
-            move_request: None,
+            switch_request: None,
 
             entities: Vec::new(),
 
@@ -1560,13 +1560,15 @@ impl Client {
                         .follow_mut(client_state().character_slots())
                         .set_characters(characters);
 
-                    // TODO: this will do one unnecessary restore_focus. check
-                    // if that will be problematic
-                    self.interface.close_all_windows_except(DEBUG_WINDOWS);
-                    self.interface.open_window(
-                        &self.client_state,
-                        CharacterSelectionWindow::new(client_state().character_slots(), client_state().move_request()),
-                    );
+                    if !self.interface.is_window_with_class_open(WindowClass::CharacterSelection) {
+                        // TODO: this will do one unnecessary restore_focus. check
+                        // if that will be problematic
+                        self.interface.close_all_windows_except(DEBUG_WINDOWS);
+                        self.interface.open_window(
+                            &self.client_state,
+                            CharacterSelectionWindow::new(client_state().character_slots(), client_state().switch_request()),
+                        );
+                    }
                 }
                 NetworkEvent::CharacterSelectionFailed { message, .. } => {
                     self.interface.open_window(&self.client_state, ErrorWindow::new(message.to_owned()))
@@ -1656,7 +1658,9 @@ impl Client {
                 NetworkEvent::CharacterCreationFailed { message, .. } => {
                     self.interface.open_window(&self.client_state, ErrorWindow::new(message.to_owned()));
                 }
-                NetworkEvent::CharacterSlotSwitched => {}
+                NetworkEvent::CharacterSlotSwitched => {
+                    *self.client_state.follow_mut(client_state().switch_request()) = None;
+                }
                 NetworkEvent::CharacterSlotSwitchFailed => {
                     self.interface.open_window(
                         &self.client_state,
@@ -2254,19 +2258,17 @@ impl Client {
                 UserEvent::CreateCharacter { slot, name } => {
                     let _ = self.networking_system.create_character(slot, name);
                 }
-                UserEvent::DeleteCharacter(character_id) => {
+                UserEvent::DeleteCharacter { character_id } => {
                     if self.client_state.follow(client_state().currently_deleting()).is_none() {
                         let _ = self.networking_system.delete_character(character_id);
                         *self.client_state.follow_mut(client_state().currently_deleting()) = Some(character_id);
                     }
                 }
-                UserEvent::RequestSwitchCharacterSlot(origin_slot) => {} //self.move_request.set(Some(origin_slot)),
-                UserEvent::CancelSwitchCharacterSlot => {}               // self.move_request.set(None),
-                UserEvent::SwitchCharacterSlot(destination_slot) => {
-                    // let _ = self
-                    //     .networking_system
-                    //     .switch_character_slot(self.move_request.take().
-                    // unwrap(), destination_slot);
+                UserEvent::SwitchCharacterSlot {
+                    origin_slot,
+                    destination_slot,
+                } => {
+                    let _ = self.networking_system.switch_character_slot(origin_slot, destination_slot);
                 }
                 UserEvent::RequestPlayerMove(destination) => {
                     if self.client_state.try_follow(this_entity()).is_some() {
@@ -2583,7 +2585,7 @@ impl Client {
 
                             self.interface.open_window(
                                 &self.client_state,
-                                CharacterSelectionWindow::new(client_state().character_slots(), client_state().move_request()),
+                                CharacterSelectionWindow::new(client_state().character_slots(), client_state().switch_request()),
                             );
 
                             self.start_camera.set_focus_point(START_CAMERA_FOCUS_POINT);

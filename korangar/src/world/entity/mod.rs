@@ -24,9 +24,9 @@ use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 use crate::interface::theme::GameTheme;
 use crate::interface::windows::WindowCache;
+use crate::loaders::GameFileLoader;
 #[cfg(feature = "debug")]
-use crate::loaders::split_mesh_by_texture;
-use crate::loaders::{GAT_TILE_SIZE, GameFileLoader};
+use crate::loaders::{GAT_TILE_SIZE, split_mesh_by_texture};
 use crate::renderer::GameInterfaceRenderer;
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;

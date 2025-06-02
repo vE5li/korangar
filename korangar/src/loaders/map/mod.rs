@@ -44,8 +44,8 @@ fn assert_byte_reader_empty<Meta>(mut byte_reader: ByteReader<Meta>, file_name: 
 
 #[derive(new)]
 pub struct MapLoader {
-    device: Arc<Device>,
-    queue: Arc<Queue>,
+    device: Device,
+    queue: Queue,
     game_file_loader: Arc<GameFileLoader>,
     audio_engine: Arc<AudioEngine<GameFileLoader>>,
     bindless_support: BindlessSupport,

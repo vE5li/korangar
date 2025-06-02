@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use cgmath::Vector2;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, print_debug};
@@ -37,7 +35,7 @@ impl PresentModeInfo {
 }
 
 pub struct Surface {
-    device: Arc<Device>,
+    device: Device,
     surface: wgpu::Surface<'static>,
     config: SurfaceConfiguration,
     present_mode_info: PresentModeInfo,
@@ -47,7 +45,7 @@ pub struct Surface {
 impl Surface {
     pub fn new(
         adapter: &Adapter,
-        device: Arc<Device>,
+        device: Device,
         surface: wgpu::Surface<'static>,
         window_width: u32,
         window_height: u32,

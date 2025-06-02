@@ -295,9 +295,9 @@ struct Client {
     networking_system: NetworkingSystem<NoPacketCallback>,
     audio_engine: Arc<AudioEngine<GameFileLoader>>,
     graphics_engine: GraphicsEngine,
-    queue: Arc<Queue>,
+    queue: Queue,
     #[cfg(feature = "debug")]
-    device: Arc<Device>,
+    device: Device,
     window: Option<Arc<Window>>,
 }
 
@@ -370,8 +370,6 @@ impl Client {
                     .await
                     .unwrap()
             });
-            let device = Arc::new(device);
-            let queue = Arc::new(queue);
 
             #[cfg(feature = "debug")]
             device.on_uncaptured_error(Box::new(error_handler));

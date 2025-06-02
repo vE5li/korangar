@@ -38,8 +38,8 @@ pub enum ImageType {
 }
 
 pub struct TextureLoader {
-    device: Arc<Device>,
-    queue: Arc<Queue>,
+    device: Device,
+    queue: Queue,
     game_file_loader: Arc<GameFileLoader>,
     mip_map_render_context: MipMapRenderPassContext,
     lanczos3_drawer: Lanczos3Drawer,
@@ -51,7 +51,7 @@ pub struct TextureLoader {
 }
 
 impl TextureLoader {
-    pub fn new(device: Arc<Device>, queue: Arc<Queue>, capabilities: &Capabilities, game_file_loader: Arc<GameFileLoader>) -> Self {
+    pub fn new(device: Device, queue: Queue, capabilities: &Capabilities, game_file_loader: Arc<GameFileLoader>) -> Self {
         let lanczos3_drawer = Lanczos3Drawer::new(&device);
         let block_compressor = Mutex::new(GpuBlockCompressor::new(device.clone(), queue.clone()));
 

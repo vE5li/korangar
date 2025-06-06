@@ -48,7 +48,15 @@ pub fn derive_prototype_element_struct(
     if initializers.len() == 1 && is_unnamed {
         return quote! {
             impl<App: korangar_interface::application::Appli> #impl_generics korangar_interface::element::PrototypeElement<App> for #name #type_generics #where_clause {
-                fn to_element(self_path: impl rust_state::Path<App, Self>, name: String) -> impl korangar_interface::element::Element<App> {
+                type Layouted = impl std::any::Any;
+                type Return<P>
+                    = impl korangar_interface::element::Element<App, Layouted = Self::Layouted>
+                where
+                    P: rust_state::Path<App, Self>;
+
+                fn to_element<P>(self_path: P, name: String) -> Self::Return<P>
+                    where P: rust_state::Path<App, Self>
+                {
                     use korangar_interface::prelude::*;
 
                     // korangar_interface::element::PrototypeElement::to_element(&self.0, name)
@@ -67,7 +75,15 @@ pub fn derive_prototype_element_struct(
 
     let output = quote! {
         impl<App: korangar_interface::application::Appli> #impl_generics korangar_interface::element::PrototypeElement<App> for #name #type_generics #where_clause {
-            fn to_element(self_path: impl rust_state::Path<App, Self>, name: String) -> impl korangar_interface::element::Element<App> {
+            type Layouted = impl std::any::Any;
+            type Return<P>
+                = impl korangar_interface::element::Element<App, Layouted = Self::Layouted>
+            where
+                P: rust_state::Path<App, Self>;
+
+            fn to_element<P>(self_path: P, name: String) -> Self::Return<P>
+                where P: rust_state::Path<App, Self>
+            {
                 use korangar_interface::prelude::*;
 
                 collapsable! {
@@ -114,7 +130,15 @@ pub fn derive_prototype_element_enum(data_enum: DataEnum, generics: Generics, na
 
     quote! {
         impl<App: korangar_interface::application::Appli> #impl_generics korangar_interface::element::PrototypeElement<App> for #name #type_generics #where_clause {
-            fn to_element(self_path: impl rust_state::Path<App, Self>, name: String) -> impl korangar_interface::element::Element<App> {
+            type Layouted = impl std::any::Any;
+            type Return<P>
+                = impl korangar_interface::element::Element<App, Layouted = Self::Layouted>
+            where
+                P: rust_state::Path<App, Self>;
+
+            fn to_element<P>(self_path: P, name: String) -> Self::Return<P>
+                where P: rust_state::Path<App, Self>
+            {
                 use korangar_interface::prelude::*;
                 // match self {
                 //     #( Self::#variants => korangar_interface::element::PrototypeElement::to_element(&#variant_strings, display), )*

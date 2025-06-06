@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::marker::PhantomData;
 
 pub use interface_macros::PrototypeWindow;
@@ -5,8 +6,8 @@ use rust_state::{Context, RustState, Selector};
 use store::WindowStore;
 
 use crate::application::{Appli, CornerRadiusTrait, PositionTrait, SizeTrait};
-use crate::element::ElementSet;
 use crate::element::id::ElementIdGenerator;
+use crate::element::{DefaultLayoutedSet, ElementSet};
 use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
 use crate::layout::area::Area;
 use crate::layout::{Layout, Resolver};
@@ -29,14 +30,18 @@ pub mod store {
     pub struct WindowStore {
         // The element stores need to be in a Box so that we can safely pass out references
         // to them without worrying about relocation of the hashmap when inserting new children.
-        stores: UnsafeCell<HashMap<u64, Box<ElementStore>>>,
+        stores: HashMap<u64, Box<ElementStore>>,
     }
 
     impl WindowStore {
-        pub fn get_from_window_id(&self, window_id: u64, generator: &mut ElementIdGenerator) -> &ElementStore {
-            let stores = unsafe { &mut *self.stores.get() };
+        pub fn get_or_create_from_window_id(&mut self, window_id: u64, generator: &mut ElementIdGenerator) -> &mut ElementStore {
+            self.stores
+                .entry(window_id)
+                .or_insert_with(|| Box::new(ElementStore::root(generator)))
+        }
 
-            stores.entry(window_id).or_insert_with(|| Box::new(ElementStore::root(generator)))
+        pub fn get_from_window_id(&self, window_id: u64) -> &ElementStore {
+            self.stores.get(&window_id).expect("This shouldn't happen")
         }
     }
 }
@@ -45,12 +50,20 @@ pub mod store {
 pub trait WindowTrait<App: Appli> {
     fn get_window_class(&self) -> Option<App::WindowClass>;
 
+    fn make_layout(
+        &mut self,
+        state: &Context<App>,
+        store: &mut WindowStore,
+        data: &WindowData<App>,
+        generator: &mut ElementIdGenerator,
+    ) -> Box<dyn Any>;
+
     fn do_layout<'a>(
         &'a self,
         state: &'a Context<App>,
         store: &'a WindowStore,
         data: &'a WindowData<App>,
-        generator: &mut ElementIdGenerator,
+        layouted: &'a Box<dyn Any>,
         layout: &mut Layout<'a, App>,
     );
 }
@@ -81,6 +94,12 @@ where
     pub id: u64,
     pub position: App::Position,
     pub size: App::Size,
+}
+
+struct WindowLayoutedSet<T> {
+    area: Area,
+    title_area: Area,
+    children: T,
 }
 
 pub struct Window<App, Title, A, B, C, D, E, F, G, H, I, J, Elements>
@@ -118,22 +137,20 @@ where
     I: Selector<App, App::CornerRadius>,
     J: Selector<App, bool>,
     Elements: ElementSet<App>,
+    <Elements as ElementSet<App>>::Layouted: 'static,
 {
     fn get_window_class(&self) -> Option<App::WindowClass> {
         self.class
     }
 
-    // TODO: Rename
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn do_layout<'a>(
-        &'a self,
-        state: &'a Context<App>,
-        store: &'a WindowStore,
-        data: &'a WindowData<App>,
+    fn make_layout(
+        &mut self,
+        state: &Context<App>,
+        store: &mut WindowStore,
+        data: &WindowData<App>,
         generator: &mut ElementIdGenerator,
-        layout: &mut Layout<'a, App>,
-    ) {
-        let store = store.get_from_window_id(data.id, generator);
+    ) -> Box<dyn Any> {
+        let store = store.get_or_create_from_window_id(data.id, generator);
 
         let available_area = Area {
             x: data.position.left(),
@@ -149,31 +166,47 @@ where
         let title_height = *state.get(&self.title_height);
         let title_area = resolver.with_height(title_height);
 
-        let area = layout.with_clip_layer(|layout| {
-            resolver.with_derived(*state.get(&self.gaps), *state.get(&self.border), |resolver| {
-                // TODO: Very much temp
-                layout.push_layer();
-
-                self.elements.create_layout(state, store, generator, resolver, layout);
-
-                // TODO: Very much temp
-                layout.pop_layer();
-            })
+        let (area, children) = resolver.with_derived(*state.get(&self.gaps), *state.get(&self.border), |resolver| {
+            self.elements.make_layout(state, store, generator, resolver)
         });
 
-        let window_area = Area {
+        let area = Area {
             x: title_area.x,
             y: title_area.y,
             width: title_area.width,
             height: title_area.height + area.height,
         };
 
+        Box::new(WindowLayoutedSet {
+            area,
+            title_area,
+            children,
+        })
+    }
+
+    // TODO: Rename
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
+    fn do_layout<'a>(
+        &'a self,
+        state: &'a Context<App>,
+        store: &'a WindowStore,
+        data: &'a WindowData<App>,
+        layouted: &'a Box<dyn Any>,
+        layout: &mut Layout<'a, App>,
+    ) {
+        let store = store.get_from_window_id(data.id);
+        let layouted = layouted
+            .downcast_ref::<WindowLayoutedSet<<Elements as ElementSet<App>>::Layouted>>()
+            .unwrap();
+
+        App::set_current_theme_type(self.theme);
+
         let close_button = if *state.get(&self.closable) {
             let close_button_area = Area {
-                x: title_area.x + title_area.width - 40.0,
-                y: title_area.y,
+                x: layouted.title_area.x + layouted.title_area.width - 40.0,
+                y: layouted.title_area.y,
                 width: 30.0,
-                height: title_area.height,
+                height: layouted.title_area.height,
             };
 
             let close_button_color = match layout.is_area_hovered_and_active(close_button_area) {
@@ -191,13 +224,21 @@ where
             None
         };
 
-        let title_color = match layout.is_area_hovered_and_active(title_area) {
+        layout.with_clip_layer(layouted.area, |layout| {
+            layout.push_layer();
+
+            self.elements.create_layout(state, store, &layouted.children, layout);
+
+            layout.pop_layer();
+        });
+
+        let title_color = match layout.is_area_hovered_and_active(layouted.title_area) {
             true => *state.get(&self.hovered_title_color),
             false => *state.get(&self.title_color),
         };
 
         layout.add_text(
-            title_area,
+            layouted.title_area,
             state.get(&self.title).as_ref(),
             *state.get(&self.font_size),
             title_color,
@@ -205,17 +246,21 @@ where
             *state.get(&theme().window().vertical_alignment()),
         );
 
-        if layout.is_area_hovered_and_active(title_area) {
-            layout.add_window_move_area(title_area, data.id);
+        if layout.is_area_hovered_and_active(layouted.title_area) {
+            layout.add_window_move_area(layouted.title_area, data.id);
             layout.mark_hovered();
         }
 
-        layout.add_rectangle(window_area, *state.get(&self.corner_radius), *state.get(&self.background_color));
+        layout.add_rectangle(
+            layouted.area,
+            *state.get(&self.corner_radius),
+            *state.get(&self.background_color),
+        );
 
         // TODO: Compute this better.
         let resize_area = Area {
-            x: window_area.x + window_area.width - 14.0,
-            y: window_area.y + window_area.height - 14.0,
+            x: layouted.area.x + layouted.area.width - 14.0,
+            y: layouted.area.y + layouted.area.height - 14.0,
             width: 14.0,
             height: 14.0,
         };
@@ -250,7 +295,7 @@ where
             layout.mark_hovered();
         }
 
-        if layout.is_area_hovered_and_active(window_area) {
+        if layout.is_area_hovered_and_active(layouted.area) {
             layout.mark_hovered();
         }
     }

@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::array;
 use std::cell::UnsafeCell;
 use std::cmp::Ordering;
@@ -18,7 +19,15 @@ use crate::layout::{Layout, Resolver};
 
 // TODO: Rename this to StateElement
 pub trait PrototypeElement<App: Appli> {
-    fn to_element(self_path: impl Path<App, Self>, name: String) -> impl Element<App>;
+    type Return<P>: Element<App, Layouted = Self::Layouted>
+    where
+        P: Path<App, Self>;
+
+    type Layouted;
+
+    fn to_element<P>(self_path: P, name: String) -> Self::Return<P>
+    where
+        P: Path<App, Self>;
 
     // TODO: Add `to_element_mut`
 }
@@ -129,7 +138,16 @@ where
     App: Appli,
     T: ElementDisplay + NoPrototype,
 {
-    fn to_element(self_path: impl Path<App, Self>, name: String) -> impl Element<App> {
+    type Layouted = impl Any;
+    type Return<P>
+        = impl Element<App, Layouted = Self::Layouted>
+    where
+        P: Path<App, Self>;
+
+    fn to_element<P>(self_path: P, name: String) -> Self::Return<P>
+    where
+        P: Path<App, Self>,
+    {
         button! {
             text: name,
             event: move |state: &Context<App>, _: &mut EventQueue<App>| {
@@ -147,7 +165,16 @@ where
     App: Appli,
     T: PrototypeElement<App>,
 {
-    fn to_element(self_path: impl Path<App, Self>, name: String) -> impl Element<App> {
+    type Layouted = impl Any;
+    type Return<P>
+        = impl Element<App, Layouted = Self::Layouted>
+    where
+        P: Path<App, Self>;
+
+    fn to_element<P>(self_path: P, name: String) -> Self::Return<P>
+    where
+        P: Path<App, Self>,
+    {
         use korangar_interface::prelude::*;
 
         button! {
@@ -164,7 +191,16 @@ where
     App: Appli,
     T: PrototypeElement<App>,
 {
-    fn to_element(self_path: impl Path<App, Self>, name: String) -> impl Element<App> {
+    type Layouted = impl Any;
+    type Return<P>
+        = impl Element<App, Layouted = Self::Layouted>
+    where
+        P: Path<App, Self>;
+
+    fn to_element<P>(self_path: P, name: String) -> Self::Return<P>
+    where
+        P: Path<App, Self>,
+    {
         use korangar_interface::prelude::*;
 
         button! {
@@ -181,7 +217,16 @@ where
     App: Appli,
     T: PrototypeElement<App> + 'static,
 {
-    fn to_element(self_path: impl Path<App, Self>, name: String) -> impl Element<App> {
+    type Layouted = impl Any;
+    type Return<P>
+        = impl Element<App, Layouted = Self::Layouted>
+    where
+        P: Path<App, Self>;
+
+    fn to_element<P>(self_path: P, name: String) -> Self::Return<P>
+    where
+        P: Path<App, Self>,
+    {
         let elements: [impl Element<App>; SIZE] = array::from_fn(|index| {
             let item_path = self_path.array_index(index).manually_asserted();
             T::to_element(item_path, index.to_string())
@@ -320,15 +365,25 @@ where
     App: Appli,
     T: PrototypeElement<App> + 'static,
 {
-    fn to_element(self_path: impl Path<App, Self>, name: String) -> impl Element<App> {
+    type Layouted = impl Any;
+    type Return<P>
+        = impl Element<App, Layouted = Self::Layouted>
+    where
+        P: Path<App, Self>;
+
+    fn to_element<P>(self_path: P, name: String) -> Self::Return<P>
+    where
+        P: Path<App, Self>,
+    {
         use rust_state::{ManuallyAssertExt, VecIndexExt};
 
         struct VecWrapper<App, T, P>
         where
             App: Appli,
+            T: PrototypeElement<App>,
         {
             self_path: P,
-            item_boxes: UnsafeCell<Vec<Box<dyn Element<App>>>>,
+            item_boxes: Vec<Box<dyn Element<App, Layouted = <T as PrototypeElement<App>>::Layouted>>>,
             _marker: PhantomData<T>,
         }
 
@@ -338,32 +393,35 @@ where
             T: PrototypeElement<App> + 'static,
             P: Path<App, Vec<T>>,
         {
+            // TODO: Refactor to not have to re-allocate this every frame.
+            type Layouted = Vec<T::Layouted>;
+
             fn get_element_count(&self) -> usize {
                 unimplemented!("We need to take the state, store, genertor, and resolver here too to give the number of elements")
             }
 
-            fn get_height(
-                &self,
+            fn make_layout(
+                &mut self,
                 state: &Context<App>,
-                store: &ElementStore,
+                store: &mut ElementStore,
                 generator: &mut ElementIdGenerator,
                 mut resolver_set: impl ResolverSet,
-            ) {
+            ) -> Self::Layouted {
                 let vector = state.get(&self.self_path);
-                let item_boxes = unsafe { &mut *self.item_boxes.get() };
 
-                match item_boxes.len().cmp(&vector.len()) {
+                match self.item_boxes.len().cmp(&vector.len()) {
                     Ordering::Greater => {
                         // Delete excess elements.
-                        item_boxes.truncate(vector.len());
+                        self.item_boxes.truncate(vector.len());
                     }
                     Ordering::Less => {
                         // Add new elements.
-                        for index in item_boxes.len()..vector.len() {
-                            item_boxes.push({
+                        for index in self.item_boxes.len()..vector.len() {
+                            self.item_boxes.push({
                                 let item_path = self.self_path.index(index).manually_asserted();
                                 let item_element = PrototypeElement::to_element(item_path, index.to_string());
-                                let item_box: Box<dyn Element<App>> = Box::new(item_element);
+                                let item_box: Box<dyn Element<App, Layouted = <T as PrototypeElement<App>>::Layouted>> =
+                                    Box::new(item_element);
                                 item_box
                             });
                         }
@@ -371,60 +429,33 @@ where
                     Ordering::Equal => {}
                 }
 
-                // FIX: Make this right. Maybe with_derived should expect a resolver set as well
+                // FIX: Make this right. Maybe with_derived should expect a resolverset as well
                 resolver_set.with_index(0, |resolver| {
                     resolver.with_derived(2.0, 4.0, |resolver| {
-                        for (index, item_box) in item_boxes.iter().enumerate() {
-                            item_box.get_height(state, store.child_store(index as u64, generator), generator, resolver);
+                        for (index, item_box) in self.item_boxes.iter_mut().enumerate() {
+                            item_box.make_layout(
+                                state,
+                                store.get_or_create_child_store(index as u64, generator),
+                                generator,
+                                resolver,
+                            );
                         }
                     });
                 });
+
+                todo!()
             }
 
             fn create_layout<'a>(
                 &'a self,
                 state: &'a Context<App>,
                 store: &'a ElementStore,
-                generator: &mut ElementIdGenerator,
-                mut resolver_set: impl ResolverSet,
+                layouted: &'a Self::Layouted,
                 layout: &mut Layout<'a, App>,
             ) {
-                let vector = state.get(&self.self_path);
-                let item_boxes = unsafe { &mut *self.item_boxes.get() };
-
-                match item_boxes.len().cmp(&vector.len()) {
-                    Ordering::Greater => {
-                        // Delete excess elements.
-                        item_boxes.truncate(vector.len());
-                    }
-                    Ordering::Less => {
-                        // Add new elements.
-                        for index in item_boxes.len()..vector.len() {
-                            item_boxes.push({
-                                let item_path = self.self_path.index(index).manually_asserted();
-                                let item_element = PrototypeElement::to_element(item_path, index.to_string());
-                                let item_box: Box<dyn Element<App>> = Box::new(item_element);
-                                item_box
-                            });
-                        }
-                    }
-                    Ordering::Equal => {}
+                for (index, item_box) in self.item_boxes.iter().enumerate() {
+                    item_box.create_layout(state, store.child_store(index as u64), &layouted[index], layout);
                 }
-
-                // FIX: Make this right. Maybe with_derived should expect a resolver set as well
-                resolver_set.with_index(0, |resolver| {
-                    resolver.with_derived(2.0, 4.0, |resolver| {
-                        // TODO: Very much temp
-                        layout.push_layer();
-
-                        for (index, item_box) in item_boxes.iter().enumerate() {
-                            item_box.create_layout(state, store.child_store(index as u64, generator), generator, resolver, layout);
-                        }
-
-                        // TODO: Very much temp
-                        layout.pop_layer();
-                    });
-                });
             }
         }
 
@@ -432,7 +463,7 @@ where
             text: name,
             children: VecWrapper {
                 self_path,
-                item_boxes: UnsafeCell::new(Vec::new()),
+                item_boxes: Vec::new(),
                 _marker: PhantomData,
             },
         }

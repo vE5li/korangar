@@ -50,32 +50,36 @@ pub mod components {
             A: Selector<ClientState, Color>,
             B: Path<ClientState, Option<usize>>,
         {
-            fn get_height(&self, state: &Context<ClientState>, _: &ElementStore, _: &mut ElementIdGenerator, resolver: &mut Resolver) {
-                resolver.with_height(180.0);
+            fn make_layout(
+                &mut self,
+                state: &Context<ClientState>,
+                store: &mut ElementStore,
+                generator: &mut ElementIdGenerator,
+                resolver: &mut Resolver,
+            ) -> Self::Layouted {
+                let area = resolver.with_height(180.0);
+                Self::Layouted { area }
             }
 
             fn create_layout<'a>(
                 &'a self,
                 state: &'a Context<ClientState>,
                 _: &'a ElementStore,
-                _: &mut ElementIdGenerator,
-                resolver: &mut Resolver,
+                layouted: &'a Self::Layouted,
                 layout: &mut Layout<'a, ClientState>,
             ) {
-                let area = resolver.with_height(180.0);
-
                 if let Some(switch_request) = state.get(&self.switch_request) {
-                    let is_hoverered = layout.is_area_hovered_and_active(area);
+                    let is_hoverered = layout.is_area_hovered_and_active(layouted.area);
 
                     let background_color = match is_hoverered {
                         true => Color::monochrome_u8(95),
                         false => *state.get(&self.background_color),
                     };
-                    layout.add_rectangle(area, CornerRadius::uniform(25.0), background_color);
+                    layout.add_rectangle(layouted.area, CornerRadius::uniform(25.0), background_color);
 
                     if *switch_request == self.slot {
                         layout.add_text(
-                            area,
+                            layouted.area,
                             "Cancel",
                             FontSize(14.0),
                             Color::WHITE,
@@ -84,11 +88,11 @@ pub mod components {
                         );
 
                         if is_hoverered {
-                            layout.add_click_area(area, &self.click_handler.cancel_switch);
+                            layout.add_click_area(layouted.area, &self.click_handler.cancel_switch);
                         }
                     } else {
                         layout.add_text(
-                            area,
+                            layouted.area,
                             "Switch slots",
                             FontSize(14.0),
                             Color::WHITE,
@@ -97,7 +101,7 @@ pub mod components {
                         );
 
                         if is_hoverered {
-                            layout.add_click_area(area, &self.click_handler.request_switch);
+                            layout.add_click_area(layouted.area, &self.click_handler.request_switch);
                         }
                     }
 
@@ -106,8 +110,8 @@ pub mod components {
 
                 if let Some(character_information) = state.try_get(&self.character_information) {
                     let switch_area = Area {
-                        x: area.x,
-                        y: area.y + area.height - 40.0,
+                        x: layouted.area.x,
+                        y: layouted.area.y + layouted.area.height - 40.0,
                         width: 50.0,
                         height: 30.0,
                     };
@@ -115,12 +119,12 @@ pub mod components {
                     let is_switch_hoverered = layout.is_area_hovered_and_active(switch_area);
                     if is_switch_hoverered {
                         layout.mark_hovered();
-                        layout.add_click_area(area, &self.click_handler.start_switch);
+                        layout.add_click_area(layouted.area, &self.click_handler.start_switch);
                     }
 
                     let delete_area = Area {
-                        x: area.x + area.width - 50.0,
-                        y: area.y + area.height - 40.0,
+                        x: layouted.area.x + layouted.area.width - 50.0,
+                        y: layouted.area.y + layouted.area.height - 40.0,
                         width: 50.0,
                         height: 30.0,
                     };
@@ -128,16 +132,16 @@ pub mod components {
                     let is_delete_hoverered = layout.is_area_hovered_and_active(delete_area);
                     if is_delete_hoverered {
                         layout.mark_hovered();
-                        layout.add_click_area(area, &self.click_handler.delete_character);
+                        layout.add_click_area(layouted.area, &self.click_handler.delete_character);
                     }
 
-                    let is_hoverered = layout.is_area_hovered_and_active(area);
+                    let is_hoverered = layout.is_area_hovered_and_active(layouted.area);
 
                     let background_color = match is_hoverered {
                         true => Color::monochrome_u8(95),
                         false => *state.get(&self.background_color),
                     };
-                    layout.add_rectangle(area, CornerRadius::uniform(25.0), background_color);
+                    layout.add_rectangle(layouted.area, CornerRadius::uniform(25.0), background_color);
 
                     let background_color = match is_switch_hoverered {
                         true => Color::monochrome_u8(180),
@@ -152,7 +156,7 @@ pub mod components {
                     layout.add_rectangle(delete_area, CornerRadius::uniform(25.0), background_color);
 
                     layout.add_text(
-                        area,
+                        layouted.area,
                         &character_information.name,
                         FontSize(18.0),
                         Color::rgb_u8(255, 200, 150),
@@ -161,7 +165,7 @@ pub mod components {
                     );
 
                     layout.add_text(
-                        area,
+                        layouted.area,
                         "Base level",
                         FontSize(14.0),
                         Color::rgb_u8(200, 200, 150),
@@ -170,7 +174,7 @@ pub mod components {
                     );
 
                     layout.add_text(
-                        area,
+                        layouted.area,
                         self.click_handler
                             .base_level_str
                             .get_str(self.character_information.manually_asserted().base_level(), state),
@@ -181,7 +185,7 @@ pub mod components {
                     );
 
                     layout.add_text(
-                        area,
+                        layouted.area,
                         "Job level",
                         FontSize(14.0),
                         Color::rgb_u8(200, 200, 150),
@@ -190,7 +194,7 @@ pub mod components {
                     );
 
                     layout.add_text(
-                        area,
+                        layouted.area,
                         self.click_handler
                             .job_level_str
                             .get_str(self.character_information.manually_asserted().job_level(), state),
@@ -201,7 +205,7 @@ pub mod components {
                     );
 
                     layout.add_text(
-                        area,
+                        layouted.area,
                         "Map",
                         FontSize(14.0),
                         Color::rgb_u8(200, 200, 150),
@@ -210,7 +214,7 @@ pub mod components {
                     );
 
                     layout.add_text(
-                        area,
+                        layouted.area,
                         &character_information.map_name,
                         FontSize(14.0),
                         Color::rgb_u8(200, 200, 150),
@@ -219,20 +223,20 @@ pub mod components {
                     );
 
                     if is_hoverered {
-                        layout.add_click_area(area, &self.click_handler.select_character);
+                        layout.add_click_area(layouted.area, &self.click_handler.select_character);
                         layout.mark_hovered();
                     }
                 } else {
-                    let is_hoverered = layout.is_area_hovered_and_active(area);
+                    let is_hoverered = layout.is_area_hovered_and_active(layouted.area);
 
                     let background_color = match is_hoverered {
                         true => Color::monochrome_u8(95),
                         false => *state.get(&self.background_color),
                     };
-                    layout.add_rectangle(area, CornerRadius::uniform(25.0), background_color);
+                    layout.add_rectangle(layouted.area, CornerRadius::uniform(25.0), background_color);
 
                     layout.add_text(
-                        area,
+                        layouted.area,
                         "Create Character",
                         FontSize(14.0),
                         Color::WHITE,
@@ -241,7 +245,7 @@ pub mod components {
                     );
 
                     if is_hoverered {
-                        layout.add_click_area(area, &self.click_handler.create_character);
+                        layout.add_click_area(layouted.area, &self.click_handler.create_character);
                         layout.mark_hovered();
                     }
                 }

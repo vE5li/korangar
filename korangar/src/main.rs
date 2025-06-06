@@ -14,6 +14,7 @@
 #![feature(associated_type_defaults)]
 #![feature(macro_metavar_expr)]
 #![feature(unsafe_cell_access)]
+#![feature(impl_trait_in_assoc_type)]
 
 // Helper macro to time and print the startup time of Korangar
 macro_rules! time_phase {
@@ -375,7 +376,7 @@ mod state {
         impl Path<ClientState, Player, false> for CustomPath {
             fn follow<'a>(&self, state: &'a ClientState) -> Option<&'a Player> {
                 // TODO: Select our player better.
-                match state.entities.get(0)? {
+                match state.entities.first()? {
                     Entity::Player(player) => Some(player),
                     _ => unreachable!(),
                 }
@@ -383,7 +384,7 @@ mod state {
 
             fn follow_mut<'a>(&self, state: &'a mut ClientState) -> Option<&'a mut Player> {
                 // TODO: Select our player better.
-                match state.entities.get_mut(0)? {
+                match state.entities.first_mut()? {
                     Entity::Player(player) => Some(player),
                     _ => unreachable!(),
                 }

@@ -269,14 +269,12 @@ impl<'a, App: Appli> Layout<'a, App> {
         std::mem::forget(handle);
     }
 
-    pub fn with_clip_layer(&mut self, mut f: impl FnMut(&mut Self) -> Area) -> Area {
+    pub fn with_clip_layer(&mut self, area: Area, mut f: impl FnMut(&mut Self)) {
         let handle = self.new_clip_layer();
 
-        let area = f(self);
+        f(self);
 
         self.set_layer_clip(handle, area);
-
-        area
     }
 
     pub fn pop_layer(&mut self) {

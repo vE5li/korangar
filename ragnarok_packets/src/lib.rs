@@ -1,4 +1,5 @@
 #![cfg_attr(feature = "interface", feature(negative_impls))]
+#![cfg_attr(feature = "interface", feature(impl_trait_in_assoc_type))]
 
 pub mod handler;
 mod position;
@@ -1511,7 +1512,16 @@ impl ToBytes for StatusType {
 // TODO: make StatusType derivable
 #[cfg(feature = "interface")]
 impl<App: korangar_interface::application::Appli> korangar_interface::element::PrototypeElement<App> for StatusType {
-    fn to_element(self_path: impl rust_state::Path<App, Self>, name: String) -> impl korangar_interface::element::Element<App> {
+    type Layouted = impl std::any::Any;
+    type Return<P>
+        = impl korangar_interface::element::Element<App, Layouted = Self::Layouted>
+    where
+        P: rust_state::Path<App, Self>;
+
+    fn to_element<P>(self_path: P, name: String) -> Self::Return<P>
+    where
+        P: rust_state::Path<App, Self>,
+    {
         // format!("{self:?}").to_element(display)
 
         use korangar_interface::prelude::*;

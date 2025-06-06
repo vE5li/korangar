@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::cell::UnsafeCell;
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -5,7 +6,7 @@ use std::collections::HashMap;
 use derive_new::new;
 use korangar_interface::element::id::ElementIdGenerator;
 use korangar_interface::element::store::ElementStore;
-use korangar_interface::element::{Element, ElementSet, ResolverSet};
+use korangar_interface::element::{DefaultLayouted, Element, ElementSet, ResolverSet};
 use korangar_interface::event::EventQueue;
 use korangar_interface::layout::{Layout, Resolver};
 use korangar_interface::window::{CustomWindow, PrototypeWindow, Window, WindowTrait};
@@ -47,7 +48,7 @@ where
 
         struct ServerWrapper<P> {
             path: P,
-            item_boxes: UnsafeCell<Vec<Box<dyn Element<ClientState>>>>,
+            item_boxes: Vec<Box<dyn Element<ClientState, Layouted = DefaultLayouted>>>,
         }
 
         impl<P> ServerWrapper<P>
@@ -57,24 +58,23 @@ where
             fn new(path: P) -> Self {
                 Self {
                     path,
-                    item_boxes: UnsafeCell::new(Vec::new()),
+                    item_boxes: Vec::new(),
                 }
             }
 
-            fn correct_element_size(&self, state: &Context<ClientState>) {
+            fn correct_element_size(&mut self, state: &Context<ClientState>) {
                 let character_server_information = state.get(&self.path);
-                let item_boxes = unsafe { &mut *self.item_boxes.get() };
 
-                match item_boxes.len().cmp(&character_server_information.len()) {
+                match self.item_boxes.len().cmp(&character_server_information.len()) {
                     Ordering::Greater => {
                         // Delete excess elements.
-                        item_boxes.truncate(character_server_information.len());
+                        self.item_boxes.truncate(character_server_information.len());
                     }
                     Ordering::Less => {
                         // Add new elements.
-                        for index in item_boxes.len()..character_server_information.len() {
+                        for index in self.item_boxes.len()..character_server_information.len() {
                             let path = self.path.index(index).manually_asserted();
-                            item_boxes.push(Box::new(button! {
+                            self.item_boxes.push(Box::new(button! {
                                 text: self.path.index(index).manually_asserted().server_name(),
                                 event: move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
                                     let character_server_information = state.get(&path).clone();
@@ -92,55 +92,57 @@ where
         where
             P: Path<ClientState, Vec<CharacterServerInformation>>,
         {
+            type Layouted = Vec<DefaultLayouted>;
+
             fn get_element_count(&self) -> usize {
                 unimplemented!()
             }
 
-            fn get_height(
-                &self,
+            fn make_layout(
+                &mut self,
                 state: &Context<ClientState>,
-                store: &ElementStore,
+                store: &mut ElementStore,
                 generator: &mut ElementIdGenerator,
                 mut resolver_set: impl ResolverSet,
-            ) {
+            ) -> Self::Layouted {
                 self.correct_element_size(state);
-                let item_boxes = unsafe { &mut *self.item_boxes.get() };
 
                 // FIX: Make this right. Maybe with_derived should expect a resolver set as well
                 resolver_set.with_index(0, |resolver| {
-                    resolver.with_derived(2.0, 4.0, |resolver| {
-                        for (index, item_box) in item_boxes.iter().enumerate() {
-                            item_box.get_height(state, store.child_store(index as u64, generator), generator, resolver);
-                        }
+                    let (area, layouted) = resolver.with_derived(2.0, 4.0, |resolver| {
+                        self.item_boxes
+                            .iter_mut()
+                            .enumerate()
+                            .map(|(index, item_box)| {
+                                item_box.make_layout(
+                                    state,
+                                    store.get_or_create_child_store(index as u64, generator),
+                                    generator,
+                                    resolver,
+                                )
+                            })
+                            .collect()
                     });
-                });
+
+                    layouted
+                })
             }
 
             fn create_layout<'a>(
                 &'a self,
                 state: &'a Context<ClientState>,
                 store: &'a ElementStore,
-                generator: &mut ElementIdGenerator,
-                mut resolver_set: impl ResolverSet,
+                layouted: &'a Self::Layouted,
                 layout: &mut Layout<'a, ClientState>,
             ) {
-                self.correct_element_size(state);
-                let item_boxes = unsafe { &mut *self.item_boxes.get() };
+                layout.push_layer();
 
-                // FIX: Make this right. Maybe with_derived should expect a resolver set as well
-                resolver_set.with_index(0, |resolver| {
-                    resolver.with_derived(2.0, 4.0, |resolver| {
-                        // TODO: Very much temp
-                        layout.push_layer();
+                for (index, item_box) in self.item_boxes.iter().enumerate() {
+                    item_box.create_layout(state, store.child_store(index as u64), &layouted[index], layout);
+                }
 
-                        for (index, item_box) in item_boxes.iter().enumerate() {
-                            item_box.create_layout(state, store.child_store(index as u64, generator), generator, resolver, layout);
-                        }
-
-                        // TODO: Very much temp
-                        layout.pop_layer();
-                    });
-                });
+                // TODO: Very much temp
+                layout.pop_layer();
             }
         }
 

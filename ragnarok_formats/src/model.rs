@@ -2,6 +2,7 @@ use cgmath::{Matrix3, Point3, Quaternion, Vector2, Vector3};
 use ragnarok_bytes::{
     ByteConvertable, ByteReader, ByteWriter, ConversionError, ConversionResult, ConversionResultExt, FromBytes, FromBytesExt, ToBytes,
 };
+use rust_state::Path;
 
 use crate::signature::Signature;
 use crate::version::{InternalVersion, MajorFirst, Version};
@@ -47,7 +48,16 @@ impl<App, const LENGTH: usize> korangar_interface::element::PrototypeElement<App
 where
     App: korangar_interface::application::Appli,
 {
-    fn to_element(self_path: impl rust_state::Path<App, Self>, name: String) -> impl korangar_interface::element::Element<App> {
+    type Layouted = impl std::any::Any;
+    type Return<P>
+        = impl korangar_interface::element::Element<App, Layouted = Self::Layouted>
+    where
+        P: rust_state::Path<App, Self>;
+
+    fn to_element<P>(self_path: P, name: String) -> Self::Return<P>
+    where
+        P: Path<App, Self>,
+    {
         use korangar_interface::prelude::*;
 
         button! {

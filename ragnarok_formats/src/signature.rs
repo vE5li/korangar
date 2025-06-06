@@ -1,4 +1,5 @@
 use ragnarok_bytes::{ByteReader, ByteWriter, ConversionError, ConversionResult, FixedByteSize, FromBytes, ToBytes};
+use rust_state::Path;
 
 #[derive(Debug, Clone, Default)]
 pub struct Signature<const MAGIC: &'static [u8]>;
@@ -33,7 +34,16 @@ impl<const MAGIC: &'static [u8]> ToBytes for Signature<MAGIC> {
 impl<const MAGIC: &'static [u8], App: korangar_interface::application::Appli> korangar_interface::element::PrototypeElement<App>
     for Signature<MAGIC>
 {
-    fn to_element(self_path: impl rust_state::Path<App, Self>, name: String) -> impl korangar_interface::element::Element<App> {
+    type Layouted = impl std::any::Any;
+    type Return<P>
+        = impl korangar_interface::element::Element<App, Layouted = Self::Layouted>
+    where
+        P: rust_state::Path<App, Self>;
+
+    fn to_element<P>(self_path: P, name: String) -> Self::Return<P>
+    where
+        P: Path<App, Self>,
+    {
         use korangar_interface::prelude::*;
 
         button! {

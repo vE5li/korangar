@@ -27,18 +27,23 @@ impl<P> Element<ClientState> for SkillBox<P>
 where
     P: Path<ClientState, Skill, false>,
 {
-    fn get_height(&self, state: &Context<ClientState>, store: &ElementStore, generator: &mut ElementIdGenerator, resolver: &mut Resolver) {
-        resolver.with_height(30.0);
+    fn make_layout(
+        &mut self,
+        state: &Context<ClientState>,
+        store: &mut ElementStore,
+        generator: &mut ElementIdGenerator,
+        resolver: &mut Resolver,
+    ) -> Self::Layouted {
+        let area = resolver.with_height(30.0);
+        Self::Layouted { area }
     }
 
     fn create_layout<'a>(
         &'a self,
         state: &'a Context<ClientState>,
         store: &'a ElementStore,
-        generator: &mut ElementIdGenerator,
-        resolver: &mut Resolver,
+        layouted: &'a Self::Layouted,
         layout: &mut Layout<'a, ClientState>,
     ) {
-        resolver.with_height(30.0);
     }
 }

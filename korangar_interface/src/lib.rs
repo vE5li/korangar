@@ -7,6 +7,8 @@
 #![feature(macro_metavar_expr)]
 #![feature(impl_trait_in_bindings)]
 #![feature(unsafe_cell_access)]
+#![feature(associated_type_defaults)]
+#![feature(impl_trait_in_assoc_type)]
 
 pub mod application;
 pub mod components;
@@ -18,6 +20,8 @@ pub mod window;
 
 // Re-export self as korangar_interface so we can use proc macros in this crate.
 extern crate self as korangar_interface;
+
+use std::any::Any;
 
 use application::{Appli, PositionTrait, SizeTrait, WindowCache};
 use element::id::{ElementId, ElementIdGenerator};
@@ -113,6 +117,7 @@ where
     window_cache: App::Cache,
     available_space: App::Size,
 
+    layouteds: Vec<Box<dyn Any>>,
     generator: ElementIdGenerator,
     window_store: WindowStore,
     focused_element: Option<ElementId>,
@@ -134,6 +139,7 @@ where
             window_cache,
             available_space,
 
+            layouteds: Vec::new(),
             generator: ElementIdGenerator::new(),
             window_store: WindowStore::default(),
             focused_element: None,
@@ -307,11 +313,14 @@ where
         // TODO: Actual logic to wrap around and adjust all window IDs.
         self.next_window_id = self.next_window_id.wrapping_add(1);
 
-        self.windows.push((Box::new(window), WindowData {
-            id,
-            position: App::Position::new(200.0, 200.0),
-            size: App::Size::new(400.0, 500.0),
-        }));
+        self.windows.insert(
+            0,
+            (Box::new(window), WindowData {
+                id,
+                position: App::Position::new(200.0, 200.0),
+                size: App::Size::new(400.0, 500.0),
+            }),
+        );
         // focus_state.set_focused_window(self.windows.len() - 1);
     }
 
@@ -401,13 +410,20 @@ where
     pub fn do_layouts<'a>(&'a mut self, state: &'a Context<App>, mouse_position: App::Position) -> BuiltUi<'a, App> {
         let mut is_ui_hovered = false;
 
+        self.layouteds = self
+            .windows
+            .iter_mut()
+            .map(|(window, window_data)| window.make_layout(state, &mut self.window_store, window_data, &mut self.generator))
+            .collect::<Vec<_>>();
+
         let layouts = self
             .windows
             .iter()
-            .map(|(window, window_data)| {
+            .zip(self.layouteds.iter())
+            .map(|((window, window_data), layouted)| {
                 let mut layout = Layout::new(mouse_position, self.focused_element, !is_ui_hovered);
 
-                window.do_layout(state, &self.window_store, window_data, &mut self.generator, &mut layout);
+                window.do_layout(state, &self.window_store, window_data, layouted, &mut layout);
 
                 is_ui_hovered |= layout.is_hovered();
 

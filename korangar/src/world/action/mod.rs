@@ -44,7 +44,16 @@ pub enum ActionEvent {
 }
 
 impl PrototypeElement<ClientState> for ActionEvent {
-    fn to_element(self_path: impl Path<ClientState, Self>, name: String) -> impl Element<ClientState> {
+    type Layouted = impl std::any::Any;
+    type Return<P>
+        = impl korangar_interface::element::Element<ClientState, Layouted = Self::Layouted>
+    where
+        P: rust_state::Path<ClientState, Self>;
+
+    fn to_element<P>(self_path: P, name: String) -> Self::Return<P>
+    where
+        P: Path<ClientState, Self>,
+    {
         use korangar_interface::prelude::*;
 
         button! {

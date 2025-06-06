@@ -43,24 +43,27 @@ pub mod text {
         E: Selector<App, HorizontalAlignment>,
         F: Selector<App, VerticalAlignment>,
     {
-        fn get_height(&self, state: &Context<App>, _: &ElementStore, _: &mut ElementIdGenerator, resolver: &mut Resolver) {
+        fn make_layout(
+            &mut self,
+            state: &Context<App>,
+            store: &mut ElementStore,
+            generator: &mut ElementIdGenerator,
+            resolver: &mut Resolver,
+        ) -> Self::Layouted {
             let height = state.get(&self.height);
-            resolver.with_height(*height);
+            let area = resolver.with_height(*height);
+            Self::Layouted { area }
         }
 
         fn create_layout<'a>(
             &'a self,
             state: &'a Context<App>,
             _: &'a ElementStore,
-            _: &mut ElementIdGenerator,
-            resolver: &mut Resolver,
+            layouted: &'a Self::Layouted,
             layout: &mut Layout<'a, App>,
         ) {
-            let height = state.get(&self.height);
-            let area = resolver.with_height(*height);
-
             layout.add_text(
-                area,
+                layouted.area,
                 state.get(&self.text).as_ref(),
                 *state.get(&self.font_size),
                 *state.get(&self.color),
@@ -132,29 +135,33 @@ pub mod button {
         J: Selector<App, App::FontSize>,
         K: Selector<App, HorizontalAlignment>,
     {
-        fn get_height(&self, state: &Context<App>, _: &ElementStore, _: &mut ElementIdGenerator, resolver: &mut Resolver) {
+        fn make_layout(
+            &mut self,
+            state: &Context<App>,
+            store: &mut ElementStore,
+            generator: &mut ElementIdGenerator,
+            resolver: &mut Resolver,
+        ) -> Self::Layouted {
             let height = state.get(&self.height);
-            resolver.with_height(*height);
+            let area = resolver.with_height(*height);
+            Self::Layouted { area }
         }
 
         fn create_layout<'a>(
             &'a self,
             state: &'a Context<App>,
             store: &'a ElementStore,
-            _: &mut ElementIdGenerator,
-            resolver: &mut Resolver,
+            layouted: &'a Self::Layouted,
             layout: &mut Layout<'a, App>,
         ) {
-            let height = state.get(&self.height);
-            let area = resolver.with_height(*height);
-            let is_hoverered = layout.is_area_hovered_and_active(area);
+            let is_hoverered = layout.is_area_hovered_and_active(layouted.area);
 
             if is_hoverered {
-                layout.add_click_area(area, &self.event);
+                layout.add_click_area(layouted.area, &self.event);
                 layout.mark_hovered();
             }
 
-            layout.add_focus_area(area, store.get_element_id());
+            layout.add_focus_area(layouted.area, store.get_element_id());
 
             let background_color = match is_hoverered {
                 true => *state.get(&self.hovered_background_color),
@@ -163,7 +170,7 @@ pub mod button {
 
             // TODO: Temp
             if !layout.is_element_focused(store.get_element_id()) {
-                layout.add_rectangle(area, *state.get(&self.corner_radius), background_color);
+                layout.add_rectangle(layouted.area, *state.get(&self.corner_radius), background_color);
             }
 
             let foreground_color = match is_hoverered {
@@ -172,7 +179,7 @@ pub mod button {
             };
 
             layout.add_text(
-                area,
+                layouted.area,
                 state.get(&self.text).as_ref(),
                 *state.get(&self.font_size),
                 foreground_color,
@@ -250,36 +257,40 @@ pub mod state_button {
         L: Selector<App, App::FontSize>,
         M: Selector<App, HorizontalAlignment>,
     {
-        fn get_height(&self, state: &Context<App>, _: &ElementStore, _: &mut ElementIdGenerator, resolver: &mut Resolver) {
+        fn make_layout(
+            &mut self,
+            state: &Context<App>,
+            store: &mut ElementStore,
+            generator: &mut ElementIdGenerator,
+            resolver: &mut Resolver,
+        ) -> Self::Layouted {
             let height = state.get(&self.height);
-            resolver.with_height(*height);
+            let area = resolver.with_height(*height);
+            Self::Layouted { area }
         }
 
         fn create_layout<'a>(
             &'a self,
             state: &'a Context<App>,
             store: &'a ElementStore,
-            _: &mut ElementIdGenerator,
-            resolver: &mut Resolver,
+            layouted: &'a Self::Layouted,
             layout: &mut Layout<'a, App>,
         ) {
-            let height = state.get(&self.height);
-            let area = resolver.with_height(*height);
-            let is_hoverered = layout.is_area_hovered_and_active(area);
+            let is_hoverered = layout.is_area_hovered_and_active(layouted.area);
 
             if is_hoverered {
-                layout.add_click_area(area, &self.event);
+                layout.add_click_area(layouted.area, &self.event);
                 layout.mark_hovered();
             }
 
-            layout.add_focus_area(area, store.get_element_id());
+            layout.add_focus_area(layouted.area, store.get_element_id());
 
             let background_color = match is_hoverered {
                 true => *state.get(&self.hovered_background_color),
                 false => *state.get(&self.background_color),
             };
 
-            layout.add_rectangle(area, *state.get(&self.corner_radius), background_color);
+            layout.add_rectangle(layouted.area, *state.get(&self.corner_radius), background_color);
 
             let foreground_color = match is_hoverered {
                 true => *state.get(&self.hovered_foreground_color),
@@ -287,7 +298,7 @@ pub mod state_button {
             };
 
             layout.add_text(
-                area,
+                layouted.area,
                 state.get(&self.text).as_ref(),
                 *state.get(&self.font_size),
                 foreground_color,
@@ -295,11 +306,11 @@ pub mod state_button {
                 *state.get(&theme().state_button().vertical_alignment()),
             );
 
-            let checkbox_size = area.height - 6.0;
+            let checkbox_size = layouted.area.height - 6.0;
             layout.add_checkbox(
                 Area {
-                    x: area.x + 8.0,
-                    y: area.y + 3.0,
+                    x: layouted.area.x + 8.0,
+                    y: layouted.area.y + 3.0,
                     width: checkbox_size,
                     height: checkbox_size,
                 },
@@ -376,6 +387,11 @@ pub mod collapsable {
         type Data = CollapsableData;
     }
 
+    pub struct MyLayouted<C> {
+        area: Area,
+        children: Option<C>,
+    }
+
     impl<App, Text, A, B, C, D, E, F, G, H, I, J, K, Children> Element<App> for Collapsable<Text, A, B, C, D, E, F, G, H, I, J, K, Children>
     where
         App: Appli,
@@ -393,56 +409,61 @@ pub mod collapsable {
         K: Selector<App, bool>,
         Children: ElementSet<App>,
     {
-        fn get_height(&self, state: &Context<App>, store: &ElementStore, generator: &mut ElementIdGenerator, resolver: &mut Resolver) {
+        type Layouted = MyLayouted<Children::Layouted>;
+
+        fn make_layout(
+            &mut self,
+            state: &Context<App>,
+            store: &mut ElementStore,
+            generator: &mut ElementIdGenerator,
+            resolver: &mut Resolver,
+        ) -> Self::Layouted {
             let persistent = self.get_persistent_data(store, *state.get(&self.initially_expanded));
+            let expanded = *persistent.expanded.borrow();
 
             let title_height = *state.get(&self.title_height);
-            match *persistent.expanded.borrow() {
+
+            let (area, children) = match expanded {
                 true => resolver.with_derived(*state.get(&self.gaps), *state.get(&self.border), |resolver| {
                     resolver.push_top(title_height);
-                    self.children.get_height(state, store, generator, resolver);
+                    Some(self.children.make_layout(state, store, generator, resolver))
                 }),
-                false => resolver.with_height(title_height),
+                false => (resolver.with_height(title_height), None),
             };
+
+            MyLayouted { area, children }
         }
 
         fn create_layout<'a>(
             &'a self,
             state: &'a Context<App>,
             store: &'a ElementStore,
-            generator: &mut ElementIdGenerator,
-            resolver: &mut Resolver,
+            layouted: &'a Self::Layouted,
             layout: &mut Layout<'a, App>,
         ) {
-            let persistent = self.get_persistent_data(store, *state.get(&self.initially_expanded));
+            if let Some(layouted) = &layouted.children {
+                self.children.create_layout(state, store, layouted, layout);
+            }
 
             let title_height = *state.get(&self.title_height);
-            let area = match *persistent.expanded.borrow() {
-                true => {
-                    resolver.with_derived(*state.get(&self.gaps), *state.get(&self.border), |resolver| {
-                        resolver.push_top(title_height);
-                        // TODO: Very much temp
-                        layout.push_layer();
-                        self.children.create_layout(state, store, generator, resolver, layout);
-                        // TODO: Very much temp
-                        layout.pop_layer();
-                    })
-                }
-                false => resolver.with_height(title_height),
-            };
 
             let title_area = Area {
-                x: area.x,
-                y: area.y,
-                width: area.width,
+                x: layouted.area.x,
+                y: layouted.area.y,
+                width: layouted.area.width,
                 height: title_height,
             };
 
-            layout.add_rectangle(area, *state.get(&self.corner_radius), *state.get(&self.background_color));
+            layout.add_rectangle(
+                layouted.area,
+                *state.get(&self.corner_radius),
+                *state.get(&self.background_color),
+            );
 
             let is_title_hovered = layout.is_area_hovered_and_active(title_area);
 
             if is_title_hovered {
+                let persistent = self.get_persistent_data(store, *state.get(&self.initially_expanded));
                 layout.add_toggle(title_area, &persistent.expanded);
                 layout.mark_hovered();
             }
@@ -497,7 +518,7 @@ pub mod split {
     }
 
     impl ResolverSet for CellResolverSet<'_> {
-        fn with_index(&mut self, index: usize, f: impl FnMut(&mut Resolver)) {
+        fn with_index<C>(&mut self, index: usize, f: impl FnMut(&mut Resolver) -> C) -> C {
             let cell_area = PartialArea {
                 x: self.initial_available_area.x + self.cell_size * index as f32,
                 y: self.initial_available_area.y,
@@ -505,7 +526,7 @@ pub mod split {
                 height: self.initial_available_area.height,
             };
 
-            self.resolver.with_derived_custom(cell_area, f);
+            self.resolver.with_derived_custom(cell_area, f)
         }
     }
 
@@ -514,25 +535,29 @@ pub mod split {
         App: Appli,
         Children: ElementSet<App>,
     {
-        fn get_height(&self, state: &Context<App>, store: &ElementStore, generator: &mut ElementIdGenerator, resolver: &mut Resolver) {
+        type Layouted = Children::Layouted;
+
+        fn make_layout(
+            &mut self,
+            state: &Context<App>,
+            store: &mut ElementStore,
+            generator: &mut ElementIdGenerator,
+            resolver: &mut Resolver,
+        ) -> Self::Layouted {
             let cell_size = resolver.push_available_area().width / self.children.get_element_count() as f32;
             let resolver_set = CellResolverSet::new(resolver, cell_size);
 
-            self.children.get_height(state, store, generator, resolver_set);
+            self.children.make_layout(state, store, generator, resolver_set)
         }
 
         fn create_layout<'a>(
             &'a self,
             state: &'a Context<App>,
             store: &'a ElementStore,
-            generator: &mut ElementIdGenerator,
-            resolver: &mut Resolver,
+            layouted: &'a Self::Layouted,
             layout: &mut Layout<'a, App>,
         ) {
-            let cell_size = resolver.push_available_area().width / self.children.get_element_count() as f32;
-            let resolver_set = CellResolverSet::new(resolver, cell_size);
-
-            self.children.create_layout(state, store, generator, resolver_set, layout);
+            self.children.create_layout(state, store, layouted, layout);
         }
     }
 }
@@ -545,7 +570,7 @@ pub mod scroll_view {
     use crate::application::Appli;
     use crate::element::id::ElementIdGenerator;
     use crate::element::store::{ElementStore, Persistent, PersistentExt};
-    use crate::element::{Element, ElementSet};
+    use crate::element::{DefaultLayoutedSet, Element, ElementSet};
     use crate::layout::{HeightBound, Layout, Resolver};
 
     #[derive(Default)]
@@ -568,18 +593,54 @@ pub mod scroll_view {
         App: Appli,
         Children: ElementSet<App>,
     {
-        fn get_height(&self, state: &Context<App>, store: &ElementStore, generator: &mut ElementIdGenerator, resolver: &mut Resolver) {
-            resolver.with_derived_scrolled(0.0, self.height_bound, |resolver| {
-                self.children.get_height(state, store, generator, resolver);
-            });
+        type Layouted = DefaultLayoutedSet<Children::Layouted>;
+
+        fn make_layout(
+            &mut self,
+            state: &Context<App>,
+            store: &mut ElementStore,
+            generator: &mut ElementIdGenerator,
+            resolver: &mut Resolver,
+        ) -> Self::Layouted {
+            // resolver.with_derived_scrolled(0.0, self.height_bound, |resolver| {
+            //     let (children_area, children) = self.children.make_layout(state, store,
+            // generator, resolver);
+            //
+            //     DefaultLayoutedSet::new(area, children)
+            // });
+
+            // let (height, content_height) = {
+            //     let mut cloned_resolver = resolver.clone();
+            //
+            //     let (children_area, content_height) =
+            // cloned_resolver.with_derived_scrolled(0.0, self.height_bound,
+            // |resolver| {         self.children.get_height(state,
+            // store, generator, resolver);     });
+            //
+            //     (children_area.height, content_height)
+            // };
+            //
+            // let max_scroll = (content_height - height).max(0.0);
+            // let final_scroll = {
+            //     let mut current_scroll = persistent.scroll.borrow_mut();
+            //
+            //     if *current_scroll > max_scroll {
+            //         *current_scroll = max_scroll;
+            //     } else if *current_scroll < 0.0 {
+            //         *current_scroll = 0.0;
+            //     }
+            //
+            //     *current_scroll
+            // };
+
+            todo!()
         }
 
         fn create_layout<'a>(
             &'a self,
             state: &'a Context<App>,
             store: &'a ElementStore,
-            generator: &mut ElementIdGenerator,
-            resolver: &mut Resolver,
+            layouted: &'a Self::Layouted,
             layout: &mut Layout<'a, App>,
         ) {
             let persistent = self.get_persistent_data(store, ());
@@ -588,45 +649,18 @@ pub mod scroll_view {
                 println!("unbound scroll views don't do anything");
             }
 
-            let (height, content_height) = {
-                let mut cloned_resolver = resolver.clone();
-
-                let (children_area, content_height) = cloned_resolver.with_derived_scrolled(0.0, self.height_bound, |resolver| {
-                    self.children.get_height(state, store, generator, resolver);
-                });
-
-                (children_area.height, content_height)
-            };
-
-            let max_scroll = (content_height - height).max(0.0);
-            let final_scroll = {
-                let mut current_scroll = persistent.scroll.borrow_mut();
-
-                if *current_scroll > max_scroll {
-                    *current_scroll = max_scroll;
-                } else if *current_scroll < 0.0 {
-                    *current_scroll = 0.0;
-                }
-
-                *current_scroll
-            };
-
-            let area = layout.with_clip_layer(|layout| {
-                resolver
-                    .with_derived_scrolled(final_scroll, self.height_bound, |resolver| {
-                        // resolver.push_top(title_height);
-                        // TODO: Very much temp
-                        layout.push_layer();
-                        self.children.create_layout(state, store, generator, resolver, layout);
-                        // TODO: Very much temp
-                        layout.pop_layer();
-                    })
-                    .0
-            });
-
-            if layout.is_area_hovered(area) {
-                layout.add_scroll_area(area, max_scroll, &persistent.scroll);
-            }
+            // layout.with_clip_layer(|layout| {
+            //     // resolver.push_top(title_height);
+            //     // TODO: Very much temp
+            //     layout.push_layer();
+            //     self.children.create_layout(state, store, &layouted.children,
+            // layout);     // TODO: Very much temp
+            //     layout.pop_layer();
+            // });
+            //
+            // if layout.is_area_hovered(area) {
+            //     layout.add_scroll_area(area, max_scroll, &persistent.scroll);
+            // }
         }
     }
 }
@@ -693,28 +727,34 @@ pub mod text_box {
         K: Selector<App, App::FontSize>,
         L: Selector<App, HorizontalAlignment>,
     {
-        fn get_height(&self, state: &Context<App>, _: &ElementStore, _: &mut ElementIdGenerator, resolver: &mut Resolver) {
+        fn make_layout(
+            &mut self,
+            state: &Context<App>,
+            store: &mut ElementStore,
+            generator: &mut ElementIdGenerator,
+            resolver: &mut Resolver,
+        ) -> Self::Layouted {
             let height = state.get(&self.height);
-            resolver.with_height(*height);
+
+            Self::Layouted {
+                area: resolver.with_height(*height),
+            }
         }
 
         fn create_layout<'a>(
             &'a self,
             state: &'a Context<App>,
             store: &'a ElementStore,
-            _: &mut ElementIdGenerator,
-            resolver: &mut Resolver,
+            layouted: &'a Self::Layouted,
             layout: &mut Layout<'a, App>,
         ) {
-            let height = state.get(&self.height);
-            let area = resolver.with_height(*height);
-            let is_hoverered = layout.is_area_hovered_and_active(area);
+            let is_hoverered = layout.is_area_hovered_and_active(layouted.area);
 
             if is_hoverered {
                 layout.mark_hovered();
             }
 
-            layout.add_focus_area(area, store.get_element_id());
+            layout.add_focus_area(layouted.area, store.get_element_id());
 
             if layout.is_element_focused(store.get_element_id()) {
                 layout.add_input_handler(&self.input_handler);
@@ -727,7 +767,7 @@ pub mod text_box {
 
             // TODO: Remove if
             if !layout.is_element_focused(store.get_element_id()) {
-                layout.add_rectangle(area, *state.get(&self.corner_radius), background_color);
+                layout.add_rectangle(layouted.area, *state.get(&self.corner_radius), background_color);
             }
 
             let foreground_color = match is_hoverered {
@@ -745,7 +785,7 @@ pub mod text_box {
             // );
 
             layout.add_text(
-                area,
+                layouted.area,
                 state.get(&self.state).as_str(),
                 *state.get(&self.font_size),
                 foreground_color,

@@ -71,7 +71,7 @@ impl Resolver {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile("derived"))]
-    pub fn with_derived(&mut self, gaps: f32, border: f32, f: impl FnOnce(&mut Resolver)) -> Area {
+    pub fn with_derived<L>(&mut self, gaps: f32, border: f32, f: impl FnOnce(&mut Resolver) -> L) -> (Area, L) {
         self.push_gaps();
 
         let mut inner = Resolver {
@@ -85,7 +85,7 @@ impl Resolver {
             gaps,
         };
 
-        f(&mut inner);
+        let layouted = f(&mut inner);
 
         let returned = Area {
             x: self.available_area.x,
@@ -101,7 +101,7 @@ impl Resolver {
             *available_height -= returned.height;
         }
 
-        returned
+        (returned, layouted)
     }
 
     pub fn with_derived_scrolled(&mut self, scroll: f32, height_bound: HeightBound, f: impl FnOnce(&mut Resolver)) -> (Area, f32) {
@@ -147,14 +147,14 @@ impl Resolver {
         (returned, children_height)
     }
 
-    pub fn with_derived_custom(&mut self, available_area: PartialArea, f: impl FnOnce(&mut Resolver)) {
+    pub fn with_derived_custom<L>(&mut self, available_area: PartialArea, f: impl FnOnce(&mut Resolver) -> L) -> L {
         let mut inner = Resolver {
             available_area,
             used_height: 0.0,
             gaps: self.gaps,
         };
 
-        f(&mut inner);
+        let layouted = f(&mut inner);
 
         let delta = inner.available_area.y - self.available_area.y;
         if delta > 0.0 {
@@ -168,5 +168,7 @@ impl Resolver {
         //     .height
         //     .map(|height| height.min(other.available_area.height.unwrap()))
         //     .or(other.available_area.height);
+
+        layouted
     }
 }

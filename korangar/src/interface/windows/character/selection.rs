@@ -1,9 +1,10 @@
+use std::any::Any;
 use std::cell::UnsafeCell;
 
 use korangar_components::character_slot_preview;
 use korangar_interface::element::id::ElementIdGenerator;
 use korangar_interface::element::store::ElementStore;
-use korangar_interface::element::{Element, ElementSet, ResolverSet};
+use korangar_interface::element::{DefaultLayouted, DefaultLayoutedSet, Element, ElementSet, ResolverSet};
 use korangar_interface::layout::Layout;
 use korangar_interface::window::{CustomWindow, WindowTrait};
 use rust_state::{Context, Path};
@@ -45,10 +46,18 @@ where
     ) -> impl WindowTrait<ClientState> + 'a {
         use korangar_interface::prelude::*;
 
+        type RowLayouted = (
+            DefaultLayouted,
+            DefaultLayouted,
+            DefaultLayouted,
+            DefaultLayouted,
+            DefaultLayouted,
+        );
+
         struct CharacterWrapper<C, M> {
             character_slots: C,
             switch_request: M,
-            item_boxes: UnsafeCell<Vec<Box<dyn Element<ClientState>>>>,
+            item_boxes: Vec<Box<dyn Element<ClientState, Layouted = RowLayouted>>>,
         }
 
         impl<C, M> CharacterWrapper<C, M>
@@ -60,24 +69,23 @@ where
                 Self {
                     character_slots,
                     switch_request,
-                    item_boxes: UnsafeCell::new(Vec::new()),
+                    item_boxes: Vec::new(),
                 }
             }
 
-            fn correct_element_size(&self, state: &Context<ClientState>) {
+            fn correct_element_size(&mut self, state: &Context<ClientState>) {
                 let character_slots = state.get(&self.character_slots);
-                let item_boxes = unsafe { &mut *self.item_boxes.get() };
                 let slot_count = character_slots.get_slot_count();
 
                 // FIX: Very broken check
-                if item_boxes.len() != slot_count / 5 {
-                    item_boxes.clear();
+                if self.item_boxes.len() != slot_count / 5 {
+                    self.item_boxes.clear();
 
                     for row in 0..slot_count / 5 {
                         let slot = row * 5;
                         let path = self.character_slots;
 
-                        item_boxes.push(Box::new(split! {
+                        self.item_boxes.push(Box::new(split! {
                             children: (
                                 character_slot_preview! {
                                     character_information: path.in_slot(slot),
@@ -121,55 +129,57 @@ where
             C: Path<ClientState, CharacterSlots>,
             M: Path<ClientState, Option<usize>>,
         {
+            type Layouted = Vec<RowLayouted>;
+
             fn get_element_count(&self) -> usize {
                 unimplemented!()
             }
 
-            fn get_height(
-                &self,
+            fn make_layout(
+                &mut self,
                 state: &Context<ClientState>,
-                store: &ElementStore,
+                store: &mut ElementStore,
                 generator: &mut ElementIdGenerator,
                 mut resolver_set: impl ResolverSet,
-            ) {
+            ) -> Self::Layouted {
                 self.correct_element_size(state);
-                let item_boxes = unsafe { &mut *self.item_boxes.get() };
-
                 // FIX: Make this right. Maybe with_derived should expect a resolver set as well
                 resolver_set.with_index(0, |resolver| {
-                    resolver.with_derived(2.0, 4.0, |resolver| {
-                        for (index, item_box) in item_boxes.iter().enumerate() {
-                            item_box.get_height(state, store.child_store(index as u64, generator), generator, resolver);
-                        }
+                    let (area, layouted) = resolver.with_derived(2.0, 4.0, |resolver| {
+                        self.item_boxes
+                            .iter_mut()
+                            .enumerate()
+                            .map(|(index, item_box)| {
+                                item_box.make_layout(
+                                    state,
+                                    store.get_or_create_child_store(index as u64, generator),
+                                    generator,
+                                    resolver,
+                                )
+                            })
+                            .collect()
                     });
-                });
+
+                    layouted
+                })
             }
 
             fn create_layout<'a>(
                 &'a self,
                 state: &'a Context<ClientState>,
                 store: &'a ElementStore,
-                generator: &mut ElementIdGenerator,
-                mut resolver_set: impl ResolverSet,
+                layouted: &'a Self::Layouted,
                 layout: &mut Layout<'a, ClientState>,
             ) {
-                self.correct_element_size(state);
-                let item_boxes = unsafe { &mut *self.item_boxes.get() };
+                // TODO: Very much temp
+                layout.push_layer();
 
-                // FIX: Make this right. Maybe with_derived should expect a resolver set as well
-                resolver_set.with_index(0, |resolver| {
-                    resolver.with_derived(2.0, 4.0, |resolver| {
-                        // TODO: Very much temp
-                        layout.push_layer();
+                for (index, item_box) in self.item_boxes.iter().enumerate() {
+                    item_box.create_layout(state, store.child_store(index as u64), &layouted[index], layout);
+                }
 
-                        for (index, item_box) in item_boxes.iter().enumerate() {
-                            item_box.create_layout(state, store.child_store(index as u64, generator), generator, resolver, layout);
-                        }
-
-                        // TODO: Very much temp
-                        layout.pop_layer();
-                    });
-                });
+                // TODO: Very much temp
+                layout.pop_layer();
             }
         }
 

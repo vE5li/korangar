@@ -50,22 +50,9 @@ pub mod store {
 pub trait WindowTrait<App: Appli> {
     fn get_window_class(&self) -> Option<App::WindowClass>;
 
-    fn make_layout(
-        &mut self,
-        state: &Context<App>,
-        store: &mut WindowStore,
-        data: &WindowData<App>,
-        generator: &mut ElementIdGenerator,
-    ) -> Box<dyn Any>;
+    fn make_layout(&mut self, state: &Context<App>, store: &mut WindowStore, data: &WindowData<App>, generator: &mut ElementIdGenerator);
 
-    fn do_layout<'a>(
-        &'a self,
-        state: &'a Context<App>,
-        store: &'a WindowStore,
-        data: &'a WindowData<App>,
-        layouted: &'a Box<dyn Any>,
-        layout: &mut Layout<'a, App>,
-    );
+    fn do_layout<'a>(&'a self, state: &'a Context<App>, store: &'a WindowStore, data: &'a WindowData<App>, layout: &mut Layout<'a, App>);
 }
 
 #[derive(RustState)]
@@ -96,7 +83,7 @@ where
     pub size: App::Size,
 }
 
-struct WindowLayoutedSet<T> {
+pub struct WindowLayoutedSet<T> {
     area: Area,
     title_area: Area,
     children: T,
@@ -105,6 +92,7 @@ struct WindowLayoutedSet<T> {
 pub struct Window<App, Title, A, B, C, D, E, F, G, H, I, J, Elements>
 where
     App: Appli,
+    Elements: ElementSet<App>,
 {
     pub title_marker: PhantomData<Title>,
     pub title: A,
@@ -120,6 +108,7 @@ where
     pub theme: App::ThemeType,
     pub class: Option<App::WindowClass>,
     pub elements: Elements,
+    pub layouted: Option<WindowLayoutedSet<<Elements as ElementSet<App>>::Layouted>>,
 }
 
 impl<App, Title, A, B, C, D, E, F, G, H, I, J, Elements> WindowTrait<App> for Window<App, Title, A, B, C, D, E, F, G, H, I, J, Elements>
@@ -143,13 +132,7 @@ where
         self.class
     }
 
-    fn make_layout(
-        &mut self,
-        state: &Context<App>,
-        store: &mut WindowStore,
-        data: &WindowData<App>,
-        generator: &mut ElementIdGenerator,
-    ) -> Box<dyn Any> {
+    fn make_layout(&mut self, state: &Context<App>, store: &mut WindowStore, data: &WindowData<App>, generator: &mut ElementIdGenerator) {
         let store = store.get_or_create_from_window_id(data.id, generator);
 
         let available_area = Area {
@@ -177,27 +160,18 @@ where
             height: title_area.height + area.height,
         };
 
-        Box::new(WindowLayoutedSet {
+        self.layouted = Some(WindowLayoutedSet {
             area,
             title_area,
             children,
-        })
+        });
     }
 
     // TODO: Rename
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn do_layout<'a>(
-        &'a self,
-        state: &'a Context<App>,
-        store: &'a WindowStore,
-        data: &'a WindowData<App>,
-        layouted: &'a Box<dyn Any>,
-        layout: &mut Layout<'a, App>,
-    ) {
+    fn do_layout<'a>(&'a self, state: &'a Context<App>, store: &'a WindowStore, data: &'a WindowData<App>, layout: &mut Layout<'a, App>) {
         let store = store.get_from_window_id(data.id);
-        let layouted = layouted
-            .downcast_ref::<WindowLayoutedSet<<Elements as ElementSet<App>>::Layouted>>()
-            .unwrap();
+        let layouted = self.layouted.as_ref().expect("no layout present");
 
         App::set_current_theme_type(self.theme);
 

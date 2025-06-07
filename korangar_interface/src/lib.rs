@@ -117,7 +117,6 @@ where
     window_cache: App::Cache,
     available_space: App::Size,
 
-    layouteds: Vec<Box<dyn Any>>,
     generator: ElementIdGenerator,
     window_store: WindowStore,
     focused_element: Option<ElementId>,
@@ -139,7 +138,6 @@ where
             window_cache,
             available_space,
 
-            layouteds: Vec::new(),
             generator: ElementIdGenerator::new(),
             window_store: WindowStore::default(),
             focused_element: None,
@@ -410,20 +408,17 @@ where
     pub fn do_layouts<'a>(&'a mut self, state: &'a Context<App>, mouse_position: App::Position) -> BuiltUi<'a, App> {
         let mut is_ui_hovered = false;
 
-        self.layouteds = self
-            .windows
+        self.windows
             .iter_mut()
-            .map(|(window, window_data)| window.make_layout(state, &mut self.window_store, window_data, &mut self.generator))
-            .collect::<Vec<_>>();
+            .for_each(|(window, window_data)| window.make_layout(state, &mut self.window_store, window_data, &mut self.generator));
 
         let layouts = self
             .windows
             .iter()
-            .zip(self.layouteds.iter())
-            .map(|((window, window_data), layouted)| {
+            .map(|(window, window_data)| {
                 let mut layout = Layout::new(mouse_position, self.focused_element, !is_ui_hovered);
 
-                window.do_layout(state, &self.window_store, window_data, layouted, &mut layout);
+                window.do_layout(state, &self.window_store, window_data, &mut layout);
 
                 is_ui_hovered |= layout.is_hovered();
 

@@ -18,6 +18,7 @@ pub fn window(token_stream: TokenStream) -> TokenStream {
         class: { None },
         theme: !,
         elements: !,
+        layouted: { const None },
     });
 
     macro_impl(token_stream.into()).into()

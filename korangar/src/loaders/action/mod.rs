@@ -66,6 +66,7 @@ impl ActionLoader {
             }
         };
 
+        #[allow(clippy::unused_enumerate_index)]
         let events: Vec<ActionEvent> = actions_data
             .events
             .iter()

@@ -479,6 +479,7 @@ impl TextureLoader {
 
         let dds_file_data = self.game_file_loader.get(&dds_file_path).ok()?;
 
+        #[allow(clippy::question_mark)]
         let Some(dds) = Dds::read_bc7(dds_file_data.as_slice()) else {
             #[cfg(feature = "debug")]
             print_debug!("Could not decode DDS file: {}", dds_file_path);
@@ -719,6 +720,7 @@ impl<'a> Dds<'a> {
             total_size += level_size;
         }
 
+        #[allow(clippy::question_mark)]
         let Some(data) = data.get(..total_size as usize) else {
             #[cfg(feature = "debug")]
             print_debug!("DDS file does not contain the expected data size");

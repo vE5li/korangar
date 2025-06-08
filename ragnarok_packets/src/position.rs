@@ -189,7 +189,7 @@ mod conversion {
     fn world_position() {
         // The direction must be between 0 and 7 inclusive.
         let direction = [0, 3, 7];
-        let cases = [[255, 0, 0 + direction[0]], [0, 255, 0 + direction[1]], [0, 0, 240 + direction[2]]];
+        let cases = [[255, 0, direction[0]], [0, 255, direction[1]], [0, 0, 240 + direction[2]]];
 
         for case in cases {
             let mut byte_reader = ragnarok_bytes::ByteReader::without_metadata(&case);

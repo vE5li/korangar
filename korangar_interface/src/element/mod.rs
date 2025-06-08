@@ -222,17 +222,16 @@ where
         generator: &mut ElementIdGenerator,
         mut resolver_set: impl ResolverSet,
     ) -> Self::Layouted {
-        // std::array::from_fn(|index| {
-        //     resolver_set.with_index(index, |resolver| {
-        //         self[index].make_layout(
-        //             state,
-        //             store.get_or_create_child_store(index as u64, generator),
-        //             generator,
-        //             resolver,
-        //         )
-        //     })
-        // })
-        todo!()
+        std::array::from_fn(|index| {
+            resolver_set.with_index(index, |resolver| {
+                self[index].make_layout(
+                    state,
+                    store.get_or_create_child_store(index as u64, generator),
+                    generator,
+                    resolver,
+                )
+            })
+        })
     }
 
     fn create_layout<'a>(

@@ -104,7 +104,12 @@ impl Resolver {
         (returned, layouted)
     }
 
-    pub fn with_derived_scrolled(&mut self, scroll: f32, height_bound: HeightBound, f: impl FnOnce(&mut Resolver)) -> (Area, f32) {
+    pub fn with_derived_scrolled<L>(
+        &mut self,
+        scroll: f32,
+        height_bound: HeightBound,
+        f: impl FnOnce(&mut Resolver) -> L,
+    ) -> (Area, f32, L) {
         self.push_gaps();
 
         let mut inner = Resolver {
@@ -118,7 +123,7 @@ impl Resolver {
             gaps: self.gaps,
         };
 
-        f(&mut inner);
+        let layouted = f(&mut inner);
 
         let children_height = inner.used_height;
         let height = match height_bound {
@@ -144,7 +149,7 @@ impl Resolver {
             *available_height -= returned.height;
         }
 
-        (returned, children_height)
+        (returned, children_height, layouted)
     }
 
     pub fn with_derived_custom<L>(&mut self, available_area: PartialArea, f: impl FnOnce(&mut Resolver) -> L) -> L {

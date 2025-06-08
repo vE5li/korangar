@@ -620,7 +620,7 @@ impl<'a, App: Appli> Layout<'a, App> {
                         continue;
                     }
 
-                    *current_scroll -= delta;
+                    *current_scroll = (*current_scroll - delta).max(0.0).min(scroll_area.max_scroll);
 
                     return true;
                 }

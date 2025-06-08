@@ -84,11 +84,16 @@ jobs:
           ARTIFACT_NAME="${DATE}-${{ env.BINARY_NAME }}-v${VERSION_PART}-${{ matrix.architecture }}"
           echo "ARTIFACT_NAME=${ARTIFACT_NAME}" >> $GITHUB_ENV
 
+      - name: Create zip archive
+        run: |
+          cd staging
+          zip -r "../${{ env.ARTIFACT_NAME }}.zip" .
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.ARTIFACT_NAME }}
-          path: staging/**
+          path: ${{ env.ARTIFACT_NAME }}.zip
 
   create-github-release:
     name: Create GitHub Release

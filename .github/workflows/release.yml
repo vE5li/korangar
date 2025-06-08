@@ -73,9 +73,11 @@ jobs:
 
       - name: Prepare release archive
         run: |
+          mkdir -p archive
           mkdir -p staging
           cp "target/release/${{ env.BINARY_NAME }}" staging/
           cp -r korangar/archive staging/
+
 
       - name: Generate artifact name
         run: |
@@ -84,16 +86,30 @@ jobs:
           ARTIFACT_NAME="${DATE}-${{ env.BINARY_NAME }}-v${VERSION_PART}-${{ matrix.architecture }}"
           echo "ARTIFACT_NAME=${ARTIFACT_NAME}" >> $GITHUB_ENV
 
-      - name: Create zip archive
+      - name: Create archive (Linux)
+        if: matrix.name == 'Linux'
         run: |
           cd staging
-          zip -r "../${{ env.ARTIFACT_NAME }}.zip" .
+          tar -czf "../archive/${{ env.ARTIFACT_NAME }}.tar.gz" .
+
+      - name: Create archive (MacOS)
+        if: matrix.name == 'MacOS'
+        run: |
+          cd staging
+          zip -r "../archive/${{ env.ARTIFACT_NAME }}.zip" .
+
+      - name: Create archive (Windows)
+        if: matrix.name == 'Windows'
+        shell: pwsh
+        run: |
+          cd staging
+          Compress-Archive -Path * -DestinationPath "..\archive\${{ env.ARTIFACT_NAME }}.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.ARTIFACT_NAME }}
-          path: ${{ env.ARTIFACT_NAME }}.zip
+          path: archive/*
 
   create-github-release:
     name: Create GitHub Release

@@ -73,7 +73,7 @@ jobs:
 
       - name: Prepare release archive
         run: |
-          mkdir -p archive
+          mkdir -p archives
           mkdir -p staging
           cp "target/release/${{ env.BINARY_NAME }}" staging/
           cp -r korangar/archive staging/
@@ -89,26 +89,27 @@ jobs:
       - name: Create archive (Linux)
         if: matrix.name == 'Linux'
         run: |
-          tar -czf "archive/${{ env.ARTIFACT_NAME }}.tar.gz" -C "staging/"
+          cd staging
+          tar -czf "../archives/${{ env.ARTIFACT_NAME }}.tar.gz" *
 
       - name: Create archive (MacOS)
         if: matrix.name == 'MacOS'
         run: |
           cd staging
-          zip -r "../archive/${{ env.ARTIFACT_NAME }}.zip" .
+          zip -r "../archives/${{ env.ARTIFACT_NAME }}.zip" .
 
       - name: Create archive (Windows)
         if: matrix.name == 'Windows'
         shell: pwsh
         run: |
           cd staging
-          Compress-Archive -Path * -DestinationPath "..\archive\${{ env.ARTIFACT_NAME }}.zip"
+          Compress-Archive -Path * -DestinationPath "..\archives\${{ env.ARTIFACT_NAME }}.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.ARTIFACT_NAME }}
-          path: archive/*
+          path: archives/*
 
   create-github-release:
     name: Create GitHub Release

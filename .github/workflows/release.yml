@@ -3,7 +3,7 @@ on:
     tags:
       # This pattern triggers for the following pattern:
       # vMAJOR.MINOR.PATCH-YYYYMMDD
-      - 'v[0-9]+\.[0-9]+\.[0-9]+-20[0-9][0-9](0[1-9]|1[0-2])(0[1-9]|[12][0-9]|3[01])'
+      - 'v[0-9]+.[0-9]+.[0-9]+-20[0-9][0-9][0-1][0-9][0-3][0-9]'
 
 name: Release
 

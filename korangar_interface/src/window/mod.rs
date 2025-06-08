@@ -73,6 +73,10 @@ where
     pub gaps: f32,
     pub border: f32,
     pub corner_radius: App::CornerRadius,
+    pub minimum_width: f32,
+    pub maximum_width: f32,
+    pub minimum_height: f32,
+    pub maximum_height: f32,
     pub title_height: f32,
     pub font_size: App::FontSize,
     pub text_alignment: HorizontalAlignment,
@@ -96,7 +100,7 @@ pub struct WindowLayoutedSet<T> {
     children: T,
 }
 
-pub struct Window<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, Elements>
+pub struct Window<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, Elements>
 where
     App: Appli,
     Elements: ElementSet<App>,
@@ -114,15 +118,16 @@ where
     pub closable: J,
     pub minimum_width: K,
     pub maximum_width: L,
-    pub maximum_height: M,
+    pub minimum_height: M,
+    pub maximum_height: N,
     pub theme: App::ThemeType,
     pub class: Option<App::WindowClass>,
     pub elements: Elements,
     pub layouted: Option<WindowLayoutedSet<<Elements as ElementSet<App>>::Layouted>>,
 }
 
-impl<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, Elements> WindowTrait<App>
-    for Window<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, Elements>
+impl<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, Elements> WindowTrait<App>
+    for Window<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, Elements>
 where
     App: Appli,
     Title: AsRef<str>,
@@ -139,6 +144,7 @@ where
     K: Selector<App, f32>,
     L: Selector<App, f32>,
     M: Selector<App, f32>,
+    N: Selector<App, f32>,
     Elements: ElementSet<App>,
     <Elements as ElementSet<App>>::Layouted: 'static,
 {
@@ -164,11 +170,12 @@ where
         let adjusted_size = {
             let minimum_width = *state.get(&self.minimum_width);
             let maximum_width = *state.get(&self.maximum_width);
+            let minimum_height = *state.get(&self.minimum_height);
             let maximum_height = *state.get(&self.maximum_height);
 
             App::Size::new(
                 data.size.width().max(minimum_width).min(maximum_width),
-                data.size.height().min(maximum_height),
+                data.size.height().max(minimum_height).min(maximum_height),
             )
         };
 

@@ -1,6 +1,7 @@
 use cgmath::Vector2;
 use derive_new::new;
 use korangar_interface::element::ElementDisplay;
+use rust_state::RustState;
 use serde::{Deserialize, Serialize};
 use winit::dpi::PhysicalSize;
 
@@ -89,7 +90,7 @@ macro_rules! implement_ops {
 }
 
 /// The position as seen on screen.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize, RustState)]
 pub struct ScreenPosition {
     pub left: f32,
     pub top: f32,
@@ -150,7 +151,7 @@ impl std::ops::AddAssign<ScreenSize> for ScreenPosition {
 }
 
 /// The size as seen on screen.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize, RustState)]
 pub struct ScreenSize {
     pub width: f32,
     pub height: f32,

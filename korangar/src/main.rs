@@ -455,6 +455,7 @@ mod state {
 
         pub hotbar: Hotbar,
 
+        pub window_size: ScreenSize,
         pub audio_settings: AudioSettings,
         pub graphics_settings: GraphicsSettings,
         #[cfg(feature = "debug")]
@@ -517,6 +518,10 @@ mod state {
                     gaps: 15.0,
                     border: 20.0,
                     corner_radius: CornerRadius::uniform(20.0),
+                    minimum_width: 400.0,
+                    maximum_width: 600.0,
+                    minimum_height: 80.0,
+                    maximum_height: 700.0,
                     title_height: 45.0,
                     font_size: FontSize(20.0),
                     text_alignment: HorizontalAlignment::Center { offset: 0.0 },
@@ -594,6 +599,10 @@ mod state {
                     gaps: 8.0,
                     border: 15.0,
                     corner_radius: CornerRadius::uniform(14.0),
+                    minimum_width: 400.0,
+                    maximum_width: 600.0,
+                    minimum_height: 80.0,
+                    maximum_height: 700.0,
                     title_height: 25.0,
                     font_size: FontSize(14.0),
                     text_alignment: HorizontalAlignment::Center { offset: 0.0 },
@@ -1250,6 +1259,7 @@ impl Client {
 
             audio_settings,
 
+            window_size: ScreenSize::default(),
             graphics_settings,
             #[cfg(feature = "debug")]
             render_settings,
@@ -3274,6 +3284,7 @@ impl ApplicationHandler for Client {
             }
             WindowEvent::Resized(screen_size) => {
                 let screen_size = screen_size.max(PhysicalSize::new(1, 1)).into();
+                *self.client_state.follow_mut(client_state().window_size()) = screen_size;
                 self.graphics_engine.on_resize(screen_size);
                 self.interface.update_window_size(screen_size);
                 self.interface_renderer.update_window_size(screen_size);

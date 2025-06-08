@@ -89,8 +89,7 @@ jobs:
       - name: Create archive (Linux)
         if: matrix.name == 'Linux'
         run: |
-          cd staging
-          tar -czf "../archive/${{ env.ARTIFACT_NAME }}.tar.gz" .
+          tar -czf "archive/${{ env.ARTIFACT_NAME }}.tar.gz" -c "staging"
 
       - name: Create archive (MacOS)
         if: matrix.name == 'MacOS'

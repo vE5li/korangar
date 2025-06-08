@@ -12,8 +12,19 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
+      - name: Install build dependencies
+        run: sudo apt install libasound2-dev nasm
+
+      - name: Add Clippy
+        run: rustup component add clippy
+
+      - name: Run Clippy (default features)
+        run: cargo clippy -- -Dwarnings
+
+      - name: Run Clippy (all features)
         run: cargo clippy --all-features -- -Dwarnings
 
   flake-nix:
@@ -21,7 +32,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Install Nix
         uses: cachix/install-nix-action@v25

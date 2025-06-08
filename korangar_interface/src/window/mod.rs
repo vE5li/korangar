@@ -174,8 +174,8 @@ where
             let maximum_height = *state.get(&self.maximum_height);
 
             App::Size::new(
-                data.size.width().max(minimum_width).min(maximum_width),
-                data.size.height().max(minimum_height).min(maximum_height),
+                data.size.width().min(maximum_width).max(minimum_width),
+                data.size.height().min(maximum_height).max(minimum_height),
             )
         };
 

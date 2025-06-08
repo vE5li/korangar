@@ -150,6 +150,8 @@ where
             title: "Select Server",
             class: Self::window_class(),
             theme: ClientThemeType::Menu,
+            minimum_width: 450.0,
+            maximum_width: 450.0,
             elements: ServerWrapper::new(self.path),
         }
     }

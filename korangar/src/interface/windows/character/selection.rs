@@ -187,6 +187,8 @@ where
             title: "Select Character",
             class: Self::window_class(),
             theme: ClientThemeType::Menu,
+            minimum_width: 900.0,
+            maximum_width: 900.0,
             elements: CharacterWrapper::new(self.character_slots, self.switch_request),
         }
     }

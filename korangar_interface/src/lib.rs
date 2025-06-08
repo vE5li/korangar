@@ -316,7 +316,7 @@ where
             (Box::new(window), WindowData {
                 id,
                 position: App::Position::new(200.0, 200.0),
-                size: App::Size::new(400.0, 500.0),
+                size: App::Size::new(0.0, 500.0),
             }),
         );
         // focus_state.set_focused_window(self.windows.len() - 1);

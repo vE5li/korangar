@@ -50,7 +50,13 @@ pub mod store {
 pub trait WindowTrait<App: Appli> {
     fn get_window_class(&self) -> Option<App::WindowClass>;
 
-    fn make_layout(&mut self, state: &Context<App>, store: &mut WindowStore, data: &WindowData<App>, generator: &mut ElementIdGenerator);
+    fn make_layout(
+        &mut self,
+        state: &Context<App>,
+        store: &mut WindowStore,
+        data: &mut WindowData<App>,
+        generator: &mut ElementIdGenerator,
+    );
 
     fn do_layout<'a>(&'a self, state: &'a Context<App>, store: &'a WindowStore, data: &'a WindowData<App>, layout: &mut Layout<'a, App>);
 }
@@ -89,7 +95,7 @@ pub struct WindowLayoutedSet<T> {
     children: T,
 }
 
-pub struct Window<App, Title, A, B, C, D, E, F, G, H, I, J, Elements>
+pub struct Window<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, Elements>
 where
     App: Appli,
     Elements: ElementSet<App>,
@@ -105,13 +111,17 @@ where
     pub border: H,
     pub corner_radius: I,
     pub closable: J,
+    pub minimum_width: K,
+    pub maximum_width: L,
+    pub maximum_height: M,
     pub theme: App::ThemeType,
     pub class: Option<App::WindowClass>,
     pub elements: Elements,
     pub layouted: Option<WindowLayoutedSet<<Elements as ElementSet<App>>::Layouted>>,
 }
 
-impl<App, Title, A, B, C, D, E, F, G, H, I, J, Elements> WindowTrait<App> for Window<App, Title, A, B, C, D, E, F, G, H, I, J, Elements>
+impl<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, Elements> WindowTrait<App>
+    for Window<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, Elements>
 where
     App: Appli,
     Title: AsRef<str>,
@@ -125,6 +135,9 @@ where
     H: Selector<App, f32>,
     I: Selector<App, App::CornerRadius>,
     J: Selector<App, bool>,
+    K: Selector<App, f32>,
+    L: Selector<App, f32>,
+    M: Selector<App, f32>,
     Elements: ElementSet<App>,
     <Elements as ElementSet<App>>::Layouted: 'static,
 {
@@ -132,8 +145,25 @@ where
         self.class
     }
 
-    fn make_layout(&mut self, state: &Context<App>, store: &mut WindowStore, data: &WindowData<App>, generator: &mut ElementIdGenerator) {
+    fn make_layout(
+        &mut self,
+        state: &Context<App>,
+        store: &mut WindowStore,
+        data: &mut WindowData<App>,
+        generator: &mut ElementIdGenerator,
+    ) {
         let store = store.get_or_create_from_window_id(data.id, generator);
+
+        {
+            let minimum_width = *state.get(&self.minimum_width);
+            let maximum_width = *state.get(&self.maximum_width);
+            let maximum_height = *state.get(&self.maximum_height);
+
+            data.size = App::Size::new(
+                data.size.width().max(minimum_width).min(maximum_width),
+                data.size.height().min(maximum_height),
+            );
+        }
 
         let available_area = Area {
             x: data.position.left(),
@@ -231,42 +261,47 @@ where
             *state.get(&self.background_color),
         );
 
-        // TODO: Compute this better.
-        let resize_area = Area {
-            x: layouted.area.x + layouted.area.width - 14.0,
-            y: layouted.area.y + layouted.area.height - 14.0,
-            width: 14.0,
-            height: 14.0,
-        };
+        // FIX: Add height to the check as well. Currently there is no concept of an
+        // window with a fixed height and a flexible one, so after that is
+        // implemented this can be corrected.
+        if *state.get(&self.minimum_width) != *state.get(&self.maximum_width) {
+            // TODO: Compute this better.
+            let resize_area = Area {
+                x: layouted.area.x + layouted.area.width - 14.0,
+                y: layouted.area.y + layouted.area.height - 14.0,
+                width: 14.0,
+                height: 14.0,
+            };
 
-        // TEMP
-        layout.add_rectangle(
-            resize_area,
-            App::CornerRadius::new(0.0, 0.0, state.get(&self.corner_radius).bottom_right(), 0.0),
-            *state.get(&self.title_color),
-        );
-
-        if let Some((close_button_area, close_button_color)) = close_button {
+            // TEMP
             layout.add_rectangle(
-                close_button_area,
-                App::CornerRadius::new(0.0, 0.0, 0.0, 0.0),
-                close_button_color,
+                resize_area,
+                App::CornerRadius::new(0.0, 0.0, state.get(&self.corner_radius).bottom_right(), 0.0),
+                *state.get(&self.title_color),
             );
 
-            // TODO: Use own values
-            layout.add_text(
-                close_button_area,
-                "X",
-                *state.get(&self.font_size),
-                *state.get(&self.background_color),
-                HorizontalAlignment::Center { offset: 0.0 },
-                VerticalAlignment::Center { offset: 0.0 },
-            );
-        }
+            if let Some((close_button_area, close_button_color)) = close_button {
+                layout.add_rectangle(
+                    close_button_area,
+                    App::CornerRadius::new(0.0, 0.0, 0.0, 0.0),
+                    close_button_color,
+                );
 
-        if layout.is_area_hovered_and_active(resize_area) {
-            layout.add_window_resize_area(resize_area, data.id);
-            layout.mark_hovered();
+                // TODO: Use own values
+                layout.add_text(
+                    close_button_area,
+                    "X",
+                    *state.get(&self.font_size),
+                    *state.get(&self.background_color),
+                    HorizontalAlignment::Center { offset: 0.0 },
+                    VerticalAlignment::Center { offset: 0.0 },
+                );
+            }
+
+            if layout.is_area_hovered_and_active(resize_area) {
+                layout.add_window_resize_area(resize_area, data.id);
+                layout.mark_hovered();
+            }
         }
 
         if layout.is_area_hovered_and_active(layouted.area) {

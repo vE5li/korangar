@@ -146,6 +146,8 @@ where
             title: "Log In",
             class: Self::window_class(),
             theme: ClientThemeType::Menu,
+            minimum_width: 450.0,
+            maximum_width: 450.0,
             elements: (
                 text! { text: "Select service" },
                 // pick_list! { options: options, selected: selected_service },

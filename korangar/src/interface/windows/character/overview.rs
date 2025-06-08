@@ -109,6 +109,8 @@ where
             title: "Character Overview",
             class: Self::window_class(),
             theme: ClientThemeType::Game,
+            minimum_width: 300.0,
+            maximum_width: 300.0,
             elements: elements,
         }
     }

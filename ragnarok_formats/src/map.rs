@@ -601,7 +601,7 @@ mod conversion {
             let mut test = |flags: TileFlags| {
                 let mut byte_writer = ByteWriter::new();
 
-                if let Ok(_) = flags.to_bytes(&mut byte_writer) {
+                if flags.to_bytes(&mut byte_writer).is_ok() {
                     let bytes = byte_writer.into_inner();
                     let mut byte_reader = ByteReader::without_metadata(&bytes);
                     let index = EncodedType::from_bytes(&mut byte_reader).unwrap();

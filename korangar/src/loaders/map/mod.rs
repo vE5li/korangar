@@ -219,8 +219,12 @@ impl MapLoader {
             .collect();
         let object_kdtree = KDTree::from_objects(&object_bounding_boxes);
 
-        let (vertex_buffer, index_buffer, texture_set, videos) =
-            self.build_buffer_and_texture_set_and_videos(&resource_file, texture_set_builder, model_vertices, model_indices);
+        let BufferAndTextures {
+            vertex_buffer,
+            index_buffer,
+            texture_set,
+            videos,
+        } = self.build_buffer_and_textures(&resource_file, texture_set_builder, model_vertices, model_indices);
 
         let lighting = Lighting::new(map_data.light_settings);
 
@@ -275,13 +279,13 @@ impl MapLoader {
         Ok(Box::new(map))
     }
 
-    fn build_buffer_and_texture_set_and_videos(
+    fn build_buffer_and_textures(
         &self,
         resource_file: &str,
         texture_set_builder: TextureSetBuilder,
         model_vertices: Vec<ModelVertex>,
         model_indices: Vec<u32>,
-    ) -> (Arc<Buffer<ModelVertex>>, Arc<Buffer<u32>>, Arc<TextureSet>, Mutex<Vec<Video>>) {
+    ) -> BufferAndTextures {
         let vertex_buffer = Arc::new(create_vertex_buffer(
             &self.device,
             &self.queue,
@@ -299,8 +303,21 @@ impl MapLoader {
         let (texture_set, videos) = texture_set_builder.build();
         let texture_set = Arc::new(texture_set);
         let videos = Mutex::new(videos);
-        (vertex_buffer, index_buffer, texture_set, videos)
+
+        BufferAndTextures {
+            vertex_buffer,
+            index_buffer,
+            texture_set,
+            videos,
+        }
     }
+}
+
+struct BufferAndTextures {
+    vertex_buffer: Arc<Buffer<ModelVertex>>,
+    index_buffer: Arc<Buffer<u32>>,
+    texture_set: Arc<TextureSet>,
+    videos: Mutex<Vec<Video>>,
 }
 
 /// We shift the map resources, so that the world coordinate system's origin has

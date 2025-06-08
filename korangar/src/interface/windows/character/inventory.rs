@@ -27,9 +27,6 @@ impl PrototypeWindow<InterfaceSettings> for InventoryWindow {
 
     fn to_window(
         &self,
-        window_cache: &WindowCache,
-        application: &InterfaceSettings,
-        available_space: ScreenSize,
     ) -> Window<InterfaceSettings> {
         let elements = vec![InventoryContainer::new(self.items.clone()).wrap()];
 

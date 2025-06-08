@@ -20,12 +20,7 @@ impl<P> CustomWindow<ClientState> for FrameInspectorWindow<P>
 where
     P: Path<ClientState, FrameMeasurement>,
 {
-    fn to_window<'a>(
-        self,
-        state: &Context<ClientState>,
-        window_cache: &WindowCache,
-        available_space: ScreenSize,
-    ) -> impl WindowTrait<ClientState> + 'a {
+    fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
         use korangar_interface::prelude::*;
 
         window! {

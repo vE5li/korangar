@@ -36,9 +36,6 @@ impl PrototypeWindow<InterfaceSettings> for DialogWindow {
 
     fn to_window(
         &self,
-        window_cache: &WindowCache,
-        application: &InterfaceSettings,
-        available_space: ScreenSize,
     ) -> impl WindowTrait<InterfaceSettings> {
         let elements = vec![DialogContainer::new(self.elements.new_remote(), self.npc_id).wrap()];
 

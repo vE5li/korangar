@@ -39,9 +39,6 @@ impl PrototypeWindow<InterfaceSettings> for ChatWindow {
 
     fn to_window(
         &self,
-        window_cache: &WindowCache,
-        application: &InterfaceSettings,
-        available_space: ScreenSize,
     ) -> Window<InterfaceSettings> {
         let input_text = PlainTrackedState::<String>::default();
 

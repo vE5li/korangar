@@ -21,9 +21,6 @@ impl FriendRequestWindow {
 impl PrototypeWindow<InterfaceSettings> for FriendRequestWindow {
     fn to_window(
         &self,
-        window_cache: &WindowCache,
-        application: &InterfaceSettings,
-        available_space: ScreenSize,
     ) -> Window<InterfaceSettings> {
         let elements = vec![
             Text::default()

@@ -14,12 +14,7 @@ impl CustomWindow<ClientState> for MapsWindow {
         Some(WindowClass::Maps)
     }
 
-    fn to_window<'a>(
-        self,
-        state: &Context<ClientState>,
-        window_cache: &WindowCache,
-        available_space: ScreenSize,
-    ) -> impl WindowTrait<ClientState> + 'a {
+    fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
         use korangar_interface::prelude::*;
 
         const MAP_COUNT: usize = 23;

@@ -29,9 +29,6 @@ pub fn derive_prototype_window_struct(
                 }
 
                 fn to_window<'a>(self_path: impl rust_state::Path<#impl_for, Self>,
-                    window_cache: &<#impl_for as korangar_interface::application::Appli>::Cache,
-                    application: &#impl_for,
-                    available_space: <#impl_for as korangar_interface::application::Appli>::Size,
                 ) -> impl korangar_interface::window::WindowTrait<#impl_for> + 'a {
                     use korangar_interface::prelude::*;
 
@@ -53,7 +50,7 @@ pub fn derive_prototype_window_struct(
                 #window_class_option
             }
 
-            fn to_window<'a>(self_path: impl rust_state::Path<App, Self>, window_cache: &App::Cache, application: &App, available_space: App::Size) -> impl korangar_interface::window::WindowTrait<App> + 'a {
+            fn to_window<'a>(self_path: impl rust_state::Path<App, Self>) -> impl korangar_interface::window::WindowTrait<App> + 'a {
                 use korangar_interface::prelude::*;
 
                 window! {

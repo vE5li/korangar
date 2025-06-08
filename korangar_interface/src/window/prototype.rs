@@ -12,12 +12,7 @@ where
         None
     }
 
-    fn to_window<'a>(
-        self_path: impl Path<App, Self>,
-        window_cache: &App::Cache,
-        application: &App,
-        available_space: App::Size,
-    ) -> impl WindowTrait<App> + 'a;
+    fn to_window<'a>(self_path: impl Path<App, Self>) -> impl WindowTrait<App> + 'a;
 
     // TODO: Add `to_window_mut`
 }
@@ -30,5 +25,5 @@ where
         None
     }
 
-    fn to_window<'a>(self, state: &Context<App>, window_cache: &App::Cache, available_space: App::Size) -> impl WindowTrait<App> + 'a;
+    fn to_window<'a>(self) -> impl WindowTrait<App> + 'a;
 }

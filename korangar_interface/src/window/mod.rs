@@ -54,8 +54,9 @@ pub trait WindowTrait<App: Appli> {
         &mut self,
         state: &Context<App>,
         store: &mut WindowStore,
-        data: &mut WindowData<App>,
+        data: &WindowData<App>,
         generator: &mut ElementIdGenerator,
+        window_size: App::Size,
     );
 
     fn do_layout<'a>(&'a self, state: &'a Context<App>, store: &'a WindowStore, data: &'a WindowData<App>, layout: &mut Layout<'a, App>);
@@ -149,34 +150,49 @@ where
         &mut self,
         state: &Context<App>,
         store: &mut WindowStore,
-        data: &mut WindowData<App>,
+        data: &WindowData<App>,
         generator: &mut ElementIdGenerator,
+        window_size: App::Size,
     ) {
         let store = store.get_or_create_from_window_id(data.id, generator);
 
-        {
+        App::set_current_theme_type(self.theme);
+
+        let title_height = *state.get(&self.title_height);
+
+        // Adjust size
+        let adjusted_size = {
             let minimum_width = *state.get(&self.minimum_width);
             let maximum_width = *state.get(&self.maximum_width);
             let maximum_height = *state.get(&self.maximum_height);
 
-            data.size = App::Size::new(
+            App::Size::new(
                 data.size.width().max(minimum_width).min(maximum_width),
                 data.size.height().min(maximum_height),
-            );
-        }
-
-        let available_area = Area {
-            x: data.position.left(),
-            y: data.position.top(),
-            width: data.size.width(),
-            height: data.size.height(),
+            )
         };
 
-        App::set_current_theme_type(self.theme);
+        // TODO: Something like this needs to be done when we create the anchor too.
+
+        // Adjust position
+        let adjusted_position = {
+            let half_width = adjusted_size.width() / 2.0;
+
+            App::Position::new(
+                data.position.left().max(-half_width).min(window_size.width() - half_width),
+                data.position.top().max(0.0).min(window_size.height() - title_height),
+            )
+        };
+
+        let available_area = Area {
+            x: adjusted_position.left(),
+            y: adjusted_position.top(),
+            width: adjusted_size.width(),
+            height: adjusted_size.height(),
+        };
 
         let mut resolver = Resolver::new(available_area, 0.0);
 
-        let title_height = *state.get(&self.title_height);
         let title_area = resolver.with_height(title_height);
 
         let (area, children) = resolver.with_derived(*state.get(&self.gaps), *state.get(&self.border), |resolver| {

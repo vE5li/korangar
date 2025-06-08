@@ -115,7 +115,7 @@ where
 {
     windows: Vec<(Box<dyn WindowTrait<App>>, WindowData<App>)>,
     window_cache: App::Cache,
-    available_space: App::Size,
+    window_size: App::Size,
 
     generator: ElementIdGenerator,
     window_store: WindowStore,
@@ -136,7 +136,7 @@ where
         Self {
             windows: Vec::new(),
             window_cache,
-            available_space,
+            window_size: available_space,
 
             generator: ElementIdGenerator::new(),
             window_store: WindowStore::default(),
@@ -149,7 +149,7 @@ where
     }
 
     pub fn update_window_size(&mut self, screen_size: App::Size) {
-        self.available_space = screen_size;
+        self.window_size = screen_size;
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
@@ -323,23 +323,23 @@ where
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn open_window<T>(&mut self, state: &Context<App>, window: T)
+    pub fn open_window<T>(&mut self, window: T)
     where
         T: CustomWindow<App> + 'static,
     {
         if !T::window_class().is_some_and(|window_class| self.is_window_with_class_open(window_class)) {
-            let window = window.to_window(state, &self.window_cache, self.available_space);
+            let window = window.to_window();
             self.open_new_window(window);
         }
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn open_prototype_window<T>(&mut self, application: &App, window_path: impl rust_state::Path<App, T>)
+    pub fn open_prototype_window<T>(&mut self, window_path: impl rust_state::Path<App, T>)
     where
         T: PrototypeWindow<App>,
     {
         if !T::window_class().is_some_and(|window_class| self.is_window_with_class_open(window_class)) {
-            let window = T::to_window(window_path, &self.window_cache, application, self.available_space);
+            let window = T::to_window(window_path);
             self.open_new_window(window);
         }
     }
@@ -408,9 +408,15 @@ where
     pub fn do_layouts<'a>(&'a mut self, state: &'a Context<App>, mouse_position: App::Position) -> BuiltUi<'a, App> {
         let mut is_ui_hovered = false;
 
-        self.windows
-            .iter_mut()
-            .for_each(|(window, window_data)| window.make_layout(state, &mut self.window_store, window_data, &mut self.generator));
+        self.windows.iter_mut().for_each(|(window, window_data)| {
+            window.make_layout(
+                state,
+                &mut self.window_store,
+                window_data,
+                &mut self.generator,
+                self.window_size,
+            )
+        });
 
         let layouts = self
             .windows

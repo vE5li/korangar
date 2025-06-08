@@ -28,9 +28,6 @@ impl PrototypeWindow<InterfaceSettings> for BuyWindow {
 
     fn to_window(
         &self,
-        window_cache: &WindowCache,
-        application: &InterfaceSettings,
-        available_space: ScreenSize,
     ) -> Window<InterfaceSettings> {
         let elements = vec![BuyContainer::new(self.items.clone(), self.cart.clone()).wrap()];
         let elements = vec![ScrollView::new(elements, size_bound!(100%, ? < super)).wrap()];

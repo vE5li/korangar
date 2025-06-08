@@ -15,12 +15,7 @@ impl CustomWindow<ClientState> for RespawnWindow {
         Some(WindowClass::Respawn)
     }
 
-    fn to_window<'a>(
-        self,
-        state: &Context<ClientState>,
-        window_cache: &WindowCache,
-        available_space: ScreenSize,
-    ) -> impl WindowTrait<ClientState> + 'a {
+    fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
         window! {
             title: "Respawn Menu",
             class: Self::window_class(),

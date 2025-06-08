@@ -1264,14 +1264,11 @@ impl Client {
             create_character_name: String::new(),
         });
 
-        interface.open_window(
-            &client_state,
-            LoginWindow::new(
-                ClientState::path().login_window(),
-                ClientState::path().login_settings(),
-                ClientState::path().client_info(),
-            ),
-        );
+        interface.open_window(LoginWindow::new(
+            ClientState::path().login_window(),
+            ClientState::path().login_settings(),
+            ClientState::path().client_info(),
+        ));
 
         Some(Self {
             action_loader,
@@ -1467,12 +1464,12 @@ impl Client {
 
                     self.interface.close_all_windows_except(DEBUG_WINDOWS);
                     self.interface
-                        .open_window(&self.client_state, SelectServerWindow::new(client_state().character_servers()));
+                        .open_window(SelectServerWindow::new(client_state().character_servers()));
                 }
                 NetworkEvent::LoginServerConnectionFailed { message, .. } => {
                     self.networking_system.disconnect_from_login_server();
 
-                    self.interface.open_window(&self.client_state, ErrorWindow::new(message.to_owned()));
+                    self.interface.open_window(ErrorWindow::new(message.to_owned()));
                 }
                 NetworkEvent::LoginServerDisconnected { reason } => {
                     if reason != DisconnectReason::ClosedByClient {
@@ -1494,7 +1491,7 @@ impl Client {
                 }
                 NetworkEvent::CharacterServerConnectionFailed { message, .. } => {
                     self.networking_system.disconnect_from_character_server();
-                    self.interface.open_window(&self.client_state, ErrorWindow::new(message.to_owned()));
+                    self.interface.open_window(ErrorWindow::new(message.to_owned()));
                 }
                 NetworkEvent::CharacterServerDisconnected { reason } => {
                     if reason != DisconnectReason::ClosedByClient {
@@ -1565,15 +1562,13 @@ impl Client {
                         // TODO: this will do one unnecessary restore_focus. check
                         // if that will be problematic
                         self.interface.close_all_windows_except(DEBUG_WINDOWS);
-                        self.interface.open_window(
-                            &self.client_state,
-                            CharacterSelectionWindow::new(client_state().character_slots(), client_state().switch_request()),
-                        );
+                        self.interface.open_window(CharacterSelectionWindow::new(
+                            client_state().character_slots(),
+                            client_state().switch_request(),
+                        ));
                     }
                 }
-                NetworkEvent::CharacterSelectionFailed { message, .. } => {
-                    self.interface.open_window(&self.client_state, ErrorWindow::new(message.to_owned()))
-                }
+                NetworkEvent::CharacterSelectionFailed { message, .. } => self.interface.open_window(ErrorWindow::new(message.to_owned())),
                 NetworkEvent::CharacterDeleted => {
                     if let Some(character_id) = self.client_state.follow_mut(client_state().currently_deleting()).take() {
                         self.client_state
@@ -1583,7 +1578,7 @@ impl Client {
                 }
                 NetworkEvent::CharacterDeletionFailed { message, .. } => {
                     *self.client_state.follow_mut(client_state().currently_deleting()) = None;
-                    self.interface.open_window(&self.client_state, ErrorWindow::new(message.to_owned()))
+                    self.interface.open_window(ErrorWindow::new(message.to_owned()))
                 }
                 NetworkEvent::CharacterSelected { login_data, .. } => {
                     self.audio_engine.play_sound_effect(self.main_menu_click_sound_effect);
@@ -1620,25 +1615,21 @@ impl Client {
                     self.client_state.follow_mut(client_state().entities()).push(player);
 
                     self.interface.close_window_with_class(WindowClass::CharacterSelection);
-                    self.interface.open_window(
-                        &self.client_state,
-                        CharacterOverviewWindow::new(
-                            client_state().player_name(),
-                            // TODO: Check that manually asserting is fine. Technically this window should only
-                            // be open while the player is selected.
-                            this_player().manually_asserted().base_level(),
-                            // TODO: Check that manually asserting is fine. Technically this window should only
-                            // be open while the player is selected.
-                            this_player().manually_asserted().job_level(),
-                        ),
-                    );
+                    self.interface.open_window(CharacterOverviewWindow::new(
+                        client_state().player_name(),
+                        // TODO: Check that manually asserting is fine. Technically this window should only
+                        // be open while the player is selected.
+                        this_player().manually_asserted().base_level(),
+                        // TODO: Check that manually asserting is fine. Technically this window should only
+                        // be open while the player is selected.
+                        this_player().manually_asserted().job_level(),
+                    ));
                     // self.interface.open_window(
                     //     &self.client_state,
                     //     &mut self.focus_state,
                     //     &ChatWindow::new(client_state().chat_messages(),
                     // self.font_loader.clone()), );
-                    self.interface
-                        .open_window(&self.client_state, HotbarWindow::new(client_state().hotbar().skills()));
+                    self.interface.open_window(HotbarWindow::new(client_state().hotbar().skills()));
 
                     // Put the dialog system in a well-defined state.
                     // self.dialog_system.close_dialog();
@@ -1657,16 +1648,14 @@ impl Client {
                     self.interface.close_window_with_class(WindowClass::CharacterCreation);
                 }
                 NetworkEvent::CharacterCreationFailed { message, .. } => {
-                    self.interface.open_window(&self.client_state, ErrorWindow::new(message.to_owned()));
+                    self.interface.open_window(ErrorWindow::new(message.to_owned()));
                 }
                 NetworkEvent::CharacterSlotSwitched => {
                     *self.client_state.follow_mut(client_state().switch_request()) = None;
                 }
                 NetworkEvent::CharacterSlotSwitchFailed => {
-                    self.interface.open_window(
-                        &self.client_state,
-                        ErrorWindow::new("Failed to switch character slots".to_owned()),
-                    );
+                    self.interface
+                        .open_window(ErrorWindow::new("Failed to switch character slots".to_owned()));
                 }
                 NetworkEvent::AddEntity(entity_data) => {
                     if let Some(map) = self.map.as_ref() {
@@ -1718,7 +1707,7 @@ impl Client {
 
                                 // If the player is us, we need to open the respawn window.
                                 if entity_id == self.client_state.follow(client_state().entities())[0].get_entity_id() {
-                                    self.interface.open_window(&self.client_state, RespawnWindow);
+                                    self.interface.open_window(RespawnWindow);
                                 }
                             }
                         }
@@ -2196,7 +2185,7 @@ impl Client {
                 UserEvent::CameraResetRotation => self.player_camera.reset_rotation(),
                 UserEvent::OpenMenuWindow => {
                     if self.client_state.try_follow(this_entity()).is_some() {
-                        self.interface.open_window(&self.client_state, MenuWindow)
+                        self.interface.open_window(MenuWindow)
                     }
                 }
                 UserEvent::OpenInventoryWindow => {
@@ -2226,13 +2215,12 @@ impl Client {
                         // get_skills()), )
                     }
                 }
-                UserEvent::OpenGraphicsSettingsWindow => self.interface.open_window(
-                    &self.client_state,
-                    GraphicsSettingsWindow::new(client_state().graphics_settings()),
-                ),
+                UserEvent::OpenGraphicsSettingsWindow => self
+                    .interface
+                    .open_window(GraphicsSettingsWindow::new(client_state().graphics_settings())),
                 UserEvent::OpenAudioSettingsWindow => self
                     .interface
-                    .open_window(&self.client_state, AudioSettingsWindow::new(client_state().audio_settings())),
+                    .open_window(AudioSettingsWindow::new(client_state().audio_settings())),
                 UserEvent::OpenFriendsWindow => {
                     // self.interface.open_window(
                     //     &self.client_state,
@@ -2251,10 +2239,8 @@ impl Client {
                     // Clear the name before opening the window.
                     self.client_state.follow_mut(client_state().create_character_name()).clear();
 
-                    self.interface.open_window(
-                        &self.client_state,
-                        CharacterCreationWindow::new(client_state().create_character_name(), slot),
-                    )
+                    self.interface
+                        .open_window(CharacterCreationWindow::new(client_state().create_character_name(), slot))
                 }
                 UserEvent::CreateCharacter { slot, name } => {
                     let _ = self.networking_system.create_character(slot, name);
@@ -2487,7 +2473,7 @@ impl Client {
                 #[cfg(feature = "debug")]
                 UserEvent::OpenRenderSettingsWindow => self
                     .interface
-                    .open_window(&self.client_state, RenderSettingsWindow::new(client_state().render_settings())),
+                    .open_window(RenderSettingsWindow::new(client_state().render_settings())),
                 #[cfg(feature = "debug")]
                 UserEvent::OpenMapDataWindow => {
                     if let Some(map) = self.map.as_ref() {
@@ -2496,11 +2482,11 @@ impl Client {
                     }
                 }
                 #[cfg(feature = "debug")]
-                UserEvent::OpenMapsWindow => self.interface.open_window(&self.client_state, MapsWindow),
+                UserEvent::OpenMapsWindow => self.interface.open_window(MapsWindow),
                 #[cfg(feature = "debug")]
-                UserEvent::OpenCommandsWindow => self.interface.open_window(&self.client_state, CommandsWindow),
+                UserEvent::OpenCommandsWindow => self.interface.open_window(CommandsWindow),
                 #[cfg(feature = "debug")]
-                UserEvent::OpenTimeWindow => self.interface.open_window(&self.client_state, TimeWindow),
+                UserEvent::OpenTimeWindow => self.interface.open_window(TimeWindow),
                 #[cfg(feature = "debug")]
                 UserEvent::SetDawn => self.game_timer.set_day_timer(5.0 * 3600.0),
                 #[cfg(feature = "debug")]
@@ -2512,14 +2498,11 @@ impl Client {
                 #[cfg(feature = "debug")]
                 UserEvent::OpenThemeViewerWindow => {} //self.interface.open_window(&self.client_state, self.client_state.theme_window()),
                 #[cfg(feature = "debug")]
-                UserEvent::OpenProfilerWindow => self.interface.open_window(
-                    &self.client_state,
-                    ProfilerWindow::new(client_state().profiler_visible_thread()),
-                ),
-                #[cfg(feature = "debug")]
-                UserEvent::OpenPacketWindow => self
+                UserEvent::OpenProfilerWindow => self
                     .interface
-                    .open_window(&self.client_state, PacketWindow::new(client_state().packet_state())),
+                    .open_window(ProfilerWindow::new(client_state().profiler_visible_thread())),
+                #[cfg(feature = "debug")]
+                UserEvent::OpenPacketWindow => self.interface.open_window(PacketWindow::new(client_state().packet_state())),
                 #[cfg(feature = "debug")]
                 UserEvent::ClearPacketHistory => {} //self.packet_history_callback.clear_all(),
                 #[cfg(feature = "debug")]
@@ -2584,10 +2567,10 @@ impl Client {
                             map.set_ambient_sound_sources(&self.audio_engine);
                             self.audio_engine.play_background_music_track(DEFAULT_BACKGROUND_MUSIC);
 
-                            self.interface.open_window(
-                                &self.client_state,
-                                CharacterSelectionWindow::new(client_state().character_slots(), client_state().switch_request()),
-                            );
+                            self.interface.open_window(CharacterSelectionWindow::new(
+                                client_state().character_slots(),
+                                client_state().switch_request(),
+                            ));
 
                             self.start_camera.set_focus_point(START_CAMERA_FOCUS_POINT);
                             self.directional_shadow_camera

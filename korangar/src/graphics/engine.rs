@@ -31,7 +31,7 @@ use crate::{NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS, init_tls_rand};
 pub struct GraphicsEngineDescriptor {
     pub capabilities: Capabilities,
     pub instance: Instance,
-    pub adapter: Arc<Adapter>,
+    pub adapter: Adapter,
     pub device: Device,
     pub queue: Queue,
     pub texture_loader: Arc<TextureLoader>,
@@ -63,7 +63,7 @@ pub struct GraphicsEngine {
     staging_belt: StagingBelt,
     queue: Queue,
     device: Device,
-    adapter: Arc<Adapter>,
+    adapter: Adapter,
     instance: Instance,
     surface: Option<Surface>,
     thread_pool: ThreadPool,

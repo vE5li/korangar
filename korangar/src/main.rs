@@ -344,7 +344,6 @@ impl Client {
             });
 
             let adapter = pollster::block_on(async { initialize_adapter_from_env_or_default(&instance, None).await.unwrap() });
-            let adapter = Arc::new(adapter);
 
             #[cfg(feature = "debug")]
             {

@@ -44,7 +44,7 @@ ragnarok_formats = { path = "ragnarok_formats" }
 ragnarok_packets = { path = "ragnarok_packets" }
 ragnarok_procedural = { path = "ragnarok_procedural" }
 rand_aes = { version = "0.5", default-features = false }
-rav1d = { version = "1", git = "https://github.com/memorysafety/rav1d", rev = "1be76ea9cbe70ae7cb4ffc9cb4a05971f82669ac" }
+rav1d = "1"
 rayon = "1"
 reqwest = "0.12"
 ron = "0.10"

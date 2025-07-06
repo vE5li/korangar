@@ -37,7 +37,7 @@ option-ext = "0.2"
 pcap = "2"
 pollster = "0.4"
 proc-macro2 = "1"
-quick-xml = "0.37"
+quick-xml = "0.38"
 quote = "1"
 ragnarok_bytes = { path = "ragnarok_bytes" }
 ragnarok_formats = { path = "ragnarok_formats" }
@@ -49,7 +49,7 @@ rayon = "1"
 reqwest = "0.12"
 ron = "0.10"
 serde = "1"
-sevenz-rust2 = { version = "0.14", default-features = false }
+sevenz-rust2 = { version = "0.16", default-features = false }
 smallvec = "1"
 spin_sleep = "1"
 syn = "2"

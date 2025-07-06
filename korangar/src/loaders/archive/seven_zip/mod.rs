@@ -11,7 +11,7 @@ use blake3::Hasher;
 use hashbrown::HashMap;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, Timer, print_debug};
-use sevenz_rust2::{Password, SevenZReader};
+use sevenz_rust2::{ArchiveReader, EncoderMethod, Password};
 
 pub use self::builder::SevenZipArchiveBuilder;
 use crate::loaders::archive::{Archive, Compression};
@@ -22,7 +22,7 @@ struct FileIndexEntry {
 }
 
 pub struct SevenZipArchive {
-    pub(crate) reader: Mutex<SevenZReader<BufReader<File>>>,
+    pub(crate) reader: Mutex<ArchiveReader<BufReader<File>>>,
     file_index: HashMap<String, FileIndexEntry>,
     file_path: PathBuf,
 }
@@ -42,7 +42,7 @@ impl Archive for SevenZipArchive {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load game data from {}", path.display().magenta()));
         let file = File::open(path).expect("can't open archive");
-        let reader = SevenZReader::new(BufReader::new(file), Password::empty()).unwrap();
+        let reader = ArchiveReader::new(BufReader::new(file), Password::empty()).unwrap();
         let archive = reader.archive();
 
         assert!(!archive.is_solid, "7zip archives needs to be non-solid for fast file access");
@@ -57,10 +57,7 @@ impl Archive for SevenZipArchive {
                 .file_compression_methods(file.name(), &mut compression_methods)
                 .expect("can't read compression methods of file");
 
-            let compression = if compression_methods
-                .iter()
-                .any(|method| method.id() == sevenz_rust2::SevenZMethod::ID_COPY)
-            {
+            let compression = if compression_methods.iter().any(|method| method.id() == EncoderMethod::ID_COPY) {
                 Compression::Off
             } else {
                 Compression::Default

@@ -8,24 +8,24 @@ use std::fs::File;
 use std::io::BufWriter;
 use std::path::Path;
 
-use sevenz_rust2::{SevenZArchiveEntry, SevenZMethod, SevenZMethodConfiguration, SevenZWriter};
+use sevenz_rust2::{ArchiveEntry, ArchiveWriter, EncoderConfiguration, EncoderMethod, NtTime};
 
 use super::SevenZipArchive;
 use crate::loaders::archive::{Compression, Writable};
 
 pub struct SevenZipArchiveBuilder {
-    writer: Option<SevenZWriter<BufWriter<File>>>,
-    folder_seen: HashSet<String>,
+    writer: Option<ArchiveWriter<BufWriter<File>>>,
+    seen_directories: HashSet<String>,
 }
 
 impl SevenZipArchiveBuilder {
     pub fn from_path(path: &Path) -> Self {
         let file = File::create(path).expect("can't create archive file");
-        let writer = SevenZWriter::new(BufWriter::new(file)).unwrap();
+        let writer = ArchiveWriter::new(BufWriter::new(file)).unwrap();
 
         Self {
             writer: Some(writer),
-            folder_seen: HashSet::default(),
+            seen_directories: HashSet::default(),
         }
     }
 
@@ -41,7 +41,7 @@ impl SevenZipArchiveBuilder {
             .lock()
             .unwrap()
             .read_file(&path_with_slash)
-            .expect("Unable to read file from archive");
+            .expect("unable to read file from archive");
 
         get_parent_directories(&path_with_slash)
             .iter()
@@ -57,8 +57,8 @@ impl SevenZipArchiveBuilder {
     }
 
     fn add_directory(&mut self, path: &str) {
-        if !self.folder_seen.contains(path) {
-            self.folder_seen.insert(path.to_string());
+        if !self.seen_directories.contains(path) {
+            self.seen_directories.insert(path.to_string());
         }
     }
 }
@@ -72,24 +72,25 @@ impl Writable for SevenZipArchiveBuilder {
             .for_each(|directory| self.add_directory(directory));
 
         if let Some(writer) = self.writer.as_mut() {
-            let mut entry = SevenZArchiveEntry::new_file(&path);
+            let mut file_entry = ArchiveEntry::new_file(&path);
 
-            let now = sevenz_rust2::nt_time::FileTime::now();
-            let has_date = now > sevenz_rust2::nt_time::FileTime::NT_TIME_EPOCH;
+            let now = NtTime::now();
 
-            entry.creation_date = now;
-            entry.has_creation_date = has_date;
-            entry.last_modified_date = now;
-            entry.has_last_modified_date = has_date;
+            file_entry.creation_date = now;
+            file_entry.has_creation_date = true;
+            file_entry.last_modified_date = now;
+            file_entry.has_last_modified_date = true;
+            file_entry.has_access_date = true;
+            file_entry.access_date = now;
 
             match compression {
-                Compression::Off => writer.set_content_methods(vec![SevenZMethodConfiguration::new(SevenZMethod::COPY)]),
-                Compression::Default => writer.set_content_methods(vec![SevenZMethodConfiguration::new(SevenZMethod::LZMA)]),
+                Compression::Off => writer.set_content_methods(vec![EncoderConfiguration::new(EncoderMethod::COPY)]),
+                Compression::Default => writer.set_content_methods(vec![EncoderConfiguration::new(EncoderMethod::LZMA)]),
             };
 
             writer
-                .push_archive_entry(entry, Some(asset_data.as_slice()))
-                .expect("Failed to write file to archive");
+                .push_archive_entry(file_entry, Some(asset_data.as_slice()))
+                .expect("failed to write file to archive");
         }
     }
 
@@ -102,14 +103,14 @@ impl Writable for SevenZipArchiveBuilder {
 impl Drop for SevenZipArchiveBuilder {
     fn drop(&mut self) {
         if let Some(mut writer) = self.writer.take() {
-            let mut folder_seen: Vec<String> = self.folder_seen.drain().collect();
-            folder_seen.sort();
+            let mut seen_directories: Vec<String> = self.seen_directories.drain().collect();
+            seen_directories.sort();
 
-            for path in folder_seen.iter() {
-                let folder = SevenZArchiveEntry::new_folder(path);
+            for directory_path in seen_directories.iter() {
+                let directory = ArchiveEntry::new_directory(directory_path);
                 writer
-                    .push_archive_entry::<&[u8]>(folder, None)
-                    .unwrap_or_else(|_| panic!("can't add path '{path}' to archive"));
+                    .push_archive_entry::<&[u8]>(directory, None)
+                    .unwrap_or_else(|_| panic!("can't add directory path '{directory_path}' to archive"));
             }
 
             writer.finish().unwrap();

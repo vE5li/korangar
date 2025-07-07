@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use ragnarok_packets::{ClientTick, SkillId, SkillInformation, SkillLevel, SkillType};
+use rust_state::RustState;
 
 use crate::loaders::{ActionLoader, Sprite, SpriteLoader};
 use crate::world::{Actions, SpriteAnimationState};
@@ -16,7 +17,7 @@ pub struct Skill {
     pub animation_state: SpriteAnimationState,
 }
 
-#[derive(Default)]
+#[derive(RustState, Default)]
 pub struct SkillTree {
     skills: Vec<Skill>,
 }
@@ -48,10 +49,6 @@ impl SkillTree {
             })
             .collect();
     }
-
-    // pub fn get_skills(&self) -> &[Skill] {
-    //     &self.skills
-    // }
 
     pub fn find_skill(&self, skill_id: SkillId) -> Option<Skill> {
         self.skills.iter().find(|skill| skill.skill_id == skill_id).cloned()

@@ -1,6 +1,7 @@
 use std::ops::Not;
 
 use derive_new::new;
+use korangar_interface::components::drop_down::DefaultClickHandler;
 use korangar_interface::components::text_box::DefaultHandler;
 use korangar_interface::event::{ClickAction, Event, EventQueue, Toggle};
 use korangar_interface::window::{CustomWindow, PrototypeWindow, Window, WindowTrait};
@@ -45,12 +46,6 @@ where
 
         // TODO: Move this to the main function where the ClientState is created.
         let mut login_settings = LoginSettings::new();
-
-        // let options = state
-        //     .get(&self.client_info_path.services())
-        //     .iter()
-        //     .map(|service| (service.display_name.clone().unwrap(),
-        // service.service_id()))     .collect();
 
         let disabled = move |state: &Context<ClientState>| {
             !state.get(&self.window_state_path.username()).is_empty() && !state.get(&self.window_state_path.password()).is_empty()
@@ -145,7 +140,11 @@ where
             maximum_width: 450.0,
             elements: (
                 text! { text: "Select service" },
-                // pick_list! { options: options, selected: selected_service },
+                drop_down! {
+                    options: self.client_info_path.services(),
+                    selected: self.window_state_path.selected_service(),
+                    click_handler: DefaultClickHandler::<_, _, _, ()>::new(self.window_state_path.selected_service(), self.client_info_path.services()),
+                },
                 text! { text: "Account data" },
                 text_box! {
                     text: "Username",

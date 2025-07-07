@@ -1,41 +1,39 @@
-use derive_new::new;
-use korangar_interface::element::ElementWrap;
-use korangar_interface::size_bound;
-use korangar_interface::state::PlainRemote;
-use korangar_interface::window::{PrototypeWindow, Window, WindowBuilder};
+use korangar_interface::window::{CustomWindow, PrototypeWindow, Window, WindowTrait};
 use korangar_networking::InventoryItem;
+use rust_state::Path;
 
-use crate::interface::application::InterfaceSettings;
-use crate::interface::elements::InventoryContainer;
 use crate::interface::layout::ScreenSize;
-use crate::interface::windows::WindowCache;
+use crate::interface::windows::{WindowCache, WindowClass};
+use crate::state::{ClientState, ClientThemeType};
 use crate::world::ResourceMetadata;
 
-#[derive(new)]
-pub struct InventoryWindow {
-    items: PlainRemote<Vec<InventoryItem<ResourceMetadata>>>,
+pub struct InventoryWindow<P> {
+    items_path: P,
 }
 
-impl InventoryWindow {
-    pub const WINDOW_CLASS: &'static str = "inventory";
+impl<P> InventoryWindow<P> {
+    pub fn new(items_path: P) -> Self {
+        Self { items_path }
+    }
 }
 
-impl PrototypeWindow<InterfaceSettings> for InventoryWindow {
-    fn window_class(&self) -> Option<&str> {
-        Some(Self::WINDOW_CLASS)
+impl<P> CustomWindow<ClientState> for InventoryWindow<P>
+where
+    P: Path<ClientState, Vec<InventoryItem<ResourceMetadata>>>,
+{
+    fn window_class() -> Option<WindowClass> {
+        Some(WindowClass::Inventory)
     }
 
-    fn to_window(
-        &self,
-    ) -> Window<InterfaceSettings> {
-        let elements = vec![InventoryContainer::new(self.items.clone()).wrap()];
+    fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
+        use korangar_interface::prelude::*;
 
-        WindowBuilder::new()
-            .with_title("Inventory".to_string())
-            .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size_bound(size_bound!(300 > 400 < 500, ? < 80%))
-            .with_elements(elements)
-            .closable()
-            .build(window_cache, application, available_space)
+        window! {
+            title: "Inventory",
+            class: Self::window_class(),
+            theme: ClientThemeType::Game,
+            closable: true,
+            elements: ()
+        }
     }
 }

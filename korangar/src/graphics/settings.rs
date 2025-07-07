@@ -4,6 +4,7 @@ use std::num::NonZeroU32;
 
 #[cfg(feature = "debug")]
 use derive_new::new;
+use korangar_interface::components::drop_down::DropDownItem;
 use rust_state::RustState;
 use serde::{Deserialize, Serialize};
 
@@ -15,11 +16,46 @@ pub enum LimitFramerate {
     Limit(u16),
 }
 
+impl DropDownItem<LimitFramerate> for LimitFramerate {
+    fn text(&self) -> &str {
+        match self {
+            LimitFramerate::Unlimited => "Unlimited",
+            LimitFramerate::Limit(30) => "30 Hz",
+            LimitFramerate::Limit(60) => "60 Hz",
+            LimitFramerate::Limit(120) => "120 Hz",
+            LimitFramerate::Limit(144) => "144 Hz",
+            LimitFramerate::Limit(240) => "240 Hz",
+            LimitFramerate::Limit(_) => unimplemented!(),
+        }
+    }
+
+    fn value(&self) -> LimitFramerate {
+        *self
+    }
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum TextureSamplerType {
     Nearest,
     Linear,
     Anisotropic(u16),
+}
+
+impl DropDownItem<TextureSamplerType> for TextureSamplerType {
+    fn text(&self) -> &str {
+        match self {
+            TextureSamplerType::Nearest => "Nearest",
+            TextureSamplerType::Linear => "Linear",
+            TextureSamplerType::Anisotropic(4) => "Anisotropic x4",
+            TextureSamplerType::Anisotropic(8) => "Anisotropic x8",
+            TextureSamplerType::Anisotropic(16) => "Anisotropic x16",
+            TextureSamplerType::Anisotropic(_) => unimplemented!(),
+        }
+    }
+
+    fn value(&self) -> TextureSamplerType {
+        *self
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -47,6 +83,20 @@ impl ShadowDetail {
     }
 }
 
+impl DropDownItem<ShadowDetail> for ShadowDetail {
+    fn text(&self) -> &str {
+        match self {
+            Self::Normal => "Normal",
+            Self::Ultra => "Ultra",
+            Self::Insane => "Insane",
+        }
+    }
+
+    fn value(&self) -> ShadowDetail {
+        *self
+    }
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ShadowQuality {
     Hard,
@@ -55,6 +105,23 @@ pub enum ShadowQuality {
     SoftPCSSx16,
     SoftPCSSx32,
     SoftPCSSx64,
+}
+
+impl DropDownItem<ShadowQuality> for ShadowQuality {
+    fn text(&self) -> &str {
+        match self {
+            Self::Hard => "Hard",
+            Self::SoftPCF => "Soft (PCF)",
+            Self::SoftPCSSx8 => "Soft (PCSS x8)",
+            Self::SoftPCSSx16 => "Soft (PCSS x16)",
+            Self::SoftPCSSx32 => "Soft (PCSS x32)",
+            Self::SoftPCSSx64 => "Soft (PCSS x64)",
+        }
+    }
+
+    fn value(&self) -> ShadowQuality {
+        *self
+    }
 }
 
 impl From<ShadowQuality> for u32 {
@@ -77,6 +144,22 @@ pub enum Msaa {
     X4,
     X8,
     X16,
+}
+
+impl DropDownItem<Msaa> for Msaa {
+    fn text(&self) -> &str {
+        match self {
+            Msaa::Off => "Off",
+            Msaa::X2 => "x2",
+            Msaa::X4 => "x4",
+            Msaa::X8 => "x8",
+            Msaa::X16 => "x16",
+        }
+    }
+
+    fn value(&self) -> Msaa {
+        *self
+    }
 }
 
 impl Display for Msaa {
@@ -128,6 +211,21 @@ pub enum Ssaa {
     X4,
 }
 
+impl DropDownItem<Ssaa> for Ssaa {
+    fn text(&self) -> &str {
+        match self {
+            Ssaa::Off => "Off",
+            Ssaa::X2 => "x2",
+            Ssaa::X3 => "x3",
+            Ssaa::X4 => "x4",
+        }
+    }
+
+    fn value(&self) -> Ssaa {
+        *self
+    }
+}
+
 impl Display for Ssaa {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -158,6 +256,19 @@ impl Ssaa {
 pub enum ScreenSpaceAntiAliasing {
     Off,
     Fxaa,
+}
+
+impl DropDownItem<ScreenSpaceAntiAliasing> for ScreenSpaceAntiAliasing {
+    fn text(&self) -> &str {
+        match self {
+            ScreenSpaceAntiAliasing::Off => "Off",
+            ScreenSpaceAntiAliasing::Fxaa => "FXAA",
+        }
+    }
+
+    fn value(&self) -> ScreenSpaceAntiAliasing {
+        *self
+    }
 }
 
 impl Display for ScreenSpaceAntiAliasing {

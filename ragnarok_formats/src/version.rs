@@ -3,13 +3,13 @@ use std::marker::PhantomData;
 
 use ragnarok_bytes::{ByteReader, ByteWriter, ConversionResult, FromBytes, ToBytes};
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct MajorFirst;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct MinorFirst;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Version<T> {
     pub major: u8,
     pub minor: u8,
@@ -80,7 +80,7 @@ impl<T> Display for Version<T> {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct InternalVersion {
     pub major: u8,
     pub minor: u8,

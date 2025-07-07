@@ -10,12 +10,15 @@ mod queue {
 
     use super::ClickAction;
     use crate::application::Appli;
+    use crate::element::ElementBox;
 
     pub enum Event<App: Appli> {
         FocusNext,
         FocusPrevious,
         Application(App::Event),
+        OpenOverlay(ElementBox<App>),
         CloseWindow { window_id: u64 },
+        CloseOverlay,
     }
 
     impl<App: Appli> Clone for Event<App> {
@@ -24,7 +27,9 @@ mod queue {
                 Self::FocusNext => Self::FocusNext,
                 Self::FocusPrevious => Self::FocusPrevious,
                 Self::Application(event) => Self::Application(event.clone()),
+                Self::OpenOverlay(_) => unimplemented!(),
                 Self::CloseWindow { window_id } => Self::CloseWindow { window_id: *window_id },
+                Self::CloseOverlay => Self::CloseOverlay,
             }
         }
     }
@@ -39,11 +44,15 @@ mod queue {
         events: Vec<Event<App>>,
     }
 
-    impl<App: Appli> EventQueue<App> {
-        pub fn new() -> Self {
-            Self { events: Vec::new() }
+    impl<App: Appli> Default for EventQueue<App> {
+        fn default() -> Self {
+            Self {
+                events: Default::default(),
+            }
         }
+    }
 
+    impl<App: Appli> EventQueue<App> {
         pub fn queue(&mut self, event: impl Into<Event<App>>) {
             self.events.push(event.into());
         }

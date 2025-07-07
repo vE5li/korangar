@@ -43,8 +43,8 @@ impl ArrayType for FontSize {
 }
 
 impl ElementDisplay for FontSize {
-    fn display(&self) -> String {
-        format!("^FFBB00F^000000{}", self.0.display())
+    fn element_display(&self) -> String {
+        format!("^FFBB00F^000000{}", self.0.element_display())
     }
 }
 
@@ -85,8 +85,8 @@ impl ArrayType for Scaling {
 }
 
 impl ElementDisplay for Scaling {
-    fn display(&self) -> String {
-        format!("^FFBB00a^000000{}", self.0.display())
+    fn element_display(&self) -> String {
+        format!("^FFBB00a^000000{}", self.0.element_display())
     }
 }
 

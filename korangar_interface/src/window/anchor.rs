@@ -1,13 +1,13 @@
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::application::{Appli, PositionTrait};
+use crate::application::{Appli, ClipTrait, CornerRadiusTrait, PositionTrait, RenderLayer, SizeTrait};
 
 macro_rules! anchor_color {
-    ($anchor_point:expr, $theme:expr, $name:ident) => {
+    ($anchor_point:expr, $anchor_color:expr, $closest_anchor_color:expr, $name:ident) => {
         match $anchor_point {
-            AnchorPoint::$name => $theme.closest_anchor_color,
-            _ => $theme.anchor_color,
+            AnchorPoint::$name => $closest_anchor_color,
+            _ => $anchor_color,
         }
     };
 }
@@ -54,22 +54,57 @@ where
     App: Appli,
 {
     fn clone(&self) -> Self {
-        Self {
-            anchor_point: self.anchor_point,
-            offset: self.offset,
-        }
+        *self
     }
 }
 
-/* impl<App> Anchor<App>
+impl<App> Copy for Anchor<App> where App: Appli {}
+
+impl<App> Anchor<App>
 where
     App: Appli,
 {
-    pub fn update(&mut self, available_space: App::Size, position: App::Position, size: App::Size) {
+    pub fn to_position(&self, window_space: App::Size, window_size: App::Size) -> App::Position {
+        let half_width = window_space.width() / 2.0;
+        let half_height = window_space.height() / 2.0;
+
+        match self.anchor_point {
+            AnchorPoint::Center => App::Position::new(
+                half_width + self.offset.left() - window_size.width() / 2.0,
+                half_height + self.offset.top() - window_size.height() / 2.0,
+            ),
+            AnchorPoint::TopLeft => App::Position::new(self.offset.left(), self.offset.top()),
+            AnchorPoint::TopCenter => App::Position::new(half_width + self.offset.left() - window_size.width() / 2.0, self.offset.top()),
+            AnchorPoint::TopRight => App::Position::new(
+                window_space.width() + self.offset.left() - window_size.width(),
+                self.offset.top(),
+            ),
+            AnchorPoint::CenterRight => App::Position::new(
+                window_space.width() + self.offset.left() - window_size.width(),
+                half_height + self.offset.top() - window_size.height() / 2.0,
+            ),
+            AnchorPoint::BottomRight => App::Position::new(
+                window_space.width() + self.offset.left() - window_size.width(),
+                window_space.height() + self.offset.top() - window_size.height(),
+            ),
+            AnchorPoint::BottomCenter => App::Position::new(
+                half_width + self.offset.left() - window_size.width() / 2.0,
+                window_space.height() + self.offset.top() - window_size.height(),
+            ),
+            AnchorPoint::BottomLeft => App::Position::new(
+                self.offset.left(),
+                window_space.height() + self.offset.top() - window_size.height(),
+            ),
+            AnchorPoint::CenterLeft => App::Position::new(self.offset.left(), half_height + self.offset.top() - window_size.height() / 2.0),
+        }
+    }
+
+    pub fn update(&mut self, window_space: App::Size, position: App::Position, window_size: App::Size) {
         let center = Anchor {
-            offset: position
-                .offset(size.halved())
-                .relative_to(App::Position::from_size(available_space.halved())),
+            offset: App::Position::new(
+                position.left() - (window_space.width() - window_size.width()) / 2.0,
+                position.top() - (window_space.height() - window_size.height()) / 2.0,
+            ),
             anchor_point: AnchorPoint::Center,
         };
         let top_left = Anchor {
@@ -77,37 +112,46 @@ where
             anchor_point: AnchorPoint::TopLeft,
         };
         let top_center = Anchor {
-            offset: App::Position::new(position.left() - available_space.shrink(size).halved().width(), position.top()),
+            offset: App::Position::new(
+                position.left() - (window_space.width() - window_size.width()) / 2.0,
+                position.top(),
+            ),
             anchor_point: AnchorPoint::TopCenter,
         };
         let top_right = Anchor {
-            offset: App::Position::new(position.left() - available_space.shrink(size).width(), position.top()),
+            offset: App::Position::new(position.left() - window_space.width() + window_size.width(), position.top()),
             anchor_point: AnchorPoint::TopRight,
         };
         let center_right = Anchor {
             offset: App::Position::new(
-                position.left() - available_space.shrink(size).width(),
-                position.top() - available_space.shrink(size).halved().height(),
+                position.left() - window_space.width() + window_size.width(),
+                position.top() - (window_space.height() - window_size.height()) / 2.0,
             ),
             anchor_point: AnchorPoint::CenterRight,
         };
         let bottom_right = Anchor {
-            offset: position.relative_to(App::Position::from_size(available_space.shrink(size))),
+            offset: App::Position::new(
+                position.left() - window_space.width() + window_size.width(),
+                position.top() - window_space.height() + window_size.height(),
+            ),
             anchor_point: AnchorPoint::BottomRight,
         };
         let bottom_center = Anchor {
             offset: App::Position::new(
-                position.left() - available_space.shrink(size).halved().width(),
-                position.top() - available_space.shrink(size).height(),
+                position.left() - (window_space.width() - window_size.width()) / 2.0,
+                position.top() - window_space.height() + window_size.height(),
             ),
             anchor_point: AnchorPoint::BottomCenter,
         };
         let bottom_left = Anchor {
-            offset: App::Position::new(position.left(), position.top() - available_space.shrink(size).height()),
+            offset: App::Position::new(position.left(), position.top() - window_space.height() + window_size.height()),
             anchor_point: AnchorPoint::BottomLeft,
         };
         let center_left = Anchor {
-            offset: App::Position::new(position.left(), position.top() - available_space.shrink(size).halved().height()),
+            offset: App::Position::new(
+                position.left(),
+                position.top() - (window_space.height() - window_size.height()) / 2.0,
+            ),
             anchor_point: AnchorPoint::CenterLeft,
         };
 
@@ -127,191 +171,185 @@ where
         .unwrap();
     }
 
-    pub fn current_position(&self, available_space: App::Size, size: App::Size) -> App::Position {
-        match self.anchor_point {
-            AnchorPoint::Center => App::Position::from_size(available_space.shrink(size))
-                .halved()
-                .combined(self.offset),
-            AnchorPoint::TopLeft => self.offset,
-            AnchorPoint::TopCenter => App::Position::only_left(available_space.width() - size.width())
-                .halved()
-                .combined(self.offset),
-            AnchorPoint::TopRight => App::Position::only_left(available_space.width() - size.width()).combined(self.offset),
-            AnchorPoint::CenterRight => App::Position::new(
-                available_space.shrink(size).width(),
-                available_space.shrink(size).halved().height(),
-            )
-            .combined(self.offset),
-            AnchorPoint::BottomRight => App::Position::from_size(available_space.shrink(size)).combined(self.offset),
-            AnchorPoint::BottomCenter => App::Position::new(
-                available_space.shrink(size).halved().width(),
-                available_space.shrink(size).height(),
-            )
-            .combined(self.offset),
-            AnchorPoint::BottomLeft => App::Position::only_top(available_space.height() - size.height()).combined(self.offset),
-            AnchorPoint::CenterLeft => App::Position::only_top(available_space.height() - size.height())
-                .halved()
-                .combined(self.offset),
-        }
-    }
-
-    pub(super) fn render_window_anchors(
+    pub fn render_window_anchors(
         &self,
-        theme: &WindowTheme<App>,
         renderer: &App::Renderer,
+        anchor_color: App::Color,
+        closest_anchor_color: App::Color,
         window_position: App::Position,
         window_size: App::Size,
     ) {
         let dot_width = 10.0;
         let wide_dot_width = 40.0;
-        let dot_size = App::Size::uniform(dot_width);
+        let dot_size = App::Size::new(dot_width, dot_width);
         let screen_clip = App::Clip::unbound();
 
         renderer.render_rectangle(
-            window_position.offset(window_size.shrink(dot_size).halved()),
+            App::Position::new(
+                window_position.left() + (window_size.width() - dot_width) / 2.0,
+                window_position.top() + (window_size.height() - dot_width) / 2.0,
+            ),
             dot_size,
             screen_clip,
             App::CornerRadius::new(dot_width, dot_width, dot_width, dot_width),
-            anchor_color!(self.anchor_point, theme, Center),
+            anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, Center),
         );
         renderer.render_rectangle(
             window_position,
             dot_size,
             screen_clip,
             App::CornerRadius::new(0.0, 0.0, dot_width, 0.0),
-            anchor_color!(self.anchor_point, theme, TopLeft),
+            anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, TopLeft),
         );
         renderer.render_rectangle(
-            window_position.offset(App::Size::only_width(window_size.width() - wide_dot_width).halved()),
+            App::Position::new(
+                window_position.left() + (window_size.width() - wide_dot_width) / 2.0,
+                window_position.top() + 0.0,
+            ),
             App::Size::new(wide_dot_width, dot_width),
             screen_clip,
             App::CornerRadius::new(0.0, 0.0, dot_width, dot_width),
-            anchor_color!(self.anchor_point, theme, TopCenter),
+            anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, TopCenter),
         );
         renderer.render_rectangle(
-            window_position.offset(App::Size::only_width(window_size.width() - dot_width)),
+            App::Position::new(window_position.left() + window_size.width() - dot_width, window_position.top()),
             dot_size,
             screen_clip,
             App::CornerRadius::new(0.0, 0.0, 0.0, dot_width),
-            anchor_color!(self.anchor_point, theme, TopRight),
+            anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, TopRight),
         );
         renderer.render_rectangle(
-            window_position.offset(App::Size::new(
-                window_size.shrink(dot_size).width(),
-                window_size.shrink(App::Size::only_height(wide_dot_width)).halved().height(),
-            )),
+            App::Position::new(
+                window_position.left() + window_size.width() - dot_width,
+                window_position.top() + (window_size.height() - dot_width) / 2.0,
+            ),
             App::Size::new(dot_width, wide_dot_width),
             screen_clip,
             App::CornerRadius::new(dot_width, 0.0, 0.0, dot_width),
-            anchor_color!(self.anchor_point, theme, CenterRight),
+            anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, CenterRight),
         );
         renderer.render_rectangle(
-            window_position.offset(window_size.shrink(dot_size)),
+            App::Position::new(
+                window_position.left() + window_size.width() - dot_width,
+                window_position.top() + window_size.height() - dot_width,
+            ),
             dot_size,
             screen_clip,
             App::CornerRadius::new(dot_width, 0.0, 0.0, 0.0),
-            anchor_color!(self.anchor_point, theme, BottomRight),
+            anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, BottomRight),
         );
         renderer.render_rectangle(
-            window_position.offset(App::Size::new(
-                window_size.shrink(App::Size::only_width(wide_dot_width)).halved().width(),
-                window_size.shrink(dot_size).height(),
-            )),
+            App::Position::new(
+                window_position.left() + (window_size.width() - wide_dot_width) / 2.0,
+                window_position.top() + window_size.height() - dot_width,
+            ),
             App::Size::new(wide_dot_width, dot_width),
             screen_clip,
             App::CornerRadius::new(dot_width, dot_width, 0.0, 0.0),
-            anchor_color!(self.anchor_point, theme, BottomCenter),
+            anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, BottomCenter),
         );
         renderer.render_rectangle(
-            window_position.offset(App::Size::only_height(window_size.height() - dot_width)),
+            App::Position::new(window_position.left(), window_position.top() + window_size.height() - dot_width),
             dot_size,
             screen_clip,
             App::CornerRadius::new(0.0, dot_width, 0.0, 0.0),
-            anchor_color!(self.anchor_point, theme, BottomLeft),
+            anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, BottomLeft),
         );
         renderer.render_rectangle(
-            window_position.offset(App::Size::only_height(window_size.height() - wide_dot_width).halved()),
+            App::Position::new(
+                window_position.left(),
+                window_position.top() + (window_size.height() - dot_width) / 2.0,
+            ),
             App::Size::new(dot_width, wide_dot_width),
             screen_clip,
             App::CornerRadius::new(0.0, dot_width, dot_width, 0.0),
-            anchor_color!(self.anchor_point, theme, CenterLeft),
+            anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, CenterLeft),
         );
     }
 
-    pub(super) fn render_screen_anchors(&self, renderer: &App::Renderer, theme: &App::Theme, available_space: App::Size) {
+    pub fn render_screen_anchors(
+        &self,
+        renderer: &App::Renderer,
+        anchor_color: App::Color,
+        closest_anchor_color: App::Color,
+        available_space: App::Size,
+    ) {
         let dot_width = 10.0;
         let wide_dot_width = 60.0;
-        let dot_size = App::Size::uniform(dot_width);
+        let dot_size = App::Size::new(dot_width, dot_width);
         let screen_clip = App::Clip::unbound();
 
         renderer.render_rectangle(
-            App::Position::from_size(available_space.shrink(dot_size).halved()),
+            App::Position::new(
+                (available_space.width() - dot_width) / 2.0,
+                (available_space.height() - dot_width) / 2.0,
+            ),
             dot_size,
             screen_clip,
             App::CornerRadius::new(dot_width, dot_width, dot_width, dot_width),
-            anchor_color!(self.anchor_point, theme, Center),
+            anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, Center),
         );
         renderer.render_rectangle(
-            App::Position::zero(),
+            App::Position::new(0.0, 0.0),
             dot_size,
             screen_clip,
             App::CornerRadius::new(0.0, 0.0, dot_width, 0.0),
-            anchor_color!(self.anchor_point, theme, TopLeft),
+            anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, TopLeft),
         );
         renderer.render_rectangle(
-            App::Position::only_left(available_space.width() - wide_dot_width).halved(),
+            App::Position::new((available_space.width() - wide_dot_width) / 2.0, 0.0),
             App::Size::new(wide_dot_width, dot_width),
             screen_clip,
             App::CornerRadius::new(0.0, 0.0, dot_width, dot_width),
-            anchor_color!(self.anchor_point, theme, TopCenter),
+            anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, TopCenter),
         );
         renderer.render_rectangle(
-            App::Position::only_left(available_space.width() - dot_width),
+            App::Position::new(available_space.width() - dot_width, 0.0),
             dot_size,
             screen_clip,
             App::CornerRadius::new(0.0, 0.0, 0.0, dot_width),
-            anchor_color!(self.anchor_point, theme, TopRight),
+            anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, TopRight),
         );
         renderer.render_rectangle(
             App::Position::new(
-                available_space.shrink(dot_size).width(),
-                available_space.shrink(App::Size::only_height(wide_dot_width)).halved().height(),
+                available_space.width() - dot_width,
+                (available_space.height() - wide_dot_width) / 2.0,
             ),
             App::Size::new(dot_width, wide_dot_width),
             screen_clip,
             App::CornerRadius::new(dot_width, 0.0, 0.0, dot_width),
-            anchor_color!(self.anchor_point, theme, CenterRight),
+            anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, CenterRight),
         );
         renderer.render_rectangle(
-            App::Position::from_size(available_space.shrink(dot_size)),
+            App::Position::new(available_space.width() - dot_width, available_space.height() - dot_width),
             dot_size,
             screen_clip,
             App::CornerRadius::new(dot_width, 0.0, 0.0, 0.0),
-            anchor_color!(self.anchor_point, theme, BottomRight),
+            anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, BottomRight),
         );
         renderer.render_rectangle(
             App::Position::new(
-                available_space.shrink(App::Size::only_width(wide_dot_width)).halved().width(),
-                available_space.shrink(dot_size).height(),
+                (available_space.width() - wide_dot_width) / 2.0,
+                available_space.height() - dot_width,
             ),
             App::Size::new(wide_dot_width, dot_width),
             screen_clip,
             App::CornerRadius::new(dot_width, dot_width, 0.0, 0.0),
-            anchor_color!(self.anchor_point, theme, BottomCenter),
+            anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, BottomCenter),
         );
         renderer.render_rectangle(
-            App::Position::only_top(available_space.height() - dot_width),
+            App::Position::new(0.0, available_space.height() - dot_width),
             dot_size,
             screen_clip,
             App::CornerRadius::new(0.0, dot_width, 0.0, 0.0),
-            anchor_color!(self.anchor_point, theme, BottomLeft),
+            anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, BottomLeft),
         );
         renderer.render_rectangle(
-            App::Position::only_top(available_space.height() - wide_dot_width).halved(),
+            App::Position::new(0.0, (available_space.height() - wide_dot_width) / 2.0),
             App::Size::new(dot_width, wide_dot_width),
             screen_clip,
             App::CornerRadius::new(0.0, dot_width, dot_width, 0.0),
-            anchor_color!(self.anchor_point, theme, CenterLeft),
+            anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, CenterLeft),
         );
     }
-} */
+}

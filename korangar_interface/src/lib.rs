@@ -25,14 +25,17 @@ use std::any::Any;
 
 use application::{Appli, PositionTrait, SizeTrait, WindowCache};
 use element::id::{ElementId, ElementIdGenerator};
+use element::store::ElementStore;
+use element::{Element, ElementBox};
 use event::EventQueue;
 #[cfg(feature = "debug")]
 use korangar_debug::profile_block;
-use layout::Layout;
+use layout::area::Area;
+use layout::{Layout, Resolver};
 use option_ext::OptionExt;
 use rust_state::Context;
 use window::store::WindowStore;
-use window::{CustomWindow, PrototypeWindow, WindowData, WindowTrait};
+use window::{Anchor, CustomWindow, DisplayInformation, PrototypeWindow, WindowData, WindowTrait};
 
 pub mod prelude {
     // Re-export proc macros.
@@ -48,6 +51,7 @@ pub mod prelude {
     // TODO: Should this really be here?
     pub use crate::layout::HeightBound;
     pub use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
+    pub use crate::selector_helpers::*;
     pub use crate::theme::ThemePathGetter;
     pub use crate::window::WindowThemePathExt;
 }
@@ -60,6 +64,7 @@ pub mod selector_helpers {
     use rust_state::{Path, Selector};
 
     use crate::application::Appli;
+    use crate::element::ElementDisplay;
 
     pub struct PartialEqDisplaySelector<P, T> {
         path: P,
@@ -100,6 +105,46 @@ pub mod selector_helpers {
             unsafe { Some(self.text.as_ref_unchecked()) }
         }
     }
+
+    pub struct ElementDisplaySelector<P, T> {
+        path: P,
+        last_value: UnsafeCell<Option<T>>,
+        text: UnsafeCell<String>,
+    }
+
+    impl<P, T> ElementDisplaySelector<P, T> {
+        pub fn new(path: P) -> Self {
+            Self {
+                path,
+                last_value: UnsafeCell::default(),
+                text: UnsafeCell::default(),
+            }
+        }
+    }
+
+    impl<App, P, T> Selector<App, String> for ElementDisplaySelector<P, T>
+    where
+        App: Appli,
+        P: Path<App, T>,
+        T: ElementDisplay,
+    {
+        fn select<'a>(&'a self, state: &'a App) -> Option<&'a String> {
+            // SAFETY
+            // `unnwrap` is safe here because the bound of `P` specifies a safe path.
+            let value = self.path.follow(state).unwrap();
+
+            unsafe {
+                let last_value = &mut *self.last_value.get();
+
+                if last_value.is_none() || last_value.as_ref().is_some_and(|last| last != value) {
+                    *self.text.get() = value.element_display();
+                    *last_value = Some(value.clone());
+                }
+            }
+
+            unsafe { Some(self.text.as_ref_unchecked()) }
+        }
+    }
 }
 
 // TODO: This will likely be renamed + Moved
@@ -109,11 +154,20 @@ pub enum MouseMode {
     ResizingWindow { window_id: u64 },
 }
 
+struct WindowWrapper<App>
+where
+    App: Appli,
+{
+    window: Box<dyn WindowTrait<App>>,
+    data: WindowData<App>,
+    display_information: DisplayInformation<App>,
+}
+
 pub struct Interface<App>
 where
     App: Appli,
 {
-    windows: Vec<(Box<dyn WindowTrait<App>>, WindowData<App>)>,
+    windows: Vec<WindowWrapper<App>>,
     window_cache: App::Cache,
     window_size: App::Size,
 
@@ -122,6 +176,7 @@ where
     focused_element: Option<ElementId>,
     mouse_mode: MouseMode,
     event_queue: EventQueue<App>,
+    overlay_element: Option<(ElementBox<App>, ElementStore)>,
 
     next_window_id: u64,
 }
@@ -142,7 +197,8 @@ where
             window_store: WindowStore::default(),
             focused_element: None,
             mouse_mode: MouseMode::Default,
-            event_queue: EventQueue::new(),
+            event_queue: EventQueue::default(),
+            overlay_element: None,
 
             next_window_id: 0,
         }
@@ -240,23 +296,32 @@ where
         match self.mouse_mode {
             MouseMode::Default => {}
             MouseMode::MovingWindow { window_id } => {
-                if let Some((_, window_data)) = self.windows.iter_mut().find(|window| window.1.id == window_id) {
-                    window_data.position = App::Position::new(
-                        window_data.position.left() + delta.width(),
-                        window_data.position.top() + delta.height(),
+                if let Some(wrapper) = self.windows.iter_mut().find(|window| window.data.id == window_id) {
+                    let new_position = App::Position::new(
+                        wrapper.display_information.real_position.left() + delta.width(),
+                        wrapper.display_information.real_position.top() + delta.height(),
                     );
 
-                    // TODO: Update the window cache.
+                    wrapper
+                        .data
+                        .anchor
+                        .update(self.window_size, new_position, wrapper.display_information.real_size);
+
+                    if let Some(window_class) = wrapper.window.get_window_class() {
+                        self.window_cache.update_anchor(window_class, wrapper.data.anchor);
+                    }
                 }
             }
             MouseMode::ResizingWindow { window_id } => {
-                if let Some((_, window_data)) = self.windows.iter_mut().find(|window| window.1.id == window_id) {
-                    window_data.size = App::Size::new(
-                        window_data.size.width() + delta.width(),
-                        window_data.size.height() + delta.height(),
+                if let Some(wrapper) = self.windows.iter_mut().find(|window| window.data.id == window_id) {
+                    wrapper.data.size = App::Size::new(
+                        wrapper.display_information.real_size.width() + delta.width(),
+                        wrapper.display_information.real_size.height() + delta.height(),
                     );
 
-                    // TODO: Update the window cache.
+                    if let Some(window_class) = wrapper.window.get_window_class() {
+                        self.window_cache.update_size(window_class, wrapper.data.size);
+                    }
                 }
             }
         }
@@ -296,29 +361,39 @@ where
     pub fn is_window_with_class_open(&self, window_class: App::WindowClass) -> bool {
         self.windows
             .iter()
-            .any(|window| window.0.get_window_class().is_some_and(|class| class == window_class))
+            .any(|wrapper| wrapper.window.get_window_class().is_some_and(|class| class == window_class))
     }
 
     fn open_new_window(&mut self, window: impl WindowTrait<App> + 'static) {
-        // TODO: `get_window_class` is already implemented on the prototype window,
-        // should we really re-implement it for the Window trait too?
-        if let Some(window_class) = window.get_window_class() {
-            // let (anchor, size) = window.get_layout();
-            // self.window_cache.register_window(window_class, anchor, size);
-        }
-
         let id = self.next_window_id;
         // TODO: Actual logic to wrap around and adjust all window IDs.
         self.next_window_id = self.next_window_id.wrapping_add(1);
 
-        self.windows.insert(
-            0,
-            (Box::new(window), WindowData {
-                id,
-                position: App::Position::new(200.0, 200.0),
-                size: App::Size::new(0.0, 500.0),
-            }),
-        );
+        let window_class = window.get_window_class();
+
+        let (anchor, size) = match window_class.and_then(|window_class| self.window_cache.get_window_state(window_class)) {
+            Some(saved_state) => saved_state,
+            None => {
+                let anchor = Anchor::default();
+                let size = App::Size::new(0.0, 500.0);
+
+                if let Some(window_class) = window_class {
+                    self.window_cache.register_window(window_class, anchor, size);
+                }
+
+                (anchor, size)
+            }
+        };
+
+        self.windows.insert(0, WindowWrapper {
+            window: Box::new(window),
+            data: WindowData { id, anchor, size },
+            display_information: DisplayInformation {
+                real_position: App::Position::new(0.0, 0.0),
+                real_size: size,
+                display_height: 0.0,
+            },
+        });
         // focus_state.set_focused_window(self.windows.len() - 1);
     }
 
@@ -374,7 +449,7 @@ where
             .windows
             .iter()
             .rev()
-            .map(|(window, _)| window.get_window_class())
+            .map(|wrapper| wrapper.window.get_window_class())
             .position(|class_option| class_option.contains(&window_class))
         {
             let index = self.windows.len() - 1 - index_from_back;
@@ -394,7 +469,7 @@ where
     pub fn close_all_windows_except(&mut self, exceptions: &[App::WindowClass]) {
         for index in (0..self.windows.len()).rev() {
             if self.windows[index]
-                .0
+                .window
                 .get_window_class()
                 .map(|class| !exceptions.contains(&class))
                 .unwrap_or(true)
@@ -408,23 +483,46 @@ where
     pub fn do_layouts<'a>(&'a mut self, state: &'a Context<App>, mouse_position: App::Position) -> BuiltUi<'a, App> {
         let mut is_ui_hovered = false;
 
-        self.windows.iter_mut().for_each(|(window, window_data)| {
-            window.make_layout(
+        if let Some((element, store)) = &mut self.overlay_element {
+            let available_area = Area {
+                x: 200.0,
+                y: 200.0,
+                width: 400.0,
+                height: 400.0,
+            };
+
+            let mut resolver = Resolver::new(available_area, 0.0);
+
+            element.make_layout(state, store, &mut self.generator, &mut resolver);
+        }
+
+        self.windows.iter_mut().for_each(|wrapper| {
+            wrapper.display_information = wrapper.window.make_layout(
                 state,
                 &mut self.window_store,
-                window_data,
+                &wrapper.data,
                 &mut self.generator,
                 self.window_size,
-            )
+            );
         });
 
-        let layouts = self
+        let overlay_layout = self.overlay_element.as_ref().map(|(element, store)| {
+            let mut layout = Layout::new(mouse_position, self.focused_element, !is_ui_hovered);
+
+            element.create_layout(state, store, &(), &mut layout);
+
+            is_ui_hovered |= layout.is_hovered();
+
+            layout
+        });
+
+        let mut layouts = self
             .windows
             .iter()
-            .map(|(window, window_data)| {
+            .map(|wrapper| {
                 let mut layout = Layout::new(mouse_position, self.focused_element, !is_ui_hovered);
 
-                window.do_layout(state, &self.window_store, window_data, &mut layout);
+                wrapper.window.do_layout(state, &self.window_store, &wrapper.data, &mut layout);
 
                 is_ui_hovered |= layout.is_hovered();
 
@@ -432,11 +530,39 @@ where
             })
             .collect::<Vec<_>>();
 
+        if let Some(layout) = overlay_layout {
+            layouts.insert(0, layout);
+        }
+
         BuiltUi {
             layouts,
             focused_element: &mut self.focused_element,
             mouse_mode: &mut self.mouse_mode,
             event_queue: &mut self.event_queue,
+        }
+    }
+
+    pub fn render_overlay(&self, renderer: &App::Renderer, anchor_color: App::Color, closest_anchor_color: App::Color) {
+        if let MouseMode::MovingWindow { window_id } = self.mouse_mode {
+            if let Some(wrapper) = self.windows.iter().find(|wrapper| wrapper.data.id == window_id) {
+                wrapper
+                    .data
+                    .anchor
+                    .render_screen_anchors(renderer, anchor_color, closest_anchor_color, self.window_size);
+
+                let window_display_size = App::Size::new(
+                    wrapper.display_information.real_size.width(),
+                    wrapper.display_information.display_height,
+                );
+
+                wrapper.data.anchor.render_window_anchors(
+                    renderer,
+                    anchor_color,
+                    closest_anchor_color,
+                    wrapper.display_information.real_position,
+                    window_display_size,
+                );
+            }
         }
     }
 
@@ -449,11 +575,13 @@ where
                 event::Event::FocusNext => todo!(),
                 event::Event::FocusPrevious => todo!(),
                 event::Event::Application(application_event) => application_events.push(application_event),
+                event::Event::OpenOverlay(element) => self.overlay_element = Some((element, ElementStore::root(&mut self.generator))),
                 event::Event::CloseWindow { window_id } => {
-                    if let Some(index) = self.windows.iter().position(|(_, window_data)| window_data.id == window_id) {
+                    if let Some(index) = self.windows.iter().position(|wrapper| wrapper.data.id == window_id) {
                         self.windows.remove(index);
                     }
                 }
+                event::Event::CloseOverlay => self.overlay_element = None,
             }
         }
 

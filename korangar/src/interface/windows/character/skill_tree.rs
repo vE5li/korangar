@@ -1,47 +1,38 @@
-use korangar_interface::element::ElementWrap;
-use korangar_interface::size_bound;
-use korangar_interface::state::PlainRemote;
-use korangar_interface::window::{PrototypeWindow, Window, WindowBuilder};
+use korangar_interface::window::{CustomWindow, PrototypeWindow, Window, WindowTrait};
+use rust_state::Path;
 
-use crate::interface::application::InterfaceSettings;
-use crate::interface::elements::SkillTreeContainer;
 use crate::interface::layout::ScreenSize;
-use crate::interface::windows::WindowCache;
+use crate::interface::windows::{WindowCache, WindowClass};
 use crate::inventory::Skill;
+use crate::state::{ClientState, ClientThemeType};
 
-pub struct SkillTreeWindow {
-    skills: PlainRemote<Vec<Skill>>,
+pub struct SkillTreeWindow<P> {
+    skills_path: P,
 }
 
-impl SkillTreeWindow {
-    pub fn new(skills: PlainRemote<Vec<Skill>>) -> Self {
-        Self { skills }
+impl<P> SkillTreeWindow<P> {
+    pub fn new(skills_path: P) -> Self {
+        Self { skills_path }
     }
 }
 
-impl SkillTreeWindow {
-    pub const WINDOW_CLASS: &'static str = "skill_tree";
-}
-
-impl PrototypeWindow<InterfaceSettings> for SkillTreeWindow {
-    fn window_class(&self) -> Option<&str> {
-        Some(Self::WINDOW_CLASS)
+impl<P> CustomWindow<ClientState> for SkillTreeWindow<P>
+where
+    P: Path<ClientState, Vec<Skill>>,
+{
+    fn window_class() -> Option<WindowClass> {
+        Some(WindowClass::SkillTree)
     }
 
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        application: &InterfaceSettings,
-        available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
-        let elements = vec![SkillTreeContainer::new(self.skills.clone()).wrap()];
+    fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
+        use korangar_interface::prelude::*;
 
-        WindowBuilder::new()
-            .with_title("Skill tree".to_string())
-            .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size_bound(size_bound!(300 > 400 < 500, ? < 80%))
-            .with_elements(elements)
-            .closable()
-            .build(window_cache, application, available_space)
+        window! {
+            title: "Skill tree",
+            class: Self::window_class(),
+            theme: ClientThemeType::Game,
+            closable: true,
+            elements: ()
+        }
     }
 }

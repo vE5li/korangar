@@ -1,17 +1,17 @@
 mod creation;
-// mod equipment;
+mod equipment;
 mod hotbar;
-// mod inventory;
+mod inventory;
 mod overview;
 mod respawn;
 mod selection;
-// mod skill_tree;
+mod skill_tree;
 
 pub use self::creation::CharacterCreationWindow;
-// pub use self::equipment::EquipmentWindow;
+pub use self::equipment::EquipmentWindow;
 pub use self::hotbar::HotbarWindow;
-// pub use self::inventory::InventoryWindow;
+pub use self::inventory::InventoryWindow;
 pub use self::overview::CharacterOverviewWindow;
 pub use self::respawn::RespawnWindow;
 pub use self::selection::CharacterSelectionWindow;
-// pub use self::skill_tree::SkillTreeWindow;
+pub use self::skill_tree::SkillTreeWindow;

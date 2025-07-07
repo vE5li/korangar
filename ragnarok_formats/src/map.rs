@@ -48,12 +48,15 @@ pub struct MapData {
     // TODO: Parse remaining fields
     pub resources: MapResources,
     #[version_equals_or_above(2, 1)]
+    // TODO: This is only hidden because otherwise the type evaluation overflows.
+    #[hidden_element]
     pub quadtree: Option<QuadTreeData>,
 }
 
 #[cfg_attr(
     feature = "interface",
-    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
+    // TODO: Uncomment this once the compiler stops overflowing its stack
+    derive(rust_state::RustState, /* korangar_interface::element::PrototypeElement */)
 )]
 #[derive(Clone)]
 pub struct QuadTreeData {

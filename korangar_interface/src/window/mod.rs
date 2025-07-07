@@ -57,7 +57,7 @@ pub trait WindowTrait<App: Appli> {
         data: &WindowData<App>,
         generator: &mut ElementIdGenerator,
         window_size: App::Size,
-    );
+    ) -> DisplayInformation<App>;
 
     fn do_layout<'a>(&'a self, state: &'a Context<App>, store: &'a WindowStore, data: &'a WindowData<App>, layout: &mut Layout<'a, App>);
 }
@@ -90,8 +90,17 @@ where
     App: Appli,
 {
     pub id: u64,
-    pub position: App::Position,
+    pub anchor: Anchor<App>,
     pub size: App::Size,
+}
+
+pub struct DisplayInformation<App>
+where
+    App: Appli,
+{
+    pub real_position: App::Position,
+    pub real_size: App::Size,
+    pub display_height: f32,
 }
 
 pub struct WindowLayoutedSet<T> {
@@ -159,7 +168,7 @@ where
         data: &WindowData<App>,
         generator: &mut ElementIdGenerator,
         window_size: App::Size,
-    ) {
+    ) -> DisplayInformation<App> {
         let store = store.get_or_create_from_window_id(data.id, generator);
 
         App::set_current_theme_type(self.theme);
@@ -167,7 +176,7 @@ where
         let title_height = *state.get(&self.title_height);
 
         // Adjust size
-        let adjusted_size = {
+        let real_size = {
             let minimum_width = *state.get(&self.minimum_width);
             let maximum_width = *state.get(&self.maximum_width);
             let minimum_height = *state.get(&self.minimum_height);
@@ -179,23 +188,22 @@ where
             )
         };
 
-        // TODO: Something like this needs to be done when we create the anchor too.
-
         // Adjust position
-        let adjusted_position = {
-            let half_width = adjusted_size.width() / 2.0;
+        let real_position = {
+            let anchor_position = data.anchor.to_position(window_size, real_size);
+            let half_width = real_size.width() / 2.0;
 
             App::Position::new(
-                data.position.left().max(-half_width).min(window_size.width() - half_width),
-                data.position.top().max(0.0).min(window_size.height() - title_height),
+                anchor_position.left().max(-half_width).min(window_size.width() - half_width),
+                anchor_position.top().max(0.0).min(window_size.height() - title_height),
             )
         };
 
         let available_area = Area {
-            x: adjusted_position.left(),
-            y: adjusted_position.top(),
-            width: adjusted_size.width(),
-            height: adjusted_size.height(),
+            x: real_position.left(),
+            y: real_position.top(),
+            width: real_size.width(),
+            height: real_size.height(),
         };
 
         let mut resolver = Resolver::new(available_area, 0.0);
@@ -206,6 +214,7 @@ where
             self.elements.make_layout(state, store, generator, resolver)
         });
 
+        // FIX: Content needs to respect the max size.
         let area = Area {
             x: title_area.x,
             y: title_area.y,
@@ -218,6 +227,14 @@ where
             title_area,
             children,
         });
+
+        let display_height = area.height;
+
+        DisplayInformation {
+            real_position,
+            real_size,
+            display_height,
+        }
     }
 
     // TODO: Rename

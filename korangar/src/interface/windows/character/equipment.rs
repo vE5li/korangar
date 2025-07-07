@@ -1,41 +1,39 @@
-use derive_new::new;
-use korangar_interface::element::ElementWrap;
-use korangar_interface::size_bound;
-use korangar_interface::state::PlainRemote;
-use korangar_interface::window::{PrototypeWindow, Window, WindowBuilder};
+use korangar_interface::window::{CustomWindow, PrototypeWindow, Window, WindowTrait};
 use korangar_networking::InventoryItem;
+use rust_state::Path;
 
-use crate::interface::application::InterfaceSettings;
-use crate::interface::elements::EquipmentContainer;
 use crate::interface::layout::ScreenSize;
-use crate::interface::windows::WindowCache;
+use crate::interface::windows::{WindowCache, WindowClass};
+use crate::state::{ClientState, ClientThemeType};
 use crate::world::ResourceMetadata;
 
-#[derive(new)]
-pub struct EquipmentWindow {
-    items: PlainRemote<Vec<InventoryItem<ResourceMetadata>>>,
+pub struct EquipmentWindow<P> {
+    items_path: P,
 }
 
-impl EquipmentWindow {
-    pub const WINDOW_CLASS: &'static str = "equipment";
+impl<P> EquipmentWindow<P> {
+    pub fn new(items_path: P) -> Self {
+        Self { items_path }
+    }
 }
 
-impl PrototypeWindow<InterfaceSettings> for EquipmentWindow {
-    fn window_class(&self) -> Option<&str> {
-        Some(Self::WINDOW_CLASS)
+impl<P> CustomWindow<ClientState> for EquipmentWindow<P>
+where
+    P: Path<ClientState, Vec<InventoryItem<ResourceMetadata>>>,
+{
+    fn window_class() -> Option<WindowClass> {
+        Some(WindowClass::Equipment)
     }
 
-    fn to_window(
-        &self,
-    ) -> Window<InterfaceSettings> {
-        let elements = vec![EquipmentContainer::new(self.items.clone()).wrap()];
+    fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
+        use korangar_interface::prelude::*;
 
-        WindowBuilder::new()
-            .with_title("Equipment".to_string())
-            .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size_bound(size_bound!(150 > 200 < 300, ?))
-            .with_elements(elements)
-            .closable()
-            .build(window_cache, application, available_space)
+        window! {
+            title: "Equipment",
+            class: Self::window_class(),
+            theme: ClientThemeType::Game,
+            closable: true,
+            elements: ()
+        }
     }
 }

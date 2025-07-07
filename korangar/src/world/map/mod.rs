@@ -23,6 +23,7 @@ use ragnarok_formats::map::{LightSource, SoundSource, Tile, TileFlags, WaterSett
 #[cfg(feature = "debug")]
 use ragnarok_formats::transform::Transform;
 use ragnarok_packets::ClientTick;
+use rust_state::RustState;
 use wgpu::Queue;
 
 pub use self::lighting::Lighting;
@@ -65,7 +66,7 @@ impl MarkerIdentifier {
     pub const SIZE: f32 = 1.5;
 }
 
-#[derive(new)]
+#[derive(RustState, new)]
 pub struct Map {
     width: usize,
     height: usize,
@@ -381,11 +382,6 @@ impl Map {
             );
         }
     }
-
-    // #[cfg(feature = "debug")]
-    // pub fn to_prototype_window(&self) -> &dyn PrototypeWindow<InterfaceSettings>
-    // {     &self.map_data
-    // }
 
     #[cfg(feature = "debug")]
     #[korangar_debug::profile]

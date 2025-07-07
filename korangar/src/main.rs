@@ -52,7 +52,7 @@ use graphics::RenderSettings;
 use image::{EncodableLayout, ImageFormat, ImageReader};
 use interface::layout::CornerRadius;
 use interface::theme::{CursorThemePathExt, GameTheme, GameThemePathExt, IndicatorThemePathExt};
-use inventory::HotbarPathExt;
+use inventory::{HotbarPathExt, InventoryPathExt, SkillTreePathExt};
 use korangar_audio::{AudioEngine, SoundEffectKey};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, print_debug};
@@ -64,6 +64,7 @@ use korangar_interface::Interface;
 use korangar_interface::application::{FontSizeTrait, PositionTrait, ScalingTrait};
 use korangar_interface::element::id::ElementId;
 use korangar_interface::event::EventQueue;
+use korangar_interface::window::WindowThemePathExt;
 use korangar_networking::{
     DisconnectReason, HotkeyState, LoginServerLoginData, MessageColor, NetworkEvent, NetworkEventBuffer, NetworkingSystem, SellItem,
     ShopItem,
@@ -77,11 +78,11 @@ use ragnarok_packets::{
     SellItemsResult, SkillId, SkillType, TilePosition, UnitId, WorldPosition,
 };
 use renderer::InterfaceRenderer;
-use rust_state::{Context, ManuallyAssertExt, Path, RustState};
-use settings::{AudioSettings, AudioSettingsPathExt, GraphicsSettingsPathExt};
+use rust_state::{BoxedExt, Context, ManuallyAssertExt, OptionExt, Path, RustState};
+use settings::{AudioSettings, AudioSettingsPathExt, GraphicsSettingsCapabilities, GraphicsSettingsPathExt};
 use state::{
-    ClientState, ClientStatePathExt, ClientStateRootExt, ClientTheme, DefaultGame, DefaultMenu, LoginWindowState, ThemeDefault,
-    client_state, this_entity, this_player,
+    ClientState, ClientStatePathExt, ClientStateRootExt, ClientTheme, ClientThemePathExt, DefaultGame, DefaultMenu, LoginWindowState,
+    ThemeDefault, client_state, client_theme, this_entity, this_player,
 };
 #[cfg(feature = "debug")]
 use wgpu::Device;
@@ -353,10 +354,10 @@ mod state {
     use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
     use crate::interface::theme::GameTheme;
     use crate::interface::windows::{WindowCache, WindowClass};
-    use crate::inventory::Hotbar;
+    use crate::inventory::{Hotbar, Inventory, SkillTree};
     use crate::loaders::{ClientInfo, FontSize, Scaling, ServiceId};
-    use crate::settings::LoginSettings;
-    use crate::world::{Entity, Player, ResourceMetadata};
+    use crate::settings::{GraphicsSettingsCapabilities, LoginSettings};
+    use crate::world::{Entity, Map, Player, ResourceMetadata};
     use crate::{AudioSettings, ChatMessage, GraphicsSettings, PacketState};
 
     pub(super) fn client_state() -> impl Path<ClientState, ClientState> {
@@ -451,13 +452,17 @@ mod state {
         pub player_name: String,
         pub switch_request: Option<usize>,
 
+        pub map: Option<Box<Map>>,
         pub entities: Vec<Entity>,
 
         pub hotbar: Hotbar,
+        pub player_inventory: Inventory,
+        pub player_skill_tree: SkillTree,
 
         pub window_size: ScreenSize,
         pub audio_settings: AudioSettings,
         pub graphics_settings: GraphicsSettings,
+        pub graphics_settings_capabilities: GraphicsSettingsCapabilities,
         #[cfg(feature = "debug")]
         pub render_settings: RenderSettings,
         #[cfg(feature = "debug")]
@@ -526,8 +531,8 @@ mod state {
                     font_size: FontSize(20.0),
                     text_alignment: HorizontalAlignment::Center { offset: 0.0 },
                     vertical_alignment: VerticalAlignment::Center { offset: 0.0 },
-                    anchor_color: Color::WHITE,
-                    closest_anchor_color: Color::WHITE,
+                    anchor_color: Color::rgba_u8(255, 80, 200, 40),
+                    closest_anchor_color: Color::rgb_u8(255, 80, 200),
                 },
                 text: TextTheme {
                     color: Color::monochrome_u8(220),
@@ -607,8 +612,8 @@ mod state {
                     font_size: FontSize(14.0),
                     text_alignment: HorizontalAlignment::Center { offset: 0.0 },
                     vertical_alignment: VerticalAlignment::Center { offset: 0.0 },
-                    anchor_color: Color::WHITE,
-                    closest_anchor_color: Color::WHITE,
+                    anchor_color: Color::rgba_u8(255, 80, 200, 40),
+                    closest_anchor_color: Color::rgb_u8(255, 80, 200),
                 },
                 text: TextTheme {
                     color: Color::monochrome_u8(220),
@@ -867,8 +872,6 @@ struct Client {
     particle_holder: ParticleHolder,
     point_light_manager: PointLightManager,
     effect_holder: EffectHolder,
-    player_inventory: Inventory,
-    player_skill_tree: SkillTree,
     path_finder: PathFinder,
 
     point_light_set_buffer: ResourceSetBuffer<LightSourceKey>,
@@ -884,8 +887,6 @@ struct Client {
     tile_texture_set: Arc<TextureSet>,
 
     main_menu_click_sound_effect: SoundEffectKey,
-
-    map: Option<Box<Map>>,
 
     // #[cfg(feature = "debug")]
     // packet_history_callback: PacketHistoryCallback,
@@ -1102,6 +1103,12 @@ impl Client {
                 texture_loader: texture_loader.clone(),
                 picker_value,
             });
+
+            let graphics_settings_capabilities = GraphicsSettingsCapabilities::new(
+                graphics_engine.get_supported_msaa(),
+                // FIX: Get this from the present info later on.
+                true,
+            );
         });
 
         time_phase!("initialize interface", {
@@ -1253,14 +1260,18 @@ impl Client {
             player_name,
             switch_request: None,
 
+            map: Some(map),
             entities: Vec::new(),
 
             hotbar,
+            player_inventory,
+            player_skill_tree,
 
             audio_settings,
 
             window_size: ScreenSize::default(),
             graphics_settings,
+            graphics_settings_capabilities,
             #[cfg(feature = "debug")]
             render_settings,
             #[cfg(feature = "debug")]
@@ -1332,8 +1343,6 @@ impl Client {
             particle_holder,
             point_light_manager,
             effect_holder,
-            player_inventory,
-            player_skill_tree,
             path_finder,
             point_light_set_buffer,
             directional_shadow_object_set_buffer,
@@ -1346,7 +1355,6 @@ impl Client {
             #[cfg(feature = "debug")]
             tile_texture_set,
             main_menu_click_sound_effect,
-            map: Some(map),
             // #[cfg(feature = "debug")]
             // packet_history_callback,
             networking_system,
@@ -1525,7 +1533,8 @@ impl Client {
                     let server = self.saved_character_server.clone().unwrap();
                     self.networking_system.connect_to_character_server(login_data, server);
 
-                    self.map = None;
+                    *self.client_state.follow_mut(client_state().map()) = None;
+
                     self.particle_holder.clear();
                     self.effect_holder.clear();
                     self.point_light_manager.clear();
@@ -1644,7 +1653,8 @@ impl Client {
                     // Put the dialog system in a well-defined state.
                     // self.dialog_system.close_dialog();
 
-                    self.map = None;
+                    *self.client_state.follow_mut(client_state().map()) = None;
+
                     self.particle_holder.clear();
                     self.effect_holder.clear();
                     self.point_light_manager.clear();
@@ -1668,7 +1678,7 @@ impl Client {
                         .open_window(ErrorWindow::new("Failed to switch character slots".to_owned()));
                 }
                 NetworkEvent::AddEntity(entity_data) => {
-                    if let Some(map) = self.map.as_ref() {
+                    if let Some(map) = self.client_state.follow(client_state().map()) {
                         let mut npc = Entity::Npc(Npc::new(map, entity_data, client_tick));
 
                         let entity_id = npc.get_entity_id();
@@ -1678,9 +1688,9 @@ impl Client {
                         // Sometimes (like after a job change) the server will tell the client
                         // that a new entity appeared, even though it was already on screen. So
                         // to prevent the entity existing twice, we remove the old one.
-                        self.client_state
-                            .follow_mut(client_state().entities())
-                            .retain(|entity| entity.get_entity_id() != entity_id);
+                        // self.client_state
+                        //     .follow_mut(client_state().entities())
+                        //     .retain(|entity| entity.get_entity_id() != entity_id);
 
                         if let Some(animation_data) =
                             self.async_loader
@@ -1728,37 +1738,46 @@ impl Client {
                     }
                 }
                 NetworkEvent::EntityMove(entity_id, position_from, position_to, starting_timestamp) => {
-                    let entity = self
-                        .client_state
-                        .follow_mut(client_state().entities())
-                        .iter_mut()
-                        .find(|entity| entity.get_entity_id() == entity_id);
-
-                    if let Some(entity) = entity
-                        && let Some(map) = self.map.as_ref()
-                    {
-                        let position_from = Vector2::new(position_from.x, position_from.y);
-                        let position_to = Vector2::new(position_to.x, position_to.y);
-
-                        entity.move_from_to(map, &mut self.path_finder, position_from, position_to, starting_timestamp);
-                        #[cfg(feature = "debug")]
-                        entity.generate_pathing_mesh(&self.device, &self.queue, self.graphics_engine.bindless_support(), map);
-                    }
+                    // let entity = self
+                    //     .client_state
+                    //     .follow_mut(client_state().entities())
+                    //     .iter_mut()
+                    //     .find(|entity| entity.get_entity_id() == entity_id);
+                    //
+                    // if let Some(entity) = entity
+                    //     && let Some(map) =
+                    // self.client_state.follow(client_state().map())
+                    // {
+                    //     let position_from = Vector2::new(position_from.x,
+                    // position_from.y);     let position_to
+                    // = Vector2::new(position_to.x, position_to.y);
+                    //
+                    //     entity.move_from_to(map, &mut self.path_finder,
+                    // position_from, position_to, starting_timestamp);
+                    //     #[cfg(feature = "debug")]
+                    //     entity.generate_pathing_mesh(&self.device,
+                    // &self.queue, self.graphics_engine.bindless_support(),
+                    // map); }
                 }
                 NetworkEvent::PlayerMove(position_from, position_to, starting_timestamp) => {
-                    if let Some(map) = self.map.as_ref() {
-                        let position_from = Vector2::new(position_from.x, position_from.y);
-                        let position_to = Vector2::new(position_to.x, position_to.y);
-
-                        if let Some(player) = self.client_state.try_follow_mut(this_entity()) {
-                            player.move_from_to(map, &mut self.path_finder, position_from, position_to, starting_timestamp);
-                            #[cfg(feature = "debug")]
-                            player.generate_pathing_mesh(&self.device, &self.queue, self.graphics_engine.bindless_support(), map);
-                        }
-                    }
+                    // if let Some(map) =
+                    // self.client_state.follow(client_state().map()) {
+                    //     let position_from = Vector2::new(position_from.x,
+                    // position_from.y);     let position_to
+                    // = Vector2::new(position_to.x, position_to.y);
+                    //
+                    //     if let Some(player) =
+                    // self.client_state.try_follow_mut(this_entity()) {
+                    //         player.move_from_to(map, &mut self.path_finder,
+                    // position_from, position_to, starting_timestamp);
+                    //         #[cfg(feature = "debug")]
+                    //         player.generate_pathing_mesh(&self.device,
+                    // &self.queue, self.graphics_engine.bindless_support(),
+                    // map);     }
+                    // }
                 }
                 NetworkEvent::ChangeMap(map_name, player_position) => {
-                    self.map = None;
+                    *self.client_state.follow_mut(client_state().map()) = None;
                     self.particle_holder.clear();
                     self.effect_holder.clear();
                     self.point_light_manager.clear();
@@ -1838,16 +1857,20 @@ impl Client {
                 NetworkEvent::AddCloseButton => {}            // self.dialog_system.add_close_button(),
                 NetworkEvent::AddChoiceButtons(choices) => {} //self.dialog_system.add_choice_buttons(choices),
                 NetworkEvent::AddQuestEffect(quest_effect) => {
-                    if let Some(map) = self.map.as_ref() {
+                    if let Some(map) = self.client_state.follow(client_state().map()) {
                         self.particle_holder.add_quest_icon(&self.texture_loader, map, quest_effect)
                     }
                 }
                 NetworkEvent::RemoveQuestEffect(entity_id) => self.particle_holder.remove_quest_icon(entity_id),
                 NetworkEvent::SetInventory { items } => {
-                    self.player_inventory.fill(&self.async_loader, &self.library, items);
+                    self.client_state
+                        .follow_mut(client_state().player_inventory())
+                        .fill(&self.async_loader, &self.library, items);
                 }
                 NetworkEvent::IventoryItemAdded { item } => {
-                    self.player_inventory.add_item(&self.async_loader, &self.library, item);
+                    self.client_state
+                        .follow_mut(client_state().player_inventory())
+                        .add_item(&self.async_loader, &self.library, item);
 
                     // TODO: Update the selling items. If you pick up an item
                     // that you already have the sell window
@@ -1859,14 +1882,22 @@ impl Client {
                     index,
                     amount,
                 } => {
-                    self.player_inventory.remove_item(index, amount);
+                    self.client_state
+                        .follow_mut(client_state().player_inventory())
+                        .remove_item(index, amount);
                 }
                 NetworkEvent::SkillTree(skill_information) => {
-                    self.player_skill_tree
-                        .fill(&self.sprite_loader, &self.action_loader, skill_information, client_tick);
+                    self.client_state.follow_mut(client_state().player_skill_tree()).fill(
+                        &self.sprite_loader,
+                        &self.action_loader,
+                        skill_information,
+                        client_tick,
+                    );
                 }
                 NetworkEvent::UpdateEquippedPosition { index, equipped_position } => {
-                    self.player_inventory.update_equipped_position(index, equipped_position);
+                    self.client_state
+                        .follow_mut(client_state().player_inventory())
+                        .update_equipped_position(index, equipped_position);
                 }
                 NetworkEvent::ChangeJob { account_id, job_id } => {
                     let entity = self
@@ -1946,7 +1977,9 @@ impl Client {
                     )));
                 }
                 NetworkEvent::AddSkillUnit(entity_id, unit_id, position) => {
-                    let Some(map) = self.map.as_ref() else { continue };
+                    let Some(map) = self.client_state.follow(client_state().map()) else {
+                        continue;
+                    };
 
                     match unit_id {
                         UnitId::Firewall => {
@@ -2010,7 +2043,11 @@ impl Client {
                     for (index, hotkey) in hotkeys.into_iter().take(10).enumerate() {
                         match hotkey {
                             HotkeyState::Bound(hotkey) => {
-                                let Some(mut skill) = self.player_skill_tree.find_skill(SkillId(hotkey.skill_id as u16)) else {
+                                let Some(mut skill) = self
+                                    .client_state
+                                    .follow(client_state().player_skill_tree())
+                                    .find_skill(SkillId(hotkey.skill_id as u16))
+                                else {
                                     self.client_state
                                         .follow_mut(client_state().hotbar())
                                         .clear_slot(&mut self.networking_system, HotbarSlot(index as u16));
@@ -2071,7 +2108,7 @@ impl Client {
                     }
                 },
                 NetworkEvent::SellItemList { items } => {
-                    let inventory_items = self.player_inventory.get_items();
+                    // let inventory_items = self.player_inventory.get_items();
 
                     // self.sell_items.mutate(|sell_items| {
                     //     *sell_items = items
@@ -2200,34 +2237,26 @@ impl Client {
                 }
                 UserEvent::OpenInventoryWindow => {
                     if self.client_state.try_follow(this_entity()).is_some() {
-                        // self.interface.open_window(
-                        //     &self.client_state,
-                        //     &mut self.focus_state,
-                        //     &InventoryWindow::new(self.player_inventory.
-                        // item_remote()), )
+                        self.interface
+                            .open_window(InventoryWindow::new(client_state().player_inventory().items()));
                     }
                 }
                 UserEvent::OpenEquipmentWindow => {
                     if self.client_state.try_follow(this_entity()).is_some() {
-                        // self.interface.open_window(
-                        //     &self.client_state,
-                        //     &mut self.focus_state,
-                        //     &EquipmentWindow::new(self.player_inventory.
-                        // item_remote()), )
+                        self.interface
+                            .open_window(EquipmentWindow::new(client_state().player_inventory().items()));
                     }
                 }
                 UserEvent::OpenSkillTreeWindow => {
                     if self.client_state.try_follow(this_entity()).is_some() {
-                        // self.interface.open_window(
-                        //     &self.client_state,
-                        //     &mut self.focus_state,
-                        //     &SkillTreeWindow::new(self.player_skill_tree.
-                        // get_skills()), )
+                        self.interface
+                            .open_window(SkillTreeWindow::new(client_state().player_skill_tree().skills()))
                     }
                 }
-                UserEvent::OpenGraphicsSettingsWindow => self
-                    .interface
-                    .open_window(GraphicsSettingsWindow::new(client_state().graphics_settings())),
+                UserEvent::OpenGraphicsSettingsWindow => self.interface.open_window(GraphicsSettingsWindow::new(
+                    client_state().graphics_settings(),
+                    client_state().graphics_settings_capabilities(),
+                )),
                 UserEvent::OpenAudioSettingsWindow => self
                     .interface
                     .open_window(AudioSettingsWindow::new(client_state().audio_settings())),
@@ -2472,7 +2501,7 @@ impl Client {
                 }
                 #[cfg(feature = "debug")]
                 UserEvent::OpenMarkerDetails(marker_identifier) => {
-                    if let Some(map) = self.map.as_ref() {
+                    if let Some(map) = self.client_state.follow(client_state().map()) {
                         // self.interface.open_window(
                         //     &self.client_state,
                         //     map.resolve_marker(self.client_state.
@@ -2486,9 +2515,9 @@ impl Client {
                     .open_window(RenderSettingsWindow::new(client_state().render_settings())),
                 #[cfg(feature = "debug")]
                 UserEvent::OpenMapDataWindow => {
-                    if let Some(map) = self.map.as_ref() {
-                        // self.interface.open_window(&self.client_state,
-                        // map.to_prototype_window());
+                    if let Some(map) = self.client_state.follow(client_state().map()) {
+                        self.interface
+                            .open_prototype_window(client_state().map().unwrapped().manually_asserted().unboxed().map_data());
                     }
                 }
                 #[cfg(feature = "debug")]
@@ -2554,7 +2583,9 @@ impl Client {
                 }
                 (LoaderId::ItemSprite(item_id), LoadableResource::ItemSprite { texture, location }) => match location {
                     ItemLocation::Inventory => {
-                        self.player_inventory.update_item_sprite(item_id, texture);
+                        self.client_state
+                            .follow_mut(client_state().player_inventory())
+                            .update_item_sprite(item_id, texture);
                     }
                     ItemLocation::Shop => {
                         // self.shop_items.mutate(|items| {
@@ -2572,7 +2603,7 @@ impl Client {
                     match self.client_state.try_follow(this_player()).is_none() {
                         true => {
                             // Load of main menu map
-                            let map = self.map.insert(map);
+                            let map = self.client_state.follow_mut(client_state().map()).insert(map);
 
                             map.set_ambient_sound_sources(&self.audio_engine);
                             self.audio_engine.play_background_music_track(DEFAULT_BACKGROUND_MUSIC);
@@ -2588,7 +2619,7 @@ impl Client {
                         }
                         false => {
                             // Normal map switch
-                            let map = self.map.insert(map);
+                            let map = self.client_state.follow_mut(client_state().map()).insert(map);
 
                             map.set_ambient_sound_sources(&self.audio_engine);
                             self.audio_engine.play_background_music_track(map.background_music_track_name());
@@ -2597,12 +2628,17 @@ impl Client {
                                 let player_position = Vector2::new(player_position.x as usize, player_position.y as usize);
 
                                 // SAFETY
-                                // `manually_asserted` is safe because we are in the branch where `this_player`
+                                // `manually_asserted` is safe because we are in
+                                // the branch where `this_player`
                                 // is not `None`.
-                                let player = self.client_state.follow_mut(this_entity().manually_asserted());
-
-                                player.set_position(map, player_position, client_tick);
-                                self.player_camera.set_focus_point(player.get_position());
+                                // let player =
+                                // self.client_state.follow_mut(this_entity().
+                                // manually_asserted());
+                                //
+                                // player.set_position(map, player_position,
+                                // client_tick);
+                                // self.player_camera.set_focus_point(player.
+                                // get_position());
                             }
 
                             let _ = self.networking_system.map_loaded();
@@ -2617,7 +2653,7 @@ impl Client {
         loads_measurement.stop();
 
         // Main map update and render loop
-        match self.map.as_ref() {
+        match self.client_state.follow(client_state().map()) {
             Some(map) => {
                 #[cfg(feature = "debug")]
                 let update_main_camera_measurement = Profiler::start_measurement("update main camera");
@@ -2663,10 +2699,11 @@ impl Client {
                         false => &self.player_camera,
                     };
 
-                    self.client_state
-                        .follow_mut(client_state().entities())
-                        .iter_mut()
-                        .for_each(|entity| entity.update(&self.audio_engine, map, current_camera, client_tick));
+                    // self.client_state
+                    //     .follow_mut(client_state().entities())
+                    //     .iter_mut()
+                    //     .for_each(|entity| entity.update(&self.audio_engine,
+                    // map, current_camera, client_tick));
                 }
 
                 match self.client_state.try_follow(this_player()).is_some() {
@@ -2856,12 +2893,14 @@ impl Client {
                         &self.pathing_texture_set,
                     );
 
-                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
-                    map.render_entities(
-                        &mut self.directional_shadow_entity_instructions,
-                        self.client_state.follow_mut(client_state().entities()),
-                        &self.directional_shadow_camera,
-                    );
+                    // #[cfg_attr(feature = "debug",
+                    // korangar_debug::debug_condition(render_settings.
+                    // show_entities))] map.render_entities(
+                    //     &mut self.directional_shadow_entity_instructions,
+                    //     self.client_state.follow_mut(client_state().
+                    // entities()),
+                    //     &self.directional_shadow_camera,
+                    // );
                 }
 
                 // Point Lights and Shadows
@@ -2927,12 +2966,13 @@ impl Client {
                         _ => current_camera,
                     };
 
-                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
-                    map.render_entities(
-                        &mut self.entity_instructions,
-                        self.client_state.follow_mut(client_state().entities()),
-                        entity_camera,
-                    );
+                    // #[cfg_attr(feature = "debug",
+                    // korangar_debug::debug_condition(render_settings.show_entities))]
+                    // map.render_entities(
+                    //     &mut self.entity_instructions,
+                    //     self.client_state.follow_mut(client_state().entities()),
+                    //     entity_camera,
+                    // );
 
                     #[cfg(feature = "debug")]
                     if render_settings.show_entities_debug {
@@ -3060,6 +3100,14 @@ impl Client {
                     };
 
                     built_ui.render(&self.interface_renderer);
+
+                    self.interface.render_overlay(
+                        &self.interface_renderer,
+                        // TODO: Get the right theme (and maybe pass this better).
+                        *self.client_state.get(&client_state().menu_theme().window().anchor_color()),
+                        // TODO: Get the right theme (and maybe pass this better).
+                        *self.client_state.get(&client_state().menu_theme().window().closest_anchor_color()),
+                    );
 
                     if let Some(delta) = self.input_system.get_drag() {
                         self.interface.handle_drag(delta);

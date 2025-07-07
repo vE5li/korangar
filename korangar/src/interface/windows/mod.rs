@@ -20,7 +20,7 @@ pub use self::generic::*;
 pub use self::settings::*;
 // pub use self::shop::*;
 
-#[derive(Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum WindowClass {
     AudioSettings,
     CharacterCreation,
@@ -28,6 +28,9 @@ pub enum WindowClass {
     CharacterSelection,
     GraphicsSettings,
     Hotbar,
+    Inventory,
+    Equipment,
+    SkillTree,
     Login,
     Menu,
     Respawn,

@@ -1,5 +1,7 @@
 mod prototype;
 
+use std::marker::PhantomData;
+
 use id::ElementIdGenerator;
 pub use interface_macros::PrototypeElement;
 use rust_state::Context;
@@ -308,3 +310,60 @@ fn impl_element_set(up_to: usize) {
 
 // Implement `ElementSet` for tuples up to 64 elements.
 impl_element_set!(64);
+
+pub struct ErasedElement<App, E>
+where
+    App: Appli,
+    E: Element<App>,
+{
+    element: E,
+    layouted: Option<E::Layouted>,
+    _marker: PhantomData<App>,
+}
+
+impl<App, E> ErasedElement<App, E>
+where
+    App: Appli,
+    E: Element<App>,
+{
+    pub fn new(element: E) -> Self {
+        Self {
+            element,
+            layouted: None,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<App, E> Element<App> for ErasedElement<App, E>
+where
+    App: Appli,
+    E: Element<App>,
+    E::Layouted: 'static,
+{
+    type Layouted = ();
+
+    fn make_layout(
+        &mut self,
+        state: &Context<App>,
+        store: &mut ElementStore,
+        generator: &mut ElementIdGenerator,
+        resolver: &mut Resolver,
+    ) -> () {
+        let layouted = self.element.make_layout(state, store, generator, resolver);
+        self.layouted = Some(layouted);
+    }
+
+    fn create_layout<'a>(
+        &'a self,
+        state: &'a Context<App>,
+        store: &'a ElementStore,
+        layouted: &'a Self::Layouted,
+        layout: &mut Layout<'a, App>,
+    ) {
+        let layouted = self.layouted.as_ref().expect("no layout created");
+        self.element.create_layout(state, store, layouted, layout);
+    }
+}
+
+pub type ElementBox<App: Appli> = Box<dyn Element<App, Layouted = ()>>;

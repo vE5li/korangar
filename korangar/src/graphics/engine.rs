@@ -603,12 +603,8 @@ impl GraphicsEngine {
         self.surface.as_ref().unwrap().present_mode_info()
     }
 
-    pub fn get_supported_msaa(&self) -> Vec<(String, Msaa)> {
-        self.capabilities
-            .get_supported_msaa()
-            .iter()
-            .map(|msaa| (msaa.to_string(), *msaa))
-            .collect()
+    pub fn get_supported_msaa(&self) -> Vec<Msaa> {
+        self.capabilities.get_supported_msaa().to_vec()
     }
 
     pub fn get_window_size(&self) -> Vector2<usize> {

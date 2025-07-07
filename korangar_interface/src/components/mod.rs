@@ -46,8 +46,8 @@ pub mod text {
         fn make_layout(
             &mut self,
             state: &Context<App>,
-            store: &mut ElementStore,
-            generator: &mut ElementIdGenerator,
+            _: &mut ElementStore,
+            _: &mut ElementIdGenerator,
             resolver: &mut Resolver,
         ) -> Self::Layouted {
             let height = state.get(&self.height);
@@ -316,6 +316,372 @@ pub mod state_button {
                 },
                 *state.get(&self.checkbox_color),
                 *state.get(&self.state),
+            );
+        }
+    }
+}
+
+pub mod drop_down {
+    use std::cmp::Ordering;
+    use std::marker::PhantomData;
+
+    use rust_state::{Context, ManuallyAssertExt, Path, RustState, Selector, VecIndexExt};
+
+    use crate::application::Appli;
+    use crate::element::id::ElementIdGenerator;
+    use crate::element::store::ElementStore;
+    use crate::element::{DefaultLayouted, Element, ErasedElement};
+    use crate::event::{ClickAction, Event, EventQueue};
+    use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
+    use crate::layout::area::Area;
+    use crate::layout::{Layout, Resolver};
+    use crate::prelude::ButtonThemePathExt;
+    use crate::theme::{ThemePathGetter, theme};
+
+    pub trait DropDownItem<T> {
+        fn text(&self) -> &str;
+
+        fn value(&self) -> T;
+    }
+
+    // TODO: Pretty this up
+    pub struct DefaultClickHandler<App, Value, Item, F> {
+        overlay_element: F,
+        _marker: PhantomData<(App, Value, Item)>,
+    }
+
+    impl<App, Value, Item, F> DefaultClickHandler<App, Value, Item, F>
+    where
+        App: Appli,
+        Value: 'static,
+        Item: DropDownItem<Value> + 'static,
+    {
+        pub fn new(
+            value_path: impl Path<App, Value>,
+            options_path: impl Path<App, Vec<Item>>,
+        ) -> DefaultClickHandler<App, Value, Item, impl ClickAction<App>> {
+            struct InnerButton<Value, Item, A, B, C, D, E, F, G, H, I, J> {
+                pub text_marker: PhantomData<(Value, Item)>,
+                pub option: A,
+                pub event: B,
+                pub foreground_color: C,
+                pub background_color: D,
+                pub hovered_foreground_color: E,
+                pub hovered_background_color: F,
+                pub height: G,
+                pub corner_radius: H,
+                pub font_size: I,
+                pub text_alignment: J,
+            }
+
+            impl<App, Value, Item, A, B, C, D, E, F, G, H, I, J> Element<App> for InnerButton<Value, Item, A, B, C, D, E, F, G, H, I, J>
+            where
+                App: Appli,
+                Item: DropDownItem<Value>,
+                A: Selector<App, Item>,
+                B: ClickAction<App> + 'static,
+                C: Selector<App, App::Color>,
+                D: Selector<App, App::Color>,
+                E: Selector<App, App::Color>,
+                F: Selector<App, App::Color>,
+                G: Selector<App, f32>,
+                H: Selector<App, App::CornerRadius>,
+                I: Selector<App, App::FontSize>,
+                J: Selector<App, HorizontalAlignment>,
+            {
+                fn make_layout(
+                    &mut self,
+                    state: &Context<App>,
+                    _: &mut ElementStore,
+                    _: &mut ElementIdGenerator,
+                    resolver: &mut Resolver,
+                ) -> Self::Layouted {
+                    let height = state.get(&self.height);
+                    let area = resolver.with_height(*height);
+                    Self::Layouted { area }
+                }
+
+                fn create_layout<'a>(
+                    &'a self,
+                    state: &'a Context<App>,
+                    store: &'a ElementStore,
+                    layouted: &'a Self::Layouted,
+                    layout: &mut Layout<'a, App>,
+                ) {
+                    let is_hoverered = layout.is_area_hovered_and_active(layouted.area);
+
+                    if is_hoverered {
+                        layout.add_click_area(layouted.area, &self.event);
+                        layout.mark_hovered();
+                    }
+
+                    layout.add_focus_area(layouted.area, store.get_element_id());
+
+                    let background_color = match is_hoverered {
+                        true => *state.get(&self.hovered_background_color),
+                        false => *state.get(&self.background_color),
+                    };
+
+                    layout.add_rectangle(layouted.area, *state.get(&self.corner_radius), background_color);
+
+                    let foreground_color = match is_hoverered {
+                        true => *state.get(&self.hovered_foreground_color),
+                        false => *state.get(&self.foreground_color),
+                    };
+
+                    let option = state.get(&self.option);
+
+                    layout.add_text(
+                        layouted.area,
+                        option.text(),
+                        *state.get(&self.font_size),
+                        foreground_color,
+                        *state.get(&self.text_alignment),
+                        *state.get(&theme().button().vertical_alignment()),
+                    );
+                }
+            }
+
+            struct InnerElement<App, Value, Item, A, B>
+            where
+                App: Appli,
+            {
+                value_path: A,
+                options_path: B,
+                item_boxes: Vec<Box<dyn Element<App, Layouted = DefaultLayouted>>>,
+                _marker: PhantomData<(App, Value, Item)>,
+            }
+
+            impl<App, Value, Item, A, B> Element<App> for InnerElement<App, Value, Item, A, B>
+            where
+                App: Appli,
+                Value: 'static,
+                Item: DropDownItem<Value> + 'static,
+                A: Path<App, Value>,
+                B: Path<App, Vec<Item>>,
+            {
+                // TODO: Refactor to not have to re-allocate this every frame.
+                type Layouted = (Area, Vec<DefaultLayouted>);
+
+                fn make_layout(
+                    &mut self,
+                    state: &Context<App>,
+                    store: &mut ElementStore,
+                    generator: &mut ElementIdGenerator,
+                    resolver: &mut Resolver,
+                ) -> Self::Layouted {
+                    let vector = state.get(&self.options_path);
+
+                    match self.item_boxes.len().cmp(&vector.len()) {
+                        Ordering::Greater => {
+                            // Delete excess elements.
+                            self.item_boxes.truncate(vector.len());
+                        }
+                        Ordering::Less => {
+                            // Add new elements.
+                            for index in self.item_boxes.len()..vector.len() {
+                                self.item_boxes.push({
+                                    let value_path = self.value_path;
+                                    let option_path = self.options_path.index(index).manually_asserted();
+
+                                    let item_box: Box<dyn Element<App, Layouted = DefaultLayouted>> = Box::new(InnerButton {
+                                        text_marker: PhantomData,
+                                        option: option_path,
+                                        event: move |state: &Context<App>, queue: &mut EventQueue<App>| {
+                                            let value = state.get(&option_path).value();
+                                            state.update_value(value_path, value);
+                                            queue.queue(Event::CloseOverlay);
+                                        },
+                                        // FIX: Don't use button theme
+                                        foreground_color: theme().button().foreground_color(),
+                                        background_color: theme().button().background_color(),
+                                        hovered_foreground_color: theme().button().hovered_foreground_color(),
+                                        hovered_background_color: theme().button().hovered_background_color(),
+                                        height: theme().button().height(),
+                                        corner_radius: theme().button().corner_radius(),
+                                        font_size: theme().button().font_size(),
+                                        text_alignment: theme().button().text_alignment(),
+                                    });
+                                    item_box
+                                });
+                            }
+                        }
+                        Ordering::Equal => {}
+                    }
+
+                    resolver.with_derived(2.0, 4.0, |resolver| {
+                        self.item_boxes
+                            .iter_mut()
+                            .enumerate()
+                            .map(|(index, item_box)| {
+                                item_box.make_layout(
+                                    state,
+                                    store.get_or_create_child_store(index as u64, generator),
+                                    generator,
+                                    resolver,
+                                )
+                            })
+                            .collect()
+                    })
+                }
+
+                fn create_layout<'a>(
+                    &'a self,
+                    state: &'a Context<App>,
+                    store: &'a ElementStore,
+                    layouted: &'a Self::Layouted,
+                    layout: &mut Layout<'a, App>,
+                ) {
+                    // TODO: Render the background.
+
+                    for (index, item_box) in self.item_boxes.iter().enumerate() {
+                        item_box.create_layout(state, store.child_store(index as u64), &layouted.1[index], layout);
+                    }
+                }
+            }
+
+            struct InnerClickAction<Value, Item, A, B> {
+                value_path: A,
+                options_path: B,
+                _marker: PhantomData<(Value, Item)>,
+            }
+
+            impl<App, Value, Item, A, B> ClickAction<App> for InnerClickAction<Value, Item, A, B>
+            where
+                App: Appli,
+                Value: 'static,
+                Item: DropDownItem<Value> + 'static,
+                A: Path<App, Value>,
+                B: Path<App, Vec<Item>>,
+            {
+                fn execute(&self, _: &Context<App>, queue: &mut EventQueue<App>) {
+                    let erased_element = ErasedElement::new(InnerElement {
+                        value_path: self.value_path,
+                        options_path: self.options_path,
+                        item_boxes: Vec::new(),
+                        _marker: PhantomData,
+                    });
+
+                    queue.queue(Event::OpenOverlay(Box::new(erased_element)));
+                }
+            }
+
+            DefaultClickHandler {
+                overlay_element: InnerClickAction {
+                    value_path,
+                    options_path,
+                    _marker: PhantomData,
+                },
+                _marker: PhantomData,
+            }
+        }
+    }
+
+    #[derive(RustState)]
+    pub struct DropDownTheme<App>
+    where
+        App: Appli + 'static,
+    {
+        pub foreground_color: App::Color,
+        pub background_color: App::Color,
+        pub hovered_foreground_color: App::Color,
+        pub hovered_background_color: App::Color,
+        pub height: f32,
+        pub corner_radius: App::CornerRadius,
+        pub font_size: App::FontSize,
+        pub text_alignment: HorizontalAlignment,
+        pub vertical_alignment: VerticalAlignment,
+    }
+
+    pub struct DropDown<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K> {
+        pub options: A,
+        pub selected: B,
+        pub foreground_color: C,
+        pub background_color: D,
+        pub hovered_foreground_color: E,
+        pub hovered_background_color: F,
+        pub height: G,
+        pub corner_radius: H,
+        pub font_size: I,
+        pub text_alignment: J,
+        pub click_handler: DefaultClickHandler<App, Value, Item, K>,
+    }
+
+    impl<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K> Element<App> for DropDown<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K>
+    where
+        App: Appli,
+        Value: PartialEq + 'static,
+        Item: DropDownItem<Value>,
+        A: Selector<App, Vec<Item>>,
+        B: Selector<App, Value>,
+        C: Selector<App, App::Color>,
+        D: Selector<App, App::Color>,
+        E: Selector<App, App::Color>,
+        F: Selector<App, App::Color>,
+        G: Selector<App, f32>,
+        H: Selector<App, App::CornerRadius>,
+        I: Selector<App, App::FontSize>,
+        J: Selector<App, HorizontalAlignment>,
+        K: ClickAction<App>,
+    {
+        fn make_layout(
+            &mut self,
+            state: &Context<App>,
+            _: &mut ElementStore,
+            _: &mut ElementIdGenerator,
+            resolver: &mut Resolver,
+        ) -> Self::Layouted {
+            let height = state.get(&self.height);
+            let area = resolver.with_height(*height);
+            Self::Layouted { area }
+        }
+
+        fn create_layout<'a>(
+            &'a self,
+            state: &'a Context<App>,
+            store: &'a ElementStore,
+            layouted: &'a Self::Layouted,
+            layout: &mut Layout<'a, App>,
+        ) {
+            let is_hoverered = layout.is_area_hovered_and_active(layouted.area);
+
+            if is_hoverered {
+                layout.add_click_area(layouted.area, &self.click_handler.overlay_element);
+                layout.mark_hovered();
+            }
+
+            layout.add_focus_area(layouted.area, store.get_element_id());
+
+            let background_color = match is_hoverered {
+                true => *state.get(&self.hovered_background_color),
+                false => *state.get(&self.background_color),
+            };
+
+            layout.add_rectangle(layouted.area, *state.get(&self.corner_radius), background_color);
+
+            let foreground_color = match is_hoverered {
+                true => *state.get(&self.hovered_foreground_color),
+                false => *state.get(&self.foreground_color),
+            };
+
+            let selected = state.get(&self.selected);
+            // TODO: Maybe don't unwrap here.
+            let index = state
+                .get(&self.options)
+                .iter()
+                .position(|value| value.value() == *selected)
+                .unwrap();
+            // TODO: Maybe don't unwrap here either.
+            let selected_option = state.get(&self.options).get(index).unwrap();
+
+            layout.add_text(
+                layouted.area,
+                selected_option.text(),
+                *state.get(&self.font_size),
+                foreground_color,
+                *state.get(&self.text_alignment),
+                // FIX: Don't use button theme
+                *state.get(&theme().button().vertical_alignment()),
             );
         }
     }

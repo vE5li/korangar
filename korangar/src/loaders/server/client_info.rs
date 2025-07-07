@@ -1,5 +1,6 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 
+use korangar_interface::components::drop_down::DropDownItem;
 use rust_state::RustState;
 use serde::de::Error;
 use serde::{Deserialize, Deserializer};
@@ -130,6 +131,16 @@ impl Service {
         self.port.hash(&mut hasher);
 
         ServiceId(hasher.finish() as usize)
+    }
+}
+
+impl DropDownItem<ServiceId> for Service {
+    fn text(&self) -> &str {
+        self.display_name.as_ref().unwrap_or(&self.address)
+    }
+
+    fn value(&self) -> ServiceId {
+        self.service_id()
     }
 }
 

@@ -1,10 +1,13 @@
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, print_debug};
+use korangar_interface::components::drop_down::DropDownItem;
 use ron::ser::PrettyConfig;
 use rust_state::RustState;
 use serde::{Deserialize, Serialize};
 
-use crate::graphics::{LimitFramerate, Msaa, ScreenSpaceAntiAliasing, ShadowDetail, ShadowQuality, Ssaa, TextureSamplerType};
+use crate::graphics::{
+    LimitFramerate, Msaa, PresentModeInfo, ScreenSpaceAntiAliasing, ShadowDetail, ShadowQuality, Ssaa, TextureSamplerType,
+};
 
 #[derive(RustState, Serialize, Deserialize)]
 pub struct GraphicsSettings {
@@ -82,4 +85,67 @@ pub enum LightingMode {
     Classic,
     /// Mode that enabled all enhanced graphics features.
     Enhanced,
+}
+
+impl DropDownItem<LightingMode> for LightingMode {
+    fn text(&self) -> &str {
+        match self {
+            LightingMode::Classic => "Classic",
+            LightingMode::Enhanced => "Enhanced",
+        }
+    }
+
+    fn value(&self) -> LightingMode {
+        *self
+    }
+}
+
+#[derive(RustState)]
+pub struct GraphicsSettingsCapabilities {
+    lighting_modes: Vec<LightingMode>,
+    texture_filtering_options: Vec<TextureSamplerType>,
+    limit_framerate_options: Vec<LimitFramerate>,
+    supported_msaa: Vec<Msaa>,
+    ssaa_options: Vec<Ssaa>,
+    screen_space_anti_aliasing_options: Vec<ScreenSpaceAntiAliasing>,
+    shadow_quality_options: Vec<ShadowQuality>,
+    shadow_detail_options: Vec<ShadowDetail>,
+    // TODO: Rename most likely.
+    additional_settings_disabled: bool,
+}
+
+impl GraphicsSettingsCapabilities {
+    pub fn new(supported_msaa: Vec<Msaa>, additional_settings_disabled: bool) -> Self {
+        Self {
+            lighting_modes: vec![LightingMode::Classic, LightingMode::Enhanced],
+            texture_filtering_options: vec![
+                TextureSamplerType::Nearest,
+                TextureSamplerType::Linear,
+                TextureSamplerType::Anisotropic(4),
+                TextureSamplerType::Anisotropic(8),
+                TextureSamplerType::Anisotropic(16),
+            ],
+            limit_framerate_options: vec![
+                LimitFramerate::Unlimited,
+                LimitFramerate::Limit(30),
+                LimitFramerate::Limit(60),
+                LimitFramerate::Limit(120),
+                LimitFramerate::Limit(144),
+                LimitFramerate::Limit(240),
+            ],
+            supported_msaa,
+            ssaa_options: vec![Ssaa::Off, Ssaa::X2, Ssaa::X3, Ssaa::X4],
+            screen_space_anti_aliasing_options: vec![ScreenSpaceAntiAliasing::Off, ScreenSpaceAntiAliasing::Fxaa],
+            shadow_quality_options: vec![
+                ShadowQuality::Hard,
+                ShadowQuality::SoftPCF,
+                ShadowQuality::SoftPCSSx8,
+                ShadowQuality::SoftPCSSx16,
+                ShadowQuality::SoftPCSSx32,
+                ShadowQuality::SoftPCSSx64,
+            ],
+            shadow_detail_options: vec![ShadowDetail::Normal, ShadowDetail::Ultra, ShadowDetail::Insane],
+            additional_settings_disabled,
+        }
+    }
 }

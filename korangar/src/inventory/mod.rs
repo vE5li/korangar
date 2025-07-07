@@ -6,14 +6,15 @@ use std::sync::Arc;
 
 use korangar_networking::{InventoryItem, InventoryItemDetails, NoMetadata};
 use ragnarok_packets::{EquipPosition, InventoryIndex, ItemId};
+use rust_state::RustState;
 
 pub use self::hotbar::{Hotbar, HotbarPathExt};
-pub use self::skills::{Skill, SkillTree};
+pub use self::skills::{Skill, SkillTree, SkillTreePathExt};
 use crate::graphics::Texture;
 use crate::loaders::AsyncLoader;
 use crate::world::{Library, ResourceMetadata};
 
-#[derive(Default)]
+#[derive(RustState, Default)]
 pub struct Inventory {
     items: Vec<InventoryItem<ResourceMetadata>>,
 }
@@ -74,9 +75,5 @@ impl Inventory {
         };
 
         *equipped_position = new_equipped_position;
-    }
-
-    pub fn get_items(&self) -> &Vec<InventoryItem<ResourceMetadata>> {
-        &self.items
     }
 }

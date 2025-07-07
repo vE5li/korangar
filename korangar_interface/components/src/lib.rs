@@ -86,6 +86,26 @@ pub fn state_button(token_stream: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
+pub fn drop_down(token_stream: TokenStream) -> TokenStream {
+    create_component_macro!(korangar_interface::components::drop_down::DropDown, {
+        options: !,
+        selected: !,
+        // TODO: Don't use the button theme.
+        foreground_color: { korangar_interface::theme::theme().state_button().foreground_color() },
+        background_color: { korangar_interface::theme::theme().state_button().background_color() },
+        hovered_foreground_color: { korangar_interface::theme::theme().state_button().hovered_foreground_color() },
+        hovered_background_color: { korangar_interface::theme::theme().state_button().hovered_background_color() },
+        height: { korangar_interface::theme::theme().state_button().height() },
+        corner_radius: { korangar_interface::theme::theme().state_button().corner_radius() },
+        font_size: { korangar_interface::theme::theme().state_button().font_size() },
+        text_alignment: { korangar_interface::theme::theme().state_button().text_alignment() },
+        click_handler: !,
+    });
+
+    macro_impl(token_stream.into()).into()
+}
+
+#[proc_macro]
 pub fn collapsable(token_stream: TokenStream) -> TokenStream {
     create_component_macro!(korangar_interface::components::collapsable::Collapsable, {
         text_marker: { const std::marker::PhantomData },

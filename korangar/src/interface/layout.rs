@@ -111,8 +111,12 @@ impl ScreenPosition {
 }
 
 impl ElementDisplay for ScreenPosition {
-    fn display(&self) -> String {
-        format!("^FFBB00↦^000000{} ^FFBB00↧^000000{}", self.left.display(), self.top.display())
+    fn element_display(&self) -> String {
+        format!(
+            "^FFBB00↦^000000{} ^FFBB00↧^000000{}",
+            self.left.element_display(),
+            self.top.element_display()
+        )
     }
 }
 
@@ -182,11 +186,11 @@ impl ScreenSize {
 }
 
 impl ElementDisplay for ScreenSize {
-    fn display(&self) -> String {
+    fn element_display(&self) -> String {
         format!(
             "^FFBB00↔^000000{} ^FFBB00↕^000000{}",
-            self.width.display(),
-            self.height.display(),
+            self.width.element_display(),
+            self.height.element_display(),
         )
     }
 }
@@ -349,13 +353,13 @@ impl CornerRadius {
 }
 
 impl ElementDisplay for CornerRadius {
-    fn display(&self) -> String {
+    fn element_display(&self) -> String {
         format!(
             "^FFBB00↖^000000{} ^FFBB00↗^000000{} ^FFBB00↘^000000{} ^FFBB00↙^000000{}",
-            self.top_left.display(),
-            self.top_right.display(),
-            self.bottom_right.display(),
-            self.bottom_left.display()
+            self.top_left.element_display(),
+            self.top_right.element_display(),
+            self.bottom_right.element_display(),
+            self.bottom_left.element_display()
         )
     }
 }

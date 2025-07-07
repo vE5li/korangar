@@ -264,7 +264,7 @@ impl<T: Sized + Pod + Zeroable> DynamicUniformBuffer<T> {
         }
     }
 
-    pub fn get_binding_resource(&self) -> BindingResource {
+    pub fn get_binding_resource(&self) -> BindingResource<'_> {
         BindingResource::Buffer(wgpu::BufferBinding {
             buffer: self.buffer.get_buffer(),
             offset: 0,

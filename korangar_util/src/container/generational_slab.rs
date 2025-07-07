@@ -121,7 +121,7 @@ impl<I: GenerationalKey, V> GenerationalSlab<I, V> {
 
     /// Iterates over all non-empty entries.
     #[must_use]
-    pub fn iter(&self) -> GenerationalIter<I, V> {
+    pub fn iter(&self) -> GenerationalIter<'_, I, V> {
         GenerationalIter {
             entries: self.entries.iter().enumerate(),
             size: self.entries.len(),

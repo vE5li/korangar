@@ -625,7 +625,7 @@ impl Picture {
     }
 
     /// Plane data of the `component` for the decoded frame.
-    pub fn plane(&self, component: PlanarImageComponent) -> Plane {
+    pub fn plane(&self, component: PlanarImageComponent) -> Plane<'_> {
         Plane(self, component)
     }
 

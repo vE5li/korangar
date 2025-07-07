@@ -4,7 +4,6 @@
 #![feature(allocator_api)]
 #![feature(generic_const_exprs)]
 #![feature(iter_next_chunk)]
-#![feature(let_chains)]
 #![feature(negative_impls)]
 #![feature(proc_macro_hygiene)]
 #![feature(random)]

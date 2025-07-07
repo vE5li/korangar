@@ -1,6 +1,7 @@
 use korangar_interface::elements::PrototypeElement;
 use ragnarok_bytes::ByteConvertable;
 
+#[allow(unused)]
 #[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 #[numeric_type(u32)]
 pub enum EffectId {

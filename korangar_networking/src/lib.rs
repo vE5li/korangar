@@ -1,5 +1,3 @@
-#![feature(let_chains)]
-
 mod entity;
 mod event;
 mod hotkey;

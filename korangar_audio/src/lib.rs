@@ -1,5 +1,4 @@
 //! This crate exposes an audio engine for the client
-#![feature(let_chains)]
 #![forbid(missing_docs)]
 
 use std::cmp::Ordering;

@@ -1,9 +1,9 @@
 #![allow(incomplete_features)]
 #![feature(auto_traits)]
-#![feature(let_chains)]
 #![feature(negative_impls)]
 #![feature(option_zip)]
 #![feature(type_changing_struct_update)]
+#![feature(allocator_api)]
 
 pub mod application;
 pub mod event;

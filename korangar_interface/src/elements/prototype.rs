@@ -1,3 +1,4 @@
+use std::alloc::Allocator;
 use std::fmt::Display;
 use std::rc::Rc;
 
@@ -105,12 +106,13 @@ impl<T: ElementDisplay> ElementDisplay for cgmath::Rad<T> {
 
 // workaround for not having negative trait bounds or better specialization
 auto trait NoPrototype {}
-impl<T> !NoPrototype for std::sync::Arc<T> {}
+
+impl<T: ?Sized, A: Allocator> !NoPrototype for std::sync::Arc<T, A> {}
 impl<T> !NoPrototype for Option<T> {}
 impl<T, const N: usize> !NoPrototype for [T; N] {}
 impl<T> !NoPrototype for &[T] {}
-impl<T> !NoPrototype for Vec<T> {}
-impl<T> !NoPrototype for Rc<T> {}
+impl<T: ?Sized, A: Allocator> !NoPrototype for Vec<T, A> {}
+impl<T: ?Sized, A: Allocator> !NoPrototype for Rc<T, A> {}
 
 impl NoPrototype for &str {}
 impl NoPrototype for String {}

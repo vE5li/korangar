@@ -1,5 +1,3 @@
-#![feature(extract_if)]
-
 mod bound;
 mod element;
 mod helper;

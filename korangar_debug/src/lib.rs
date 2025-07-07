@@ -1,6 +1,4 @@
 #![feature(decl_macro)]
-#![feature(let_chains)]
-#![feature(slice_take)]
 #![feature(thread_local)]
 
 #[macro_use]

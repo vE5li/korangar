@@ -162,7 +162,7 @@ impl PointLightManager {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn create_point_light_set(&mut self, shadow_map_count: usize) -> PointLightSet {
+    pub fn create_point_light_set(&mut self, shadow_map_count: usize) -> PointLightSet<'_> {
         for (index, point_light) in self.point_lights.iter().enumerate() {
             self.scored_point_lights
                 .push((index, point_light.id, self.score_point_light(point_light)))

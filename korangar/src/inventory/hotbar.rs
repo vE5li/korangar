@@ -96,7 +96,7 @@ impl Hotbar {
         });
     }
 
-    pub fn get_skill_in_slot(&self, slot: HotbarSlot) -> Ref<Option<Skill>> {
+    pub fn get_skill_in_slot(&self, slot: HotbarSlot) -> Ref<'_, Option<Skill>> {
         Ref::map(self.skills.get(), |skills| &skills[slot.0 as usize])
     }
 

@@ -59,7 +59,7 @@ impl InterfaceRenderer {
         self.instructions.borrow_mut().clear();
     }
 
-    pub fn get_instructions(&self) -> Ref<Vec<InterfaceRectangleInstruction>> {
+    pub fn get_instructions(&self) -> Ref<'_, Vec<InterfaceRectangleInstruction>> {
         self.instructions.borrow()
     }
 

@@ -1,6 +1,8 @@
+use korangar_components::skill_box;
 use korangar_interface::window::{CustomWindow, PrototypeWindow, Window, WindowTrait};
-use rust_state::Path;
+use rust_state::{Path, VecIndexExt};
 
+use crate::SkillSource;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::{WindowCache, WindowClass};
 use crate::inventory::Skill;
@@ -27,12 +29,27 @@ where
     fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
         use korangar_interface::prelude::*;
 
+        // TODO: Just temporary
+        const SKILL_TREE_ROWS: usize = 4;
+        const SKILL_TREE_COLUMNS: usize = 10;
+
         window! {
             title: "Skill tree",
             class: Self::window_class(),
             theme: ClientThemeType::Game,
             closable: true,
-            elements: ()
+            elements: std::array::from_fn::<_, SKILL_TREE_ROWS, _>(|row| {
+                split! {
+                    children: std::array::from_fn::<_, SKILL_TREE_COLUMNS, _>(|column| {
+                        let path = self.skills_path.index(row * SKILL_TREE_COLUMNS + column);
+
+                        skill_box! {
+                            skill_path: path,
+                            source: SkillSource::SkillTree,
+                        }
+                    }),
+                }
+            }),
         }
     }
 }

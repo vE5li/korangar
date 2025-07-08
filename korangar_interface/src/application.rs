@@ -1,5 +1,6 @@
 use rust_state::Path;
 
+use crate::layout::ClipLayer;
 use crate::theme::ThemePathGetter;
 use crate::window::Anchor;
 
@@ -63,6 +64,8 @@ pub trait ScalingExt {
 // }
 
 pub trait RenderLayer<App: Appli> {
+    type CustomInstruction<'a>;
+
     fn render_rectangle(
         &self,
         position: App::Position,
@@ -79,6 +82,8 @@ pub trait RenderLayer<App: Appli> {
     fn render_text(&self, text: &str, position: App::Position, clip: App::Clip, color: App::Color, font_size: App::FontSize);
 
     fn render_expand_arrow(&self, position: App::Position, size: App::Size, clip: App::Clip, color: App::Color, expanded: bool);
+
+    fn render_custom(&self, instruction: Self::CustomInstruction<'_>, clip_layers: &[ClipLayer<App>]);
 }
 
 // pub trait FontLoaderTrait<App>: Clone

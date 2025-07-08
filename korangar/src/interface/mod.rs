@@ -5,7 +5,6 @@ pub mod elements;
 pub mod application;
 pub mod cursor;
 // pub mod dialog;
-pub mod linked;
 pub mod resource;
 pub mod windows;
 
@@ -405,6 +404,211 @@ pub mod components {
                     delete_character: DeleteCharacter { character_information },
                     base_level_str: PartialEqDisplayStr::new(),
                     job_level_str: PartialEqDisplayStr::new(),
+                }
+            }
+        }
+    }
+
+    pub mod item_box {
+        use korangar_interface::application::FontSizeTrait;
+        use korangar_interface::element::Element;
+        use korangar_interface::element::id::ElementIdGenerator;
+        use korangar_interface::element::store::ElementStore;
+        use korangar_interface::event::ClickAction;
+        use korangar_interface::layout::{Layout, Resolver};
+        use korangar_interface::prelude::{HorizontalAlignment, VerticalAlignment};
+        use korangar_networking::{InventoryItem, InventoryItemDetails};
+        use rust_state::{Context, Path};
+
+        use crate::graphics::Color;
+        use crate::input::MouseInputMode;
+        use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
+        use crate::interface::resource::{ItemSource, Move, PartialMove};
+        use crate::loaders::{FontSize, Scaling};
+        use crate::renderer::{InterfaceRenderer, SpriteRenderer};
+        use crate::state::{ClientState, LayoutExt};
+        use crate::world::ResourceMetadata;
+
+        #[derive(Default)]
+        pub struct AmountDisplay {
+            amount: u16,
+            string: Option<String>,
+        }
+
+        impl AmountDisplay {
+            fn update(&mut self, new_amount: u16) {
+                if self.string.is_none() || self.amount != new_amount {
+                    self.string = Some(new_amount.to_string());
+                    self.amount = new_amount;
+                }
+            }
+        }
+
+        pub struct ItemBox<P> {
+            pub item_path: P,
+            pub source: ItemSource,
+            pub amount_display: AmountDisplay,
+        }
+
+        impl<P> Element<ClientState> for ItemBox<P>
+        where
+            P: Path<ClientState, InventoryItem<ResourceMetadata>, false>,
+        {
+            fn make_layout(
+                &mut self,
+                state: &Context<ClientState>,
+                store: &mut ElementStore,
+                generator: &mut ElementIdGenerator,
+                resolver: &mut Resolver,
+            ) -> Self::Layouted {
+                let area = resolver.with_height(40.0);
+
+                if let Some(item) = state.try_get(&self.item_path)
+                    && let Some(texture) = item.metadata.texture.as_ref()
+                {
+                    if let InventoryItemDetails::Regular { amount, .. } = &item.details {
+                        self.amount_display.update(*amount);
+                    }
+                }
+
+                Self::Layouted { area }
+            }
+
+            fn create_layout<'a>(
+                &'a self,
+                state: &'a Context<ClientState>,
+                store: &'a ElementStore,
+                layouted: &'a Self::Layouted,
+                layout: &mut Layout<'a, ClientState>,
+            ) {
+                layout.add_rectangle(layouted.area, CornerRadius::uniform(20.0), Color::rgb_u8(200, 120, 120));
+
+                if let Some(item) = state.try_get(&self.item_path)
+                    && let Some(texture) = item.metadata.texture.as_ref()
+                {
+                    layout.add_texture(texture.clone(), layouted.area, Color::WHITE, false);
+
+                    if let InventoryItemDetails::Regular { amount, .. } = &item.details {
+                        layout.add_text(
+                            layouted.area,
+                            self.amount_display.string.as_ref().unwrap(),
+                            // TODO: Put this in the theme
+                            FontSize(12.0),
+                            // TODO: Put this in the theme
+                            Color::rgb_u8(255, 200, 255),
+                            // TODO: Put this in the theme
+                            HorizontalAlignment::Right { offset: 3.0 },
+                            // TODO: Put this in the theme
+                            VerticalAlignment::Bottom { offset: 3.0 },
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    pub mod skill_box {
+        use korangar_interface::application::FontSizeTrait;
+        use korangar_interface::element::Element;
+        use korangar_interface::element::id::ElementIdGenerator;
+        use korangar_interface::element::store::ElementStore;
+        use korangar_interface::event::ClickAction;
+        use korangar_interface::layout::{Layout, Resolver};
+        use korangar_interface::prelude::{HorizontalAlignment, VerticalAlignment};
+        use korangar_networking::{InventoryItem, InventoryItemDetails};
+        use ragnarok_packets::SkillLevel;
+        use rust_state::{Context, Path};
+
+        use crate::graphics::Color;
+        use crate::input::MouseInputMode;
+        use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
+        use crate::interface::resource::{ItemSource, Move, PartialMove, SkillSource};
+        use crate::inventory::Skill;
+        use crate::loaders::{FontSize, Scaling};
+        use crate::renderer::{InterfaceRenderer, SpriteRenderer};
+        use crate::state::{ClientState, LayoutExt};
+        use crate::world::ResourceMetadata;
+
+        pub struct LevelDisplay {
+            level: SkillLevel,
+            string: Option<String>,
+        }
+
+        impl Default for LevelDisplay {
+            fn default() -> Self {
+                Self {
+                    level: SkillLevel(0),
+                    string: Default::default(),
+                }
+            }
+        }
+
+        impl LevelDisplay {
+            fn update(&mut self, new_level: SkillLevel) {
+                if self.string.is_none() || self.level != new_level {
+                    self.string = Some(new_level.0.to_string());
+                    self.level = new_level;
+                }
+            }
+        }
+
+        pub struct SkillBox<P> {
+            pub skill_path: P,
+            pub source: SkillSource,
+            pub level_display: LevelDisplay,
+        }
+
+        impl<P> Element<ClientState> for SkillBox<P>
+        where
+            P: Path<ClientState, Skill, false>,
+        {
+            fn make_layout(
+                &mut self,
+                state: &Context<ClientState>,
+                store: &mut ElementStore,
+                generator: &mut ElementIdGenerator,
+                resolver: &mut Resolver,
+            ) -> Self::Layouted {
+                let area = resolver.with_height(30.0);
+
+                if let Some(skill) = state.try_get(&self.skill_path) {
+                    self.level_display.update(skill.skill_level);
+                }
+
+                Self::Layouted { area }
+            }
+
+            fn create_layout<'a>(
+                &'a self,
+                state: &'a Context<ClientState>,
+                store: &'a ElementStore,
+                layouted: &'a Self::Layouted,
+                layout: &mut Layout<'a, ClientState>,
+            ) {
+                layout.add_rectangle(layouted.area, CornerRadius::uniform(20.0), Color::rgb_u8(200, 120, 120));
+
+                if let Some(skill) = state.try_get(&self.skill_path) {
+                    layout.add_sprite(
+                        &skill.actions,
+                        &skill.sprite,
+                        &skill.animation_state,
+                        layouted.area,
+                        Color::WHITE,
+                        false,
+                    );
+
+                    layout.add_text(
+                        layouted.area,
+                        self.level_display.string.as_ref().unwrap(),
+                        // TODO: Put this in the theme
+                        FontSize(12.0),
+                        // TODO: Put this in the theme
+                        Color::rgb_u8(255, 200, 255),
+                        // TODO: Put this in the theme
+                        HorizontalAlignment::Right { offset: 3.0 },
+                        // TODO: Put this in the theme
+                        VerticalAlignment::Bottom { offset: 3.0 },
+                    );
                 }
             }
         }

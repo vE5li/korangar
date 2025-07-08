@@ -16,8 +16,14 @@ mod queue {
         FocusNext,
         FocusPrevious,
         Application(App::Event),
-        OpenOverlay(ElementBox<App>),
-        CloseWindow { window_id: u64 },
+        OpenOverlay {
+            element: ElementBox<App>,
+            position: App::Position,
+            size: App::Size,
+        },
+        CloseWindow {
+            window_id: u64,
+        },
         CloseOverlay,
     }
 
@@ -27,7 +33,7 @@ mod queue {
                 Self::FocusNext => Self::FocusNext,
                 Self::FocusPrevious => Self::FocusPrevious,
                 Self::Application(event) => Self::Application(event.clone()),
-                Self::OpenOverlay(_) => unimplemented!(),
+                Self::OpenOverlay { .. } => unimplemented!(),
                 Self::CloseWindow { window_id } => Self::CloseWindow { window_id: *window_id },
                 Self::CloseOverlay => Self::CloseOverlay,
             }

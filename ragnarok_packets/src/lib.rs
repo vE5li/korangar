@@ -1513,12 +1513,33 @@ impl ToBytes for StatusType {
 #[cfg(feature = "interface")]
 impl<App: korangar_interface::application::Appli> korangar_interface::element::PrototypeElement<App> for StatusType {
     type Layouted = impl std::any::Any;
+    type LayoutedMut = impl std::any::Any;
     type Return<P>
         = impl korangar_interface::element::Element<App, Layouted = Self::Layouted>
     where
         P: rust_state::Path<App, Self>;
+    type ReturnMut<P>
+        = impl korangar_interface::element::Element<App, Layouted = Self::LayoutedMut>
+    where
+        P: rust_state::Path<App, Self>;
 
     fn to_element<P>(self_path: P, name: String) -> Self::Return<P>
+    where
+        P: rust_state::Path<App, Self>,
+    {
+        // format!("{self:?}").to_element(display)
+
+        use korangar_interface::prelude::*;
+
+        button! {
+            text: name,
+            event: |state: &rust_state::Context<App>, _: &mut korangar_interface::event::EventQueue<App>| {
+                println!("Just a dummy for now");
+            },
+        }
+    }
+
+    fn to_element_mut<P>(self_path: P, name: String) -> Self::ReturnMut<P>
     where
         P: rust_state::Path<App, Self>,
     {

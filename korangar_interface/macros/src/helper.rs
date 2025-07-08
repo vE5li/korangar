@@ -8,7 +8,7 @@ pub fn prototype_element_helper(
     data_struct: DataStruct,
     mut attributes: Vec<Attribute>,
     name: String,
-) -> (Vec<TokenStream>, bool, TokenStream, Option<TokenStream>) {
+) -> (Vec<TokenStream>, Vec<TokenStream>, bool, TokenStream, Option<TokenStream>) {
     let (fields, is_unnamed): (Vec<Field>, bool) = match data_struct.fields {
         syn::Fields::Named(named_fields) => (named_fields.named.into_iter().collect(), false),
         syn::Fields::Unnamed(unnamed_fields) => (unnamed_fields.unnamed.into_iter().collect(), true),
@@ -25,6 +25,7 @@ pub fn prototype_element_helper(
         .map(|window_class: LitStr| quote!(#window_class));
 
     let mut initializers = vec![];
+    let mut initializers_mut = vec![];
 
     let mut counter: usize = 0;
     for mut field in fields {
@@ -46,7 +47,11 @@ pub fn prototype_element_helper(
         initializers.push(
             quote!(korangar_interface::element::PrototypeElement::to_element(self_path.#field_identifier(), #display_name.to_string())),
         );
+
+        initializers_mut.push(
+            quote!(korangar_interface::element::PrototypeElement::to_element_mut(self_path.#field_identifier(), #display_name.to_string())),
+        );
     }
 
-    (initializers, is_unnamed, window_title, window_class)
+    (initializers, initializers_mut, is_unnamed, window_title, window_class)
 }

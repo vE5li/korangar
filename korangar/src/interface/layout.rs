@@ -302,37 +302,6 @@ impl std::ops::Mul<f32> for ScreenClip {
     }
 }
 
-#[derive(Debug, Copy, Clone, new)]
-pub struct PartialScreenSize {
-    pub width: f32,
-    pub height: Option<f32>,
-}
-
-impl PartialScreenSize {
-    pub fn finalize(self) -> ScreenSize {
-        let width = self.width;
-        let height = self.height.expect("element cannot have flexible height");
-
-        ScreenSize { width, height }
-    }
-
-    pub fn finalize_or(self, height: f32) -> ScreenSize {
-        let width = self.width;
-        let height = self.height.unwrap_or(height);
-
-        ScreenSize { width, height }
-    }
-}
-
-impl From<ScreenSize> for PartialScreenSize {
-    fn from(size: ScreenSize) -> Self {
-        Self {
-            width: size.width,
-            height: Some(size.height),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 pub struct CornerRadius {
     pub top_left: f32,

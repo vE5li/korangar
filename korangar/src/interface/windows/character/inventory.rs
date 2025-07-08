@@ -1,7 +1,9 @@
+use korangar_components::item_box;
 use korangar_interface::window::{CustomWindow, PrototypeWindow, Window, WindowTrait};
 use korangar_networking::InventoryItem;
-use rust_state::Path;
+use rust_state::{Path, VecIndexExt};
 
+use crate::ItemSource;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::{WindowCache, WindowClass};
 use crate::state::{ClientState, ClientThemeType};
@@ -28,12 +30,27 @@ where
     fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
         use korangar_interface::prelude::*;
 
+        // TODO: Probably this should be more dynamic
+        const INVENTORY_ROWS: usize = 4;
+        const INVENTORY_COLUMNS: usize = 10;
+
         window! {
             title: "Inventory",
             class: Self::window_class(),
             theme: ClientThemeType::Game,
             closable: true,
-            elements: ()
+            elements: std::array::from_fn::<_, INVENTORY_ROWS, _>(|row| {
+                split! {
+                    children: std::array::from_fn::<_, INVENTORY_COLUMNS, _>(|column| {
+                        let path = self.items_path.index(row * INVENTORY_COLUMNS + column);
+
+                        item_box! {
+                            item_path: path,
+                            source: ItemSource::Inventory,
+                        }
+                    }),
+                }
+            }),
         }
     }
 }

@@ -124,6 +124,7 @@ struct LayoutLayer<'a, App: Appli> {
     rectangles: Vec<RectangleInsturction<App>>,
     texts: Vec<TextInstruction<'a, App>>,
     checkboxes: Vec<CheckboxInstruction<App>>,
+    custom_instructions: Vec<<App::Renderer as RenderLayer<App>>::CustomInstruction<'a>>,
     click_areas: Vec<ClickArea<'a, App>>,
     window_move_areas: Vec<WindowArea>,
     window_resize_areas: Vec<WindowArea>,
@@ -140,6 +141,7 @@ impl<App: Appli> Default for LayoutLayer<'_, App> {
             rectangles: Default::default(),
             texts: Default::default(),
             checkboxes: Default::default(),
+            custom_instructions: Default::default(),
             click_areas: Default::default(),
             window_move_areas: Default::default(),
             window_resize_areas: Default::default(),
@@ -153,11 +155,18 @@ impl<App: Appli> Default for LayoutLayer<'_, App> {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub struct ClipLayerId(usize);
+// TODO: Make inner field private (maybe)
+pub struct ClipLayerId(pub usize);
 
 pub struct ClipLayer<App: Appli> {
     parent: Option<ClipLayerId>,
     clip: App::Clip,
+}
+
+impl<App: Appli> ClipLayer<App> {
+    pub fn get(&self) -> App::Clip {
+        self.clip
+    }
 }
 
 impl<App: Appli> Clone for ClipLayer<App> {
@@ -281,8 +290,12 @@ impl<'a, App: Appli> Layout<'a, App> {
         self.current_layer -= 1;
     }
 
+    pub fn get_active_clip_layer(&self) -> ClipLayerId {
+        self.active_clip_layers.last().copied().unwrap()
+    }
+
     pub fn add_click_area(&mut self, area: Area, action: &'a dyn ClickAction<App>) {
-        let clip_layer = self.active_clip_layers.last().copied().unwrap();
+        let clip_layer = self.get_active_clip_layer();
 
         self.layers[self.current_layer]
             .click_areas
@@ -290,7 +303,7 @@ impl<'a, App: Appli> Layout<'a, App> {
     }
 
     pub fn add_window_move_area(&mut self, area: Area, window_id: u64) {
-        let clip_layer = self.active_clip_layers.last().copied().unwrap();
+        let clip_layer = self.get_active_clip_layer();
 
         self.layers[self.current_layer].window_move_areas.push(WindowArea {
             clip_layer,
@@ -300,7 +313,7 @@ impl<'a, App: Appli> Layout<'a, App> {
     }
 
     pub fn add_window_resize_area(&mut self, area: Area, window_id: u64) {
-        let clip_layer = self.active_clip_layers.last().copied().unwrap();
+        let clip_layer = self.get_active_clip_layer();
 
         self.layers[self.current_layer].window_resize_areas.push(WindowArea {
             clip_layer,
@@ -310,7 +323,7 @@ impl<'a, App: Appli> Layout<'a, App> {
     }
 
     pub fn add_window_close_area(&mut self, area: Area, window_id: u64) {
-        let clip_layer = self.active_clip_layers.last().copied().unwrap();
+        let clip_layer = self.get_active_clip_layer();
 
         self.layers[self.current_layer].window_close_areas.push(WindowArea {
             clip_layer,
@@ -320,7 +333,7 @@ impl<'a, App: Appli> Layout<'a, App> {
     }
 
     pub fn add_scroll_area(&mut self, area: Area, max_scroll: f32, cell: &'a RefCell<f32>) {
-        let clip_layer = self.active_clip_layers.last().copied().unwrap();
+        let clip_layer = self.get_active_clip_layer();
 
         self.layers[self.current_layer].scroll_areas.push(ScrollArea {
             clip_layer,
@@ -331,7 +344,7 @@ impl<'a, App: Appli> Layout<'a, App> {
     }
 
     pub fn add_toggle(&mut self, area: Area, cell: &'a RefCell<bool>) {
-        let clip_layer = self.active_clip_layers.last().copied().unwrap();
+        let clip_layer = self.get_active_clip_layer();
 
         self.layers[self.current_layer]
             .toggles
@@ -339,7 +352,7 @@ impl<'a, App: Appli> Layout<'a, App> {
     }
 
     pub fn add_focus_area(&mut self, area: Area, element_id: ElementId) {
-        let clip_layer = self.active_clip_layers.last().copied().unwrap();
+        let clip_layer = self.get_active_clip_layer();
 
         self.layers[self.current_layer].focus_areas.push(FocusArea {
             clip_layer,
@@ -353,7 +366,7 @@ impl<'a, App: Appli> Layout<'a, App> {
     }
 
     pub fn add_rectangle(&mut self, area: Area, corner_radius: App::CornerRadius, color: App::Color) {
-        let clip_layer = self.active_clip_layers.last().copied().unwrap();
+        let clip_layer = self.get_active_clip_layer();
 
         self.layers[self.current_layer].rectangles.push(RectangleInsturction {
             clip_layer,
@@ -372,7 +385,7 @@ impl<'a, App: Appli> Layout<'a, App> {
         horizontal_alignment: HorizontalAlignment,
         vertical_alignment: VerticalAlignment,
     ) {
-        let clip_layer = self.active_clip_layers.last().copied().unwrap();
+        let clip_layer = self.get_active_clip_layer();
 
         self.layers[self.current_layer].texts.push(TextInstruction {
             clip_layer,
@@ -386,7 +399,7 @@ impl<'a, App: Appli> Layout<'a, App> {
     }
 
     pub fn add_checkbox(&mut self, area: Area, color: App::Color, state: bool) {
-        let clip_layer = self.active_clip_layers.last().copied().unwrap();
+        let clip_layer = self.get_active_clip_layer();
 
         self.layers[self.current_layer].checkboxes.push(CheckboxInstruction {
             clip_layer,
@@ -394,6 +407,10 @@ impl<'a, App: Appli> Layout<'a, App> {
             color,
             state,
         });
+    }
+
+    pub fn add_custom_instruction(&mut self, instruction: <App::Renderer as RenderLayer<App>>::CustomInstruction<'a>) {
+        self.layers[self.current_layer].custom_instructions.push(instruction);
     }
 
     pub fn render(&mut self, renderer: &App::Renderer) {
@@ -455,6 +472,10 @@ impl<'a, App: Appli> Layout<'a, App> {
                     );
                 },
             );
+
+            layer.custom_instructions.drain(..).for_each(|instruction| {
+                renderer.render_custom(instruction, &self.clip_layers);
+            });
 
             layer.texts.drain(..).for_each(
                 |TextInstruction {

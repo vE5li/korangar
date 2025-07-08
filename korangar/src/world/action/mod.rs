@@ -45,12 +45,37 @@ pub enum ActionEvent {
 
 impl PrototypeElement<ClientState> for ActionEvent {
     type Layouted = impl std::any::Any;
+    type LayoutedMut = impl std::any::Any;
     type Return<P>
         = impl korangar_interface::element::Element<ClientState, Layouted = Self::Layouted>
     where
         P: rust_state::Path<ClientState, Self>;
+    type ReturnMut<P>
+        = impl korangar_interface::element::Element<ClientState, Layouted = Self::LayoutedMut>
+    where
+        P: rust_state::Path<ClientState, Self>;
 
     fn to_element<P>(self_path: P, name: String) -> Self::Return<P>
+    where
+        P: Path<ClientState, Self>,
+    {
+        use korangar_interface::prelude::*;
+
+        button! {
+            text: name,
+            event: |state: &rust_state::Context<ClientState>, _: &mut korangar_interface::event::EventQueue<ClientState>| {
+                println!("Just a dummy for now");
+            },
+        }
+        // match self {
+        //     Self::Sound { .. } => PrototypeElement::to_element(&"Sound",
+        // display),     Self::Attack =>
+        // PrototypeElement::to_element(&"Attack", display),
+        //     Self::Unknown => PrototypeElement::to_element(&"Unknown",
+        // display), }
+    }
+
+    fn to_element_mut<P>(self_path: P, name: String) -> Self::ReturnMut<P>
     where
         P: Path<ClientState, Self>,
     {

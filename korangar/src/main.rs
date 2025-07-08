@@ -105,7 +105,6 @@ use crate::interface::cursor::{MouseCursor, MouseCursorState};
 // #[cfg(feature = "debug")]
 // use crate::interface::elements::PacketHistoryCallback;
 use crate::interface::layout::{ScreenPosition, ScreenSize};
-use crate::interface::linked::LinkedElement;
 use crate::interface::resource::{ItemSource, Move, SkillSource};
 use crate::interface::windows::*;
 use crate::inventory::{Hotbar, Inventory, SkillTree};
@@ -333,31 +332,38 @@ pub struct PacketState {
 }
 
 mod state {
+    use std::sync::Arc;
+
     use korangar_interface::application::{Appli, RenderLayer};
     use korangar_interface::components::button::ButtonTheme;
     use korangar_interface::components::collapsable::CollapsableTheme;
+    use korangar_interface::components::drop_down::DropDownTheme;
     use korangar_interface::components::state_button::StateButtonTheme;
     use korangar_interface::components::text::TextTheme;
     use korangar_interface::components::text_box::TextBoxTheme;
+    use korangar_interface::element::PrototypeElement;
     use korangar_interface::layout::alignment::{HorizontalAlignment, VerticalAlignment};
+    use korangar_interface::layout::area::Area;
+    use korangar_interface::layout::{ClipLayer, ClipLayerId, Layout};
     use korangar_interface::theme::ThemePathGetter;
-    use korangar_interface::window::WindowTheme;
+    use korangar_interface::window::{PrototypeWindow, WindowTheme};
     use korangar_networking::{SellItem, ShopItem};
     use ragnarok_packets::{CharacterId, CharacterInformation, CharacterServerInformation, Friend};
     use rust_state::{Path, RustState, Selector};
 
     use crate::character_slots::CharacterSlots;
-    use crate::graphics::Color;
     #[cfg(feature = "debug")]
     use crate::graphics::RenderSettings;
+    use crate::graphics::{Color, Texture};
     use crate::input::UserEvent;
     use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
     use crate::interface::theme::GameTheme;
     use crate::interface::windows::{WindowCache, WindowClass};
     use crate::inventory::{Hotbar, Inventory, SkillTree};
-    use crate::loaders::{ClientInfo, FontSize, Scaling, ServiceId};
+    use crate::loaders::{ClientInfo, FontSize, Scaling, ServiceId, Sprite};
+    use crate::renderer::SpriteRenderer;
     use crate::settings::{GraphicsSettingsCapabilities, LoginSettings};
-    use crate::world::{Entity, Map, Player, ResourceMetadata};
+    use crate::world::{Actions, AnimationState, Entity, Map, Player, ResourceMetadata, SpriteAnimationState};
     use crate::{AudioSettings, ChatMessage, GraphicsSettings, PacketState};
 
     pub(super) fn client_state() -> impl Path<ClientState, ClientState> {
@@ -482,19 +488,27 @@ mod state {
         pub selected_service: ServiceId,
     }
 
-    #[derive(RustState)]
+    #[derive(RustState, PrototypeElement)]
     pub struct DebugButtonTheme {
         foreground_color: Color,
     }
 
-    #[derive(RustState)]
+    #[derive(RustState, PrototypeWindow)]
     pub struct ClientTheme {
+        #[hidden_element]
         pub window: WindowTheme<ClientState>,
+        #[hidden_element]
         pub text: TextTheme<ClientState>,
+        #[hidden_element]
         pub button: ButtonTheme<ClientState>,
+        #[hidden_element]
         pub state_button: StateButtonTheme<ClientState>,
+        #[hidden_element]
         pub text_box: TextBoxTheme<ClientState>,
+        #[hidden_element]
         pub collapsable: CollapsableTheme<ClientState>,
+        #[hidden_element]
+        pub drop_down: DropDownTheme<ClientState>,
         pub debug_button: DebugButtonTheme,
     }
 
@@ -558,7 +572,7 @@ mod state {
                     hovered_background_color: Color::monochrome_u8(120),
                     hovered_foreground_color: Color::monochrome_u8(220),
                     checkbox_color: Color::rgb_u8(255, 100, 100),
-                    height: 26.0,
+                    height: 30.0,
                     corner_radius: CornerRadius::uniform(20.0),
                     font_size: FontSize(16.0),
                     text_alignment: HorizontalAlignment::Center { offset: 0.0 },
@@ -586,6 +600,31 @@ mod state {
                     font_size: FontSize(16.0),
                     text_alignment: HorizontalAlignment::Left { offset: 20.0 },
                     vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
+                },
+                drop_down: DropDownTheme {
+                    item_background_color: Color::monochrome_u8(65),
+                    item_foreground_color: Color::monochrome_u8(180),
+                    item_hovered_background_color: Color::monochrome_u8(105),
+                    item_hovered_foreground_color: Color::monochrome_u8(220),
+                    item_height: 30.0,
+                    item_corner_radius: CornerRadius::uniform(20.0),
+                    item_font_size: FontSize(16.0),
+                    item_text_alignment: HorizontalAlignment::Center { offset: 0.0 },
+                    item_vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
+                    list_corner_radius: CornerRadius::uniform(20.0),
+                    list_background_color: Color::monochrome_u8(40),
+                    list_gaps: 8.0,
+                    list_border: 5.0,
+                    list_maximum_height: 700.0,
+                    button_background_color: Color::monochrome_u8(80),
+                    button_foreground_color: Color::monochrome_u8(180),
+                    button_hovered_background_color: Color::monochrome_u8(120),
+                    button_hovered_foreground_color: Color::monochrome_u8(220),
+                    button_height: 30.0,
+                    button_corner_radius: CornerRadius::uniform(20.0),
+                    button_font_size: FontSize(16.0),
+                    button_text_alignment: HorizontalAlignment::Center { offset: 0.0 },
+                    button_vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
                 },
                 debug_button: DebugButtonTheme {
                     foreground_color: Color::rgb_u8(255, 100, 255),
@@ -667,6 +706,31 @@ mod state {
                     font_size: FontSize(14.0),
                     text_alignment: HorizontalAlignment::Left { offset: 15.0 },
                     vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
+                },
+                drop_down: DropDownTheme {
+                    item_background_color: Color::monochrome_u8(80),
+                    item_foreground_color: Color::monochrome_u8(180),
+                    item_hovered_background_color: Color::monochrome_u8(120),
+                    item_hovered_foreground_color: Color::monochrome_u8(220),
+                    item_height: 20.0,
+                    item_corner_radius: CornerRadius::uniform(10.0),
+                    item_font_size: FontSize(16.0),
+                    item_text_alignment: HorizontalAlignment::Center { offset: 0.0 },
+                    item_vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
+                    list_corner_radius: CornerRadius::uniform(8.0),
+                    list_background_color: Color::monochrome_u8(40),
+                    list_gaps: 4.0,
+                    list_border: 4.0,
+                    list_maximum_height: 500.0,
+                    button_background_color: Color::monochrome_u8(120),
+                    button_foreground_color: Color::monochrome_u8(220),
+                    button_hovered_background_color: Color::monochrome_u8(150),
+                    button_hovered_foreground_color: Color::monochrome_u8(250),
+                    button_height: 20.0,
+                    button_corner_radius: CornerRadius::uniform(10.0),
+                    button_font_size: FontSize(16.0),
+                    button_text_alignment: HorizontalAlignment::Center { offset: 0.0 },
+                    button_vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
                 },
                 debug_button: DebugButtonTheme {
                     foreground_color: Color::rgb_u8(255, 100, 255),
@@ -782,9 +846,38 @@ mod state {
         fn collapsable(self) -> impl Path<ClientState, CollapsableTheme<ClientState>> {
             ThemePath.collapsable()
         }
+
+        fn drop_down(self) -> impl Path<ClientState, DropDownTheme<ClientState>> {
+            ThemePath.drop_down()
+        }
+    }
+
+    struct TextureInstruction {
+        texture: Arc<Texture>,
+        clip_layer: ClipLayerId,
+        area: Area,
+        color: Color,
+        smooth: bool,
+    }
+
+    struct SpriteInstruction<'a> {
+        actions: &'a Actions,
+        sprite: &'a Sprite,
+        animation_state: &'a SpriteAnimationState,
+        clip_layer: ClipLayerId,
+        area: Area,
+        color: Color,
+        smooth: bool,
+    }
+
+    pub enum CustomInstruction<'a> {
+        Texture(TextureInstruction),
+        Sprite(SpriteInstruction<'a>),
     }
 
     impl RenderLayer<ClientState> for crate::renderer::InterfaceRenderer {
+        type CustomInstruction<'a> = CustomInstruction<'a>;
+
         fn render_rectangle(
             &self,
             position: ScreenPosition,
@@ -810,6 +903,94 @@ mod state {
 
         fn render_expand_arrow(&self, position: ScreenPosition, size: ScreenSize, clip: ScreenClip, color: Color, expanded: bool) {
             todo!()
+        }
+
+        fn render_custom(&self, instruction: Self::CustomInstruction<'_>, clip_layers: &[ClipLayer<ClientState>]) {
+            match instruction {
+                CustomInstruction::Sprite(SpriteInstruction {
+                    actions,
+                    sprite,
+                    animation_state,
+                    clip_layer,
+                    area,
+                    color,
+                    smooth,
+                }) => {
+                    let position = ScreenPosition {
+                        left: area.x + area.width / 2.0,
+                        top: area.y + area.height / 2.0,
+                    };
+                    let screen_clip = clip_layers[clip_layer.0].get();
+
+                    actions.render_sprite(self, sprite, animation_state, position, 0, color, 1.0);
+                }
+                CustomInstruction::Texture(TextureInstruction {
+                    texture,
+                    clip_layer,
+                    area,
+                    color,
+                    smooth,
+                }) => {
+                    let position = ScreenPosition { left: area.x, top: area.y };
+                    let size = ScreenSize {
+                        width: area.width,
+                        height: area.height,
+                    };
+                    let screen_clip = clip_layers[clip_layer.0].get();
+
+                    self.render_sprite(texture, position, size, screen_clip, color, smooth);
+                }
+            }
+        }
+    }
+
+    pub trait LayoutExt<'a> {
+        fn add_texture(&mut self, texture: Arc<Texture>, area: Area, color: Color, smooth: bool);
+
+        fn add_sprite(
+            &mut self,
+            actions: &'a Actions,
+            sprite: &'a Sprite,
+            animation_state: &'a SpriteAnimationState,
+            area: Area,
+            color: Color,
+            smooth: bool,
+        );
+    }
+
+    impl<'a> LayoutExt<'a> for Layout<'a, ClientState> {
+        fn add_texture(&mut self, texture: Arc<Texture>, area: Area, color: Color, smooth: bool) {
+            let clip_layer = self.get_active_clip_layer();
+
+            self.add_custom_instruction(CustomInstruction::Texture(TextureInstruction {
+                texture,
+                clip_layer,
+                area,
+                color,
+                smooth,
+            }));
+        }
+
+        fn add_sprite(
+            &mut self,
+            actions: &'a Actions,
+            sprite: &'a Sprite,
+            animation_state: &'a SpriteAnimationState,
+            area: Area,
+            color: Color,
+            smooth: bool,
+        ) {
+            let clip_layer = self.get_active_clip_layer();
+
+            self.add_custom_instruction(CustomInstruction::Sprite(SpriteInstruction {
+                actions,
+                sprite,
+                animation_state,
+                clip_layer,
+                area,
+                color,
+                smooth,
+            }));
         }
     }
 }
@@ -2535,7 +2716,7 @@ impl Client {
                 #[cfg(feature = "debug")]
                 UserEvent::SetMidnight => self.game_timer.set_day_timer(24.0 * 3600.0),
                 #[cfg(feature = "debug")]
-                UserEvent::OpenThemeViewerWindow => {} //self.interface.open_window(&self.client_state, self.client_state.theme_window()),
+                UserEvent::OpenThemeViewerWindow => self.interface.open_prototype_window(client_state().game_theme()),
                 #[cfg(feature = "debug")]
                 UserEvent::OpenProfilerWindow => self
                     .interface

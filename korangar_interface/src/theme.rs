@@ -3,6 +3,7 @@ use rust_state::Path;
 use crate::application::Appli;
 use crate::components::button::ButtonTheme;
 use crate::components::collapsable::CollapsableTheme;
+use crate::components::drop_down::DropDownTheme;
 use crate::components::state_button::StateButtonTheme;
 use crate::components::text::TextTheme;
 use crate::components::text_box::TextBoxTheme;
@@ -22,6 +23,8 @@ pub trait ThemePathGetter<App: Appli>: Copy {
     fn text_box(self) -> impl Path<App, TextBoxTheme<App>>;
 
     fn collapsable(self) -> impl Path<App, CollapsableTheme<App>>;
+
+    fn drop_down(self) -> impl Path<App, DropDownTheme<App>>;
 }
 
 pub fn theme<App: Appli>() -> impl ThemePathGetter<App> {

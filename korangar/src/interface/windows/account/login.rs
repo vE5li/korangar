@@ -143,7 +143,7 @@ where
                 drop_down! {
                     options: self.client_info_path.services(),
                     selected: self.window_state_path.selected_service(),
-                    click_handler: DefaultClickHandler::<_, _, _, ()>::new(self.window_state_path.selected_service(), self.client_info_path.services()),
+                    click_handler: DefaultClickHandler::new(self.window_state_path.selected_service(), self.client_info_path.services()),
                 },
                 text! { text: "Account data" },
                 text_box! {

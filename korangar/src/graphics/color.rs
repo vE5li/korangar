@@ -1,8 +1,13 @@
 use std::ops::{Add, Mul, Sub};
 
+use korangar_interface::element::{DefaultLayouted, Element, PrototypeElement};
 use mlua::{Lua, Value};
 use ragnarok_formats::color::{ColorBGRA, ColorRGB};
+use rust_state::Path;
 use serde::{Deserialize, Serialize};
+
+use crate::interface::layout::CornerRadius;
+use crate::state::{ClientState, ClientStateRootExt};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 pub struct Color {
@@ -235,5 +240,112 @@ impl mlua::FromLua for Color {
             to: "Color".to_string(),
             message: Some("Could not convert color".to_string()),
         })
+    }
+}
+
+impl PrototypeElement<ClientState> for Color {
+    type Layouted = impl std::any::Any;
+    type LayoutedMut = impl std::any::Any;
+    type Return<P>
+    where
+        P: rust_state::Path<ClientState, Self>,
+    = impl Element<ClientState, Layouted = Self::Layouted>;
+    type ReturnMut<P>
+    where
+        P: rust_state::Path<ClientState, Self>,
+    = impl Element<ClientState, Layouted = Self::LayoutedMut>;
+
+    fn to_element<P>(self_path: P, name: String) -> Self::Return<P>
+    where
+        P: rust_state::Path<ClientState, Self>,
+    {
+        use korangar_interface::prelude::*;
+
+        struct Inner<P> {
+            path: P,
+        }
+
+        impl<P> Element<ClientState> for Inner<P>
+        where
+            P: Path<ClientState, Color>,
+        {
+            fn make_layout(
+                &mut self,
+                state: &rust_state::Context<ClientState>,
+                store: &mut korangar_interface::element::store::ElementStore,
+                generator: &mut korangar_interface::element::id::ElementIdGenerator,
+                resolver: &mut korangar_interface::layout::Resolver,
+            ) -> Self::Layouted {
+                let area = resolver.with_height(30.0);
+
+                DefaultLayouted { area }
+            }
+
+            fn create_layout<'a>(
+                &'a self,
+                state: &'a rust_state::Context<ClientState>,
+                store: &'a korangar_interface::element::store::ElementStore,
+                layouted: &'a Self::Layouted,
+                layout: &mut korangar_interface::layout::Layout<'a, ClientState>,
+            ) {
+                layout.add_rectangle(layouted.area, CornerRadius::uniform(5.0), *state.get(&self.path));
+            }
+        }
+
+        split! {
+            children: (
+                text! {
+                    text: name,
+                },
+                Inner { path: self_path }
+            ),
+        }
+    }
+
+    fn to_element_mut<P>(self_path: P, name: String) -> Self::ReturnMut<P>
+    where
+        P: rust_state::Path<ClientState, Self>,
+    {
+        use korangar_interface::prelude::*;
+
+        struct Inner<P> {
+            path: P,
+        }
+
+        impl<P> Element<ClientState> for Inner<P>
+        where
+            P: Path<ClientState, Color>,
+        {
+            fn make_layout(
+                &mut self,
+                state: &rust_state::Context<ClientState>,
+                store: &mut korangar_interface::element::store::ElementStore,
+                generator: &mut korangar_interface::element::id::ElementIdGenerator,
+                resolver: &mut korangar_interface::layout::Resolver,
+            ) -> Self::Layouted {
+                let area = resolver.with_height(30.0);
+
+                DefaultLayouted { area }
+            }
+
+            fn create_layout<'a>(
+                &'a self,
+                state: &'a rust_state::Context<ClientState>,
+                store: &'a korangar_interface::element::store::ElementStore,
+                layouted: &'a Self::Layouted,
+                layout: &mut korangar_interface::layout::Layout<'a, ClientState>,
+            ) {
+                layout.add_rectangle(layouted.area, CornerRadius::uniform(5.0), *state.get(&self.path));
+            }
+        }
+
+        split! {
+            children: (
+                text! {
+                    text: name,
+                },
+                Inner { path: self_path }
+            ),
+        }
     }
 }

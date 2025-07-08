@@ -44,6 +44,7 @@ pub mod prelude {
 
     pub use crate::components::button::ButtonThemePathExt;
     pub use crate::components::collapsable::CollapsableThemePathExt;
+    pub use crate::components::drop_down::DropDownThemePathExt;
     pub use crate::components::state_button::StateButtonThemePathExt;
     pub use crate::components::text::TextThemePathExt;
     pub use crate::components::text_box::TextBoxThemePathExt;
@@ -176,7 +177,7 @@ where
     focused_element: Option<ElementId>,
     mouse_mode: MouseMode,
     event_queue: EventQueue<App>,
-    overlay_element: Option<(ElementBox<App>, ElementStore)>,
+    overlay_element: Option<(ElementBox<App>, ElementStore, App::Position, App::Size)>,
 
     next_window_id: u64,
 }
@@ -483,12 +484,12 @@ where
     pub fn do_layouts<'a>(&'a mut self, state: &'a Context<App>, mouse_position: App::Position) -> BuiltUi<'a, App> {
         let mut is_ui_hovered = false;
 
-        if let Some((element, store)) = &mut self.overlay_element {
+        if let Some((element, store, position, size)) = &mut self.overlay_element {
             let available_area = Area {
-                x: 200.0,
-                y: 200.0,
-                width: 400.0,
-                height: 400.0,
+                x: position.left(),
+                y: position.top(),
+                width: size.width(),
+                height: size.height(),
             };
 
             let mut resolver = Resolver::new(available_area, 0.0);
@@ -506,7 +507,7 @@ where
             );
         });
 
-        let overlay_layout = self.overlay_element.as_ref().map(|(element, store)| {
+        let overlay_layout = self.overlay_element.as_ref().map(|(element, store, ..)| {
             let mut layout = Layout::new(mouse_position, self.focused_element, !is_ui_hovered);
 
             element.create_layout(state, store, &(), &mut layout);
@@ -575,7 +576,9 @@ where
                 event::Event::FocusNext => todo!(),
                 event::Event::FocusPrevious => todo!(),
                 event::Event::Application(application_event) => application_events.push(application_event),
-                event::Event::OpenOverlay(element) => self.overlay_element = Some((element, ElementStore::root(&mut self.generator))),
+                event::Event::OpenOverlay { element, position, size } => {
+                    self.overlay_element = Some((element, ElementStore::root(&mut self.generator), position, size))
+                }
                 event::Event::CloseWindow { window_id } => {
                     if let Some(index) = self.windows.iter().position(|wrapper| wrapper.data.id == window_id) {
                         self.windows.remove(index);

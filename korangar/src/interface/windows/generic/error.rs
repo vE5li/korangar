@@ -1,10 +1,7 @@
 use derive_new::new;
-use korangar_interface::window::{CustomWindow, PrototypeWindow, Window, WindowTrait};
-use rust_state::Context;
+use korangar_interface::window::{CustomWindow, WindowTrait};
 
 use crate::graphics::Color;
-use crate::interface::layout::ScreenSize;
-use crate::interface::windows::WindowCache;
 use crate::state::{ClientState, ClientThemeType};
 
 #[derive(new)]

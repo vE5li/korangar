@@ -1,19 +1,21 @@
+use korangar_components::skill_box;
 use korangar_interface::window::{CustomWindow, PrototypeWindow, Window, WindowTrait};
-use rust_state::{Context, Path};
+use ragnarok_packets::HotbarSlot;
+use rust_state::{ArrayLookupExt, Context, OptionExt, Path};
 
-// use crate::interface::elements::HotbarContainer;
 use crate::interface::layout::ScreenSize;
+use crate::interface::resource::SkillSource;
 use crate::interface::windows::{WindowCache, WindowClass};
 use crate::inventory::Skill;
 use crate::state::{ClientState, ClientThemeType};
 
 pub struct HotbarWindow<P, const N: usize> {
-    path: P,
+    skills_path: P,
 }
 
 impl<P, const N: usize> HotbarWindow<P, N> {
     pub fn new(path: P) -> Self {
-        Self { path }
+        Self { skills_path: path }
     }
 }
 
@@ -28,15 +30,22 @@ where
     fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
         use korangar_interface::prelude::*;
 
-        let elements = (text! {
-            text: "Fancy Hotbar",
-        },);
-
         window! {
             title: "Hotbar",
             class: Self::window_class(),
             theme: ClientThemeType::Game,
-            elements: elements,
+            elements: (
+                split! {
+                    children: std::array::from_fn::<_, N, _>(|slot| {
+                        let path = self.skills_path.array_index(slot).unwrapped();
+
+                        skill_box! {
+                            skill_path: path,
+                            source: SkillSource::Hotbar { slot: HotbarSlot(slot as u16) },
+                        }
+                    }),
+                },
+            )
         }
     }
 }

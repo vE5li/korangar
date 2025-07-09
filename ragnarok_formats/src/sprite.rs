@@ -6,10 +6,7 @@ use crate::signature::Signature;
 use crate::version::{InternalVersion, MinorFirst, Version};
 
 #[derive(Clone, Debug)]
-#[cfg_attr(
-    feature = "interface",
-    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
-)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct PaletteImageData {
     pub width: u16,
     pub height: u16,
@@ -17,10 +14,7 @@ pub struct PaletteImageData {
 }
 
 #[derive(Clone, Debug)]
-#[cfg_attr(
-    feature = "interface",
-    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
-)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct EncodedData(pub Vec<u8>);
 
 impl FromBytes for PaletteImageData {
@@ -88,10 +82,7 @@ impl ToBytes for PaletteImageData {
 }
 
 #[derive(Clone, Debug, ByteConvertable)]
-#[cfg_attr(
-    feature = "interface",
-    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
-)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct RgbaImageData {
     pub width: u16,
     pub height: u16,
@@ -100,10 +91,7 @@ pub struct RgbaImageData {
 }
 
 #[derive(Copy, Clone, Debug, Default, ByteConvertable)]
-#[cfg_attr(
-    feature = "interface",
-    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
-)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct PaletteColor {
     pub red: u8,
     pub green: u8,
@@ -112,19 +100,13 @@ pub struct PaletteColor {
 }
 
 #[derive(Clone, Debug, ByteConvertable)]
-#[cfg_attr(
-    feature = "interface",
-    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
-)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct Palette {
     pub colors: [PaletteColor; 256],
 }
 
 #[derive(Clone, Debug, ByteConvertable)]
-#[cfg_attr(
-    feature = "interface",
-    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
-)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct SpriteData {
     #[new_default]
     pub signature: Signature<b"SP">,

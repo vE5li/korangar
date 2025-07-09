@@ -1,41 +1,37 @@
 use std::any::Any;
 use std::array;
-use std::cell::UnsafeCell;
 use std::cmp::Ordering;
 use std::fmt::Display;
 use std::marker::PhantomData;
 use std::rc::Rc;
 
 use interface_components::{button, collapsable};
-use rust_state::{ArrayLookupExt, Context, ManuallyAssertExt, OptionExt, Path};
+use rust_state::{ArrayLookupExt, Context, ManuallyAssertExt, OptionExt, Path, Selector};
 
 use super::Element;
-use crate::application::Appli;
+use crate::application::Application;
 use crate::element::id::ElementIdGenerator;
 use crate::element::store::ElementStore;
-use crate::element::{DefaultLayouted, ElementSet, ResolverSet};
+use crate::element::{ElementSet, ResolverSet};
 use crate::event::EventQueue;
-use crate::layout::area::Area;
 use crate::layout::{Layout, Resolver};
-use crate::theme::theme;
 
-// TODO: Rename this to StateElement
-pub trait PrototypeElement<App: Appli> {
-    type Return<P>: Element<App, Layouted = Self::Layouted>
+pub trait StateElement<App: Application> {
+    type Return<P>: Element<App, LayoutInfo = Self::LayoutInfo>
     where
         P: Path<App, Self>;
 
-    type Layouted;
+    type LayoutInfo;
 
     fn to_element<P>(self_path: P, name: String) -> Self::Return<P>
     where
         P: Path<App, Self>;
 
-    type ReturnMut<P>: Element<App, Layouted = Self::LayoutedMut>
+    type ReturnMut<P>: Element<App, LayoutInfo = Self::LayoutInfoMut>
     where
         P: Path<App, Self>;
 
-    type LayoutedMut;
+    type LayoutInfoMut;
 
     fn to_element_mut<P>(self_path: P, name: String) -> Self::ReturnMut<P>
     where
@@ -48,6 +44,7 @@ pub trait ElementDisplay: PartialEq + Clone + 'static {
 
 // workaround for not having negative trait bounds or better specialization
 auto trait NoElementDisplay {}
+impl !NoElementDisplay for bool {}
 impl !NoElementDisplay for f32 {}
 #[cfg(feature = "cgmath")]
 impl<T> !NoElementDisplay for cgmath::Point3<T> {}
@@ -153,19 +150,19 @@ impl<T> !NoPrototype for Rc<T> {}
 impl NoPrototype for &str {}
 impl NoPrototype for String {}
 
-impl<App, T> PrototypeElement<App> for T
+impl<App, T> StateElement<App> for T
 where
-    App: Appli,
+    App: Application,
     T: ElementDisplay + NoPrototype,
 {
-    type Layouted = impl Any;
-    type LayoutedMut = impl Any;
+    type LayoutInfo = impl Any;
+    type LayoutInfoMut = impl Any;
     type Return<P>
-        = impl Element<App, Layouted = Self::Layouted>
+        = impl Element<App, LayoutInfo = Self::LayoutInfo>
     where
         P: Path<App, Self>;
     type ReturnMut<P>
-        = impl Element<App, Layouted = Self::LayoutedMut>
+        = impl Element<App, LayoutInfo = Self::LayoutInfoMut>
     where
         P: Path<App, Self>;
 
@@ -195,19 +192,82 @@ where
     }
 }
 
-impl<App, T> PrototypeElement<App> for std::sync::Arc<T>
+impl<App> StateElement<App> for bool
 where
-    App: Appli,
-    T: PrototypeElement<App>,
+    App: Application,
 {
-    type Layouted = impl Any;
-    type LayoutedMut = impl Any;
+    type LayoutInfo = impl Any;
+    type LayoutInfoMut = impl Any;
     type Return<P>
-        = impl Element<App, Layouted = Self::Layouted>
+        = impl Element<App, LayoutInfo = Self::LayoutInfo>
     where
         P: Path<App, Self>;
     type ReturnMut<P>
-        = impl Element<App, Layouted = Self::LayoutedMut>
+        = impl Element<App, LayoutInfo = Self::LayoutInfoMut>
+    where
+        P: Path<App, Self>;
+
+    fn to_element<P>(self_path: P, name: String) -> Self::Return<P>
+    where
+        P: Path<App, Self>,
+    {
+        use korangar_interface::prelude::*;
+
+        struct BoolSelector<P>(P);
+
+        impl<App, P> Selector<App, &'static str> for BoolSelector<P>
+        where
+            P: Path<App, bool>,
+        {
+            fn select<'a>(&'a self, state: &'a App) -> Option<&'a &'static str> {
+                // SAFETY:
+                // It is safe to unwrap here because of the bound.
+                match *self.0.follow(state).unwrap() {
+                    true => Some(&"True"),
+                    false => Some(&"False"),
+                }
+            }
+        }
+
+        split! {
+            children: (
+                text! {
+                    text: name,
+                },
+                text! {
+                    text: BoolSelector(self_path),
+                },
+            ),
+        }
+    }
+
+    fn to_element_mut<P>(self_path: P, name: String) -> Self::ReturnMut<P>
+    where
+        P: Path<App, Self>,
+    {
+        use korangar_interface::prelude::*;
+
+        state_button! {
+            text: name,
+            state: self_path,
+            event: Toggle(self_path),
+        }
+    }
+}
+
+impl<App, T> StateElement<App> for std::sync::Arc<T>
+where
+    App: Application,
+    T: StateElement<App>,
+{
+    type LayoutInfo = impl Any;
+    type LayoutInfoMut = impl Any;
+    type Return<P>
+        = impl Element<App, LayoutInfo = Self::LayoutInfo>
+    where
+        P: Path<App, Self>;
+    type ReturnMut<P>
+        = impl Element<App, LayoutInfo = Self::LayoutInfoMut>
     where
         P: Path<App, Self>;
 
@@ -240,19 +300,19 @@ where
     }
 }
 
-impl<App, T> PrototypeElement<App> for Option<T>
+impl<App, T> StateElement<App> for Option<T>
 where
-    App: Appli,
-    T: PrototypeElement<App> + 'static,
+    App: Application,
+    T: StateElement<App> + 'static,
 {
-    type Layouted = impl Any;
-    type LayoutedMut = impl Any;
+    type LayoutInfo = impl Any;
+    type LayoutInfoMut = impl Any;
     type Return<P>
-        = impl Element<App, Layouted = Self::Layouted>
+        = impl Element<App, LayoutInfo = Self::LayoutInfo>
     where
         P: Path<App, Self>;
     type ReturnMut<P>
-        = impl Element<App, Layouted = Self::LayoutedMut>
+        = impl Element<App, LayoutInfo = Self::LayoutInfoMut>
     where
         P: Path<App, Self>;
 
@@ -262,17 +322,17 @@ where
     {
         use korangar_interface::prelude::*;
 
-        enum InnerLayouted<N, S> {
+        enum InnerLayoutInfo<N, S> {
             None(N),
             Some(S),
         }
 
         struct Inner<App, O, P, E, T>
         where
-            App: Appli,
+            App: Application,
             O: Path<App, Option<T>>,
             P: Path<App, T>,
-            T: PrototypeElement<App> + 'static,
+            T: StateElement<App> + 'static,
         {
             name: Option<String>,
             option_path: O,
@@ -284,42 +344,42 @@ where
 
         impl<App, O, P, E, T> Element<App> for Inner<App, O, P, E, T>
         where
-            App: Appli,
+            App: Application,
             O: Path<App, Option<T>>,
             P: Path<App, T>,
             E: Element<App>,
-            T: PrototypeElement<App> + 'static,
+            T: StateElement<App> + 'static,
         {
-            type Layouted = InnerLayouted<E::Layouted, T::Layouted>;
+            type LayoutInfo = InnerLayoutInfo<E::LayoutInfo, T::LayoutInfo>;
 
-            fn make_layout(
+            fn create_layout_info(
                 &mut self,
                 state: &Context<App>,
                 store: &mut ElementStore,
                 generator: &mut ElementIdGenerator,
                 resolver: &mut Resolver,
-            ) -> Self::Layouted {
+            ) -> Self::LayoutInfo {
                 if state.get(&self.option_path).is_some() {
                     let element = self
                         .element
                         .get_or_insert_with(|| T::to_element(self.inner_path, self.name.take().unwrap()));
 
-                    InnerLayouted::Some(element.make_layout(state, store, generator, resolver))
+                    InnerLayoutInfo::Some(element.create_layout_info(state, store, generator, resolver))
                 } else {
-                    InnerLayouted::None(self.none_element.make_layout(state, store, generator, resolver))
+                    InnerLayoutInfo::None(self.none_element.create_layout_info(state, store, generator, resolver))
                 }
             }
 
-            fn create_layout<'a>(
+            fn layout_element<'a>(
                 &'a self,
                 state: &'a Context<App>,
                 store: &'a ElementStore,
-                layouted: &'a Self::Layouted,
+                layout_info: &'a Self::LayoutInfo,
                 layout: &mut Layout<'a, App>,
             ) {
-                match layouted {
-                    InnerLayouted::None(layouted) => self.none_element.create_layout(state, store, layouted, layout),
-                    InnerLayouted::Some(layouted) => self.element.as_ref().unwrap().create_layout(state, store, layouted, layout),
+                match layout_info {
+                    InnerLayoutInfo::None(layout_info) => self.none_element.layout_element(state, store, layout_info, layout),
+                    InnerLayoutInfo::Some(layout_info) => self.element.as_ref().unwrap().layout_element(state, store, layout_info, layout),
                 }
             }
         }
@@ -350,7 +410,7 @@ where
         use korangar_interface::prelude::*;
 
         // TODO: Deduplicate
-        enum InnerLayouted<N, S> {
+        enum InnerLayoutInfo<N, S> {
             None(N),
             Some(S),
         }
@@ -358,10 +418,10 @@ where
         // TODO: Deduplicate
         struct Inner<App, O, P, E, T>
         where
-            App: Appli,
+            App: Application,
             O: Path<App, Option<T>>,
             P: Path<App, T>,
-            T: PrototypeElement<App> + 'static,
+            T: StateElement<App> + 'static,
         {
             name: Option<String>,
             option_path: O,
@@ -374,42 +434,42 @@ where
         // TODO: Deduplicate
         impl<App, O, P, E, T> Element<App> for Inner<App, O, P, E, T>
         where
-            App: Appli,
+            App: Application,
             O: Path<App, Option<T>>,
             P: Path<App, T>,
             E: Element<App>,
-            T: PrototypeElement<App> + 'static,
+            T: StateElement<App> + 'static,
         {
-            type Layouted = InnerLayouted<E::Layouted, T::LayoutedMut>;
+            type LayoutInfo = InnerLayoutInfo<E::LayoutInfo, T::LayoutInfoMut>;
 
-            fn make_layout(
+            fn create_layout_info(
                 &mut self,
                 state: &Context<App>,
                 store: &mut ElementStore,
                 generator: &mut ElementIdGenerator,
                 resolver: &mut Resolver,
-            ) -> Self::Layouted {
+            ) -> Self::LayoutInfo {
                 if state.get(&self.option_path).is_some() {
                     let element = self
                         .element
                         .get_or_insert_with(|| T::to_element_mut(self.inner_path, self.name.take().unwrap()));
 
-                    InnerLayouted::Some(element.make_layout(state, store, generator, resolver))
+                    InnerLayoutInfo::Some(element.create_layout_info(state, store, generator, resolver))
                 } else {
-                    InnerLayouted::None(self.none_element.make_layout(state, store, generator, resolver))
+                    InnerLayoutInfo::None(self.none_element.create_layout_info(state, store, generator, resolver))
                 }
             }
 
-            fn create_layout<'a>(
+            fn layout_element<'a>(
                 &'a self,
                 state: &'a Context<App>,
                 store: &'a ElementStore,
-                layouted: &'a Self::Layouted,
+                layout_info: &'a Self::LayoutInfo,
                 layout: &mut Layout<'a, App>,
             ) {
-                match layouted {
-                    InnerLayouted::None(layouted) => self.none_element.create_layout(state, store, layouted, layout),
-                    InnerLayouted::Some(layouted) => self.element.as_ref().unwrap().create_layout(state, store, layouted, layout),
+                match layout_info {
+                    InnerLayoutInfo::None(layout_info) => self.none_element.layout_element(state, store, layout_info, layout),
+                    InnerLayoutInfo::Some(layout_info) => self.element.as_ref().unwrap().layout_element(state, store, layout_info, layout),
                 }
             }
         }
@@ -434,19 +494,19 @@ where
     }
 }
 
-impl<App, T, const SIZE: usize> PrototypeElement<App> for [T; SIZE]
+impl<App, T, const SIZE: usize> StateElement<App> for [T; SIZE]
 where
-    App: Appli,
-    T: PrototypeElement<App> + 'static,
+    App: Application,
+    T: StateElement<App> + 'static,
 {
-    type Layouted = impl Any;
-    type LayoutedMut = impl Any;
+    type LayoutInfo = impl Any;
+    type LayoutInfoMut = impl Any;
     type Return<P>
-        = impl Element<App, Layouted = Self::Layouted>
+        = impl Element<App, LayoutInfo = Self::LayoutInfo>
     where
         P: Path<App, Self>;
     type ReturnMut<P>
-        = impl Element<App, Layouted = Self::LayoutedMut>
+        = impl Element<App, LayoutInfo = Self::LayoutInfoMut>
     where
         P: Path<App, Self>;
 
@@ -483,19 +543,19 @@ where
 // Furthermore this might also result in crashes if different instances of `T`
 // require different store data (for example when using trait objects). So use
 // with care!
-impl<App, T> PrototypeElement<App> for Vec<T>
+impl<App, T> StateElement<App> for Vec<T>
 where
-    App: Appli,
-    T: PrototypeElement<App> + 'static,
+    App: Application,
+    T: StateElement<App> + 'static,
 {
-    type Layouted = impl Any;
-    type LayoutedMut = impl Any;
+    type LayoutInfo = impl Any;
+    type LayoutInfoMut = impl Any;
     type Return<P>
-        = impl Element<App, Layouted = Self::Layouted>
+        = impl Element<App, LayoutInfo = Self::LayoutInfo>
     where
         P: Path<App, Self>;
     type ReturnMut<P>
-        = impl Element<App, Layouted = Self::LayoutedMut>
+        = impl Element<App, LayoutInfo = Self::LayoutInfoMut>
     where
         P: Path<App, Self>;
 
@@ -507,34 +567,37 @@ where
 
         struct VecWrapper<App, T, P>
         where
-            App: Appli,
-            T: PrototypeElement<App>,
+            App: Application,
+            T: StateElement<App>,
         {
             self_path: P,
-            item_boxes: Vec<Box<dyn Element<App, Layouted = <T as PrototypeElement<App>>::Layouted>>>,
+            item_boxes: Vec<Box<dyn Element<App, LayoutInfo = <T as StateElement<App>>::LayoutInfo>>>,
             _marker: PhantomData<T>,
         }
 
         impl<App, T, P> ElementSet<App> for VecWrapper<App, T, P>
         where
-            App: Appli,
-            T: PrototypeElement<App> + 'static,
+            App: Application,
+            T: StateElement<App> + 'static,
             P: Path<App, Vec<T>>,
         {
             // TODO: Refactor to not have to re-allocate this every frame.
-            type Layouted = Vec<T::Layouted>;
+            type LayoutInfo = Vec<T::LayoutInfo>;
 
             fn get_element_count(&self) -> usize {
-                unimplemented!("We need to take the state, store, genertor, and resolver here too to give the number of elements")
+                // FIX: This is not guaranteed to be correct with the current design of the
+                // trait. Once we mark `get_element_count` as unsafe this
+                // comment can be removed.
+                self.item_boxes.len()
             }
 
-            fn make_layout(
+            fn create_layout_info(
                 &mut self,
                 state: &Context<App>,
                 store: &mut ElementStore,
                 generator: &mut ElementIdGenerator,
                 mut resolver_set: impl ResolverSet,
-            ) -> Self::Layouted {
+            ) -> Self::LayoutInfo {
                 let vector = state.get(&self.self_path);
 
                 match self.item_boxes.len().cmp(&vector.len()) {
@@ -547,8 +610,8 @@ where
                         for index in self.item_boxes.len()..vector.len() {
                             self.item_boxes.push({
                                 let item_path = self.self_path.index(index).manually_asserted();
-                                let item_element = PrototypeElement::to_element(item_path, index.to_string());
-                                let item_box: Box<dyn Element<App, Layouted = <T as PrototypeElement<App>>::Layouted>> =
+                                let item_element = StateElement::to_element(item_path, index.to_string());
+                                let item_box: Box<dyn Element<App, LayoutInfo = <T as StateElement<App>>::LayoutInfo>> =
                                     Box::new(item_element);
                                 item_box
                             });
@@ -565,7 +628,7 @@ where
                                 .iter_mut()
                                 .enumerate()
                                 .map(|(index, item_box)| {
-                                    item_box.make_layout(
+                                    item_box.create_layout_info(
                                         state,
                                         store.get_or_create_child_store(index as u64, generator),
                                         generator,
@@ -578,15 +641,15 @@ where
                     .1
             }
 
-            fn create_layout<'a>(
+            fn layout_element<'a>(
                 &'a self,
                 state: &'a Context<App>,
                 store: &'a ElementStore,
-                layouted: &'a Self::Layouted,
+                layout_info: &'a Self::LayoutInfo,
                 layout: &mut Layout<'a, App>,
             ) {
                 for (index, item_box) in self.item_boxes.iter().enumerate() {
-                    item_box.create_layout(state, store.child_store(index as u64), &layouted[index], layout);
+                    item_box.layout_element(state, store.child_store(index as u64), &layout_info[index], layout);
                 }
             }
         }
@@ -610,35 +673,38 @@ where
         // TODO: Deduplicate
         struct VecWrapper<App, T, P>
         where
-            App: Appli,
-            T: PrototypeElement<App>,
+            App: Application,
+            T: StateElement<App>,
         {
             self_path: P,
-            item_boxes: Vec<Box<dyn Element<App, Layouted = <T as PrototypeElement<App>>::LayoutedMut>>>,
+            item_boxes: Vec<Box<dyn Element<App, LayoutInfo = <T as StateElement<App>>::LayoutInfoMut>>>,
             _marker: PhantomData<T>,
         }
 
         // TODO: Deduplicate
         impl<App, T, P> ElementSet<App> for VecWrapper<App, T, P>
         where
-            App: Appli,
-            T: PrototypeElement<App> + 'static,
+            App: Application,
+            T: StateElement<App> + 'static,
             P: Path<App, Vec<T>>,
         {
             // TODO: Refactor to not have to re-allocate this every frame.
-            type Layouted = Vec<T::LayoutedMut>;
+            type LayoutInfo = Vec<T::LayoutInfoMut>;
 
             fn get_element_count(&self) -> usize {
-                unimplemented!("We need to take the state, store, genertor, and resolver here too to give the number of elements")
+                // FIX: This is not guaranteed to be correct with the current design of the
+                // trait. Once we mark `get_element_count` as unsafe this
+                // comment can be removed.
+                self.item_boxes.len()
             }
 
-            fn make_layout(
+            fn create_layout_info(
                 &mut self,
                 state: &Context<App>,
                 store: &mut ElementStore,
                 generator: &mut ElementIdGenerator,
                 mut resolver_set: impl ResolverSet,
-            ) -> Self::Layouted {
+            ) -> Self::LayoutInfo {
                 let vector = state.get(&self.self_path);
 
                 match self.item_boxes.len().cmp(&vector.len()) {
@@ -651,8 +717,8 @@ where
                         for index in self.item_boxes.len()..vector.len() {
                             self.item_boxes.push({
                                 let item_path = self.self_path.index(index).manually_asserted();
-                                let item_element = PrototypeElement::to_element_mut(item_path, index.to_string());
-                                let item_box: Box<dyn Element<App, Layouted = <T as PrototypeElement<App>>::LayoutedMut>> =
+                                let item_element = StateElement::to_element_mut(item_path, index.to_string());
+                                let item_box: Box<dyn Element<App, LayoutInfo = <T as StateElement<App>>::LayoutInfoMut>> =
                                     Box::new(item_element);
                                 item_box
                             });
@@ -669,7 +735,7 @@ where
                                 .iter_mut()
                                 .enumerate()
                                 .map(|(index, item_box)| {
-                                    item_box.make_layout(
+                                    item_box.create_layout_info(
                                         state,
                                         store.get_or_create_child_store(index as u64, generator),
                                         generator,
@@ -682,15 +748,15 @@ where
                     .1
             }
 
-            fn create_layout<'a>(
+            fn layout_element<'a>(
                 &'a self,
                 state: &'a Context<App>,
                 store: &'a ElementStore,
-                layouted: &'a Self::Layouted,
+                layout_info: &'a Self::LayoutInfo,
                 layout: &mut Layout<'a, App>,
             ) {
                 for (index, item_box) in self.item_boxes.iter().enumerate() {
-                    item_box.create_layout(state, store.child_store(index as u64), &layouted[index], layout);
+                    item_box.layout_element(state, store.child_store(index as u64), &layout_info[index], layout);
                 }
             }
         }
@@ -702,14 +768,22 @@ where
                 item_boxes: Vec::new(),
                 _marker: PhantomData,
             },
+            extra_elements: (
+                button! {
+                    text: "clear",
+                    event: move |state: &rust_state::Context<App>, _: &mut korangar_interface::event::EventQueue<App>| {
+                        state.update_value_with(self_path, |vector| vector.clear());
+                    },
+                },
+            ),
         }
     }
 }
 
-// impl<App, T> PrototypeElement<App> for Rc<T>
+// impl<App, T> StateElement<App> for Rc<T>
 // where
-//     App: Appli,
-//     T: PrototypeElement<App>,
+//     App: Application,
+//     T: StateElement<App>,
 // {
 //     fn to_element(&self, display: String) -> ElementCell<App> {
 //         (**self).to_element(display)

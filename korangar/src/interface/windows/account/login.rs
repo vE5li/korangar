@@ -4,7 +4,7 @@ use derive_new::new;
 use korangar_interface::components::drop_down::DefaultClickHandler;
 use korangar_interface::components::text_box::DefaultHandler;
 use korangar_interface::event::{ClickAction, Event, EventQueue, Toggle};
-use korangar_interface::window::{CustomWindow, PrototypeWindow, Window, WindowTrait};
+use korangar_interface::window::{CustomWindow, StateWindow, Window, WindowTrait};
 use rust_state::{Context, ManuallyAssertExt, MapLookupExt, Path};
 
 use crate::graphics::Color;

@@ -1,19 +1,19 @@
-mod prototype;
+mod state;
 
 use std::marker::PhantomData;
 
 use id::ElementIdGenerator;
-pub use interface_macros::PrototypeElement;
+pub use interface_macros::StateElement;
 use rust_state::Context;
 use store::ElementStore;
 
-pub use self::prototype::*;
-use crate::application::Appli;
+pub use self::state::*;
+use crate::application::Application;
 use crate::layout::area::Area;
 use crate::layout::{Layout, Resolver};
 
 pub mod id {
-    #[derive(Clone, Copy, PartialEq, Eq)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct ElementId(usize);
 
     #[derive(Clone)]
@@ -126,34 +126,31 @@ pub mod store {
     }
 }
 
-// TODO: Change name
-pub struct DefaultLayouted {
+pub struct DefaultLayoutInfo {
     pub area: Area,
 }
 
-pub struct DefaultLayoutedSet<T> {
+pub struct DefaultLayoutInfoSet<T> {
     pub area: Area,
     pub children: T,
 }
 
-pub trait Element<App: Appli> {
-    // TODO: Change name
-    type Layouted = DefaultLayouted;
+pub trait Element<App: Application> {
+    type LayoutInfo = DefaultLayoutInfo;
 
-    // TODO: Change name
-    fn make_layout(
+    fn create_layout_info(
         &mut self,
         state: &Context<App>,
         store: &mut ElementStore,
         generator: &mut ElementIdGenerator,
         resolver: &mut Resolver,
-    ) -> Self::Layouted;
+    ) -> Self::LayoutInfo;
 
-    fn create_layout<'a>(
+    fn layout_element<'a>(
         &'a self,
         state: &'a Context<App>,
         store: &'a ElementStore,
-        layouted: &'a Self::Layouted,
+        layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, App>,
     );
 }
@@ -168,65 +165,64 @@ impl ResolverSet for &mut Resolver {
     }
 }
 
-pub trait ElementSet<App: Appli> {
-    // TODO: Change name
-    type Layouted;
+pub trait ElementSet<App: Application> {
+    type LayoutInfo;
 
     fn get_element_count(&self) -> usize;
 
-    fn make_layout(
+    fn create_layout_info(
         &mut self,
         state: &Context<App>,
         store: &mut ElementStore,
         generator: &mut ElementIdGenerator,
         resolver_set: impl ResolverSet,
-    ) -> Self::Layouted;
+    ) -> Self::LayoutInfo;
 
-    fn create_layout<'a>(
+    fn layout_element<'a>(
         &'a self,
         state: &'a Context<App>,
         store: &'a ElementStore,
-        layouted: &'a Self::Layouted,
+        layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, App>,
     );
 }
 
 impl<App> ElementSet<App> for ()
 where
-    App: Appli,
+    App: Application,
 {
-    type Layouted = ();
+    type LayoutInfo = ();
 
     fn get_element_count(&self) -> usize {
         0
     }
 
-    fn make_layout(&mut self, _: &Context<App>, _: &mut ElementStore, _: &mut ElementIdGenerator, _: impl ResolverSet) {}
+    fn create_layout_info(&mut self, _: &Context<App>, _: &mut ElementStore, _: &mut ElementIdGenerator, _: impl ResolverSet) {}
 
-    fn create_layout<'a>(&'a self, _: &'a Context<App>, _: &'a ElementStore, _: &'a Self::Layouted, _: &mut Layout<'a, App>) {}
+    fn layout_element<'a>(&'a self, _: &'a Context<App>, _: &'a ElementStore, _: &'a Self::LayoutInfo, _: &mut Layout<'a, App>) {}
 }
 
 impl<App, T, const N: usize> ElementSet<App> for [T; N]
 where
-    App: Appli,
+    App: Application,
     T: Element<App>,
 {
-    type Layouted = [T::Layouted; N];
+    type LayoutInfo = [T::LayoutInfo; N];
 
     fn get_element_count(&self) -> usize {
         N
     }
 
-    fn make_layout(
+    fn create_layout_info(
         &mut self,
         state: &Context<App>,
         store: &mut ElementStore,
         generator: &mut ElementIdGenerator,
         mut resolver_set: impl ResolverSet,
-    ) -> Self::Layouted {
+    ) -> Self::LayoutInfo {
         std::array::from_fn(|index| {
             resolver_set.with_index(index, |resolver| {
-                self[index].make_layout(
+                self[index].create_layout_info(
                     state,
                     store.get_or_create_child_store(index as u64, generator),
                     generator,
@@ -236,15 +232,15 @@ where
         })
     }
 
-    fn create_layout<'a>(
+    fn layout_element<'a>(
         &'a self,
         state: &'a Context<App>,
         store: &'a ElementStore,
-        layouted: &'a Self::Layouted,
+        layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, App>,
     ) {
         for index in 0..N {
-            self[index].create_layout(state, store.child_store(index as u64), &layouted[index], layout);
+            self[index].layout_element(state, store.child_store(index as u64), &layout_info[index], layout);
         }
     }
 }
@@ -254,54 +250,54 @@ fn impl_element_set(up_to: usize) {
     for number_of_elements in 1..=up_to {
         let elements = (0..number_of_elements).map(|index| format!("T{index}"));
         let element_list: String = elements.clone().map(|element| format!("{element}, ")).collect();
-        let layouted: String = elements.clone().map(|element| format!("{element}::Layouted, ")).collect();
+        let layout_info: String = elements.clone().map(|element| format!("{element}::LayoutInfo, ")).collect();
         let bounds: String = elements.map(|element| format!("{element}: Element<App>, ")).collect();
 
-        let make_layouts: String = (0..number_of_elements)
+        let create_layout_infos: String = (0..number_of_elements)
             .map(|index| {
                 format!(
                     "
                     resolver_set.with_index({index}, |resolver| {{
-                        self.{index}.make_layout(state, store.get_or_create_child_store({index}, generator), generator, resolver)
+                        self.{index}.create_layout_info(state, store.get_or_create_child_store({index}, generator), generator, resolver)
                     }}), "
                 )
             })
             .collect();
 
-        let create_layouts: String = (0..number_of_elements)
-            .map(|index| format!("self.{index}.create_layout(state, store.child_store({index}), &layouted.{index}, layout);"))
+        let layout_elements: String = (0..number_of_elements)
+            .map(|index| format!("self.{index}.layout_element(state, store.child_store({index}), &layout_info.{index}, layout);"))
             .collect();
 
         crabtime::output! {
             impl<App, {{element_list}}> ElementSet<App> for ({{element_list}})
             where
-                App: Appli,
+                App: Application,
                 {{bounds}}
             {
-                type Layouted = ({{layouted}});
+                type LayoutInfo = ({{layout_info}});
 
                 fn get_element_count(&self) -> usize {
                     {{number_of_elements}}
                 }
 
-                fn make_layout(
+                fn create_layout_info(
                     &mut self,
                     state: &Context<App>,
                     store: &mut ElementStore,
                     generator: &mut ElementIdGenerator,
                     mut resolver_set: impl ResolverSet,
-                ) -> Self::Layouted {
-                    ({{make_layouts}})
+                ) -> Self::LayoutInfo {
+                    ({{create_layout_infos}})
                 }
 
-                fn create_layout<'a>(
+                fn layout_element<'a>(
                     &'a self,
                     state: &'a Context<App>,
                     store: &'a ElementStore,
-                    layouted: &'a Self::Layouted,
+                    layout_info: &'a Self::LayoutInfo,
                     layout: &mut Layout<'a, App>,
                 ) {
-                    {{create_layouts}}
+                    {{layout_elements}}
                 }
             }
         }
@@ -313,23 +309,23 @@ impl_element_set!(64);
 
 pub struct ErasedElement<App, E>
 where
-    App: Appli,
+    App: Application,
     E: Element<App>,
 {
     element: E,
-    layouted: Option<E::Layouted>,
+    layout_info: Option<E::LayoutInfo>,
     _marker: PhantomData<App>,
 }
 
 impl<App, E> ErasedElement<App, E>
 where
-    App: Appli,
+    App: Application,
     E: Element<App>,
 {
     pub fn new(element: E) -> Self {
         Self {
             element,
-            layouted: None,
+            layout_info: None,
             _marker: PhantomData,
         }
     }
@@ -337,33 +333,33 @@ where
 
 impl<App, E> Element<App> for ErasedElement<App, E>
 where
-    App: Appli,
+    App: Application,
     E: Element<App>,
-    E::Layouted: 'static,
+    E::LayoutInfo: 'static,
 {
-    type Layouted = ();
+    type LayoutInfo = ();
 
-    fn make_layout(
+    fn create_layout_info(
         &mut self,
         state: &Context<App>,
         store: &mut ElementStore,
         generator: &mut ElementIdGenerator,
         resolver: &mut Resolver,
-    ) -> () {
-        let layouted = self.element.make_layout(state, store, generator, resolver);
-        self.layouted = Some(layouted);
+    ) {
+        let layout_info = self.element.create_layout_info(state, store, generator, resolver);
+        self.layout_info = Some(layout_info);
     }
 
-    fn create_layout<'a>(
+    fn layout_element<'a>(
         &'a self,
         state: &'a Context<App>,
         store: &'a ElementStore,
-        layouted: &'a Self::Layouted,
+        _: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, App>,
     ) {
-        let layouted = self.layouted.as_ref().expect("no layout created");
-        self.element.create_layout(state, store, layouted, layout);
+        let layout_info = self.layout_info.as_ref().expect("no layout created");
+        self.element.layout_element(state, store, layout_info, layout);
     }
 }
 
-pub type ElementBox<App: Appli> = Box<dyn Element<App, Layouted = ()>>;
+pub type ElementBox<App: Application> = Box<dyn Element<App, LayoutInfo = ()>>;

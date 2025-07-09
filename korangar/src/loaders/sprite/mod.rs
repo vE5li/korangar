@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use image::RgbaImage;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, Timer, print_debug};
-use korangar_interface::element::PrototypeElement;
+use korangar_interface::element::StateElement;
 use korangar_util::FileLoader;
 use korangar_util::color::premultiply_alpha;
 use korangar_util::container::{Cacheable, SimpleCache};
@@ -21,7 +21,7 @@ use crate::loaders::error::LoadError;
 const MAX_CACHE_COUNT: u32 = 512;
 const MAX_CACHE_SIZE: usize = 512 * 1024 * 1024;
 
-#[derive(Clone, Debug, RustState, PrototypeElement)]
+#[derive(Clone, Debug, RustState, StateElement)]
 pub struct Sprite {
     pub palette_size: usize,
     #[hidden_element]

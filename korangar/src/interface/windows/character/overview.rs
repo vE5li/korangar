@@ -3,7 +3,7 @@ use std::fmt::Display;
 
 use derive_new::new;
 use korangar_interface::selector_helpers::PartialEqDisplaySelector;
-use korangar_interface::window::{CustomWindow, PrototypeWindow, Window, WindowTrait};
+use korangar_interface::window::{CustomWindow, StateWindow, Window, WindowTrait};
 use rust_state::{Context, Path, Selector};
 
 use crate::graphics::Color;
@@ -91,8 +91,8 @@ where
                 event: UserEvent::OpenSkillTreeWindow,
             },
             button! {
-                text: "Friends",
-                event: UserEvent::OpenFriendsWindow,
+                text: "Friend list",
+                event: UserEvent::OpenFriendListWindow,
             },
             button! {
                 text: "Menu",

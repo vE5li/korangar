@@ -4,9 +4,9 @@ use std::sync::Arc;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, print_debug};
 use korangar_interface::application::ScalingTrait;
-use korangar_interface::element::PrototypeElement;
+use korangar_interface::element::StateElement;
 use korangar_interface::event::ClickAction;
-use korangar_interface::window::PrototypeWindow;
+use korangar_interface::window::StateWindow;
 use ron::ser::PrettyConfig;
 use rust_state::Path;
 use serde::{Deserialize, Serialize};

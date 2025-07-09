@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use derive_new::new;
-use korangar_interface::element::PrototypeElement;
-use korangar_interface::window::PrototypeWindow;
+use korangar_interface::element::StateElement;
+use korangar_interface::window::StateWindow;
 use korangar_util::collision::AABB;
 use ragnarok_formats::transform::Transform;
 use ragnarok_packets::ClientTick;
@@ -20,7 +20,7 @@ use crate::graphics::ModelInstruction;
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
 
-#[derive(RustState, PrototypeElement, PrototypeWindow, new)]
+#[derive(RustState, StateElement, StateWindow, new)]
 pub struct Object {
     pub name: Option<String>,
     pub model_name: String,

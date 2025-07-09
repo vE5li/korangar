@@ -6,10 +6,7 @@ use crate::math::multiply_matrix4_and_point3;
 
 /// An axis aligned bounding box.
 #[derive(Debug, Clone, Copy)]
-#[cfg_attr(
-    feature = "interface",
-    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
-)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct AABB {
     pub(super) min: Point3<f32>,
     pub(super) max: Point3<f32>,

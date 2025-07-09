@@ -4,7 +4,7 @@ use std::ops::Mul;
 
 use cgmath::{EuclideanSpace, Matrix4, SquareMatrix, Vector3, Vector4, Zero};
 use derive_new::new;
-use korangar_interface::element::PrototypeElement;
+use korangar_interface::element::StateElement;
 use korangar_util::collision::AABB;
 #[cfg(feature = "debug")]
 use ragnarok_formats::model::ModelData;
@@ -21,7 +21,7 @@ use crate::graphics::DebugAabbInstruction;
 use crate::graphics::ModelInstruction;
 use crate::world::Camera;
 
-#[derive(RustState, PrototypeElement, new)]
+#[derive(RustState, StateElement, new)]
 pub struct Model {
     pub version: InternalVersion,
     pub root_nodes: Vec<Node>,

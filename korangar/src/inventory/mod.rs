@@ -4,6 +4,7 @@ mod skills;
 use std::cell::Ref;
 use std::sync::Arc;
 
+use korangar_interface::element::StateElement;
 use korangar_networking::{InventoryItem, InventoryItemDetails, NoMetadata};
 use ragnarok_packets::{EquipPosition, InventoryIndex, ItemId};
 use rust_state::RustState;
@@ -14,7 +15,7 @@ use crate::graphics::Texture;
 use crate::loaders::AsyncLoader;
 use crate::world::{Library, ResourceMetadata};
 
-#[derive(RustState, Default)]
+#[derive(Default, RustState)]
 pub struct Inventory {
     items: Vec<InventoryItem<ResourceMetadata>>,
 }

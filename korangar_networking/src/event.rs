@@ -138,7 +138,7 @@ pub enum NetworkEvent {
     AddSkillUnit(EntityId, UnitId, TilePosition),
     RemoveSkillUnit(EntityId),
     SetFriendList {
-        friends: Vec<Friend>,
+        friend_list: Vec<Friend>,
     },
     FriendAdded {
         friend: Friend,

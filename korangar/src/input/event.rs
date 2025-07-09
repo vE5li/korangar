@@ -38,7 +38,7 @@ pub enum UserEvent {
     OpenSkillTreeWindow,
     OpenGraphicsSettingsWindow,
     OpenAudioSettingsWindow,
-    OpenFriendsWindow,
+    OpenFriendListWindow,
     ToggleShowInterface,
     // SetThemeFile {
     //     theme_file: String,
@@ -108,6 +108,8 @@ pub enum UserEvent {
     OpenRenderSettingsWindow,
     #[cfg(feature = "debug")]
     OpenMapDataWindow,
+    #[cfg(feature = "debug")]
+    OpenClientStateViewerWindow,
     #[cfg(feature = "debug")]
     OpenMapsWindow,
     #[cfg(feature = "debug")]

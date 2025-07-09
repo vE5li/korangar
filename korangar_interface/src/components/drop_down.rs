@@ -4,14 +4,14 @@ use std::marker::PhantomData;
 use interface_components::scroll_view;
 use rust_state::{Context, ManuallyAssertExt, Path, RustState, Selector, VecIndexExt};
 
-use crate::application::{Appli, PositionTrait, SizeTrait};
+use crate::application::{Application, PositionTrait, SizeTrait};
 use crate::element::id::ElementIdGenerator;
 use crate::element::store::ElementStore;
-use crate::element::{DefaultLayouted, Element, ErasedElement};
+use crate::element::{DefaultLayoutInfo, Element, ErasedElement};
 use crate::event::{ClickAction, Event, EventQueue};
 use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
 use crate::layout::area::Area;
-use crate::layout::{Layout, Resolver};
+use crate::layout::{Layout, MouseButton, Resolver};
 use crate::theme::{ThemePathGetter, theme};
 
 pub trait DropDownItem<T> {
@@ -36,7 +36,7 @@ struct InnerButton<Value, Item, A, B, C, D, E, F, G, H, I, J> {
 
 impl<App, Value, Item, A, B, C, D, E, F, G, H, I, J> Element<App> for InnerButton<Value, Item, A, B, C, D, E, F, G, H, I, J>
 where
-    App: Appli,
+    App: Application,
     Item: DropDownItem<Value>,
     A: Selector<App, Item>,
     B: ClickAction<App> + 'static,
@@ -49,40 +49,38 @@ where
     I: Selector<App, App::FontSize>,
     J: Selector<App, HorizontalAlignment>,
 {
-    fn make_layout(
+    fn create_layout_info(
         &mut self,
         state: &Context<App>,
         _: &mut ElementStore,
         _: &mut ElementIdGenerator,
         resolver: &mut Resolver,
-    ) -> Self::Layouted {
+    ) -> Self::LayoutInfo {
         let height = state.get(&self.height);
         let area = resolver.with_height(*height);
-        Self::Layouted { area }
+        Self::LayoutInfo { area }
     }
 
-    fn create_layout<'a>(
+    fn layout_element<'a>(
         &'a self,
         state: &'a Context<App>,
         store: &'a ElementStore,
-        layouted: &'a Self::Layouted,
+        layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, App>,
     ) {
-        let is_hoverered = layout.is_area_hovered_and_active(layouted.area);
+        let is_hoverered = layout.is_area_hovered_and_active(layout_info.area);
 
         if is_hoverered {
-            layout.add_click_area(layouted.area, &self.event);
+            layout.add_click_area(layout_info.area, MouseButton::Left, &self.event);
             layout.mark_hovered();
         }
-
-        layout.add_focus_area(layouted.area, store.get_element_id());
 
         let background_color = match is_hoverered {
             true => *state.get(&self.hovered_background_color),
             false => *state.get(&self.background_color),
         };
 
-        layout.add_rectangle(layouted.area, *state.get(&self.corner_radius), background_color);
+        layout.add_rectangle(layout_info.area, *state.get(&self.corner_radius), background_color);
 
         let foreground_color = match is_hoverered {
             true => *state.get(&self.hovered_foreground_color),
@@ -92,7 +90,7 @@ where
         let option = state.get(&self.option);
 
         layout.add_text(
-            layouted.area,
+            layout_info.area,
             option.text(),
             *state.get(&self.font_size),
             foreground_color,
@@ -104,32 +102,32 @@ where
 
 struct InnerElement<App, Value, Item, A, B>
 where
-    App: Appli,
+    App: Application,
 {
     value_path: A,
     options_path: B,
-    item_boxes: Vec<Box<dyn Element<App, Layouted = DefaultLayouted>>>,
+    item_boxes: Vec<Box<dyn Element<App, LayoutInfo = DefaultLayoutInfo>>>,
     _marker: PhantomData<(App, Value, Item)>,
 }
 
 impl<App, Value, Item, A, B> Element<App> for InnerElement<App, Value, Item, A, B>
 where
-    App: Appli,
+    App: Application,
     Value: 'static,
     Item: DropDownItem<Value> + 'static,
     A: Path<App, Value>,
     B: Path<App, Vec<Item>>,
 {
     // TODO: Refactor to not have to re-allocate this every frame.
-    type Layouted = (Area, Vec<DefaultLayouted>);
+    type LayoutInfo = (Area, Vec<DefaultLayoutInfo>);
 
-    fn make_layout(
+    fn create_layout_info(
         &mut self,
         state: &Context<App>,
         store: &mut ElementStore,
         generator: &mut ElementIdGenerator,
         resolver: &mut Resolver,
-    ) -> Self::Layouted {
+    ) -> Self::LayoutInfo {
         let vector = state.get(&self.options_path);
 
         match self.item_boxes.len().cmp(&vector.len()) {
@@ -144,7 +142,7 @@ where
                         let value_path = self.value_path;
                         let option_path = self.options_path.index(index).manually_asserted();
 
-                        let item_box: Box<dyn Element<App, Layouted = DefaultLayouted>> = Box::new(InnerButton {
+                        let item_box: Box<dyn Element<App, LayoutInfo = DefaultLayoutInfo>> = Box::new(InnerButton {
                             text_marker: PhantomData,
                             option: option_path,
                             event: move |state: &Context<App>, queue: &mut EventQueue<App>| {
@@ -173,12 +171,12 @@ where
         let gaps = *state.get(&theme().drop_down().list_gaps());
         let border = *state.get(&theme().drop_down().list_border());
 
-        let (area, layouted) = resolver.with_derived(gaps, border, |resolver| {
+        let (area, layout_info) = resolver.with_derived(gaps, border, |resolver| {
             self.item_boxes
                 .iter_mut()
                 .enumerate()
                 .map(|(index, item_box)| {
-                    item_box.make_layout(
+                    item_box.create_layout_info(
                         state,
                         store.get_or_create_child_store(index as u64, generator),
                         generator,
@@ -188,31 +186,31 @@ where
                 .collect()
         });
 
-        (area, layouted)
+        (area, layout_info)
     }
 
-    fn create_layout<'a>(
+    fn layout_element<'a>(
         &'a self,
         state: &'a Context<App>,
         store: &'a ElementStore,
-        layouted: &'a Self::Layouted,
+        layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, App>,
     ) {
         layout.add_rectangle(
-            layouted.0,
+            layout_info.0,
             *state.get(&theme().drop_down().list_corner_radius()),
             *state.get(&theme().drop_down().list_background_color()),
         );
 
         for (index, item_box) in self.item_boxes.iter().enumerate() {
-            item_box.create_layout(state, store.child_store(index as u64), &layouted.1[index], layout);
+            item_box.layout_element(state, store.child_store(index as u64), &layout_info.1[index], layout);
         }
     }
 }
 
 struct InnerClickAction<App, Value, Item, A, B>
 where
-    App: Appli,
+    App: Application,
 {
     value_path: A,
     options_path: B,
@@ -223,7 +221,7 @@ where
 
 impl<App, Value, Item, A, B> ClickAction<App> for InnerClickAction<App, Value, Item, A, B>
 where
-    App: Appli,
+    App: Application,
     Value: 'static,
     Item: DropDownItem<Value> + 'static,
     A: Path<App, Value>,
@@ -253,7 +251,7 @@ where
 // TODO: Pretty this up
 pub struct DefaultClickHandler<App, Value, Item, A, B>
 where
-    App: Appli,
+    App: Application,
 {
     overlay_element: InnerClickAction<App, Value, Item, A, B>,
     _marker: PhantomData<(App, Value, Item)>,
@@ -261,7 +259,7 @@ where
 
 impl<App, Value, Item, A, B> DefaultClickHandler<App, Value, Item, A, B>
 where
-    App: Appli,
+    App: Application,
     Value: 'static,
     Item: DropDownItem<Value> + 'static,
     A: Path<App, Value>,
@@ -289,7 +287,7 @@ where
 #[derive(RustState)]
 pub struct DropDownTheme<App>
 where
-    App: Appli + 'static,
+    App: Application + 'static,
 {
     pub item_foreground_color: App::Color,
     pub item_background_color: App::Color,
@@ -318,7 +316,7 @@ where
 
 pub struct DropDown<App, Value, Item, A, B, C, D, E, F, G, H, I, J>
 where
-    App: Appli,
+    App: Application,
 {
     pub options: A,
     pub selected: B,
@@ -335,7 +333,7 @@ where
 
 impl<App, Value, Item, A, B, C, D, E, F, G, H, I, J> Element<App> for DropDown<App, Value, Item, A, B, C, D, E, F, G, H, I, J>
 where
-    App: Appli,
+    App: Application,
     Value: PartialEq + 'static,
     Item: DropDownItem<Value> + 'static,
     // TODO: Is it nicer to take a selector here?
@@ -351,13 +349,13 @@ where
     I: Selector<App, App::FontSize>,
     J: Selector<App, HorizontalAlignment>,
 {
-    fn make_layout(
+    fn create_layout_info(
         &mut self,
         state: &Context<App>,
         _: &mut ElementStore,
         _: &mut ElementIdGenerator,
         resolver: &mut Resolver,
-    ) -> Self::Layouted {
+    ) -> Self::LayoutInfo {
         let height = state.get(&self.height);
         let area = resolver.with_height(*height);
 
@@ -369,31 +367,29 @@ where
             App::Size::new(area.width + border * 2.0, list_maximum_height + border * 2.0),
         );
 
-        Self::Layouted { area }
+        Self::LayoutInfo { area }
     }
 
-    fn create_layout<'a>(
+    fn layout_element<'a>(
         &'a self,
         state: &'a Context<App>,
-        store: &'a ElementStore,
-        layouted: &'a Self::Layouted,
+        _: &'a ElementStore,
+        layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, App>,
     ) {
-        let is_hoverered = layout.is_area_hovered_and_active(layouted.area);
+        let is_hoverered = layout.is_area_hovered_and_active(layout_info.area);
 
         if is_hoverered {
-            layout.add_click_area(layouted.area, &self.click_handler.overlay_element);
+            layout.add_click_area(layout_info.area, MouseButton::Left, &self.click_handler.overlay_element);
             layout.mark_hovered();
         }
-
-        layout.add_focus_area(layouted.area, store.get_element_id());
 
         let background_color = match is_hoverered {
             true => *state.get(&self.hovered_background_color),
             false => *state.get(&self.background_color),
         };
 
-        layout.add_rectangle(layouted.area, *state.get(&self.corner_radius), background_color);
+        layout.add_rectangle(layout_info.area, *state.get(&self.corner_radius), background_color);
 
         let foreground_color = match is_hoverered {
             true => *state.get(&self.hovered_foreground_color),
@@ -401,17 +397,16 @@ where
         };
 
         let selected = state.get(&self.selected);
-        // TODO: Maybe don't unwrap here.
-        let index = state
-            .get(&self.options)
-            .iter()
-            .position(|value| value.value() == *selected)
-            .unwrap();
-        // TODO: Maybe don't unwrap here either.
-        let selected_option = state.get(&self.options).get(index).unwrap();
+        let Some(index) = state.get(&self.options).iter().position(|value| value.value() == *selected) else {
+            return;
+        };
+
+        let Some(selected_option) = state.get(&self.options).get(index) else {
+            return;
+        };
 
         layout.add_text(
-            layouted.area,
+            layout_info.area,
             selected_option.text(),
             *state.get(&self.font_size),
             foreground_color,

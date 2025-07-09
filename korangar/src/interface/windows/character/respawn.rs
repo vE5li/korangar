@@ -1,5 +1,5 @@
 use korangar_interface::prelude::window;
-use korangar_interface::window::{CustomWindow, PrototypeWindow, Window, WindowTrait};
+use korangar_interface::window::{CustomWindow, StateWindow, Window, WindowTrait};
 use rust_state::Context;
 
 use crate::input::UserEvent;

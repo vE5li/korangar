@@ -23,7 +23,7 @@ extern crate self as korangar_interface;
 
 use std::any::Any;
 
-use application::{Appli, PositionTrait, SizeTrait, WindowCache};
+use application::{Application, PositionTrait, SizeTrait, WindowCache};
 use element::id::{ElementId, ElementIdGenerator};
 use element::store::ElementStore;
 use element::{Element, ElementBox};
@@ -31,11 +31,11 @@ use event::EventQueue;
 #[cfg(feature = "debug")]
 use korangar_debug::profile_block;
 use layout::area::Area;
-use layout::{Layout, Resolver};
+use layout::{Layout, MouseButton, Resolver};
 use option_ext::OptionExt;
 use rust_state::Context;
 use window::store::WindowStore;
-use window::{Anchor, CustomWindow, DisplayInformation, PrototypeWindow, WindowData, WindowTrait};
+use window::{Anchor, CustomWindow, DisplayInformation, StateWindow, WindowData, WindowTrait};
 
 pub mod prelude {
     // Re-export proc macros.
@@ -64,7 +64,7 @@ pub mod selector_helpers {
 
     use rust_state::{Path, Selector};
 
-    use crate::application::Appli;
+    use crate::application::Application;
     use crate::element::ElementDisplay;
 
     pub struct PartialEqDisplaySelector<P, T> {
@@ -85,7 +85,7 @@ pub mod selector_helpers {
 
     impl<App, P, T> Selector<App, String> for PartialEqDisplaySelector<P, T>
     where
-        App: Appli,
+        App: Application,
         P: Path<App, T>,
         T: Clone + PartialEq + Display + 'static,
     {
@@ -125,7 +125,7 @@ pub mod selector_helpers {
 
     impl<App, P, T> Selector<App, String> for ElementDisplaySelector<P, T>
     where
-        App: Appli,
+        App: Application,
         P: Path<App, T>,
         T: ElementDisplay,
     {
@@ -157,7 +157,7 @@ pub enum MouseMode {
 
 struct WindowWrapper<App>
 where
-    App: Appli,
+    App: Application,
 {
     window: Box<dyn WindowTrait<App>>,
     data: WindowData<App>,
@@ -166,7 +166,7 @@ where
 
 pub struct Interface<App>
 where
-    App: Appli,
+    App: Application,
 {
     windows: Vec<WindowWrapper<App>>,
     window_cache: App::Cache,
@@ -184,7 +184,7 @@ where
 
 impl<App> Interface<App>
 where
-    App: Appli,
+    App: Application,
 {
     pub fn new(available_space: App::Size) -> Self {
         let window_cache = App::Cache::create();
@@ -410,12 +410,23 @@ where
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn open_prototype_window<T>(&mut self, window_path: impl rust_state::Path<App, T>)
+    pub fn open_state_window<T>(&mut self, window_path: impl rust_state::Path<App, T>)
     where
-        T: PrototypeWindow<App>,
+        T: StateWindow<App>,
     {
         if !T::window_class().is_some_and(|window_class| self.is_window_with_class_open(window_class)) {
             let window = T::to_window(window_path);
+            self.open_new_window(window);
+        }
+    }
+
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
+    pub fn open_state_window_mut<T>(&mut self, window_path: impl rust_state::Path<App, T>)
+    where
+        T: StateWindow<App>,
+    {
+        if !T::window_class().is_some_and(|window_class| self.is_window_with_class_open(window_class)) {
+            let window = T::to_window_mut(window_path);
             self.open_new_window(window);
         }
     }
@@ -467,6 +478,11 @@ where
     // }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
+    pub fn close_all_windows(&mut self) {
+        self.windows.clear();
+    }
+
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn close_all_windows_except(&mut self, exceptions: &[App::WindowClass]) {
         for index in (0..self.windows.len()).rev() {
             if self.windows[index]
@@ -494,11 +510,11 @@ where
 
             let mut resolver = Resolver::new(available_area, 0.0);
 
-            element.make_layout(state, store, &mut self.generator, &mut resolver);
+            element.create_layout_info(state, store, &mut self.generator, &mut resolver);
         }
 
         self.windows.iter_mut().for_each(|wrapper| {
-            wrapper.display_information = wrapper.window.make_layout(
+            wrapper.display_information = wrapper.window.create_layout_info(
                 state,
                 &mut self.window_store,
                 &wrapper.data,
@@ -510,7 +526,7 @@ where
         let overlay_layout = self.overlay_element.as_ref().map(|(element, store, ..)| {
             let mut layout = Layout::new(mouse_position, self.focused_element, !is_ui_hovered);
 
-            element.create_layout(state, store, &(), &mut layout);
+            element.layout_element(state, store, &(), &mut layout);
 
             is_ui_hovered |= layout.is_hovered();
 
@@ -629,14 +645,14 @@ where
     // }
 }
 
-pub struct BuiltUi<'a, App: Appli> {
+pub struct BuiltUi<'a, App: Application> {
     layouts: Vec<Layout<'a, App>>,
     focused_element: &'a mut Option<ElementId>,
     mouse_mode: &'a mut MouseMode,
     event_queue: &'a mut EventQueue<App>,
 }
 
-impl<App: Appli> BuiltUi<'_, App> {
+impl<App: Application> BuiltUi<'_, App> {
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn render(&mut self, renderer: &App::Renderer) {
         self.layouts.iter_mut().rev().for_each(|layout| {
@@ -645,13 +661,20 @@ impl<App: Appli> BuiltUi<'_, App> {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn click(&mut self, state: &Context<App>, click_position: App::Position) {
+    pub fn click(&mut self, state: &Context<App>, click_position: App::Position, mouse_button: MouseButton) {
         // TODO: Rework all of this. We need more granular control over what was clicked
         // to unfocus correctly.
         let mut ui_clicked = false;
 
         for layout in &self.layouts {
-            if layout.do_click(state, self.event_queue, self.focused_element, self.mouse_mode, click_position) {
+            if layout.do_click(
+                state,
+                self.event_queue,
+                self.focused_element,
+                self.mouse_mode,
+                click_position,
+                mouse_button,
+            ) {
                 ui_clicked = true;
                 break;
             }

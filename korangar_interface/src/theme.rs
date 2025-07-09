@@ -1,6 +1,6 @@
 use rust_state::Path;
 
-use crate::application::Appli;
+use crate::application::Application;
 use crate::components::button::ButtonTheme;
 use crate::components::collapsable::CollapsableTheme;
 use crate::components::drop_down::DropDownTheme;
@@ -9,7 +9,7 @@ use crate::components::text::TextTheme;
 use crate::components::text_box::TextBoxTheme;
 use crate::window::WindowTheme;
 
-pub trait ThemePathGetter<App: Appli>: Copy {
+pub trait ThemePathGetter<App: Application>: Copy {
     fn new() -> Self;
 
     fn window(self) -> impl Path<App, WindowTheme<App>>;
@@ -27,13 +27,13 @@ pub trait ThemePathGetter<App: Appli>: Copy {
     fn drop_down(self) -> impl Path<App, DropDownTheme<App>>;
 }
 
-pub fn theme<App: Appli>() -> impl ThemePathGetter<App> {
+pub fn theme<App: Application>() -> impl ThemePathGetter<App> {
     App::ThemeGetter::new()
 }
 
 // TODO: Rename `theme` to `theme_internal` or something and expose theme like
 // this. We want to do that be cause impl ThemePathGetter will not allow the
 // end user to get custom themes but without it this crate is unable to
-// infer the types. pub fn theme<App: Appli>() -> App::ThemeGetter {
+// infer the types. pub fn theme<App: Application>() -> App::ThemeGetter {
 //     App::ThemeGetter::new()
 // }

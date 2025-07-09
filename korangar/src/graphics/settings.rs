@@ -5,12 +5,13 @@ use std::num::NonZeroU32;
 #[cfg(feature = "debug")]
 use derive_new::new;
 use korangar_interface::components::drop_down::DropDownItem;
+use korangar_interface::element::StateElement;
 use rust_state::RustState;
 use serde::{Deserialize, Serialize};
 
 use crate::interface::layout::ScreenSize;
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, StateElement)]
 pub enum LimitFramerate {
     Unlimited,
     Limit(u16),
@@ -34,7 +35,7 @@ impl DropDownItem<LimitFramerate> for LimitFramerate {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, StateElement)]
 pub enum TextureSamplerType {
     Nearest,
     Linear,
@@ -58,7 +59,7 @@ impl DropDownItem<TextureSamplerType> for TextureSamplerType {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, StateElement)]
 pub enum ShadowDetail {
     Normal,
     Ultra,
@@ -97,7 +98,7 @@ impl DropDownItem<ShadowDetail> for ShadowDetail {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, StateElement)]
 pub enum ShadowQuality {
     Hard,
     SoftPCF,
@@ -281,7 +282,7 @@ impl Display for ScreenSpaceAntiAliasing {
 }
 
 #[cfg(feature = "debug")]
-#[derive(Copy, Clone, Default, RustState, new)]
+#[derive(Copy, Clone, Default, RustState, StateElement, new)]
 pub struct RenderSettings {
     #[new(value = "true")]
     pub show_frames_per_second: bool,

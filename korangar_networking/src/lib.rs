@@ -1097,7 +1097,9 @@ where
             .register(|packet: NotifySkillUnitPacket| NetworkEvent::AddSkillUnit(packet.entity_id, packet.unit_id, packet.position))?;
         packet_handler.register(|packet: SkillUnitDisappearPacket| NetworkEvent::RemoveSkillUnit(packet.entity_id))?;
         packet_handler.register_noop::<NotifyGroundSkillPacket>()?;
-        packet_handler.register(|packet: FriendListPacket| NetworkEvent::SetFriendList { friends: packet.friends })?;
+        packet_handler.register(|packet: FriendListPacket| NetworkEvent::SetFriendList {
+            friend_list: packet.friend_list,
+        })?;
         packet_handler.register_noop::<FriendOnlineStatusPacket>()?;
         packet_handler.register(|packet: FriendRequestPacket| NetworkEvent::FriendRequest {
             requestee: packet.requestee,

@@ -85,7 +85,7 @@ impl Resolver {
             gaps,
         };
 
-        let layouted = f(&mut inner);
+        let layout_info = f(&mut inner);
 
         let returned = Area {
             x: self.available_area.x,
@@ -101,7 +101,7 @@ impl Resolver {
             *available_height -= returned.height;
         }
 
-        (returned, layouted)
+        (returned, layout_info)
     }
 
     pub fn with_derived_scrolled<L>(
@@ -123,7 +123,7 @@ impl Resolver {
             gaps: self.gaps,
         };
 
-        let layouted = f(&mut inner);
+        let layout_info = f(&mut inner);
 
         let children_height = inner.used_height;
         let height = match height_bound {
@@ -149,7 +149,7 @@ impl Resolver {
             *available_height -= returned.height;
         }
 
-        (returned, children_height, layouted)
+        (returned, children_height, layout_info)
     }
 
     pub fn with_derived_custom<L>(&mut self, available_area: PartialArea, f: impl FnOnce(&mut Resolver) -> L) -> L {
@@ -159,7 +159,7 @@ impl Resolver {
             gaps: self.gaps,
         };
 
-        let layouted = f(&mut inner);
+        let layout_info = f(&mut inner);
 
         let delta = inner.available_area.y - self.available_area.y;
         if delta > 0.0 {
@@ -174,6 +174,6 @@ impl Resolver {
         //     .map(|height| height.min(other.available_area.height.unwrap()))
         //     .or(other.available_area.height);
 
-        layouted
+        layout_info
     }
 }

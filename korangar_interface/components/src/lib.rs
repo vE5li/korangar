@@ -22,7 +22,7 @@ pub fn window(token_stream: TokenStream) -> TokenStream {
         class: { None },
         theme: !,
         elements: !,
-        layouted: { const None },
+        layout_info: { const None },
     });
 
     macro_impl(token_stream.into()).into()
@@ -112,6 +112,7 @@ pub fn collapsable(token_stream: TokenStream) -> TokenStream {
         text: !,
         foreground_color: { korangar_interface::theme::theme().collapsable().foreground_color() },
         background_color: { korangar_interface::theme::theme().collapsable().background_color() },
+        secondary_background_color: { korangar_interface::theme::theme().collapsable().secondary_background_color() },
         hovered_foreground_color: { korangar_interface::theme::theme().collapsable().hovered_foreground_color() },
         gaps: { korangar_interface::theme::theme().collapsable().gaps() },
         border: { korangar_interface::theme::theme().collapsable().border() },
@@ -120,6 +121,16 @@ pub fn collapsable(token_stream: TokenStream) -> TokenStream {
         font_size: { korangar_interface::theme::theme().collapsable().font_size() },
         text_alignment: { korangar_interface::theme::theme().collapsable().text_alignment() },
         initially_expanded: { false },
+        extra_elements: { () },
+        children: !,
+    });
+
+    macro_impl(token_stream.into()).into()
+}
+
+#[proc_macro]
+pub fn fragment(token_stream: TokenStream) -> TokenStream {
+    create_component_macro!(korangar_interface::components::fragment::Fragment, {
         children: !,
     });
 

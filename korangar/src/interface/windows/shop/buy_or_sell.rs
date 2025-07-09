@@ -1,6 +1,6 @@
 use derive_new::new;
 use korangar_interface::element::{ButtonBuilder, ElementWrap};
-use korangar_interface::window::{PrototypeWindow, Window, WindowBuilder};
+use korangar_interface::window::{StateWindow, Window, WindowBuilder};
 use korangar_interface::{dimension_bound, size_bound};
 use ragnarok_packets::{BuyOrSellOption, ShopId};
 
@@ -18,7 +18,7 @@ impl BuyOrSellWindow {
     pub const WINDOW_CLASS: &'static str = "buy_or_sell";
 }
 
-impl PrototypeWindow<InterfaceSettings> for BuyOrSellWindow {
+impl StateWindow<InterfaceSettings> for BuyOrSellWindow {
     fn window_class(&self) -> Option<&str> {
         Some(Self::WINDOW_CLASS)
     }

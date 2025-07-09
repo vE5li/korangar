@@ -19,5 +19,5 @@ pcap = { workspace = true }
 debug = []
 derive = []
 interface = ["korangar_interface", "rust_state"]
-packet-to-prototype-element = ["interface"]
+packet-to-state-element = ["interface"]
 unicode = ["korangar_debug/unicode"]

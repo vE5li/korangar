@@ -5,7 +5,7 @@ use crate::theme::ThemePathGetter;
 use crate::window::Anchor;
 
 // TODO: Maybe make Path<State: ?Sized>
-pub trait Appli: Sized + 'static {
+pub trait Application: Sized + 'static {
     type Cache: WindowCache<Self>;
     // TODO: Does this default bound really make sense or do we need a different way
     // of deriving PrototyeWindow without specifying the theme in the
@@ -31,7 +31,7 @@ pub trait Appli: Sized + 'static {
 
 pub trait MouseInputModeTrait<App>
 where
-    App: Appli,
+    App: Application,
 {
     fn is_none(&self) -> bool;
 
@@ -63,7 +63,7 @@ pub trait ScalingExt {
 //     }
 // }
 
-pub trait RenderLayer<App: Appli> {
+pub trait RenderLayer<App: Application> {
     type CustomInstruction<'a>;
 
     fn render_rectangle(
@@ -402,7 +402,7 @@ pub trait ClipTrait: Copy {
 
 pub trait WindowCache<App>
 where
-    App: Appli,
+    App: Application,
 {
     fn create() -> Self;
 

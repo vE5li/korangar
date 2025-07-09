@@ -5,20 +5,14 @@ use crate::signature::Signature;
 use crate::version::{MajorFirst, Version};
 
 #[derive(Debug, ByteConvertable)]
-#[cfg_attr(
-    feature = "interface",
-    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
-)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct TextureName {
     #[length(128)]
     pub name: String,
 }
 
 #[derive(Debug, Clone, ByteConvertable)]
-#[cfg_attr(
-    feature = "interface",
-    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
-)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct Frame {
     pub frame_index: i32,
     pub frame_type: i32,
@@ -36,10 +30,7 @@ pub struct Frame {
 }
 
 #[derive(Debug, ByteConvertable)]
-#[cfg_attr(
-    feature = "interface",
-    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
-)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct LayerData {
     #[new_derive]
     pub texture_count: i32,
@@ -52,10 +43,7 @@ pub struct LayerData {
 }
 
 #[derive(Debug, ByteConvertable)]
-#[cfg_attr(
-    feature = "interface",
-    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
-)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct EffectData {
     #[new_default]
     pub signature: Signature<b"STRM">,

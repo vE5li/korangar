@@ -5,8 +5,8 @@ use arrayvec::ArrayVec;
 use cgmath::{EuclideanSpace, Point3, Vector2, VectorSpace, Zero};
 use derive_new::new;
 use korangar_audio::{AudioEngine, SoundEffectKey};
-use korangar_interface::element::PrototypeElement;
-use korangar_interface::window::{PrototypeWindow, Window};
+use korangar_interface::element::StateElement;
+use korangar_interface::window::{StateWindow, Window};
 use korangar_networking::EntityData;
 use korangar_util::pathing::{MAX_WALK_PATH_SIZE, PathFinder};
 use ragnarok_packets::{AccountId, CharacterInformation, ClientTick, Direction, EntityId, Sex, StatusType, WorldPosition};
@@ -54,7 +54,7 @@ impl<T> ResourceState<T> {
     }
 }
 
-#[derive(RustState, PrototypeElement, new)]
+#[derive(RustState, StateElement, new)]
 pub struct Movement {
     #[hidden_element]
     steps: ArrayVec<Step, MAX_WALK_PATH_SIZE>,
@@ -129,7 +129,7 @@ impl SoundState {
     }
 }
 
-#[derive(RustState, PrototypeElement)]
+#[derive(RustState, StateElement)]
 pub struct Common {
     pub entity_id: EntityId,
     pub job_id: usize,
@@ -784,7 +784,7 @@ impl Common {
     }
 }
 
-#[derive(RustState, PrototypeWindow)]
+#[derive(RustState, StateWindow)]
 pub struct Player {
     common: Common,
     pub hair_id: usize,
@@ -918,7 +918,7 @@ impl Player {
     }
 }
 
-#[derive(RustState, PrototypeWindow)]
+#[derive(RustState, StateWindow)]
 pub struct Npc {
     common: Common,
 }
@@ -985,7 +985,8 @@ impl Npc {
 }
 
 // TODO:
-//#[derive(PrototypeWindow)]
+//#[derive(StateWindow)]
+#[derive(StateElement)]
 pub enum Entity {
     Player(Player),
     Npc(Npc),
@@ -1138,7 +1139,7 @@ impl Entity {
     }
 }
 
-// impl PrototypeWindow<InterfaceSettings> for Entity {
+// impl StateWindow<InterfaceSettings> for Entity {
 //     fn to_window(
 //         &self,
 //         window_cache: &WindowCache,

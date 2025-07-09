@@ -1,9 +1,7 @@
-pub mod layout;
-pub mod theme;
-#[macro_use]
-pub mod elements;
 pub mod application;
 pub mod cursor;
+pub mod layout;
+pub mod theme;
 // pub mod dialog;
 pub mod resource;
 pub mod windows;
@@ -13,21 +11,97 @@ pub mod components {
         use std::cell::UnsafeCell;
         use std::fmt::Display;
 
-        use korangar_interface::element::Element;
         use korangar_interface::element::id::ElementIdGenerator;
         use korangar_interface::element::store::ElementStore;
-        use korangar_interface::event::{ClickAction, EventQueue};
+        use korangar_interface::element::{Element, ErasedElement};
+        use korangar_interface::event::{ClickAction, Event, EventQueue};
         use korangar_interface::layout::alignment::{HorizontalAlignment, VerticalAlignment};
         use korangar_interface::layout::area::Area;
-        use korangar_interface::layout::{Layout, Resolver};
+        use korangar_interface::layout::{Layout, MouseButton, Resolver};
         use ragnarok_packets::{CharacterInformation, CharacterInformationPathExt};
         use rust_state::{Context, ManuallyAssertExt, Path, RustState, Selector};
 
         use crate::graphics::Color;
         use crate::input::UserEvent;
-        use crate::interface::layout::CornerRadius;
+        use crate::interface::layout::{CornerRadius, ScreenPosition, ScreenSize};
         use crate::loaders::FontSize;
         use crate::state::ClientState;
+
+        pub struct OverlayHandler<A, B> {
+            position: ScreenPosition,
+            size: ScreenSize,
+            slot: usize,
+            switch_request_path: A,
+            character_information_path: B,
+        }
+
+        impl<A, B> OverlayHandler<A, B> {
+            pub fn new(slot: usize, switch_request_path: A, character_information_path: B) -> Self {
+                Self {
+                    position: ScreenPosition { left: 0.0, top: 0.0 },
+                    size: ScreenSize { width: 0.0, height: 0.0 },
+                    slot,
+                    switch_request_path,
+                    character_information_path,
+                }
+            }
+
+            fn set_position_size(&mut self, position: ScreenPosition, size: ScreenSize) {
+                self.position = position;
+                self.size = size;
+            }
+        }
+
+        impl<A, B> ClickAction<ClientState> for OverlayHandler<A, B>
+        where
+            A: Path<ClientState, Option<usize>>,
+            B: Path<ClientState, CharacterInformation, false>,
+        {
+            fn execute(&self, state: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
+                use korangar_interface::prelude::*;
+
+                let slot = self.slot;
+                let switch_request_path = self.switch_request_path;
+                let character_information_path = self.character_information_path;
+
+                let erased_element = ErasedElement::new(fragment! {
+                    children: (
+                        button! {
+                            text: "Delete",
+                            event: move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
+                                // SAFETY
+                                // We should not be able to get here if the character is not present, so it's
+                                // fine to unwrap.
+                                let character_information = state.try_get(&character_information_path).unwrap();
+                                let character_id = character_information.character_id;
+
+                                queue.queue(UserEvent::DeleteCharacter { character_id });
+                                queue.queue(Event::CloseOverlay);
+                            },
+                        },
+                        button! {
+                            text: "Switch",
+                            event: move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
+                                state.update_value(switch_request_path, Some(slot));
+                                queue.queue(Event::CloseOverlay);
+                            },
+                        },
+                        button! {
+                            text: "Cancel",
+                            event: move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
+                                queue.queue(Event::CloseOverlay);
+                            },
+                        },
+                    ),
+                });
+
+                queue.queue(Event::OpenOverlay {
+                    element: Box::new(erased_element),
+                    position: self.position,
+                    size: self.size,
+                });
+            }
+        }
 
         #[derive(RustState)]
         pub struct CharacterSlotPreviewTheme {
@@ -38,7 +112,8 @@ pub mod components {
             pub character_information: P,
             pub switch_request: M,
             pub background_color: A,
-            pub click_handler: CharacterSlotPreviewHandler<B, P>,
+            pub click_handler: CharacterSlotPreviewHandler<B>,
+            pub overlay_handler: OverlayHandler<M, P>,
             pub slot: usize,
         }
 
@@ -49,36 +124,43 @@ pub mod components {
             A: Selector<ClientState, Color>,
             B: Path<ClientState, Option<usize>>,
         {
-            fn make_layout(
+            fn create_layout_info(
                 &mut self,
                 state: &Context<ClientState>,
                 store: &mut ElementStore,
                 generator: &mut ElementIdGenerator,
                 resolver: &mut Resolver,
-            ) -> Self::Layouted {
+            ) -> Self::LayoutInfo {
                 let area = resolver.with_height(180.0);
-                Self::Layouted { area }
+
+                self.overlay_handler
+                    .set_position_size(ScreenPosition { left: area.x, top: area.y }, ScreenSize {
+                        width: area.width,
+                        height: area.height,
+                    });
+
+                Self::LayoutInfo { area }
             }
 
-            fn create_layout<'a>(
+            fn layout_element<'a>(
                 &'a self,
                 state: &'a Context<ClientState>,
                 _: &'a ElementStore,
-                layouted: &'a Self::Layouted,
+                layout_info: &'a Self::LayoutInfo,
                 layout: &mut Layout<'a, ClientState>,
             ) {
                 if let Some(switch_request) = state.get(&self.switch_request) {
-                    let is_hoverered = layout.is_area_hovered_and_active(layouted.area);
+                    let is_hoverered = layout.is_area_hovered_and_active(layout_info.area);
 
                     let background_color = match is_hoverered {
                         true => Color::monochrome_u8(95),
                         false => *state.get(&self.background_color),
                     };
-                    layout.add_rectangle(layouted.area, CornerRadius::uniform(25.0), background_color);
+                    layout.add_rectangle(layout_info.area, CornerRadius::uniform(25.0), background_color);
 
                     if *switch_request == self.slot {
                         layout.add_text(
-                            layouted.area,
+                            layout_info.area,
                             "Cancel",
                             FontSize(14.0),
                             Color::WHITE,
@@ -87,11 +169,11 @@ pub mod components {
                         );
 
                         if is_hoverered {
-                            layout.add_click_area(layouted.area, &self.click_handler.cancel_switch);
+                            layout.add_click_area(layout_info.area, MouseButton::Left, &self.click_handler.cancel_switch);
                         }
                     } else {
                         layout.add_text(
-                            layouted.area,
+                            layout_info.area,
                             "Switch slots",
                             FontSize(14.0),
                             Color::WHITE,
@@ -100,7 +182,7 @@ pub mod components {
                         );
 
                         if is_hoverered {
-                            layout.add_click_area(layouted.area, &self.click_handler.request_switch);
+                            layout.add_click_area(layout_info.area, MouseButton::Left, &self.click_handler.request_switch);
                         }
                     }
 
@@ -108,134 +190,97 @@ pub mod components {
                 }
 
                 if let Some(character_information) = state.try_get(&self.character_information) {
-                    let switch_area = Area {
-                        x: layouted.area.x,
-                        y: layouted.area.y + layouted.area.height - 40.0,
-                        width: 50.0,
-                        height: 30.0,
-                    };
-
-                    let is_switch_hoverered = layout.is_area_hovered_and_active(switch_area);
-                    if is_switch_hoverered {
-                        layout.mark_hovered();
-                        layout.add_click_area(layouted.area, &self.click_handler.start_switch);
-                    }
-
-                    let delete_area = Area {
-                        x: layouted.area.x + layouted.area.width - 50.0,
-                        y: layouted.area.y + layouted.area.height - 40.0,
-                        width: 50.0,
-                        height: 30.0,
-                    };
-
-                    let is_delete_hoverered = layout.is_area_hovered_and_active(delete_area);
-                    if is_delete_hoverered {
-                        layout.mark_hovered();
-                        layout.add_click_area(layouted.area, &self.click_handler.delete_character);
-                    }
-
-                    let is_hoverered = layout.is_area_hovered_and_active(layouted.area);
+                    let is_hoverered = layout.is_area_hovered_and_active(layout_info.area);
 
                     let background_color = match is_hoverered {
                         true => Color::monochrome_u8(95),
                         false => *state.get(&self.background_color),
                     };
-                    layout.add_rectangle(layouted.area, CornerRadius::uniform(25.0), background_color);
-
-                    let background_color = match is_switch_hoverered {
-                        true => Color::monochrome_u8(180),
-                        false => Color::monochrome_u8(150),
-                    };
-                    layout.add_rectangle(switch_area, CornerRadius::uniform(25.0), background_color);
-
-                    let background_color = match is_delete_hoverered {
-                        true => Color::rgb_u8(255, 70, 70),
-                        false => Color::rgb_u8(180, 50, 50),
-                    };
-                    layout.add_rectangle(delete_area, CornerRadius::uniform(25.0), background_color);
+                    layout.add_rectangle(layout_info.area, CornerRadius::uniform(25.0), background_color);
 
                     layout.add_text(
-                        layouted.area,
+                        layout_info.area,
                         &character_information.name,
                         FontSize(18.0),
                         Color::rgb_u8(255, 200, 150),
-                        HorizontalAlignment::Left { offset: 5.0 },
+                        HorizontalAlignment::Center { offset: 0.0 },
                         VerticalAlignment::Top { offset: 0.0 },
                     );
 
                     layout.add_text(
-                        layouted.area,
+                        layout_info.area,
                         "Base level",
                         FontSize(14.0),
                         Color::rgb_u8(200, 200, 150),
-                        HorizontalAlignment::Right { offset: 5.0 },
-                        VerticalAlignment::Top { offset: 0.0 },
+                        HorizontalAlignment::Left { offset: 5.0 },
+                        VerticalAlignment::Top { offset: 30.0 },
                     );
 
                     layout.add_text(
-                        layouted.area,
+                        layout_info.area,
                         self.click_handler
                             .base_level_str
                             .get_str(self.character_information.manually_asserted().base_level(), state),
                         FontSize(14.0),
                         Color::rgb_u8(200, 200, 150),
-                        HorizontalAlignment::Right { offset: 5.0 },
-                        VerticalAlignment::Top { offset: 14.0 },
+                        HorizontalAlignment::Left { offset: 5.0 },
+                        VerticalAlignment::Top { offset: 44.0 },
                     );
 
                     layout.add_text(
-                        layouted.area,
+                        layout_info.area,
                         "Job level",
                         FontSize(14.0),
                         Color::rgb_u8(200, 200, 150),
-                        HorizontalAlignment::Right { offset: 5.0 },
-                        VerticalAlignment::Top { offset: 36.0 },
+                        HorizontalAlignment::Left { offset: 5.0 },
+                        VerticalAlignment::Top { offset: 66.0 },
                     );
 
                     layout.add_text(
-                        layouted.area,
+                        layout_info.area,
                         self.click_handler
                             .job_level_str
                             .get_str(self.character_information.manually_asserted().job_level(), state),
                         FontSize(14.0),
                         Color::rgb_u8(200, 200, 150),
-                        HorizontalAlignment::Right { offset: 5.0 },
-                        VerticalAlignment::Top { offset: 50.0 },
+                        HorizontalAlignment::Left { offset: 5.0 },
+                        VerticalAlignment::Top { offset: 80.0 },
                     );
 
                     layout.add_text(
-                        layouted.area,
+                        layout_info.area,
                         "Map",
                         FontSize(14.0),
                         Color::rgb_u8(200, 200, 150),
-                        HorizontalAlignment::Right { offset: 5.0 },
-                        VerticalAlignment::Top { offset: 72.0 },
+                        HorizontalAlignment::Left { offset: 5.0 },
+                        VerticalAlignment::Top { offset: 102.0 },
                     );
 
                     layout.add_text(
-                        layouted.area,
+                        layout_info.area,
                         &character_information.map_name,
                         FontSize(14.0),
                         Color::rgb_u8(200, 200, 150),
-                        HorizontalAlignment::Right { offset: 5.0 },
-                        VerticalAlignment::Top { offset: 86.0 },
+                        HorizontalAlignment::Left { offset: 5.0 },
+                        VerticalAlignment::Top { offset: 116.0 },
                     );
 
                     if is_hoverered {
-                        layout.add_click_area(layouted.area, &self.click_handler.select_character);
+                        layout.add_click_area(layout_info.area, MouseButton::Left, &self.click_handler.select_character);
+                        layout.add_click_area(layout_info.area, MouseButton::Right, &self.overlay_handler);
                         layout.mark_hovered();
                     }
                 } else {
-                    let is_hoverered = layout.is_area_hovered_and_active(layouted.area);
+                    let is_hoverered = layout.is_area_hovered_and_active(layout_info.area);
 
                     let background_color = match is_hoverered {
                         true => Color::monochrome_u8(95),
                         false => *state.get(&self.background_color),
                     };
-                    layout.add_rectangle(layouted.area, CornerRadius::uniform(25.0), background_color);
+                    layout.add_rectangle(layout_info.area, CornerRadius::uniform(25.0), background_color);
 
                     layout.add_text(
-                        layouted.area,
+                        layout_info.area,
                         "Create Character",
                         FontSize(14.0),
                         Color::WHITE,
@@ -244,7 +289,7 @@ pub mod components {
                     );
 
                     if is_hoverered {
-                        layout.add_click_area(layouted.area, &self.click_handler.create_character);
+                        layout.add_click_area(layout_info.area, MouseButton::Left, &self.click_handler.create_character);
                         layout.mark_hovered();
                     }
                 }
@@ -310,20 +355,6 @@ pub mod components {
             }
         }
 
-        struct StartSwitch<P> {
-            switch_request: P,
-            slot: usize,
-        }
-
-        impl<P> ClickAction<ClientState> for StartSwitch<P>
-        where
-            P: Path<ClientState, Option<usize>>,
-        {
-            fn execute(&self, state: &Context<ClientState>, _: &mut EventQueue<ClientState>) {
-                state.update_value(self.switch_request, Some(self.slot));
-            }
-        }
-
         struct CancelSwitch<P> {
             switch_request: P,
         }
@@ -359,49 +390,25 @@ pub mod components {
             }
         }
 
-        struct DeleteCharacter<P> {
-            character_information: P,
-        }
-
-        impl<P> ClickAction<ClientState> for DeleteCharacter<P>
-        where
-            P: Path<ClientState, CharacterInformation, false>,
-        {
-            fn execute(&self, state: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
-                // SAFETY
-                // We should not be able to get here if the character is not present, so it's
-                // fine to unwrap.
-                let character_information = state.try_get(&self.character_information).unwrap();
-                let character_id = character_information.character_id;
-
-                queue.queue(UserEvent::DeleteCharacter { character_id });
-            }
-        }
-
-        pub struct CharacterSlotPreviewHandler<P, D> {
+        pub struct CharacterSlotPreviewHandler<P> {
             select_character: SelectCharacter,
             create_character: CreateCharacter,
-            start_switch: StartSwitch<P>,
             cancel_switch: CancelSwitch<P>,
             request_switch: RequestSwitch<P>,
-            delete_character: DeleteCharacter<D>,
             base_level_str: PartialEqDisplayStr<i16>,
             job_level_str: PartialEqDisplayStr<i32>,
         }
 
-        impl<P, D> CharacterSlotPreviewHandler<P, D>
+        impl<P> CharacterSlotPreviewHandler<P>
         where
             P: Path<ClientState, Option<usize>>,
-            D: Path<ClientState, CharacterInformation, false>,
         {
-            pub fn new(switch_request: P, character_information: D, slot: usize) -> Self {
+            pub fn new(switch_request: P, slot: usize) -> Self {
                 Self {
                     select_character: SelectCharacter { slot },
                     create_character: CreateCharacter { slot },
-                    start_switch: StartSwitch { switch_request, slot },
                     cancel_switch: CancelSwitch { switch_request },
                     request_switch: RequestSwitch { switch_request, slot },
-                    delete_character: DeleteCharacter { character_information },
                     base_level_str: PartialEqDisplayStr::new(),
                     job_level_str: PartialEqDisplayStr::new(),
                 }
@@ -454,13 +461,13 @@ pub mod components {
         where
             P: Path<ClientState, InventoryItem<ResourceMetadata>, false>,
         {
-            fn make_layout(
+            fn create_layout_info(
                 &mut self,
                 state: &Context<ClientState>,
                 store: &mut ElementStore,
                 generator: &mut ElementIdGenerator,
                 resolver: &mut Resolver,
-            ) -> Self::Layouted {
+            ) -> Self::LayoutInfo {
                 let area = resolver.with_height(40.0);
 
                 if let Some(item) = state.try_get(&self.item_path)
@@ -471,26 +478,26 @@ pub mod components {
                     }
                 }
 
-                Self::Layouted { area }
+                Self::LayoutInfo { area }
             }
 
-            fn create_layout<'a>(
+            fn layout_element<'a>(
                 &'a self,
                 state: &'a Context<ClientState>,
                 store: &'a ElementStore,
-                layouted: &'a Self::Layouted,
+                layout_info: &'a Self::LayoutInfo,
                 layout: &mut Layout<'a, ClientState>,
             ) {
-                layout.add_rectangle(layouted.area, CornerRadius::uniform(20.0), Color::rgb_u8(200, 120, 120));
+                layout.add_rectangle(layout_info.area, CornerRadius::uniform(20.0), Color::rgb_u8(200, 120, 120));
 
                 if let Some(item) = state.try_get(&self.item_path)
                     && let Some(texture) = item.metadata.texture.as_ref()
                 {
-                    layout.add_texture(texture.clone(), layouted.area, Color::WHITE, false);
+                    layout.add_texture(texture.clone(), layout_info.area, Color::WHITE, false);
 
                     if let InventoryItemDetails::Regular { amount, .. } = &item.details {
                         layout.add_text(
-                            layouted.area,
+                            layout_info.area,
                             self.amount_display.string.as_ref().unwrap(),
                             // TODO: Put this in the theme
                             FontSize(12.0),
@@ -562,43 +569,43 @@ pub mod components {
         where
             P: Path<ClientState, Skill, false>,
         {
-            fn make_layout(
+            fn create_layout_info(
                 &mut self,
                 state: &Context<ClientState>,
                 store: &mut ElementStore,
                 generator: &mut ElementIdGenerator,
                 resolver: &mut Resolver,
-            ) -> Self::Layouted {
+            ) -> Self::LayoutInfo {
                 let area = resolver.with_height(30.0);
 
                 if let Some(skill) = state.try_get(&self.skill_path) {
                     self.level_display.update(skill.skill_level);
                 }
 
-                Self::Layouted { area }
+                Self::LayoutInfo { area }
             }
 
-            fn create_layout<'a>(
+            fn layout_element<'a>(
                 &'a self,
                 state: &'a Context<ClientState>,
                 store: &'a ElementStore,
-                layouted: &'a Self::Layouted,
+                layout_info: &'a Self::LayoutInfo,
                 layout: &mut Layout<'a, ClientState>,
             ) {
-                layout.add_rectangle(layouted.area, CornerRadius::uniform(20.0), Color::rgb_u8(200, 120, 120));
+                layout.add_rectangle(layout_info.area, CornerRadius::uniform(20.0), Color::rgb_u8(200, 120, 120));
 
                 if let Some(skill) = state.try_get(&self.skill_path) {
                     layout.add_sprite(
                         &skill.actions,
                         &skill.sprite,
                         &skill.animation_state,
-                        layouted.area,
+                        layout_info.area,
                         Color::WHITE,
                         false,
                     );
 
                     layout.add_text(
-                        layouted.area,
+                        layout_info.area,
                         self.level_display.string.as_ref().unwrap(),
                         // TODO: Put this in the theme
                         FontSize(12.0),

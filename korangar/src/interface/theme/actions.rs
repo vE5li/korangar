@@ -1,4 +1,4 @@
-use korangar_interface::element::{ButtonBuilder, Container, ElementCell, ElementWrap, Headline, PrototypeElement};
+use korangar_interface::element::{ButtonBuilder, Container, ElementCell, ElementWrap, Headline, StateElement};
 use korangar_interface::{dimension_bound, size_bound};
 
 use crate::input::UserEvent;
@@ -8,7 +8,7 @@ use crate::interface::application::{InterfaceSettings, InternalThemeKind};
 #[derive(Default)]
 struct Actions<const KIND: InternalThemeKind>;
 
-impl<const KIND: InternalThemeKind> PrototypeElement<InterfaceSettings> for Actions<KIND> {
+impl<const KIND: InternalThemeKind> StateElement<InterfaceSettings> for Actions<KIND> {
     fn to_element(&self, display: String) -> ElementCell<InterfaceSettings> {
         let elements = vec![
             Headline::new(display, size_bound!(33%, 12)).wrap(),
@@ -31,7 +31,7 @@ impl<const KIND: InternalThemeKind> PrototypeElement<InterfaceSettings> for Acti
 }
 
 /// Debug actions for all themes.
-#[derive(Default, PrototypeElement)]
+#[derive(Default, StateElement)]
 pub(super) struct ThemeActions {
     #[name("Main theme")]
     main_theme_actions: Actions<{ InternalThemeKind::Main }>,

@@ -1,4 +1,4 @@
-use korangar_interface::window::{CustomWindow, PrototypeWindow, Window, WindowTrait};
+use korangar_interface::window::{CustomWindow, StateWindow, Window, WindowTrait};
 use rust_state::Context;
 
 use crate::input::UserEvent;
@@ -41,6 +41,12 @@ impl CustomWindow<ClientState> for MenuWindow {
                 button! {
                     text: "Map viewer",
                     event: UserEvent::OpenMapDataWindow,
+                    foreground_color: client_theme().debug_button().foreground_color(),
+                },
+                #[cfg(feature = "debug")]
+                button! {
+                    text: "Client state viewer",
+                    event: UserEvent::OpenClientStateViewerWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
                 },
                 #[cfg(feature = "debug")]

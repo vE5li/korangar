@@ -1,23 +1,21 @@
 use std::any::Any;
 use std::marker::PhantomData;
 
-pub use interface_macros::PrototypeWindow;
-use rust_state::{Context, RustState, Selector};
+pub use interface_macros::StateWindow;
+use rust_state::{Context, Path, RustState, Selector};
 use store::WindowStore;
 
-use crate::application::{Appli, CornerRadiusTrait, PositionTrait, SizeTrait};
+use crate::application::{Application, CornerRadiusTrait, PositionTrait, SizeTrait};
 use crate::element::id::ElementIdGenerator;
-use crate::element::{DefaultLayoutedSet, ElementSet};
+use crate::element::{DefaultLayoutInfoSet, ElementSet};
 use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
 use crate::layout::area::Area;
 use crate::layout::{Layout, Resolver};
 use crate::theme::{ThemePathGetter, theme};
 
 mod anchor;
-mod prototype;
 
 pub use anchor::{Anchor, AnchorPoint};
-pub use prototype::{CustomWindow, PrototypeWindow};
 
 pub mod store {
     use std::cell::UnsafeCell;
@@ -47,10 +45,10 @@ pub mod store {
 }
 
 // TODO: Rename
-pub trait WindowTrait<App: Appli> {
+pub trait WindowTrait<App: Application> {
     fn get_window_class(&self) -> Option<App::WindowClass>;
 
-    fn make_layout(
+    fn create_layout_info(
         &mut self,
         state: &Context<App>,
         store: &mut WindowStore,
@@ -62,10 +60,35 @@ pub trait WindowTrait<App: Appli> {
     fn do_layout<'a>(&'a self, state: &'a Context<App>, store: &'a WindowStore, data: &'a WindowData<App>, layout: &mut Layout<'a, App>);
 }
 
+// TODO: Rename this to StateWindow
+pub trait StateWindow<App>
+where
+    App: Application,
+{
+    fn window_class() -> Option<App::WindowClass> {
+        None
+    }
+
+    fn to_window<'a>(self_path: impl Path<App, Self>) -> impl WindowTrait<App> + 'a;
+
+    fn to_window_mut<'a>(self_path: impl Path<App, Self>) -> impl WindowTrait<App> + 'a;
+}
+
+pub trait CustomWindow<App>
+where
+    App: Application,
+{
+    fn window_class() -> Option<App::WindowClass> {
+        None
+    }
+
+    fn to_window<'a>(self) -> impl WindowTrait<App> + 'a;
+}
+
 #[derive(RustState)]
 pub struct WindowTheme<App>
 where
-    App: Appli,
+    App: Application,
 {
     pub title_color: App::Color,
     pub hovered_title_color: App::Color,
@@ -87,7 +110,7 @@ where
 
 pub struct WindowData<App>
 where
-    App: Appli,
+    App: Application,
 {
     pub id: u64,
     pub anchor: Anchor<App>,
@@ -96,14 +119,14 @@ where
 
 pub struct DisplayInformation<App>
 where
-    App: Appli,
+    App: Application,
 {
     pub real_position: App::Position,
     pub real_size: App::Size,
     pub display_height: f32,
 }
 
-pub struct WindowLayoutedSet<T> {
+pub struct WindowLayoutInfoSet<T> {
     area: Area,
     title_area: Area,
     children: T,
@@ -111,7 +134,7 @@ pub struct WindowLayoutedSet<T> {
 
 pub struct Window<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, Elements>
 where
-    App: Appli,
+    App: Application,
     Elements: ElementSet<App>,
 {
     pub title_marker: PhantomData<Title>,
@@ -132,13 +155,13 @@ where
     pub theme: App::ThemeType,
     pub class: Option<App::WindowClass>,
     pub elements: Elements,
-    pub layouted: Option<WindowLayoutedSet<<Elements as ElementSet<App>>::Layouted>>,
+    pub layout_info: Option<WindowLayoutInfoSet<<Elements as ElementSet<App>>::LayoutInfo>>,
 }
 
 impl<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, Elements> WindowTrait<App>
     for Window<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, Elements>
 where
-    App: Appli,
+    App: Application,
     Title: AsRef<str>,
     A: Selector<App, Title>,
     B: Selector<App, App::Color>,
@@ -155,13 +178,13 @@ where
     M: Selector<App, f32>,
     N: Selector<App, f32>,
     Elements: ElementSet<App>,
-    <Elements as ElementSet<App>>::Layouted: 'static,
+    <Elements as ElementSet<App>>::LayoutInfo: 'static,
 {
     fn get_window_class(&self) -> Option<App::WindowClass> {
         self.class
     }
 
-    fn make_layout(
+    fn create_layout_info(
         &mut self,
         state: &Context<App>,
         store: &mut WindowStore,
@@ -211,7 +234,7 @@ where
         let title_area = resolver.with_height(title_height);
 
         let (area, children) = resolver.with_derived(*state.get(&self.gaps), *state.get(&self.border), |resolver| {
-            self.elements.make_layout(state, store, generator, resolver)
+            self.elements.create_layout_info(state, store, generator, resolver)
         });
 
         // FIX: Content needs to respect the max size.
@@ -222,7 +245,7 @@ where
             height: title_area.height + area.height,
         };
 
-        self.layouted = Some(WindowLayoutedSet {
+        self.layout_info = Some(WindowLayoutInfoSet {
             area,
             title_area,
             children,
@@ -241,16 +264,16 @@ where
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     fn do_layout<'a>(&'a self, state: &'a Context<App>, store: &'a WindowStore, data: &'a WindowData<App>, layout: &mut Layout<'a, App>) {
         let store = store.get_from_window_id(data.id);
-        let layouted = self.layouted.as_ref().expect("no layout present");
+        let layout_info = self.layout_info.as_ref().expect("no layout present");
 
         App::set_current_theme_type(self.theme);
 
         let close_button = if *state.get(&self.closable) {
             let close_button_area = Area {
-                x: layouted.title_area.x + layouted.title_area.width - 40.0,
-                y: layouted.title_area.y,
+                x: layout_info.title_area.x + layout_info.title_area.width - 40.0,
+                y: layout_info.title_area.y,
                 width: 30.0,
-                height: layouted.title_area.height,
+                height: layout_info.title_area.height,
             };
 
             let close_button_color = match layout.is_area_hovered_and_active(close_button_area) {
@@ -268,21 +291,19 @@ where
             None
         };
 
-        layout.with_clip_layer(layouted.area, |layout| {
-            layout.push_layer();
-
-            self.elements.create_layout(state, store, &layouted.children, layout);
-
-            layout.pop_layer();
+        layout.with_clip_layer(layout_info.area, |layout| {
+            layout.with_layer(|layout| {
+                self.elements.layout_element(state, store, &layout_info.children, layout);
+            });
         });
 
-        let title_color = match layout.is_area_hovered_and_active(layouted.title_area) {
+        let title_color = match layout.is_area_hovered_and_active(layout_info.title_area) {
             true => *state.get(&self.hovered_title_color),
             false => *state.get(&self.title_color),
         };
 
         layout.add_text(
-            layouted.title_area,
+            layout_info.title_area,
             state.get(&self.title).as_ref(),
             *state.get(&self.font_size),
             title_color,
@@ -290,13 +311,13 @@ where
             *state.get(&theme().window().vertical_alignment()),
         );
 
-        if layout.is_area_hovered_and_active(layouted.title_area) {
-            layout.add_window_move_area(layouted.title_area, data.id);
+        if layout.is_area_hovered_and_active(layout_info.title_area) {
+            layout.add_window_move_area(layout_info.title_area, data.id);
             layout.mark_hovered();
         }
 
         layout.add_rectangle(
-            layouted.area,
+            layout_info.area,
             *state.get(&self.corner_radius),
             *state.get(&self.background_color),
         );
@@ -307,8 +328,8 @@ where
         if *state.get(&self.minimum_width) != *state.get(&self.maximum_width) {
             // TODO: Compute this better.
             let resize_area = Area {
-                x: layouted.area.x + layouted.area.width - 14.0,
-                y: layouted.area.y + layouted.area.height - 14.0,
+                x: layout_info.area.x + layout_info.area.width - 14.0,
+                y: layout_info.area.y + layout_info.area.height - 14.0,
                 width: 14.0,
                 height: 14.0,
             };
@@ -344,7 +365,7 @@ where
             }
         }
 
-        if layout.is_area_hovered_and_active(layouted.area) {
+        if layout.is_area_hovered_and_active(layout_info.area) {
             layout.mark_hovered();
         }
     }

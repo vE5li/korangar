@@ -1,5 +1,5 @@
 use korangar_debug::profiling::Profiler;
-use korangar_interface::window::{CustomWindow, PrototypeWindow, Window, WindowTrait};
+use korangar_interface::window::{CustomWindow, StateWindow, Window, WindowTrait};
 use rust_state::{Context, Path};
 
 use crate::interface::layout::ScreenSize;

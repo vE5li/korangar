@@ -6,10 +6,10 @@ use std::collections::HashMap;
 use derive_new::new;
 use korangar_interface::element::id::ElementIdGenerator;
 use korangar_interface::element::store::ElementStore;
-use korangar_interface::element::{DefaultLayouted, Element, ElementSet, ResolverSet};
+use korangar_interface::element::{DefaultLayoutInfo, Element, ElementSet, ResolverSet};
 use korangar_interface::event::EventQueue;
 use korangar_interface::layout::{Layout, Resolver};
-use korangar_interface::window::{CustomWindow, PrototypeWindow, Window, WindowTrait};
+use korangar_interface::window::{CustomWindow, StateWindow, Window, WindowTrait};
 use ragnarok_packets::{CharacterServerInformation, CharacterServerInformationPathExt};
 use rust_state::{Context, Path};
 
@@ -43,7 +43,7 @@ where
 
         struct ServerWrapper<P> {
             path: P,
-            item_boxes: Vec<Box<dyn Element<ClientState, Layouted = DefaultLayouted>>>,
+            item_boxes: Vec<Box<dyn Element<ClientState, LayoutInfo = DefaultLayoutInfo>>>,
         }
 
         impl<P> ServerWrapper<P>
@@ -87,29 +87,29 @@ where
         where
             P: Path<ClientState, Vec<CharacterServerInformation>>,
         {
-            type Layouted = Vec<DefaultLayouted>;
+            type LayoutInfo = Vec<DefaultLayoutInfo>;
 
             fn get_element_count(&self) -> usize {
                 unimplemented!()
             }
 
-            fn make_layout(
+            fn create_layout_info(
                 &mut self,
                 state: &Context<ClientState>,
                 store: &mut ElementStore,
                 generator: &mut ElementIdGenerator,
                 mut resolver_set: impl ResolverSet,
-            ) -> Self::Layouted {
+            ) -> Self::LayoutInfo {
                 self.correct_element_size(state);
 
                 // FIX: Make this right. Maybe with_derived should expect a resolver set as well
                 resolver_set.with_index(0, |resolver| {
-                    let (area, layouted) = resolver.with_derived(2.0, 4.0, |resolver| {
+                    let (area, layout_info) = resolver.with_derived(2.0, 4.0, |resolver| {
                         self.item_boxes
                             .iter_mut()
                             .enumerate()
                             .map(|(index, item_box)| {
-                                item_box.make_layout(
+                                item_box.create_layout_info(
                                     state,
                                     store.get_or_create_child_store(index as u64, generator),
                                     generator,
@@ -119,25 +119,22 @@ where
                             .collect()
                     });
 
-                    layouted
+                    layout_info
                 })
             }
 
-            fn create_layout<'a>(
+            fn layout_element<'a>(
                 &'a self,
                 state: &'a Context<ClientState>,
                 store: &'a ElementStore,
-                layouted: &'a Self::Layouted,
+                layout_info: &'a Self::LayoutInfo,
                 layout: &mut Layout<'a, ClientState>,
             ) {
-                layout.push_layer();
-
-                for (index, item_box) in self.item_boxes.iter().enumerate() {
-                    item_box.create_layout(state, store.child_store(index as u64), &layouted[index], layout);
-                }
-
-                // TODO: Very much temp
-                layout.pop_layer();
+                layout.with_layer(|layout| {
+                    for (index, item_box) in self.item_boxes.iter().enumerate() {
+                        item_box.layout_element(state, store.child_store(index as u64), &layout_info[index], layout);
+                    }
+                });
             }
         }
 

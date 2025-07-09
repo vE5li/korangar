@@ -246,8 +246,8 @@ impl InputSystem {
                             interface.schedule_render();
                         }
 
-                        ClickAction::OpenWindow(prototype_window) => {
-                            interface.open_window(application, focus_state, prototype_window.as_ref())
+                        ClickAction::OpenWindow(state_window) => {
+                            interface.open_window(application, focus_state, state_window.as_ref())
                         }
                         ClickAction::CloseWindow => interface.close_window(focus_state, *window_index),
 
@@ -409,8 +409,8 @@ impl InputSystem {
         //             // TODO: remove and replace with proper event
         //             match action {
         //                 ClickAction::Custom(event) => events.push(event),
-        //                 ClickAction::OpenWindow(prototype_window) => {
-        //                     interface.open_window(application, focus_state, prototype_window.as_ref())
+        //                 ClickAction::OpenWindow(state_window) => {
+        //                     interface.open_window(application, focus_state, state_window.as_ref())
         //                 }
         //                 ClickAction::CloseWindow => interface.close_window(focus_state, *focused_window),
         //                 _ => {}
@@ -468,8 +468,8 @@ impl InputSystem {
         //                         }
         //                         // TODO: should just move immediately ?
         //                         ClickAction::Move(..) => {}
-        //                         ClickAction::OpenWindow(prototype_window) => {
-        //                             interface.open_window(application, focus_state, prototype_window.as_ref())
+        //                         ClickAction::OpenWindow(state_window) => {
+        //                             interface.open_window(application, focus_state, state_window.as_ref())
         //                         }
         //                         ClickAction::CloseWindow => interface.close_window(focus_state, *focused_window),
         //                         ClickAction::OpenPopup {
@@ -677,8 +677,15 @@ impl InputSystem {
     }
 
     // TODO: Temp
-    pub fn get_left_click_position(&self) -> Option<ScreenPosition> {
-        self.left_mouse_button.pressed().then_some(self.new_mouse_position)
+    pub fn get_click_position(&self) -> Option<(ScreenPosition, korangar_interface::layout::MouseButton)> {
+        self.left_mouse_button
+            .pressed()
+            .then_some((self.new_mouse_position, korangar_interface::layout::MouseButton::Left))
+            .or_else(|| {
+                self.right_mouse_button
+                    .pressed()
+                    .then_some((self.new_mouse_position, korangar_interface::layout::MouseButton::Right))
+            })
     }
 
     // TODO: Temp

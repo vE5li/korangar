@@ -1,6 +1,6 @@
 use korangar_components::item_box;
 use korangar_interface::element::Element;
-use korangar_interface::window::{CustomWindow, PrototypeWindow, Window, WindowTrait};
+use korangar_interface::window::{CustomWindow, StateWindow, Window, WindowTrait};
 use korangar_networking::{InventoryItem, InventoryItemDetails};
 use ragnarok_packets::EquipPosition;
 use rust_state::{Path, Selector};

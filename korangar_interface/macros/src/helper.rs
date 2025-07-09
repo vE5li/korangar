@@ -4,7 +4,7 @@ use syn::{Attribute, DataStruct, Field, LitStr};
 
 use crate::utils::get_unique_attribute;
 
-pub fn prototype_element_helper(
+pub fn state_element_helper(
     data_struct: DataStruct,
     mut attributes: Vec<Attribute>,
     name: String,
@@ -21,8 +21,7 @@ pub fn prototype_element_helper(
         .unwrap_or(quote!(#name));
 
     let window_class = get_unique_attribute(&mut attributes, "window_class")
-        .map(|attribute| attribute.parse_args().expect("failed to parse window class"))
-        .map(|window_class: LitStr| quote!(#window_class));
+        .map(|attribute| attribute.parse_args().expect("failed to parse window class"));
 
     let mut initializers = vec![];
     let mut initializers_mut = vec![];
@@ -44,12 +43,11 @@ pub fn prototype_element_helper(
             .map(|name: LitStr| name.value())
             .unwrap_or_else(|| str::replace(&field_variable.to_string(), "_", " "));
 
-        initializers.push(
-            quote!(korangar_interface::element::PrototypeElement::to_element(self_path.#field_identifier(), #display_name.to_string())),
-        );
+        initializers
+            .push(quote!(korangar_interface::element::StateElement::to_element(self_path.#field_identifier(), #display_name.to_string())));
 
         initializers_mut.push(
-            quote!(korangar_interface::element::PrototypeElement::to_element_mut(self_path.#field_identifier(), #display_name.to_string())),
+            quote!(korangar_interface::element::StateElement::to_element_mut(self_path.#field_identifier(), #display_name.to_string())),
         );
     }
 

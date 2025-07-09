@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, print_debug};
+use korangar_interface::element::StateElement;
 use ron::ser::PrettyConfig;
 use rust_state::{MapItem, RustState};
 use serde::ser::SerializeStruct;
@@ -10,9 +11,11 @@ use serde::{Deserialize, Serialize, Serializer};
 use crate::loaders::ServiceId;
 
 // TODO: Can likely be removed.
-#[derive(Clone, Default, RustState, Serialize, Deserialize)]
+#[derive(Clone, Default, RustState, Serialize, Deserialize, StateElement)]
 pub struct LoginSettings {
     pub service: String,
+    // TODO: Unhide this element.
+    #[hidden_element]
     pub service_settings: HashMap<ServiceId, ServiceSettings>,
     pub recent_service_id: Option<ServiceId>,
 }

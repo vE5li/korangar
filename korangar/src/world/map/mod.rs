@@ -8,7 +8,7 @@ use cgmath::{Matrix4, Point3, SquareMatrix, Vector2, Vector3};
 use derive_new::new;
 use korangar_audio::AudioEngine;
 #[cfg(feature = "debug")]
-use korangar_interface::window::PrototypeWindow;
+use korangar_interface::window::StateWindow;
 use korangar_util::collision::{AABB, Frustum, KDTree, Sphere};
 use korangar_util::container::{SimpleKey, SimpleSlab};
 use korangar_util::pathing::Traversable;
@@ -266,7 +266,7 @@ impl Map {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn render_entities(&self, instructions: &mut Vec<EntityInstruction>, entities: &mut [Entity], camera: &dyn Camera) {
+    pub fn render_entities(&self, instructions: &mut Vec<EntityInstruction>, entities: &[Entity], camera: &dyn Camera) {
         entities.iter().enumerate().for_each(|(index, entity)| {
             entity.render(instructions, camera, index != 0);
         });
@@ -452,7 +452,7 @@ impl Map {
     //     &'a self,
     //     entities: &'a [Entity],
     //     marker_identifier: MarkerIdentifier,
-    // ) -> &'a dyn PrototypeWindow<ClientState> {
+    // ) -> &'a dyn StateWindow<ClientState> {
     //     match marker_identifier {
     //         MarkerIdentifier::Object(key) =>
     // self.objects.get(ObjectKey::new(key)).unwrap(),

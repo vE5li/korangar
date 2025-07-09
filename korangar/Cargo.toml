@@ -34,7 +34,7 @@ pollster = { workspace = true }
 quick-xml = { workspace = true, features = ["serde", "serialize"] }
 ragnarok_bytes = { workspace = true, features = ["derive", "cgmath"] }
 ragnarok_formats = { workspace = true, features = ["interface"] }
-ragnarok_packets = { workspace = true, features = ["derive", "interface", "packet-to-prototype-element"] }
+ragnarok_packets = { workspace = true, features = ["derive", "interface", "packet-to-state-element"] }
 rand_aes = { workspace = true, features = ["tls", "tls_aes128_ctr128"] }
 rayon = { workspace = true }
 ron = { workspace = true }

@@ -1,7 +1,7 @@
 use rust_state::{Context, Path};
 
 use super::EventQueue;
-use crate::application::Appli;
+use crate::application::Application;
 
 // pub enum ClickAction<App>
 // where
@@ -13,7 +13,7 @@ use crate::application::Appli;
 //     DragElement,
 //     Move(App::DropResource),
 //     MoveInterface,
-//     OpenWindow(Box<dyn PrototypeWindow<App>>),
+//     OpenWindow(Box<dyn StateWindow<App>>),
 //     CloseWindow,
 //     OpenPopup {
 //         element: ElementCell<App>,
@@ -24,13 +24,13 @@ use crate::application::Appli;
 //     Custom(App::CustomEvent),
 // }
 
-pub trait ClickAction<App: Appli> {
+pub trait ClickAction<App: Application> {
     fn execute(&self, state: &Context<App>, queue: &mut EventQueue<App>);
 }
 
 impl<App, F> ClickAction<App> for F
 where
-    App: Appli,
+    App: Application,
     F: Fn(&Context<App>, &mut EventQueue<App>),
 {
     fn execute(&self, state: &Context<App>, queue: &mut EventQueue<App>) {
@@ -42,7 +42,7 @@ pub struct Toggle<T>(pub T);
 
 impl<T, App> ClickAction<App> for Toggle<T>
 where
-    App: Appli,
+    App: Application,
     T: Path<App, bool>,
 {
     fn execute(&self, state: &Context<App>, _: &mut EventQueue<App>) {

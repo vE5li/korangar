@@ -1,6 +1,7 @@
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, print_debug};
 use korangar_interface::components::drop_down::DropDownItem;
+use korangar_interface::element::StateElement;
 use ron::ser::PrettyConfig;
 use rust_state::RustState;
 use serde::{Deserialize, Serialize};
@@ -9,7 +10,7 @@ use crate::graphics::{
     LimitFramerate, Msaa, PresentModeInfo, ScreenSpaceAntiAliasing, ShadowDetail, ShadowQuality, Ssaa, TextureSamplerType,
 };
 
-#[derive(RustState, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, RustState, StateElement)]
 pub struct GraphicsSettings {
     pub lighting_mode: LightingMode,
     pub vsync: bool,
@@ -79,7 +80,7 @@ impl Drop for GraphicsSettings {
 }
 
 /// The lighting mode used when rendering the game.
-#[derive(Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Copy, Clone, PartialEq, Eq, Serialize, Deserialize, StateElement)]
 pub enum LightingMode {
     /// Mode that mimics the way the original client rendered the game.
     Classic,
@@ -100,7 +101,7 @@ impl DropDownItem<LightingMode> for LightingMode {
     }
 }
 
-#[derive(RustState)]
+#[derive(RustState, StateElement)]
 pub struct GraphicsSettingsCapabilities {
     lighting_modes: Vec<LightingMode>,
     texture_filtering_options: Vec<TextureSamplerType>,

@@ -1,7 +1,7 @@
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::application::{Appli, ClipTrait, CornerRadiusTrait, PositionTrait, RenderLayer, SizeTrait};
+use crate::application::{Application, ClipTrait, CornerRadiusTrait, PositionTrait, RenderLayer, SizeTrait};
 
 macro_rules! anchor_color {
     ($anchor_point:expr, $anchor_color:expr, $closest_anchor_color:expr, $name:ident) => {
@@ -30,7 +30,7 @@ pub enum AnchorPoint {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Anchor<App>
 where
-    App: Appli,
+    App: Application,
 {
     anchor_point: AnchorPoint,
     offset: App::Position,
@@ -38,7 +38,7 @@ where
 
 impl<App> Default for Anchor<App>
 where
-    App: Appli,
+    App: Application,
 {
     fn default() -> Self {
         // By default, windows start out in the middle of the screen.
@@ -51,18 +51,18 @@ where
 
 impl<App> Clone for Anchor<App>
 where
-    App: Appli,
+    App: Application,
 {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<App> Copy for Anchor<App> where App: Appli {}
+impl<App> Copy for Anchor<App> where App: Application {}
 
 impl<App> Anchor<App>
 where
-    App: Appli,
+    App: Application,
 {
     pub fn to_position(&self, window_space: App::Size, window_size: App::Size) -> App::Position {
         let half_width = window_space.width() / 2.0;

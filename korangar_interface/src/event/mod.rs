@@ -9,10 +9,10 @@ mod queue {
     use rust_state::Context;
 
     use super::ClickAction;
-    use crate::application::Appli;
+    use crate::application::Application;
     use crate::element::ElementBox;
 
-    pub enum Event<App: Appli> {
+    pub enum Event<App: Application> {
         FocusNext,
         FocusPrevious,
         Application(App::Event),
@@ -27,7 +27,7 @@ mod queue {
         CloseOverlay,
     }
 
-    impl<App: Appli> Clone for Event<App> {
+    impl<App: Application> Clone for Event<App> {
         fn clone(&self) -> Self {
             match self {
                 Self::FocusNext => Self::FocusNext,
@@ -40,17 +40,17 @@ mod queue {
         }
     }
 
-    impl<App: Appli> ClickAction<App> for Event<App> {
+    impl<App: Application> ClickAction<App> for Event<App> {
         fn execute(&self, _: &Context<App>, queue: &mut EventQueue<App>) {
             queue.queue(self.clone());
         }
     }
 
-    pub struct EventQueue<App: Appli> {
+    pub struct EventQueue<App: Application> {
         events: Vec<Event<App>>,
     }
 
-    impl<App: Appli> Default for EventQueue<App> {
+    impl<App: Application> Default for EventQueue<App> {
         fn default() -> Self {
             Self {
                 events: Default::default(),
@@ -58,7 +58,7 @@ mod queue {
         }
     }
 
-    impl<App: Appli> EventQueue<App> {
+    impl<App: Application> EventQueue<App> {
         pub fn queue(&mut self, event: impl Into<Event<App>>) {
             self.events.push(event.into());
         }

@@ -1,8 +1,8 @@
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, print_debug};
 use korangar_interface::application::FontSizeTrait;
-use korangar_interface::element::PrototypeElement;
-use korangar_interface::window::PrototypeWindow;
+use korangar_interface::element::StateElement;
+use korangar_interface::window::StateWindow;
 use ron::ser::PrettyConfig;
 use rust_state::RustState;
 use serde::{Deserialize, Serialize};
@@ -41,7 +41,7 @@ use crate::loaders::FontSize;
 // }
 
 // // TODO: Make all theme fileds private. Use the traits to access fields
-// #[derive(Serialize, Deserialize, PrototypeElement)]
+// #[derive(Serialize, Deserialize, StateElement)]
 // pub struct ButtonTheme {
 //     pub background_color: Mutable<Color, Render>,
 //     pub hovered_background_color: Mutable<Color, Render>,
@@ -190,7 +190,7 @@ use crate::loaders::FontSize;
 //     }
 // }
 //
-// #[derive(Serialize, Deserialize, PrototypeElement)]
+// #[derive(Serialize, Deserialize, StateElement)]
 // pub struct WindowTheme {
 //     pub background_color: Mutable<Color, Render>,
 //     pub title_background_color: Mutable<Color, Render>,
@@ -323,7 +323,7 @@ use crate::loaders::FontSize;
 //     }
 // }
 //
-// #[derive(Serialize, Deserialize, PrototypeElement)]
+// #[derive(Serialize, Deserialize, StateElement)]
 // pub struct ExpandableTheme {
 //     pub background_color: Mutable<Color, Render>,
 //     pub second_background_color: Mutable<Color, Render>,
@@ -457,7 +457,7 @@ use crate::loaders::FontSize;
 //     }
 // }
 //
-// #[derive(Serialize, Deserialize, PrototypeElement)]
+// #[derive(Serialize, Deserialize, StateElement)]
 // pub struct LabelTheme {
 //     pub background_color: Mutable<Color, Render>,
 //     pub foreground_color: Mutable<Color, Render>,
@@ -527,7 +527,7 @@ use crate::loaders::FontSize;
 //     }
 // }
 //
-// #[derive(Serialize, Deserialize, PrototypeElement)]
+// #[derive(Serialize, Deserialize, StateElement)]
 // pub struct ValueTheme {
 //     pub background_color: Mutable<Color, Render>,
 //     pub hovered_background_color: Mutable<Color, Render>,
@@ -606,7 +606,7 @@ use crate::loaders::FontSize;
 //     }
 // }
 //
-// #[derive(Serialize, Deserialize, PrototypeElement)]
+// #[derive(Serialize, Deserialize, StateElement)]
 // pub struct CloseButtonTheme {
 //     pub background_color: Mutable<Color, Render>,
 //     pub hovered_background_color: Mutable<Color, Render>,
@@ -688,7 +688,7 @@ use crate::loaders::FontSize;
 //     }
 // }
 //
-#[derive(Serialize, Deserialize, RustState)]
+#[derive(Serialize, Deserialize, RustState, StateElement)]
 pub struct OverlayTheme {
     pub foreground_color: Color,
     pub text_offset: ScreenPosition,
@@ -705,7 +705,7 @@ impl Default for OverlayTheme {
     }
 }
 //
-// #[derive(Serialize, Deserialize, PrototypeElement)]
+// #[derive(Serialize, Deserialize, StateElement)]
 // pub struct SliderTheme {
 //     pub background_color: Mutable<Color, Render>,
 //     pub rail_color: Mutable<Color, Render>,
@@ -753,7 +753,7 @@ impl Default for OverlayTheme {
 //     }
 // }
 //
-// #[derive(Serialize, Deserialize, PrototypeElement)]
+// #[derive(Serialize, Deserialize, StateElement)]
 // pub struct InputTheme {
 //     pub background_color: Mutable<Color, Render>,
 //     pub hovered_background_color: Mutable<Color, Render>,
@@ -871,7 +871,7 @@ impl Default for OverlayTheme {
 //     }
 // }
 //
-// #[derive(Serialize, Deserialize, PrototypeElement)]
+// #[derive(Serialize, Deserialize, StateElement)]
 // pub struct ChatTheme {
 //     pub background_color: Mutable<Color, Render>,
 //     pub font_size: MutableRange<FontSize, Render>,
@@ -933,7 +933,7 @@ impl Default for OverlayTheme {
 //     }
 // }
 //
-#[derive(Serialize, Deserialize, RustState)]
+#[derive(Serialize, Deserialize, RustState, StateElement)]
 pub struct CursorTheme {
     pub color: Color,
 }
@@ -946,7 +946,7 @@ impl Default for CursorTheme {
     }
 }
 //
-// #[derive(Serialize, Deserialize, PrototypeElement)]
+// #[derive(Serialize, Deserialize, StateElement)]
 // pub struct ProfilerTheme {
 //     pub background_color: Mutable<Color, Render>,
 //     pub corner_radius: MutableRange<CornerRadius, Render>,
@@ -1066,7 +1066,7 @@ impl Default for CursorTheme {
 //     }
 // }
 //
-#[derive(Serialize, Deserialize, RustState)]
+#[derive(Serialize, Deserialize, RustState, StateElement)]
 pub struct StatusBarTheme {
     pub background_color: Color,
     pub player_health_color: Color,
@@ -1103,7 +1103,7 @@ impl Default for StatusBarTheme {
     }
 }
 //
-#[derive(Serialize, Deserialize, RustState)]
+#[derive(Serialize, Deserialize, RustState, StateElement)]
 pub struct IndicatorTheme {
     pub walking: Color,
 }
@@ -1213,7 +1213,7 @@ impl Default for IndicatorTheme {
 //     }
 // }
 
-#[derive(Default, Serialize, Deserialize, RustState)]
+#[derive(Default, Serialize, Deserialize, RustState, StateElement)]
 pub struct GameTheme {
     pub overlay: OverlayTheme,
     pub status_bar: StatusBarTheme,
@@ -1221,7 +1221,7 @@ pub struct GameTheme {
     pub cursor: CursorTheme,
 }
 //
-// #[derive(PrototypeWindow)]
+// #[derive(StateWindow)]
 // #[window_title("Theme Viewer")]
 // #[window_class("theme_viewer")]
 // pub struct Themes {

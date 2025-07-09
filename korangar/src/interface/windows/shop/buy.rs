@@ -2,7 +2,7 @@ use derive_new::new;
 use korangar_interface::element::{ElementWrap, ScrollView};
 use korangar_interface::size_bound;
 use korangar_interface::state::{PlainRemote, PlainTrackedState};
-use korangar_interface::window::{PrototypeWindow, Window, WindowBuilder};
+use korangar_interface::window::{StateWindow, Window, WindowBuilder};
 use korangar_networking::ShopItem;
 
 use crate::interface::application::InterfaceSettings;
@@ -21,7 +21,7 @@ impl BuyWindow {
     pub const WINDOW_CLASS: &'static str = "shop";
 }
 
-impl PrototypeWindow<InterfaceSettings> for BuyWindow {
+impl StateWindow<InterfaceSettings> for BuyWindow {
     fn window_class(&self) -> Option<&str> {
         Some(Self::WINDOW_CLASS)
     }

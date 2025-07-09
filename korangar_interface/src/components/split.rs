@@ -1,6 +1,6 @@
 use rust_state::Context;
 
-use crate::application::Appli;
+use crate::application::Application;
 use crate::element::id::ElementIdGenerator;
 use crate::element::store::ElementStore;
 use crate::element::{Element, ElementSet, ResolverSet};
@@ -44,31 +44,31 @@ impl ResolverSet for CellResolverSet<'_> {
 
 impl<App, Children> Element<App> for Split<Children>
 where
-    App: Appli,
+    App: Application,
     Children: ElementSet<App>,
 {
-    type Layouted = Children::Layouted;
+    type LayoutInfo = Children::LayoutInfo;
 
-    fn make_layout(
+    fn create_layout_info(
         &mut self,
         state: &Context<App>,
         store: &mut ElementStore,
         generator: &mut ElementIdGenerator,
         resolver: &mut Resolver,
-    ) -> Self::Layouted {
+    ) -> Self::LayoutInfo {
         let cell_size = resolver.push_available_area().width / self.children.get_element_count() as f32;
         let resolver_set = CellResolverSet::new(resolver, cell_size);
 
-        self.children.make_layout(state, store, generator, resolver_set)
+        self.children.create_layout_info(state, store, generator, resolver_set)
     }
 
-    fn create_layout<'a>(
+    fn layout_element<'a>(
         &'a self,
         state: &'a Context<App>,
         store: &'a ElementStore,
-        layouted: &'a Self::Layouted,
+        layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, App>,
     ) {
-        self.children.create_layout(state, store, layouted, layout);
+        self.children.layout_element(state, store, layout_info, layout);
     }
 }

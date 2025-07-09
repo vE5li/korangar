@@ -1,5 +1,5 @@
 use korangar_components::skill_box;
-use korangar_interface::window::{CustomWindow, PrototypeWindow, Window, WindowTrait};
+use korangar_interface::window::{CustomWindow, StateWindow, Window, WindowTrait};
 use ragnarok_packets::HotbarSlot;
 use rust_state::{ArrayLookupExt, Context, OptionExt, Path};
 

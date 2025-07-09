@@ -14,7 +14,7 @@ use korangar_debug::logging::Colorize;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::print_debug;
 use korangar_interface::application::FontSizeTrait;
-use korangar_interface::element::ElementDisplay;
+use korangar_interface::element::{ElementDisplay, StateElement};
 use korangar_util::Rectangle;
 use serde::{Deserialize, Serialize};
 

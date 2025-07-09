@@ -9,9 +9,15 @@ use rust_state::Context;
 
 pub use self::resolver::{HeightBound, Resolver};
 use crate::MouseMode;
-use crate::application::{Appli, ClipTrait, PositionTrait, RenderLayer, SizeTrait};
+use crate::application::{Application, ClipTrait, PositionTrait, RenderLayer, SizeTrait};
 use crate::element::id::ElementId;
 use crate::event::{ClickAction, Event, EventQueue};
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum MouseButton {
+    Left,
+    Right,
+}
 
 pub mod alignment {
     #[derive(Clone, Copy)]
@@ -60,21 +66,21 @@ pub mod area {
     }
 }
 
-struct RectangleInsturction<App: Appli> {
+struct RectangleInsturction<App: Application> {
     clip_layer: ClipLayerId,
     area: Area,
     corner_radius: App::CornerRadius,
     color: App::Color,
 }
 
-struct CheckboxInstruction<App: Appli> {
+struct CheckboxInstruction<App: Application> {
     clip_layer: ClipLayerId,
     area: Area,
     color: App::Color,
     state: bool,
 }
 
-struct TextInstruction<'a, App: Appli> {
+struct TextInstruction<'a, App: Application> {
     clip_layer: ClipLayerId,
     area: Area,
     text: &'a str,
@@ -87,6 +93,7 @@ struct TextInstruction<'a, App: Appli> {
 struct ClickArea<'a, App> {
     clip_layer: ClipLayerId,
     area: Area,
+    mouse_button: MouseButton,
     action: &'a dyn ClickAction<App>,
 }
 
@@ -120,7 +127,7 @@ pub trait InputHandler<App> {
     fn handle_character(&self, state: &Context<App>, character: char);
 }
 
-struct LayoutLayer<'a, App: Appli> {
+struct LayoutLayer<'a, App: Application> {
     rectangles: Vec<RectangleInsturction<App>>,
     texts: Vec<TextInstruction<'a, App>>,
     checkboxes: Vec<CheckboxInstruction<App>>,
@@ -135,7 +142,7 @@ struct LayoutLayer<'a, App: Appli> {
     input_handlers: Vec<&'a dyn InputHandler<App>>,
 }
 
-impl<App: Appli> Default for LayoutLayer<'_, App> {
+impl<App: Application> Default for LayoutLayer<'_, App> {
     fn default() -> Self {
         Self {
             rectangles: Default::default(),
@@ -158,18 +165,18 @@ impl<App: Appli> Default for LayoutLayer<'_, App> {
 // TODO: Make inner field private (maybe)
 pub struct ClipLayerId(pub usize);
 
-pub struct ClipLayer<App: Appli> {
+pub struct ClipLayer<App: Application> {
     parent: Option<ClipLayerId>,
     clip: App::Clip,
 }
 
-impl<App: Appli> ClipLayer<App> {
+impl<App: Application> ClipLayer<App> {
     pub fn get(&self) -> App::Clip {
         self.clip
     }
 }
 
-impl<App: Appli> Clone for ClipLayer<App> {
+impl<App: Application> Clone for ClipLayer<App> {
     fn clone(&self) -> Self {
         Self {
             parent: self.parent.clone(),
@@ -188,7 +195,7 @@ impl Drop for ClipLayerHandle {
     }
 }
 
-pub struct Layout<'a, App: Appli> {
+pub struct Layout<'a, App: Application> {
     layers: Vec<LayoutLayer<'a, App>>,
     current_layer: usize,
     can_hover: bool,
@@ -198,9 +205,11 @@ pub struct Layout<'a, App: Appli> {
 
     mouse_position: App::Position,
     focused_element: Option<ElementId>,
+
+    use_secondary_color: bool,
 }
 
-impl<'a, App: Appli> Layout<'a, App> {
+impl<'a, App: Application> Layout<'a, App> {
     pub fn new(mouse_position: App::Position, focused_element: Option<ElementId>, can_hover: bool) -> Self {
         Self {
             layers: vec![LayoutLayer::default()],
@@ -215,6 +224,8 @@ impl<'a, App: Appli> Layout<'a, App> {
 
             mouse_position,
             focused_element,
+
+            use_secondary_color: false,
         }
     }
 
@@ -247,12 +258,24 @@ impl<'a, App: Appli> Layout<'a, App> {
         self.focused_element.is_some_and(|id| id == element_id)
     }
 
-    pub fn push_layer(&mut self) {
+    fn push_layer(&mut self) {
         self.current_layer += 1;
 
         if self.current_layer >= self.layers.len() {
             self.layers.push(LayoutLayer::default());
         }
+    }
+
+    fn pop_layer(&mut self) {
+        self.current_layer -= 1;
+    }
+
+    pub fn with_layer(&mut self, mut f: impl FnMut(&mut Self)) {
+        self.push_layer();
+
+        f(self);
+
+        self.pop_layer();
     }
 
     fn new_clip_layer(&mut self) -> ClipLayerHandle {
@@ -286,20 +309,19 @@ impl<'a, App: Appli> Layout<'a, App> {
         self.set_layer_clip(handle, area);
     }
 
-    pub fn pop_layer(&mut self) {
-        self.current_layer -= 1;
-    }
-
     pub fn get_active_clip_layer(&self) -> ClipLayerId {
         self.active_clip_layers.last().copied().unwrap()
     }
 
-    pub fn add_click_area(&mut self, area: Area, action: &'a dyn ClickAction<App>) {
+    pub fn add_click_area(&mut self, area: Area, button: MouseButton, action: &'a dyn ClickAction<App>) {
         let clip_layer = self.get_active_clip_layer();
 
-        self.layers[self.current_layer]
-            .click_areas
-            .push(ClickArea { clip_layer, area, action });
+        self.layers[self.current_layer].click_areas.push(ClickArea {
+            clip_layer,
+            area,
+            mouse_button: button,
+            action,
+        });
     }
 
     pub fn add_window_move_area(&mut self, area: Area, window_id: u64) {
@@ -411,6 +433,16 @@ impl<'a, App: Appli> Layout<'a, App> {
 
     pub fn add_custom_instruction(&mut self, instruction: <App::Renderer as RenderLayer<App>>::CustomInstruction<'a>) {
         self.layers[self.current_layer].custom_instructions.push(instruction);
+    }
+
+    pub fn with_secondary_background(&mut self, f: impl Fn(&mut Self)) -> bool {
+        let previous = self.use_secondary_color;
+        self.use_secondary_color = !self.use_secondary_color;
+
+        f(self);
+
+        self.use_secondary_color = previous;
+        previous
     }
 
     pub fn render(&mut self, renderer: &App::Renderer) {
@@ -533,6 +565,7 @@ impl<'a, App: Appli> Layout<'a, App> {
         focused_element: &mut Option<ElementId>,
         mouse_mode: &mut MouseMode,
         click_position: App::Position,
+        mouse_button: MouseButton,
     ) -> bool {
         let mut clicked = false;
 
@@ -544,6 +577,7 @@ impl<'a, App: Appli> Layout<'a, App> {
                     && click_position.left() <= click_area.area.x + click_area.area.width
                     && click_position.top() >= click_area.area.y
                     && click_position.top() <= click_area.area.y + click_area.area.height
+                    && click_area.mouse_button == mouse_button
                 {
                     click_area.action.execute(state, queue);
                     clicked = true;

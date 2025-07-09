@@ -5,7 +5,7 @@ use korangar_interface::components::drop_down::DefaultClickHandler;
 use korangar_interface::element::Element;
 use korangar_interface::event::Toggle;
 use korangar_interface::prelude::*;
-use korangar_interface::window::{CustomWindow, PrototypeWindow, Window, WindowTrait};
+use korangar_interface::window::{CustomWindow, StateWindow, Window, WindowTrait};
 use rust_state::{Context, Path, Selector};
 
 use crate::client_state;

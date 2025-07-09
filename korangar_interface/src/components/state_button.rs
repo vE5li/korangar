@@ -2,20 +2,20 @@ use std::marker::PhantomData;
 
 use rust_state::{Context, RustState, Selector};
 
-use crate::application::Appli;
+use crate::application::Application;
 use crate::element::Element;
 use crate::element::id::ElementIdGenerator;
 use crate::element::store::ElementStore;
 use crate::event::ClickAction;
 use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
 use crate::layout::area::Area;
-use crate::layout::{Layout, Resolver};
+use crate::layout::{Layout, MouseButton, Resolver};
 use crate::theme::{ThemePathGetter, theme};
 
 #[derive(RustState)]
 pub struct StateButtonTheme<App>
 where
-    App: Appli,
+    App: Application,
 {
     pub foreground_color: App::Color,
     pub background_color: App::Color,
@@ -48,7 +48,7 @@ pub struct StateButton<Text, A, B, C, D, E, F, G, H, I, J, K, L, M> {
 
 impl<App, Text, A, B, C, D, E, F, G, H, I, J, K, L, M> Element<App> for StateButton<Text, A, B, C, D, E, F, G, H, I, J, K, L, M>
 where
-    App: Appli,
+    App: Application,
     Text: AsRef<str> + 'static,
     A: Selector<App, Text>,
     B: Selector<App, bool>,
@@ -64,40 +64,38 @@ where
     L: Selector<App, App::FontSize>,
     M: Selector<App, HorizontalAlignment>,
 {
-    fn make_layout(
+    fn create_layout_info(
         &mut self,
         state: &Context<App>,
         store: &mut ElementStore,
         generator: &mut ElementIdGenerator,
         resolver: &mut Resolver,
-    ) -> Self::Layouted {
+    ) -> Self::LayoutInfo {
         let height = state.get(&self.height);
         let area = resolver.with_height(*height);
-        Self::Layouted { area }
+        Self::LayoutInfo { area }
     }
 
-    fn create_layout<'a>(
+    fn layout_element<'a>(
         &'a self,
         state: &'a Context<App>,
         store: &'a ElementStore,
-        layouted: &'a Self::Layouted,
+        layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, App>,
     ) {
-        let is_hoverered = layout.is_area_hovered_and_active(layouted.area);
+        let is_hoverered = layout.is_area_hovered_and_active(layout_info.area);
 
         if is_hoverered {
-            layout.add_click_area(layouted.area, &self.event);
+            layout.add_click_area(layout_info.area, MouseButton::Left, &self.event);
             layout.mark_hovered();
         }
-
-        layout.add_focus_area(layouted.area, store.get_element_id());
 
         let background_color = match is_hoverered {
             true => *state.get(&self.hovered_background_color),
             false => *state.get(&self.background_color),
         };
 
-        layout.add_rectangle(layouted.area, *state.get(&self.corner_radius), background_color);
+        layout.add_rectangle(layout_info.area, *state.get(&self.corner_radius), background_color);
 
         let foreground_color = match is_hoverered {
             true => *state.get(&self.hovered_foreground_color),
@@ -105,7 +103,7 @@ where
         };
 
         layout.add_text(
-            layouted.area,
+            layout_info.area,
             state.get(&self.text).as_ref(),
             *state.get(&self.font_size),
             foreground_color,
@@ -113,11 +111,11 @@ where
             *state.get(&theme().state_button().vertical_alignment()),
         );
 
-        let checkbox_size = layouted.area.height - 6.0;
+        let checkbox_size = layout_info.area.height - 6.0;
         layout.add_checkbox(
             Area {
-                x: layouted.area.x + 8.0,
-                y: layouted.area.y + 3.0,
+                x: layout_info.area.x + 8.0,
+                y: layout_info.area.y + 3.0,
                 width: checkbox_size,
                 height: checkbox_size,
             },

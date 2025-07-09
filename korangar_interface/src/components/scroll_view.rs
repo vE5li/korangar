@@ -2,10 +2,10 @@ use std::cell::RefCell;
 
 use rust_state::Context;
 
-use crate::application::Appli;
+use crate::application::Application;
 use crate::element::id::ElementIdGenerator;
 use crate::element::store::{ElementStore, Persistent, PersistentExt};
-use crate::element::{DefaultLayoutedSet, Element, ElementSet};
+use crate::element::{DefaultLayoutInfoSet, Element, ElementSet};
 use crate::layout::area::Area;
 use crate::layout::{HeightBound, Layout, Resolver};
 
@@ -15,7 +15,7 @@ pub struct PersistentData {
     // animation_state: AnimationState,
 }
 
-pub struct ScrollViewLayouted<L> {
+pub struct ScrollViewLayoutInfo<L> {
     area: Area,
     children: L,
     max_scroll: f32,
@@ -32,18 +32,18 @@ impl<Children> Persistent for ScrollView<Children> {
 
 impl<App, Children> Element<App> for ScrollView<Children>
 where
-    App: Appli,
+    App: Application,
     Children: ElementSet<App>,
 {
-    type Layouted = ScrollViewLayouted<Children::Layouted>;
+    type LayoutInfo = ScrollViewLayoutInfo<Children::LayoutInfo>;
 
-    fn make_layout(
+    fn create_layout_info(
         &mut self,
         state: &Context<App>,
         store: &mut ElementStore,
         generator: &mut ElementIdGenerator,
         resolver: &mut Resolver,
-    ) -> Self::Layouted {
+    ) -> Self::LayoutInfo {
         loop {
             let persistent = self.get_persistent_data(store, ());
             let current_scroll = *persistent.scroll.borrow();
@@ -54,9 +54,10 @@ where
             // ugly and might be improved in the future.
             let mut cloned_resolver = resolver.clone();
 
-            let (area, children_height, layouted) = cloned_resolver.with_derived_scrolled(current_scroll, self.height_bound, |resolver| {
-                self.children.make_layout(state, store, generator, resolver)
-            });
+            let (area, children_height, layout_info) =
+                cloned_resolver.with_derived_scrolled(current_scroll, self.height_bound, |resolver| {
+                    self.children.create_layout_info(state, store, generator, resolver)
+                });
 
             let persistent = self.get_persistent_data(store, ());
             let mut current_scroll = persistent.scroll.borrow_mut();
@@ -76,19 +77,19 @@ where
 
             *resolver = cloned_resolver;
 
-            return ScrollViewLayouted {
+            return ScrollViewLayoutInfo {
                 area,
-                children: layouted,
+                children: layout_info,
                 max_scroll,
             };
         }
     }
 
-    fn create_layout<'a>(
+    fn layout_element<'a>(
         &'a self,
         state: &'a Context<App>,
         store: &'a ElementStore,
-        layouted: &'a Self::Layouted,
+        layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, App>,
     ) {
         let persistent = self.get_persistent_data(store, ());
@@ -97,18 +98,14 @@ where
             println!("unbound scroll views don't do anything");
         }
 
-        layout.with_clip_layer(layouted.area, |layout| {
-            // TODO: Very much temp
-            layout.push_layer();
-
-            self.children.create_layout(state, store, &layouted.children, layout);
-
-            // TODO: Very much temp
-            layout.pop_layer();
+        layout.with_clip_layer(layout_info.area, |layout| {
+            layout.with_layer(|layout| {
+                self.children.layout_element(state, store, &layout_info.children, layout);
+            });
         });
 
-        if layout.is_area_hovered(layouted.area) {
-            layout.add_scroll_area(layouted.area, layouted.max_scroll, &persistent.scroll);
+        if layout.is_area_hovered(layout_info.area) {
+            layout.add_scroll_area(layout_info.area, layout_info.max_scroll, &persistent.scroll);
         }
     }
 }

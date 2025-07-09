@@ -1,5 +1,5 @@
 use korangar_components::item_box;
-use korangar_interface::window::{CustomWindow, PrototypeWindow, Window, WindowTrait};
+use korangar_interface::window::{CustomWindow, StateWindow, Window, WindowTrait};
 use korangar_networking::InventoryItem;
 use rust_state::{Path, VecIndexExt};
 

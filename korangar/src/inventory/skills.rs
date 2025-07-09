@@ -17,7 +17,7 @@ pub struct Skill {
     pub animation_state: SpriteAnimationState,
 }
 
-#[derive(RustState, Default)]
+#[derive(Default, RustState)]
 pub struct SkillTree {
     skills: Vec<Skill>,
 }

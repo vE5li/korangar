@@ -31,6 +31,7 @@ macro_rules! time_phase {
 
 mod graphics;
 mod input;
+mod state;
 #[macro_use]
 mod interface;
 mod inventory;
@@ -62,6 +63,7 @@ use korangar_debug::profile_block;
 use korangar_debug::profiling::Profiler;
 use korangar_interface::Interface;
 use korangar_interface::application::{FontSizeTrait, PositionTrait, ScalingTrait};
+use korangar_interface::element::StateElement;
 use korangar_interface::element::id::ElementId;
 use korangar_interface::event::EventQueue;
 use korangar_interface::window::WindowThemePathExt;
@@ -70,8 +72,7 @@ use korangar_networking::{
     ShopItem,
 };
 use korangar_util::pathing::PathFinder;
-use ragnarok_packets::handler::NoPacketCallback;
-#[cfg(not(feature = "debug"))]
+// #[cfg(not(feature = "debug"))]
 use ragnarok_packets::handler::NoPacketCallback;
 use ragnarok_packets::{
     BuyShopItemsResult, CharacterId, CharacterInformation, CharacterServerInformation, Direction, DisappearanceReason, Friend, HotbarSlot,
@@ -141,10 +142,11 @@ pub static SHUTDOWN_SIGNAL: LazyLock<AtomicBool> = LazyLock::new(|| AtomicBool::
 
 #[cfg(feature = "debug")]
 const DEBUG_WINDOWS: &[WindowClass] = &[
-    WindowClass::Time,
+    WindowClass::ClientState,
     WindowClass::Packets,
-    WindowClass::RenderSettings,
     WindowClass::Profiler,
+    WindowClass::RenderSettings,
+    WindowClass::Time,
 ];
 
 // Create the `threads` module.
@@ -155,12 +157,13 @@ korangar_debug::create_profiler_threads!(threads, {
 });
 
 mod character_slots {
+    use korangar_interface::element::StateElement;
     use ragnarok_packets::{CharacterId, CharacterInformation};
-    use rust_state::{Path, Selector};
+    use rust_state::{Path, RustState, Selector};
 
     use crate::state::ClientState;
 
-    #[derive(Default)]
+    #[derive(Default, RustState, StateElement)]
     pub struct CharacterSlots {
         slots: Vec<Option<CharacterInformation>>,
     }
@@ -325,674 +328,10 @@ pub struct ChatMessage {
 }
 
 // TODO: Move
-#[derive(RustState)]
+#[derive(RustState, StateElement)]
 pub struct PacketState {
     update: bool,
     show_pings: bool,
-}
-
-mod state {
-    use std::sync::Arc;
-
-    use korangar_interface::application::{Appli, RenderLayer};
-    use korangar_interface::components::button::ButtonTheme;
-    use korangar_interface::components::collapsable::CollapsableTheme;
-    use korangar_interface::components::drop_down::DropDownTheme;
-    use korangar_interface::components::state_button::StateButtonTheme;
-    use korangar_interface::components::text::TextTheme;
-    use korangar_interface::components::text_box::TextBoxTheme;
-    use korangar_interface::element::PrototypeElement;
-    use korangar_interface::layout::alignment::{HorizontalAlignment, VerticalAlignment};
-    use korangar_interface::layout::area::Area;
-    use korangar_interface::layout::{ClipLayer, ClipLayerId, Layout};
-    use korangar_interface::theme::ThemePathGetter;
-    use korangar_interface::window::{PrototypeWindow, WindowTheme};
-    use korangar_networking::{SellItem, ShopItem};
-    use ragnarok_packets::{CharacterId, CharacterInformation, CharacterServerInformation, Friend};
-    use rust_state::{Path, RustState, Selector};
-
-    use crate::character_slots::CharacterSlots;
-    #[cfg(feature = "debug")]
-    use crate::graphics::RenderSettings;
-    use crate::graphics::{Color, Texture};
-    use crate::input::UserEvent;
-    use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
-    use crate::interface::theme::GameTheme;
-    use crate::interface::windows::{WindowCache, WindowClass};
-    use crate::inventory::{Hotbar, Inventory, SkillTree};
-    use crate::loaders::{ClientInfo, FontSize, Scaling, ServiceId, Sprite};
-    use crate::renderer::SpriteRenderer;
-    use crate::settings::{GraphicsSettingsCapabilities, LoginSettings};
-    use crate::world::{Actions, AnimationState, Entity, Map, Player, ResourceMetadata, SpriteAnimationState};
-    use crate::{AudioSettings, ChatMessage, GraphicsSettings, PacketState};
-
-    pub(super) fn client_state() -> impl Path<ClientState, ClientState> {
-        ClientState::path()
-    }
-
-    pub(super) fn this_player() -> impl Path<ClientState, Player, false> {
-        #[derive(Clone, Copy)]
-        struct CustomPath;
-
-        impl Selector<ClientState, Player, false> for CustomPath {
-            fn select<'a>(&'a self, state: &'a ClientState) -> Option<&'a Player> {
-                self.follow(state)
-            }
-        }
-
-        impl Path<ClientState, Player, false> for CustomPath {
-            fn follow<'a>(&self, state: &'a ClientState) -> Option<&'a Player> {
-                // TODO: Select our player better.
-                match state.entities.first()? {
-                    Entity::Player(player) => Some(player),
-                    _ => unreachable!(),
-                }
-            }
-
-            fn follow_mut<'a>(&self, state: &'a mut ClientState) -> Option<&'a mut Player> {
-                // TODO: Select our player better.
-                match state.entities.first_mut()? {
-                    Entity::Player(player) => Some(player),
-                    _ => unreachable!(),
-                }
-            }
-        }
-
-        CustomPath
-    }
-
-    pub(super) fn this_entity() -> impl Path<ClientState, Entity, false> {
-        #[derive(Clone, Copy)]
-        struct CustomPath;
-
-        impl Selector<ClientState, Entity, false> for CustomPath {
-            fn select<'a>(&'a self, state: &'a ClientState) -> Option<&'a Entity> {
-                self.follow(state)
-            }
-        }
-
-        impl Path<ClientState, Entity, false> for CustomPath {
-            fn follow<'a>(&self, state: &'a ClientState) -> Option<&'a Entity> {
-                // TODO: Select our player better.
-                state.entities.get(0)
-            }
-
-            fn follow_mut<'a>(&self, state: &'a mut ClientState) -> Option<&'a mut Entity> {
-                // TODO: Select our player better.
-                state.entities.get_mut(0)
-            }
-        }
-
-        CustomPath
-    }
-
-    // TODO: Make all of these private and load them internally
-    #[derive(RustState)]
-    #[state_root]
-    pub struct ClientState {
-        pub menu_theme: ClientTheme,
-        pub game_theme: ClientTheme,
-        pub game_theme_2: GameTheme,
-        pub interface_scale: Scaling,
-
-        pub client_info: ClientInfo,
-        pub login_window: LoginWindowState,
-        pub login_settings: LoginSettings,
-        // TODO: This should be a UniqueVec or something.
-        pub character_servers: Vec<CharacterServerInformation>,
-
-        // TODO: This should be a UniqueVec or something.
-        pub chat_messages: Vec<ChatMessage>,
-
-        // TODO: This should be a UniqueVec or something.
-        pub friend_list: Vec<Friend>,
-        // saved_login_data: Option<LoginServerLoginData>,
-        // saved_character_server: Option<CharacterServerInformation>,
-        pub character_slots: CharacterSlots,
-        // pub saved_characters: Vec<CharacterInformation>,
-        // TODO: This should be a UniqueVec or something.
-        pub shop_items: Vec<ShopItem<ResourceMetadata>>,
-        // TODO: This should be a UniqueVec or something.
-        pub sell_items: Vec<SellItem<(ResourceMetadata, u16)>>,
-        pub currently_deleting: Option<CharacterId>,
-        pub player_name: String,
-        pub switch_request: Option<usize>,
-
-        pub map: Option<Box<Map>>,
-        pub entities: Vec<Entity>,
-
-        pub hotbar: Hotbar,
-        pub player_inventory: Inventory,
-        pub player_skill_tree: SkillTree,
-
-        pub window_size: ScreenSize,
-        pub audio_settings: AudioSettings,
-        pub graphics_settings: GraphicsSettings,
-        pub graphics_settings_capabilities: GraphicsSettingsCapabilities,
-        #[cfg(feature = "debug")]
-        pub render_settings: RenderSettings,
-        #[cfg(feature = "debug")]
-        pub profiler_visible_thread: crate::threads::Enum,
-        #[cfg(feature = "debug")]
-        pub packet_state: PacketState,
-
-        pub create_character_name: String,
-    }
-
-    #[derive(RustState)]
-    pub struct LoginWindowState {
-        pub username: String,
-        pub password: String,
-        pub remember_username: bool,
-        pub remember_password: bool,
-        pub selected_service: ServiceId,
-    }
-
-    #[derive(RustState, PrototypeElement)]
-    pub struct DebugButtonTheme {
-        foreground_color: Color,
-    }
-
-    #[derive(RustState, PrototypeWindow)]
-    pub struct ClientTheme {
-        #[hidden_element]
-        pub window: WindowTheme<ClientState>,
-        #[hidden_element]
-        pub text: TextTheme<ClientState>,
-        #[hidden_element]
-        pub button: ButtonTheme<ClientState>,
-        #[hidden_element]
-        pub state_button: StateButtonTheme<ClientState>,
-        #[hidden_element]
-        pub text_box: TextBoxTheme<ClientState>,
-        #[hidden_element]
-        pub collapsable: CollapsableTheme<ClientState>,
-        #[hidden_element]
-        pub drop_down: DropDownTheme<ClientState>,
-        pub debug_button: DebugButtonTheme,
-    }
-
-    /// Marker trait to specialize the [`ThemeDefault`] trait.
-    pub trait ThemeKindMarker {}
-
-    /// Default theme in the menu.
-    pub struct DefaultMenu;
-    impl ThemeKindMarker for DefaultMenu {}
-
-    /// Default theme when in game.
-    pub struct DefaultGame;
-    impl ThemeKindMarker for DefaultGame {}
-
-    pub trait ThemeDefault<T: ThemeKindMarker> {
-        fn default() -> Self;
-    }
-
-    impl ThemeDefault<DefaultMenu> for ClientTheme {
-        fn default() -> Self {
-            Self {
-                window: WindowTheme {
-                    title_color: Color::rgb_u8(200, 150, 150),
-                    hovered_title_color: Color::rgb_u8(250, 200, 200),
-                    background_color: Color::monochrome_u8(30),
-                    gaps: 15.0,
-                    border: 20.0,
-                    corner_radius: CornerRadius::uniform(20.0),
-                    minimum_width: 400.0,
-                    maximum_width: 600.0,
-                    minimum_height: 80.0,
-                    maximum_height: 700.0,
-                    title_height: 45.0,
-                    font_size: FontSize(20.0),
-                    text_alignment: HorizontalAlignment::Center { offset: 0.0 },
-                    vertical_alignment: VerticalAlignment::Center { offset: 0.0 },
-                    anchor_color: Color::rgba_u8(255, 80, 200, 40),
-                    closest_anchor_color: Color::rgb_u8(255, 80, 200),
-                },
-                text: TextTheme {
-                    color: Color::monochrome_u8(220),
-                    height: 15.0,
-                    font_size: FontSize(14.0),
-                    horizontal_alignment: HorizontalAlignment::Left { offset: 0.0 },
-                    vertical_alignment: VerticalAlignment::Center { offset: 0.0 },
-                },
-                button: ButtonTheme {
-                    background_color: Color::monochrome_u8(80),
-                    foreground_color: Color::monochrome_u8(180),
-                    hovered_background_color: Color::monochrome_u8(120),
-                    hovered_foreground_color: Color::monochrome_u8(220),
-                    height: 30.0,
-                    corner_radius: CornerRadius::uniform(20.0),
-                    font_size: FontSize(16.0),
-                    text_alignment: HorizontalAlignment::Center { offset: 0.0 },
-                    vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
-                },
-                state_button: StateButtonTheme {
-                    background_color: Color::monochrome_u8(80),
-                    foreground_color: Color::monochrome_u8(180),
-                    hovered_background_color: Color::monochrome_u8(120),
-                    hovered_foreground_color: Color::monochrome_u8(220),
-                    checkbox_color: Color::rgb_u8(255, 100, 100),
-                    height: 30.0,
-                    corner_radius: CornerRadius::uniform(20.0),
-                    font_size: FontSize(16.0),
-                    text_alignment: HorizontalAlignment::Center { offset: 0.0 },
-                    vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
-                },
-                text_box: TextBoxTheme {
-                    background_color: Color::monochrome_u8(80),
-                    foreground_color: Color::monochrome_u8(180),
-                    hovered_background_color: Color::monochrome_u8(120),
-                    hovered_foreground_color: Color::monochrome_u8(220),
-                    height: 30.0,
-                    corner_radius: CornerRadius::uniform(20.0),
-                    font_size: FontSize(20.0),
-                    text_alignment: HorizontalAlignment::Center { offset: 0.0 },
-                    vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
-                },
-                collapsable: CollapsableTheme {
-                    background_color: Color::monochrome_u8(50),
-                    foreground_color: Color::monochrome_u8(200),
-                    hovered_foreground_color: Color::rgb_u8(250, 200, 200),
-                    corner_radius: CornerRadius::uniform(20.0),
-                    gaps: 5.0,
-                    border: 10.0,
-                    title_height: 30.0,
-                    font_size: FontSize(16.0),
-                    text_alignment: HorizontalAlignment::Left { offset: 20.0 },
-                    vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
-                },
-                drop_down: DropDownTheme {
-                    item_background_color: Color::monochrome_u8(65),
-                    item_foreground_color: Color::monochrome_u8(180),
-                    item_hovered_background_color: Color::monochrome_u8(105),
-                    item_hovered_foreground_color: Color::monochrome_u8(220),
-                    item_height: 30.0,
-                    item_corner_radius: CornerRadius::uniform(20.0),
-                    item_font_size: FontSize(16.0),
-                    item_text_alignment: HorizontalAlignment::Center { offset: 0.0 },
-                    item_vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
-                    list_corner_radius: CornerRadius::uniform(20.0),
-                    list_background_color: Color::monochrome_u8(40),
-                    list_gaps: 8.0,
-                    list_border: 5.0,
-                    list_maximum_height: 700.0,
-                    button_background_color: Color::monochrome_u8(80),
-                    button_foreground_color: Color::monochrome_u8(180),
-                    button_hovered_background_color: Color::monochrome_u8(120),
-                    button_hovered_foreground_color: Color::monochrome_u8(220),
-                    button_height: 30.0,
-                    button_corner_radius: CornerRadius::uniform(20.0),
-                    button_font_size: FontSize(16.0),
-                    button_text_alignment: HorizontalAlignment::Center { offset: 0.0 },
-                    button_vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
-                },
-                debug_button: DebugButtonTheme {
-                    foreground_color: Color::rgb_u8(255, 100, 255),
-                },
-            }
-        }
-    }
-
-    impl ThemeDefault<DefaultGame> for ClientTheme {
-        fn default() -> Self {
-            Self {
-                window: WindowTheme {
-                    title_color: Color::rgb_u8(200, 150, 150),
-                    hovered_title_color: Color::rgb_u8(250, 200, 200),
-                    background_color: Color::monochrome_u8(50),
-                    gaps: 8.0,
-                    border: 15.0,
-                    corner_radius: CornerRadius::uniform(14.0),
-                    minimum_width: 400.0,
-                    maximum_width: 600.0,
-                    minimum_height: 80.0,
-                    maximum_height: 700.0,
-                    title_height: 25.0,
-                    font_size: FontSize(14.0),
-                    text_alignment: HorizontalAlignment::Center { offset: 0.0 },
-                    vertical_alignment: VerticalAlignment::Center { offset: 0.0 },
-                    anchor_color: Color::rgba_u8(255, 80, 200, 40),
-                    closest_anchor_color: Color::rgb_u8(255, 80, 200),
-                },
-                text: TextTheme {
-                    color: Color::monochrome_u8(220),
-                    height: 12.0,
-                    font_size: FontSize(14.0),
-                    horizontal_alignment: HorizontalAlignment::Left { offset: 0.0 },
-                    vertical_alignment: VerticalAlignment::Center { offset: 0.0 },
-                },
-                button: ButtonTheme {
-                    background_color: Color::monochrome_u8(120),
-                    foreground_color: Color::monochrome_u8(220),
-                    hovered_background_color: Color::monochrome_u8(150),
-                    hovered_foreground_color: Color::monochrome_u8(250),
-                    height: 20.0,
-                    corner_radius: CornerRadius::uniform(10.0),
-                    font_size: FontSize(16.0),
-                    text_alignment: HorizontalAlignment::Center { offset: 0.0 },
-                    vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
-                },
-                state_button: StateButtonTheme {
-                    background_color: Color::monochrome_u8(120),
-                    foreground_color: Color::monochrome_u8(220),
-                    hovered_background_color: Color::monochrome_u8(150),
-                    hovered_foreground_color: Color::monochrome_u8(250),
-                    checkbox_color: Color::rgb_u8(255, 100, 100),
-                    height: 20.0,
-                    corner_radius: CornerRadius::uniform(10.0),
-                    font_size: FontSize(15.0),
-                    text_alignment: HorizontalAlignment::Center { offset: 0.0 },
-                    vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
-                },
-                text_box: TextBoxTheme {
-                    background_color: Color::monochrome_u8(120),
-                    foreground_color: Color::monochrome_u8(220),
-                    hovered_background_color: Color::monochrome_u8(150),
-                    hovered_foreground_color: Color::monochrome_u8(250),
-                    height: 20.0,
-                    corner_radius: CornerRadius::uniform(10.0),
-                    font_size: FontSize(15.0),
-                    text_alignment: HorizontalAlignment::Center { offset: 0.0 },
-                    vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
-                },
-                collapsable: CollapsableTheme {
-                    background_color: Color::monochrome_u8(80),
-                    foreground_color: Color::monochrome_u8(200),
-                    hovered_foreground_color: Color::rgb_u8(250, 200, 200),
-                    corner_radius: CornerRadius::uniform(10.0),
-                    gaps: 3.0,
-                    border: 5.0,
-                    title_height: 20.0,
-                    font_size: FontSize(14.0),
-                    text_alignment: HorizontalAlignment::Left { offset: 15.0 },
-                    vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
-                },
-                drop_down: DropDownTheme {
-                    item_background_color: Color::monochrome_u8(80),
-                    item_foreground_color: Color::monochrome_u8(180),
-                    item_hovered_background_color: Color::monochrome_u8(120),
-                    item_hovered_foreground_color: Color::monochrome_u8(220),
-                    item_height: 20.0,
-                    item_corner_radius: CornerRadius::uniform(10.0),
-                    item_font_size: FontSize(16.0),
-                    item_text_alignment: HorizontalAlignment::Center { offset: 0.0 },
-                    item_vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
-                    list_corner_radius: CornerRadius::uniform(8.0),
-                    list_background_color: Color::monochrome_u8(40),
-                    list_gaps: 4.0,
-                    list_border: 4.0,
-                    list_maximum_height: 500.0,
-                    button_background_color: Color::monochrome_u8(120),
-                    button_foreground_color: Color::monochrome_u8(220),
-                    button_hovered_background_color: Color::monochrome_u8(150),
-                    button_hovered_foreground_color: Color::monochrome_u8(250),
-                    button_height: 20.0,
-                    button_corner_radius: CornerRadius::uniform(10.0),
-                    button_font_size: FontSize(16.0),
-                    button_text_alignment: HorizontalAlignment::Center { offset: 0.0 },
-                    button_vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
-                },
-                debug_button: DebugButtonTheme {
-                    foreground_color: Color::rgb_u8(255, 100, 255),
-                },
-            }
-        }
-    }
-
-    static mut CURRENT_THEME: ClientThemeType = ClientThemeType::Game;
-
-    impl Appli for ClientState {
-        type Cache = WindowCache;
-        type Clip = ScreenClip;
-        type Color = Color;
-        type CornerRadius = CornerRadius;
-        type Event = UserEvent;
-        type FontSize = FontSize;
-        type Position = ScreenPosition;
-        type Renderer = crate::renderer::InterfaceRenderer;
-        type Size = ScreenSize;
-        type ThemeGetter = ClientThemeGetter;
-        type ThemeType = ClientThemeType;
-        type WindowClass = WindowClass;
-
-        // fn get_scaling_path() -> impl Path<Self, Scaling> {
-        //     client_state().interface_scale()
-        // }
-
-        fn set_current_theme_type(theme: ClientThemeType) {
-            unsafe {
-                CURRENT_THEME = theme;
-            }
-        }
-    }
-
-    // impl Drop for ClientState {
-    //     fn drop(&mut self) {
-    //         InterfaceSettingsStorage {
-    //             fonts: self.fonts.to_owned(),
-    //             menu_theme: self.menu_theme.get_file().to_owned(),
-    //             main_theme: self.main_theme.get_file().to_owned(),
-    //             game_theme: self.game_theme.get_file().to_owned(),
-    //             scaling: self.scaling.get(),
-    //         }
-    //         .save();
-    //     }
-    // }
-
-    #[derive(Default, Debug, Clone, Copy)]
-    pub enum ClientThemeType {
-        Menu,
-        #[default]
-        Game,
-    }
-
-    #[derive(Clone, Copy)]
-    pub struct ThemePath;
-
-    impl Path<ClientState, ClientTheme> for ThemePath {
-        fn follow<'a>(&self, state: &'a ClientState) -> Option<&'a ClientTheme> {
-            match unsafe { CURRENT_THEME } {
-                ClientThemeType::Menu => Some(&state.menu_theme),
-                ClientThemeType::Game => Some(&state.game_theme),
-            }
-        }
-
-        fn follow_mut<'a>(&self, state: &'a mut ClientState) -> Option<&'a mut ClientTheme> {
-            match unsafe { CURRENT_THEME } {
-                ClientThemeType::Menu => Some(&mut state.menu_theme),
-                ClientThemeType::Game => Some(&mut state.game_theme),
-            }
-        }
-    }
-
-    impl Selector<ClientState, ClientTheme> for ThemePath {
-        fn select<'a>(&'a self, state: &'a ClientState) -> Option<&'a ClientTheme> {
-            self.follow(state)
-        }
-    }
-
-    pub fn client_theme() -> impl Path<ClientState, ClientTheme> {
-        ThemePath
-    }
-
-    #[derive(Clone, Copy)]
-    pub struct ClientThemeGetter;
-
-    impl ThemePathGetter<ClientState> for ClientThemeGetter {
-        fn new() -> Self {
-            Self
-        }
-
-        fn window(self) -> impl Path<ClientState, WindowTheme<ClientState>> {
-            ThemePath.window()
-        }
-
-        fn text(self) -> impl Path<ClientState, TextTheme<ClientState>> {
-            ThemePath.text()
-        }
-
-        fn button(self) -> impl Path<ClientState, ButtonTheme<ClientState>> {
-            ThemePath.button()
-        }
-
-        fn state_button(self) -> impl Path<ClientState, StateButtonTheme<ClientState>> {
-            ThemePath.state_button()
-        }
-
-        fn text_box(self) -> impl Path<ClientState, TextBoxTheme<ClientState>> {
-            ThemePath.text_box()
-        }
-
-        fn collapsable(self) -> impl Path<ClientState, CollapsableTheme<ClientState>> {
-            ThemePath.collapsable()
-        }
-
-        fn drop_down(self) -> impl Path<ClientState, DropDownTheme<ClientState>> {
-            ThemePath.drop_down()
-        }
-    }
-
-    struct TextureInstruction {
-        texture: Arc<Texture>,
-        clip_layer: ClipLayerId,
-        area: Area,
-        color: Color,
-        smooth: bool,
-    }
-
-    struct SpriteInstruction<'a> {
-        actions: &'a Actions,
-        sprite: &'a Sprite,
-        animation_state: &'a SpriteAnimationState,
-        clip_layer: ClipLayerId,
-        area: Area,
-        color: Color,
-        smooth: bool,
-    }
-
-    pub enum CustomInstruction<'a> {
-        Texture(TextureInstruction),
-        Sprite(SpriteInstruction<'a>),
-    }
-
-    impl RenderLayer<ClientState> for crate::renderer::InterfaceRenderer {
-        type CustomInstruction<'a> = CustomInstruction<'a>;
-
-        fn render_rectangle(
-            &self,
-            position: ScreenPosition,
-            size: ScreenSize,
-            clip: ScreenClip,
-            corner_radius: CornerRadius,
-            color: Color,
-        ) {
-            self.render_rectangle(position, size, clip, corner_radius, color);
-        }
-
-        fn render_checkbox(&self, position: ScreenPosition, size: ScreenSize, clip: ScreenClip, color: Color, state: bool) {
-            self.render_checkbox(position, size, clip, color, state);
-        }
-
-        fn get_text_dimensions(&self, text: &str, font_size: FontSize, available_width: f32) -> ScreenSize {
-            self.get_text_dimensions(text, font_size, available_width)
-        }
-
-        fn render_text(&self, text: &str, position: ScreenPosition, clip: ScreenClip, color: Color, font_size: FontSize) {
-            self.render_text(text, position, clip, color, font_size);
-        }
-
-        fn render_expand_arrow(&self, position: ScreenPosition, size: ScreenSize, clip: ScreenClip, color: Color, expanded: bool) {
-            todo!()
-        }
-
-        fn render_custom(&self, instruction: Self::CustomInstruction<'_>, clip_layers: &[ClipLayer<ClientState>]) {
-            match instruction {
-                CustomInstruction::Sprite(SpriteInstruction {
-                    actions,
-                    sprite,
-                    animation_state,
-                    clip_layer,
-                    area,
-                    color,
-                    smooth,
-                }) => {
-                    let position = ScreenPosition {
-                        left: area.x + area.width / 2.0,
-                        top: area.y + area.height / 2.0,
-                    };
-                    let screen_clip = clip_layers[clip_layer.0].get();
-
-                    actions.render_sprite(self, sprite, animation_state, position, 0, color, 1.0);
-                }
-                CustomInstruction::Texture(TextureInstruction {
-                    texture,
-                    clip_layer,
-                    area,
-                    color,
-                    smooth,
-                }) => {
-                    let position = ScreenPosition { left: area.x, top: area.y };
-                    let size = ScreenSize {
-                        width: area.width,
-                        height: area.height,
-                    };
-                    let screen_clip = clip_layers[clip_layer.0].get();
-
-                    self.render_sprite(texture, position, size, screen_clip, color, smooth);
-                }
-            }
-        }
-    }
-
-    pub trait LayoutExt<'a> {
-        fn add_texture(&mut self, texture: Arc<Texture>, area: Area, color: Color, smooth: bool);
-
-        fn add_sprite(
-            &mut self,
-            actions: &'a Actions,
-            sprite: &'a Sprite,
-            animation_state: &'a SpriteAnimationState,
-            area: Area,
-            color: Color,
-            smooth: bool,
-        );
-    }
-
-    impl<'a> LayoutExt<'a> for Layout<'a, ClientState> {
-        fn add_texture(&mut self, texture: Arc<Texture>, area: Area, color: Color, smooth: bool) {
-            let clip_layer = self.get_active_clip_layer();
-
-            self.add_custom_instruction(CustomInstruction::Texture(TextureInstruction {
-                texture,
-                clip_layer,
-                area,
-                color,
-                smooth,
-            }));
-        }
-
-        fn add_sprite(
-            &mut self,
-            actions: &'a Actions,
-            sprite: &'a Sprite,
-            animation_state: &'a SpriteAnimationState,
-            area: Area,
-            color: Color,
-            smooth: bool,
-        ) {
-            let clip_layer = self.get_active_clip_layer();
-
-            self.add_custom_instruction(CustomInstruction::Sprite(SpriteInstruction {
-                actions,
-                sprite,
-                animation_state,
-                clip_layer,
-                area,
-                color,
-                smooth,
-            }));
-        }
-    }
 }
 
 struct Client {
@@ -1044,10 +383,15 @@ struct Client {
     point_shadow_camera: PointShadowCamera,
 
     network_event_buffer: NetworkEventBuffer,
+    // TODO: Move or remove this.
     saved_login_data: Option<LoginServerLoginData>,
+    // TODO: Move or remove this.
     saved_character_server: Option<CharacterServerInformation>,
+    // TODO: Move or remove this.
     saved_login_server_address: Option<SocketAddr>,
+    // TODO: Move or remove this.
     saved_password: String,
+    // TODO: Move or remove this.
     saved_username: String,
 
     particle_holder: ParticleHolder,
@@ -1076,9 +420,7 @@ struct Client {
     // #[cfg(not(feature = "debug"))]
     networking_system: NetworkingSystem<NoPacketCallback>,
     audio_engine: Arc<AudioEngine<GameFileLoader>>,
-    // TODO: One possible solution: store this and check the fields for eq, if they mismatch
-    // propagate and update the active field.
-    // active_graphics_settings: GraphicsSettings,
+    active_graphics_settings: GraphicsSettings,
     graphics_engine: GraphicsEngine,
     queue: Arc<Queue>,
     #[cfg(feature = "debug")]
@@ -1451,7 +793,7 @@ impl Client {
             audio_settings,
 
             window_size: ScreenSize::default(),
-            graphics_settings,
+            graphics_settings: graphics_settings.clone(),
             graphics_settings_capabilities,
             #[cfg(feature = "debug")]
             render_settings,
@@ -1540,6 +882,7 @@ impl Client {
             // packet_history_callback,
             networking_system,
             audio_engine,
+            active_graphics_settings: graphics_settings,
             graphics_engine,
             queue,
             #[cfg(feature = "debug")]
@@ -1661,7 +1004,12 @@ impl Client {
 
                     *self.client_state.follow_mut(client_state().character_servers()) = character_servers;
 
+                    #[cfg(not(feature = "debug"))]
+                    self.interface.close_all_windows();
+
+                    #[cfg(feature = "debug")]
                     self.interface.close_all_windows_except(DEBUG_WINDOWS);
+
                     self.interface
                         .open_window(SelectServerWindow::new(client_state().character_servers()));
                 }
@@ -1725,6 +1073,10 @@ impl Client {
 
                     self.audio_engine.play_background_music_track(None);
 
+                    #[cfg(not(feature = "debug"))]
+                    self.interface.close_all_windows();
+
+                    #[cfg(feature = "debug")]
                     self.interface.close_all_windows_except(DEBUG_WINDOWS);
 
                     self.async_loader
@@ -1761,7 +1113,13 @@ impl Client {
                     if !self.interface.is_window_with_class_open(WindowClass::CharacterSelection) {
                         // TODO: this will do one unnecessary restore_focus. check
                         // if that will be problematic
+
+                        #[cfg(not(feature = "debug"))]
+                        self.interface.close_all_windows();
+
+                        #[cfg(feature = "debug")]
                         self.interface.close_all_windows_except(DEBUG_WINDOWS);
+
                         self.interface.open_window(CharacterSelectionWindow::new(
                             client_state().character_slots(),
                             client_state().switch_request(),
@@ -1859,7 +1217,10 @@ impl Client {
                         .open_window(ErrorWindow::new("Failed to switch character slots".to_owned()));
                 }
                 NetworkEvent::AddEntity(entity_data) => {
-                    if let Some(map) = self.client_state.follow(client_state().map()) {
+                    // FIX: A bit hacky because of borrowing rules.
+                    let client_state = self.client_state.follow_mut(client_state());
+
+                    if let Some(map) = &client_state.map {
                         let mut npc = Entity::Npc(Npc::new(map, entity_data, client_tick));
 
                         let entity_id = npc.get_entity_id();
@@ -1869,9 +1230,7 @@ impl Client {
                         // Sometimes (like after a job change) the server will tell the client
                         // that a new entity appeared, even though it was already on screen. So
                         // to prevent the entity existing twice, we remove the old one.
-                        // self.client_state
-                        //     .follow_mut(client_state().entities())
-                        //     .retain(|entity| entity.get_entity_id() != entity_id);
+                        client_state.entities.retain(|entity| entity.get_entity_id() != entity_id);
 
                         if let Some(animation_data) =
                             self.async_loader
@@ -1883,7 +1242,7 @@ impl Client {
                         #[cfg(feature = "debug")]
                         npc.generate_pathing_mesh(&self.device, &self.queue, self.graphics_engine.bindless_support(), map);
 
-                        self.client_state.follow_mut(client_state().entities()).push(npc);
+                        client_state.entities.push(npc);
                     }
                 }
                 NetworkEvent::RemoveEntity { entity_id, reason } => {
@@ -1919,43 +1278,36 @@ impl Client {
                     }
                 }
                 NetworkEvent::EntityMove(entity_id, position_from, position_to, starting_timestamp) => {
-                    // let entity = self
-                    //     .client_state
-                    //     .follow_mut(client_state().entities())
-                    //     .iter_mut()
-                    //     .find(|entity| entity.get_entity_id() == entity_id);
-                    //
-                    // if let Some(entity) = entity
-                    //     && let Some(map) =
-                    // self.client_state.follow(client_state().map())
-                    // {
-                    //     let position_from = Vector2::new(position_from.x,
-                    // position_from.y);     let position_to
-                    // = Vector2::new(position_to.x, position_to.y);
-                    //
-                    //     entity.move_from_to(map, &mut self.path_finder,
-                    // position_from, position_to, starting_timestamp);
-                    //     #[cfg(feature = "debug")]
-                    //     entity.generate_pathing_mesh(&self.device,
-                    // &self.queue, self.graphics_engine.bindless_support(),
-                    // map); }
+                    // FIX: A bit hacky because of borrowing rules.
+                    let client_state = self.client_state.follow_mut(client_state());
+
+                    let entity = client_state.entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id);
+
+                    if let Some(entity) = entity
+                        && let Some(map) = &client_state.map
+                    {
+                        let position_from = Vector2::new(position_from.x, position_from.y);
+                        let position_to = Vector2::new(position_to.x, position_to.y);
+
+                        entity.move_from_to(map, &mut self.path_finder, position_from, position_to, starting_timestamp);
+                        #[cfg(feature = "debug")]
+                        entity.generate_pathing_mesh(&self.device, &self.queue, self.graphics_engine.bindless_support(), map);
+                    }
                 }
                 NetworkEvent::PlayerMove(position_from, position_to, starting_timestamp) => {
-                    // if let Some(map) =
-                    // self.client_state.follow(client_state().map()) {
-                    //     let position_from = Vector2::new(position_from.x,
-                    // position_from.y);     let position_to
-                    // = Vector2::new(position_to.x, position_to.y);
-                    //
-                    //     if let Some(player) =
-                    // self.client_state.try_follow_mut(this_entity()) {
-                    //         player.move_from_to(map, &mut self.path_finder,
-                    // position_from, position_to, starting_timestamp);
-                    //         #[cfg(feature = "debug")]
-                    //         player.generate_pathing_mesh(&self.device,
-                    // &self.queue, self.graphics_engine.bindless_support(),
-                    // map);     }
-                    // }
+                    // FIX: A bit hacky because of borrowing rules.
+                    let client_state = self.client_state.follow_mut(client_state());
+
+                    if let Some(map) = &client_state.map {
+                        let position_from = Vector2::new(position_from.x, position_from.y);
+                        let position_to = Vector2::new(position_to.x, position_to.y);
+
+                        if let Some(player) = client_state.entities.get_mut(0) {
+                            player.move_from_to(map, &mut self.path_finder, position_from, position_to, starting_timestamp);
+                            #[cfg(feature = "debug")]
+                            player.generate_pathing_mesh(&self.device, &self.queue, self.graphics_engine.bindless_support(), map);
+                        }
+                    }
                 }
                 NetworkEvent::ChangeMap(map_name, player_position) => {
                     *self.client_state.follow_mut(client_state().map()) = None;
@@ -2124,9 +1476,7 @@ impl Client {
                     self.networking_system.disconnect_from_map_server();
                 }
                 NetworkEvent::FriendRequest { requestee } => {
-                    // self.interface
-                    //     .open_window(&self.client_state, &mut
-                    // self.focus_state, &FriendRequestWindow::new(requestee))
+                    self.interface.open_window(FriendRequestWindow::new(requestee));
                 }
                 NetworkEvent::FriendRemoved { account_id, character_id } => {
                     self.client_state
@@ -2211,7 +1561,7 @@ impl Client {
                 NetworkEvent::RemoveSkillUnit(entity_id) => {
                     self.effect_holder.remove_unit(entity_id);
                 }
-                NetworkEvent::SetFriendList { friends } => {
+                NetworkEvent::SetFriendList { friend_list: friends } => {
                     *self.client_state.follow_mut(client_state().friend_list()) = friends;
                 }
                 NetworkEvent::SetHotkeyData { tab, hotkeys } => {
@@ -2329,7 +1679,7 @@ impl Client {
                     //     &SellWindow::new(self.sell_items.new_remote(),
                     // cart.clone()), );
                     // self.interface
-                    //     .open_prototype_window(&self.client_state,
+                    //     .open_state_window(&self.client_state,
                     // client_state().sell_cart());
                 }
                 NetworkEvent::SellingCompleted { result } => match result {
@@ -2400,9 +1750,7 @@ impl Client {
                 }
                 UserEvent::Respawn => {
                     let _ = self.networking_system.respawn();
-                    // self.interface
-                    //     .close_window_with_class(&mut self.focus_state,
-                    // RespawnWindow::WINDOW_CLASS);
+                    self.interface.close_window_with_class(WindowClass::Respawn);
                 }
                 UserEvent::LogOut => {
                     let _ = self.networking_system.log_out();
@@ -2441,12 +1789,8 @@ impl Client {
                 UserEvent::OpenAudioSettingsWindow => self
                     .interface
                     .open_window(AudioSettingsWindow::new(client_state().audio_settings())),
-                UserEvent::OpenFriendsWindow => {
-                    // self.interface.open_window(
-                    //     &self.client_state,
-                    //     &mut self.focus_state,
-                    //     &FriendsWindow::new(self.friend_list.new_remote()),
-                    // );
+                UserEvent::OpenFriendListWindow => {
+                    self.interface.open_window(FriendListWindow::new(client_state().friend_list()));
                 }
                 UserEvent::ToggleShowInterface => self.show_interface = !self.show_interface,
                 // UserEvent::SetThemeFile { theme_file, theme_kind } => {} //self.client_state.set_theme_file(theme_file, theme_kind),
@@ -2516,11 +1860,6 @@ impl Client {
                     let _ = self
                         .networking_system
                         .send_chat_message(&self.client_state.follow(client_state().player_name()), &message);
-                    // TODO: maybe find a better solution for unfocusing the
-                    // message box if this becomes
-                    // problematic
-                    //
-                    // self.focus_state. remove_focus();
                 }
                 UserEvent::NextDialog(npc_id) => {
                     let _ = self.networking_system.next_dialog(npc_id);
@@ -2638,15 +1977,11 @@ impl Client {
                 }
                 UserEvent::RejectFriendRequest { account_id, character_id } => {
                     let _ = self.networking_system.reject_friend_request(account_id, character_id);
-                    // self.interface
-                    //     .close_window_with_class(&mut self.focus_state,
-                    // FriendRequestWindow::WINDOW_CLASS);
+                    self.interface.close_window_with_class(WindowClass::FriendRequest);
                 }
                 UserEvent::AcceptFriendRequest { account_id, character_id } => {
                     let _ = self.networking_system.accept_friend_request(account_id, character_id);
-                    // self.interface
-                    //     .close_window_with_class(&mut self.focus_state,
-                    // FriendRequestWindow::WINDOW_CLASS);
+                    self.interface.close_window_with_class(WindowClass::FriendRequest);
                 }
                 UserEvent::BuyItems { items } => {
                     let _ = self.networking_system.purchase_items(items);
@@ -2698,9 +2033,11 @@ impl Client {
                 UserEvent::OpenMapDataWindow => {
                     if let Some(map) = self.client_state.follow(client_state().map()) {
                         self.interface
-                            .open_prototype_window(client_state().map().unwrapped().manually_asserted().unboxed().map_data());
+                            .open_state_window(client_state().map().unwrapped().manually_asserted().unboxed().map_data());
                     }
                 }
+                #[cfg(feature = "debug")]
+                UserEvent::OpenClientStateViewerWindow => self.interface.open_state_window_mut(client_state()),
                 #[cfg(feature = "debug")]
                 UserEvent::OpenMapsWindow => self.interface.open_window(MapsWindow),
                 #[cfg(feature = "debug")]
@@ -2716,7 +2053,7 @@ impl Client {
                 #[cfg(feature = "debug")]
                 UserEvent::SetMidnight => self.game_timer.set_day_timer(24.0 * 3600.0),
                 #[cfg(feature = "debug")]
-                UserEvent::OpenThemeViewerWindow => self.interface.open_prototype_window(client_state().game_theme()),
+                UserEvent::OpenThemeViewerWindow => self.interface.open_state_window(client_state().game_theme()),
                 #[cfg(feature = "debug")]
                 UserEvent::OpenProfilerWindow => self
                     .interface
@@ -2769,15 +2106,11 @@ impl Client {
                             .update_item_sprite(item_id, texture);
                     }
                     ItemLocation::Shop => {
-                        // self.shop_items.mutate(|items| {
-                        //     items
-                        //         .iter_mut()
-                        //         .filter(|item| item.item_id == item_id)
-                        //         .for_each(|item| item.metadata.texture =
-                        // Some(texture.clone()));
-                        //
-                        //     ValueState::Mutated(())
-                        // });
+                        self.client_state
+                            .follow_mut(client_state().shop_items())
+                            .iter_mut()
+                            .filter(|item| item.item_id == item_id)
+                            .for_each(|item| item.metadata.texture = Some(texture.clone()));
                     }
                 },
                 (LoaderId::Map(..), LoadableResource::Map { map, player_position }) => {
@@ -2800,7 +2133,9 @@ impl Client {
                         }
                         false => {
                             // Normal map switch
-                            let map = self.client_state.follow_mut(client_state().map()).insert(map);
+                            // FIX: Kinda hacky because of the borrowing rules.
+                            let client_state = self.client_state.follow_mut(client_state());
+                            let map = client_state.map.insert(map);
 
                             map.set_ambient_sound_sources(&self.audio_engine);
                             self.audio_engine.play_background_music_track(map.background_music_track_name());
@@ -2812,14 +2147,12 @@ impl Client {
                                 // `manually_asserted` is safe because we are in
                                 // the branch where `this_player`
                                 // is not `None`.
-                                // let player =
-                                // self.client_state.follow_mut(this_entity().
-                                // manually_asserted());
-                                //
-                                // player.set_position(map, player_position,
-                                // client_tick);
-                                // self.player_camera.set_focus_point(player.
-                                // get_position());
+                                // let player = self.client_state.follow_mut(this_entity().manually_asserted());
+
+                                let player = &mut client_state.entities[0];
+
+                                player.set_position(map, player_position, client_tick);
+                                self.player_camera.set_focus_point(player.get_position());
                             }
 
                             let _ = self.networking_system.map_loaded();
@@ -2834,75 +2167,36 @@ impl Client {
         loads_measurement.stop();
 
         // Main map update and render loop
-        match self.client_state.follow(client_state().map()) {
-            Some(map) => {
-                #[cfg(feature = "debug")]
-                let update_main_camera_measurement = Profiler::start_measurement("update main camera");
+        if self.client_state.follow(client_state().map()).is_some() {
+            #[cfg(feature = "debug")]
+            let update_main_camera_measurement = Profiler::start_measurement("update main camera");
 
-                let window_size = self.graphics_engine.get_window_size();
-                let screen_size: ScreenSize = window_size.into();
+            let window_size = self.graphics_engine.get_window_size();
+            let screen_size: ScreenSize = window_size.into();
 
-                if self.client_state.try_follow(this_entity()).is_some() {
-                    self.player_camera.update(delta_time);
-                    self.player_camera.generate_view_projection(window_size);
-                } else {
-                    self.start_camera.update(delta_time);
-                    self.start_camera.generate_view_projection(window_size);
-                }
+            if self.client_state.try_follow(this_entity()).is_some() {
+                self.player_camera.update(delta_time);
+                self.player_camera.generate_view_projection(window_size);
+            } else {
+                self.start_camera.update(delta_time);
+                self.start_camera.generate_view_projection(window_size);
+            }
 
-                #[cfg(feature = "debug")]
-                let render_settings = *self.client_state.follow(client_state().render_settings());
+            #[cfg(feature = "debug")]
+            let render_settings = *self.client_state.follow(client_state().render_settings());
 
-                #[cfg(feature = "debug")]
-                if render_settings.use_debug_camera {
-                    self.debug_camera.generate_view_projection(window_size);
-                }
+            #[cfg(feature = "debug")]
+            if render_settings.use_debug_camera {
+                self.debug_camera.generate_view_projection(window_size);
+            }
 
-                #[cfg(feature = "debug")]
-                update_main_camera_measurement.stop();
+            #[cfg(feature = "debug")]
+            update_main_camera_measurement.stop();
 
-                #[cfg(feature = "debug")]
-                let update_videos_measurement = Profiler::start_measurement("update videos");
+            #[cfg(feature = "debug")]
+            let update_entities_measurement = Profiler::start_measurement("update entities");
 
-                map.advance_videos(&self.queue, delta_time);
-
-                #[cfg(feature = "debug")]
-                update_videos_measurement.stop();
-
-                #[cfg(feature = "debug")]
-                let update_entities_measurement = Profiler::start_measurement("update entities");
-
-                {
-                    let current_camera: &(dyn Camera + Send + Sync) = match self.client_state.try_follow(this_player()).is_none() {
-                        #[cfg(feature = "debug")]
-                        _ if render_settings.use_debug_camera => &self.debug_camera,
-                        true => &self.start_camera,
-                        false => &self.player_camera,
-                    };
-
-                    // self.client_state
-                    //     .follow_mut(client_state().entities())
-                    //     .iter_mut()
-                    //     .for_each(|entity| entity.update(&self.audio_engine,
-                    // map, current_camera, client_tick));
-                }
-
-                match self.client_state.try_follow(this_player()).is_some() {
-                    true => {
-                        // SAFETY
-                        // `manually_asserted` is safe because we are in the branch where `this_player`
-                        // is not `None`.
-                        let player_position = self.client_state.follow(this_entity().manually_asserted()).get_position();
-                        self.player_camera.set_smoothed_focus_point(player_position);
-                        self.directional_shadow_camera
-                            .set_focus_point(self.player_camera.focus_point(), self.player_camera.view_direction());
-                    }
-                    false => {
-                        self.directional_shadow_camera
-                            .set_focus_point(self.start_camera.focus_point(), self.start_camera.view_direction());
-                    }
-                }
-
+            {
                 let current_camera: &(dyn Camera + Send + Sync) = match self.client_state.try_follow(this_player()).is_none() {
                     #[cfg(feature = "debug")]
                     _ if render_settings.use_debug_camera => &self.debug_camera,
@@ -2910,489 +2204,532 @@ impl Client {
                     false => &self.player_camera,
                 };
 
-                let (view_matrix, projection_matrix) = current_camera.view_projection_matrices();
-                let camera_position = current_camera.camera_position().to_homogeneous();
+                // FIX: Hacky for now because of the client_state borrowing rules.
+                // Ideally this would be moved outside of the render loop.
+                let client_state = self.client_state.follow_mut(client_state());
 
+                client_state.entities.iter_mut().for_each(|entity| {
+                    entity.update(
+                        &self.audio_engine,
+                        client_state.map.as_ref().unwrap(),
+                        current_camera,
+                        client_tick,
+                    )
+                });
+            }
+
+            let map = self.client_state.follow(client_state().map()).as_ref().unwrap();
+
+            #[cfg(feature = "debug")]
+            let update_videos_measurement = Profiler::start_measurement("update videos");
+
+            map.advance_videos(&self.queue, delta_time);
+
+            #[cfg(feature = "debug")]
+            update_videos_measurement.stop();
+
+            match self.client_state.try_follow(this_player()).is_some() {
+                true => {
+                    // SAFETY
+                    // `manually_asserted` is safe because we are in the branch where `this_player`
+                    // is not `None`.
+                    let player_position = self.client_state.follow(this_entity().manually_asserted()).get_position();
+                    self.player_camera.set_smoothed_focus_point(player_position);
+                    self.directional_shadow_camera
+                        .set_focus_point(self.player_camera.focus_point(), self.player_camera.view_direction());
+                }
+                false => {
+                    self.directional_shadow_camera
+                        .set_focus_point(self.start_camera.focus_point(), self.start_camera.view_direction());
+                }
+            }
+
+            let current_camera: &(dyn Camera + Send + Sync) = match self.client_state.try_follow(this_player()).is_none() {
                 #[cfg(feature = "debug")]
-                update_entities_measurement.stop();
+                _ if render_settings.use_debug_camera => &self.debug_camera,
+                true => &self.start_camera,
+                false => &self.player_camera,
+            };
 
-                #[cfg(feature = "debug")]
-                let update_shadow_camera_measurement = Profiler::start_measurement("update directional shadow camera");
+            let (view_matrix, projection_matrix) = current_camera.view_projection_matrices();
+            let camera_position = current_camera.camera_position().to_homogeneous();
 
-                let lighting_mode = *self.client_state.follow(client_state().graphics_settings().lighting_mode());
-                let shadow_detail = *self.client_state.follow(client_state().graphics_settings().shadow_detail());
-                let shadow_quality = *self.client_state.follow(client_state().graphics_settings().shadow_quality());
+            #[cfg(feature = "debug")]
+            update_entities_measurement.stop();
 
-                let shadow_map_size = shadow_detail.directional_shadow_resolution();
-                let ambient_light_color = map.ambient_light_color(lighting_mode, day_timer);
+            #[cfg(feature = "debug")]
+            let update_shadow_camera_measurement = Profiler::start_measurement("update directional shadow camera");
 
-                let (directional_light_direction, directional_light_color) = map.directional_light(lighting_mode, day_timer);
+            let lighting_mode = *self.client_state.follow(client_state().graphics_settings().lighting_mode());
+            let shadow_detail = *self.client_state.follow(client_state().graphics_settings().shadow_detail());
+            let shadow_quality = *self.client_state.follow(client_state().graphics_settings().shadow_quality());
 
-                self.directional_shadow_camera
-                    .update(directional_light_direction, current_camera.view_direction(), shadow_map_size);
-                self.directional_shadow_camera.generate_view_projection(window_size);
+            let shadow_map_size = shadow_detail.directional_shadow_resolution();
+            let ambient_light_color = map.ambient_light_color(lighting_mode, day_timer);
 
-                let (directional_light_view_matrix, directional_light_projection_matrix) =
-                    self.directional_shadow_camera.view_projection_matrices();
-                let directional_light_view_projection_matrix = directional_light_projection_matrix * directional_light_view_matrix;
+            let (directional_light_direction, directional_light_color) = map.directional_light(lighting_mode, day_timer);
 
-                #[cfg(feature = "debug")]
-                update_shadow_camera_measurement.stop();
+            self.directional_shadow_camera
+                .update(directional_light_direction, current_camera.view_direction(), shadow_map_size);
+            self.directional_shadow_camera.generate_view_projection(window_size);
 
-                #[cfg(feature = "debug")]
-                let frame_measurement = Profiler::start_measurement("update audio engine");
+            let (directional_light_view_matrix, directional_light_projection_matrix) =
+                self.directional_shadow_camera.view_projection_matrices();
+            let directional_light_view_projection_matrix = directional_light_projection_matrix * directional_light_view_matrix;
 
-                // We set the listener roughly at ear height.
-                const EAR_HEIGHT: Vector3<f32> = Vector3::new(0.0, 5.0, 0.0);
-                let listener = current_camera.focus_point() + EAR_HEIGHT;
+            #[cfg(feature = "debug")]
+            update_shadow_camera_measurement.stop();
 
-                self.audio_engine
-                    .set_spatial_listener(listener, current_camera.view_direction(), current_camera.look_up_vector());
-                self.audio_engine.update();
+            #[cfg(feature = "debug")]
+            let frame_measurement = Profiler::start_measurement("update audio engine");
 
-                #[cfg(feature = "debug")]
-                frame_measurement.stop();
+            // We set the listener roughly at ear height.
+            const EAR_HEIGHT: Vector3<f32> = Vector3::new(0.0, 5.0, 0.0);
+            let listener = current_camera.focus_point() + EAR_HEIGHT;
 
-                #[cfg(feature = "debug")]
-                let prepare_frame_measurement = Profiler::start_measurement("prepare frame");
+            self.audio_engine
+                .set_spatial_listener(listener, current_camera.view_direction(), current_camera.look_up_vector());
+            self.audio_engine.update();
 
-                self.particle_holder.update(delta_time as f32);
+            #[cfg(feature = "debug")]
+            frame_measurement.stop();
+
+            #[cfg(feature = "debug")]
+            let prepare_frame_measurement = Profiler::start_measurement("prepare frame");
+
+            self.particle_holder.update(delta_time as f32);
+            self.effect_holder
+                .update(&self.client_state.follow(client_state().entities()), delta_time as f32);
+
+            self.mouse_cursor.update(client_tick);
+
+            let walk_indicator_color = *self.client_state.follow(client_state().game_theme_2().indicator().walking());
+
+            #[cfg(feature = "debug")]
+            let hovered_marker_identifier = match mouse_target {
+                Some(PickerTarget::Marker(marker_identifier)) => Some(marker_identifier),
+                _ => None,
+            };
+
+            #[cfg(feature = "debug")]
+            let point_light_manager_measurement = Profiler::start_measurement("point light manager");
+
+            let point_light_set = {
+                self.point_light_manager.prepare();
+
                 self.effect_holder
-                    .update(&self.client_state.follow(client_state().entities()), delta_time as f32);
+                    .register_point_lights(&mut self.point_light_manager, current_camera);
 
-                self.mouse_cursor.update(client_tick);
+                map.register_point_lights(&mut self.point_light_manager, &mut self.point_light_set_buffer, current_camera);
 
-                let walk_indicator_color = *self.client_state.follow(client_state().game_theme_2().indicator().walking());
+                match lighting_mode {
+                    LightingMode::Classic => self.point_light_manager.create_point_light_set(0),
+                    LightingMode::Enhanced => self.point_light_manager.create_point_light_set(NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS),
+                }
+            };
+
+            #[cfg(feature = "debug")]
+            point_light_manager_measurement.stop();
+
+            #[cfg(feature = "debug")]
+            prepare_frame_measurement.stop();
+
+            #[cfg(feature = "debug")]
+            let collect_instructions_measurement = Profiler::start_measurement("collect instructions");
+
+            let picker_position = ScreenPosition {
+                left: mouse_position.left.clamp(0.0, window_size.x as f32),
+                top: mouse_position.top.clamp(0.0, window_size.y as f32),
+            };
+            let mut indicator_instruction = None;
+            let mut water_instruction = None;
+
+            // Marker
+            {
+                #[cfg(feature = "debug")]
+                map.render_markers(
+                    &mut self.debug_marker_renderer,
+                    current_camera,
+                    &render_settings,
+                    self.client_state.follow(client_state().entities()),
+                    &point_light_set,
+                    hovered_marker_identifier,
+                );
 
                 #[cfg(feature = "debug")]
-                let hovered_marker_identifier = match mouse_target {
-                    Some(PickerTarget::Marker(marker_identifier)) => Some(marker_identifier),
-                    _ => None,
-                };
+                map.render_markers(
+                    &mut self.middle_interface_renderer,
+                    current_camera,
+                    &render_settings,
+                    self.client_state.follow(client_state().entities()),
+                    &point_light_set,
+                    hovered_marker_identifier,
+                );
+            }
 
-                #[cfg(feature = "debug")]
-                let point_light_manager_measurement = Profiler::start_measurement("point light manager");
-
-                let point_light_set = {
-                    self.point_light_manager.prepare();
-
-                    self.effect_holder
-                        .register_point_lights(&mut self.point_light_manager, current_camera);
-
-                    map.register_point_lights(&mut self.point_light_manager, &mut self.point_light_set_buffer, current_camera);
-
-                    match lighting_mode {
-                        LightingMode::Classic => self.point_light_manager.create_point_light_set(0),
-                        LightingMode::Enhanced => self.point_light_manager.create_point_light_set(NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS),
-                    }
-                };
-
-                #[cfg(feature = "debug")]
-                point_light_manager_measurement.stop();
-
-                #[cfg(feature = "debug")]
-                prepare_frame_measurement.stop();
-
-                #[cfg(feature = "debug")]
-                let collect_instructions_measurement = Profiler::start_measurement("collect instructions");
-
-                let picker_position = ScreenPosition {
-                    left: mouse_position.left.clamp(0.0, window_size.x as f32),
-                    top: mouse_position.top.clamp(0.0, window_size.y as f32),
-                };
-                let mut indicator_instruction = None;
-                let mut water_instruction = None;
-
-                // Marker
-                {
+            // Directional Shadows
+            {
+                let object_set = map.cull_objects_with_frustum(
+                    &self.directional_shadow_camera,
+                    &mut self.directional_shadow_object_set_buffer,
                     #[cfg(feature = "debug")]
-                    map.render_markers(
-                        &mut self.debug_marker_renderer,
-                        current_camera,
-                        &render_settings,
-                        self.client_state.follow(client_state().entities()),
-                        &point_light_set,
-                        hovered_marker_identifier,
-                    );
+                    render_settings.frustum_culling,
+                );
 
+                let offset = self.directional_shadow_model_instructions.len();
+
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
+                map.render_objects(
+                    &mut self.directional_shadow_model_instructions,
+                    &object_set,
+                    client_tick,
+                    &self.directional_shadow_camera,
+                );
+
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
+                map.render_ground(&mut self.directional_shadow_model_instructions);
+
+                let count = self.directional_shadow_model_instructions.len() - offset;
+
+                self.directional_shadow_model_batches.push(ModelBatch {
+                    offset,
+                    count,
+                    texture_set: map.get_texture_set().clone(),
+                    vertex_buffer: map.get_model_vertex_buffer().clone(),
+                });
+
+                #[cfg(feature = "debug")]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map_tiles))]
+                map.render_overlay_tiles(
+                    &mut self.directional_shadow_model_instructions,
+                    &mut self.directional_shadow_model_batches,
+                    &self.tile_texture_set,
+                );
+
+                #[cfg(feature = "debug")]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_pathing))]
+                map.render_entity_pathing(
+                    &mut self.directional_shadow_model_instructions,
+                    &mut self.directional_shadow_model_batches,
+                    self.client_state.follow(client_state().entities()),
+                    &self.pathing_texture_set,
+                );
+
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
+                map.render_entities(
+                    &mut self.directional_shadow_entity_instructions,
+                    self.client_state.follow(client_state().entities()),
+                    &self.directional_shadow_camera,
+                );
+            }
+
+            // Point Lights and Shadows
+            {
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_point_lights))]
+                point_light_set.render_point_lights(&mut self.point_light_instructions);
+
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_point_lights))]
+                point_light_set.render_point_lights_with_shadows(
+                    &map,
+                    &mut self.point_shadow_camera,
+                    &mut self.point_shadow_object_set_buffer,
+                    &mut self.point_shadow_model_instructions,
+                    &mut self.point_light_with_shadow_instructions,
+                    client_tick,
                     #[cfg(feature = "debug")]
-                    map.render_markers(
-                        &mut self.middle_interface_renderer,
-                        current_camera,
-                        &render_settings,
+                    &render_settings,
+                );
+            }
+
+            // Geometry
+            {
+                let object_set = map.cull_objects_with_frustum(
+                    current_camera,
+                    &mut self.deferred_object_set_buffer,
+                    #[cfg(feature = "debug")]
+                    render_settings.frustum_culling,
+                );
+
+                let offset = self.model_instructions.len();
+
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
+                map.render_objects(&mut self.model_instructions, &object_set, client_tick, current_camera);
+
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
+                map.render_ground(&mut self.model_instructions);
+
+                let count = self.model_instructions.len() - offset;
+
+                self.model_batches.push(ModelBatch {
+                    offset,
+                    count,
+                    texture_set: map.get_texture_set().clone(),
+                    vertex_buffer: map.get_model_vertex_buffer().clone(),
+                });
+
+                #[cfg(feature = "debug")]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map_tiles))]
+                map.render_overlay_tiles(&mut self.model_instructions, &mut self.model_batches, &self.tile_texture_set);
+
+                #[cfg(feature = "debug")]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_pathing))]
+                map.render_entity_pathing(
+                    &mut self.model_instructions,
+                    &mut self.model_batches,
+                    self.client_state.follow(client_state().entities()),
+                    &self.pathing_texture_set,
+                );
+
+                let entity_camera = match true {
+                    #[cfg(feature = "debug")]
+                    _ if *self.client_state.follow(client_state().render_settings().show_entities_paper()) => &self.player_camera,
+                    _ => current_camera,
+                };
+
+                #[cfg_attr(feature = "debug",
+                    korangar_debug::debug_condition(render_settings.show_entities))]
+                map.render_entities(
+                    &mut self.entity_instructions,
+                    self.client_state.follow(client_state().entities()),
+                    entity_camera,
+                );
+
+                #[cfg(feature = "debug")]
+                if render_settings.show_entities_debug {
+                    map.render_entities_debug(
+                        &mut self.rectangle_instructions,
                         self.client_state.follow(client_state().entities()),
-                        &point_light_set,
-                        hovered_marker_identifier,
+                        entity_camera,
                     );
                 }
 
-                // Directional Shadows
-                {
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_water))]
+                map.render_water(&mut water_instruction, client_tick);
+
+                #[cfg(feature = "debug")]
+                if render_settings.show_bounding_boxes {
                     let object_set = map.cull_objects_with_frustum(
-                        &self.directional_shadow_camera,
-                        &mut self.directional_shadow_object_set_buffer,
+                        &self.player_camera,
+                        &mut self.bounding_box_object_set_buffer,
                         #[cfg(feature = "debug")]
                         render_settings.frustum_culling,
                     );
 
-                    let offset = self.directional_shadow_model_instructions.len();
-
-                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
-                    map.render_objects(
-                        &mut self.directional_shadow_model_instructions,
-                        &object_set,
-                        client_tick,
-                        &self.directional_shadow_camera,
-                    );
-
-                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
-                    map.render_ground(&mut self.directional_shadow_model_instructions);
-
-                    let count = self.directional_shadow_model_instructions.len() - offset;
-
-                    self.directional_shadow_model_batches.push(ModelBatch {
-                        offset,
-                        count,
-                        texture_set: map.get_texture_set().clone(),
-                        vertex_buffer: map.get_model_vertex_buffer().clone(),
-                    });
-
-                    #[cfg(feature = "debug")]
-                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map_tiles))]
-                    map.render_overlay_tiles(
-                        &mut self.directional_shadow_model_instructions,
-                        &mut self.directional_shadow_model_batches,
-                        &self.tile_texture_set,
-                    );
-
-                    #[cfg(feature = "debug")]
-                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_pathing))]
-                    map.render_entity_pathing(
-                        &mut self.directional_shadow_model_instructions,
-                        &mut self.directional_shadow_model_batches,
-                        self.client_state.follow(client_state().entities()),
-                        &self.pathing_texture_set,
-                    );
-
-                    // #[cfg_attr(feature = "debug",
-                    // korangar_debug::debug_condition(render_settings.
-                    // show_entities))] map.render_entities(
-                    //     &mut self.directional_shadow_entity_instructions,
-                    //     self.client_state.follow_mut(client_state().
-                    // entities()),
-                    //     &self.directional_shadow_camera,
-                    // );
+                    map.render_bounding(&mut self.aabb_instructions, render_settings.frustum_culling, &object_set);
                 }
+            }
 
-                // Point Lights and Shadows
-                {
-                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_point_lights))]
-                    point_light_set.render_point_lights(&mut self.point_light_instructions);
-
-                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_point_lights))]
-                    point_light_set.render_point_lights_with_shadows(
-                        map,
-                        &mut self.point_shadow_camera,
-                        &mut self.point_shadow_object_set_buffer,
-                        &mut self.point_shadow_model_instructions,
-                        &mut self.point_light_with_shadow_instructions,
-                        client_tick,
-                        #[cfg(feature = "debug")]
-                        &render_settings,
-                    );
-                }
-
-                // Geometry
-                {
-                    let object_set = map.cull_objects_with_frustum(
+            //  Sprites and Interface
+            {
+                #[cfg(feature = "debug")]
+                if let Some(marker_identifier) = hovered_marker_identifier {
+                    map.render_marker_overlay(
+                        &mut self.aabb_instructions,
+                        &mut self.circle_instructions,
                         current_camera,
-                        &mut self.deferred_object_set_buffer,
-                        #[cfg(feature = "debug")]
-                        render_settings.frustum_culling,
+                        marker_identifier,
+                        &point_light_set,
+                        animation_timer,
                     );
-
-                    let offset = self.model_instructions.len();
-
-                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
-                    map.render_objects(&mut self.model_instructions, &object_set, client_tick, current_camera);
-
-                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
-                    map.render_ground(&mut self.model_instructions);
-
-                    let count = self.model_instructions.len() - offset;
-
-                    self.model_batches.push(ModelBatch {
-                        offset,
-                        count,
-                        texture_set: map.get_texture_set().clone(),
-                        vertex_buffer: map.get_model_vertex_buffer().clone(),
-                    });
-
-                    #[cfg(feature = "debug")]
-                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map_tiles))]
-                    map.render_overlay_tiles(&mut self.model_instructions, &mut self.model_batches, &self.tile_texture_set);
-
-                    #[cfg(feature = "debug")]
-                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_pathing))]
-                    map.render_entity_pathing(
-                        &mut self.model_instructions,
-                        &mut self.model_batches,
-                        self.client_state.follow(client_state().entities()),
-                        &self.pathing_texture_set,
-                    );
-
-                    let entity_camera = match true {
-                        #[cfg(feature = "debug")]
-                        _ if *self.client_state.follow(client_state().render_settings().show_entities_paper()) => &self.player_camera,
-                        _ => current_camera,
-                    };
-
-                    // #[cfg_attr(feature = "debug",
-                    // korangar_debug::debug_condition(render_settings.show_entities))]
-                    // map.render_entities(
-                    //     &mut self.entity_instructions,
-                    //     self.client_state.follow_mut(client_state().entities()),
-                    //     entity_camera,
-                    // );
-
-                    #[cfg(feature = "debug")]
-                    if render_settings.show_entities_debug {
-                        map.render_entities_debug(
-                            &mut self.rectangle_instructions,
-                            self.client_state.follow(client_state().entities()),
-                            entity_camera,
-                        );
-                    }
-
-                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_water))]
-                    map.render_water(&mut water_instruction, client_tick);
-
-                    #[cfg(feature = "debug")]
-                    if render_settings.show_bounding_boxes {
-                        let object_set = map.cull_objects_with_frustum(
-                            &self.player_camera,
-                            &mut self.bounding_box_object_set_buffer,
-                            #[cfg(feature = "debug")]
-                            render_settings.frustum_culling,
-                        );
-
-                        map.render_bounding(&mut self.aabb_instructions, render_settings.frustum_culling, &object_set);
-                    }
                 }
 
-                //  Sprites and Interface
+                self.particle_holder.render(
+                    &self.bottom_interface_renderer,
+                    current_camera,
+                    screen_size,
+                    scaling,
+                    self.client_state.follow(client_state().entities()),
+                );
+
+                self.effect_holder.render(&mut self.effect_renderer, current_camera);
+
+                if let Some(PickerTarget::Tile { x, y }) = mouse_target
+                    && !self.client_state.try_follow(this_entity()).is_some()
                 {
-                    #[cfg(feature = "debug")]
-                    if let Some(marker_identifier) = hovered_marker_identifier {
-                        map.render_marker_overlay(
-                            &mut self.aabb_instructions,
-                            &mut self.circle_instructions,
-                            current_camera,
-                            marker_identifier,
-                            &point_light_set,
-                            animation_timer,
-                        );
-                    }
-
-                    self.particle_holder.render(
-                        &self.bottom_interface_renderer,
-                        current_camera,
-                        screen_size,
-                        scaling,
-                        self.client_state.follow(client_state().entities()),
+                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_indicators))]
+                    map.render_walk_indicator(
+                        &mut indicator_instruction,
+                        walk_indicator_color,
+                        Vector2::new(x as usize, y as usize),
                     );
+                } else if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
+                    let entity = self
+                        .client_state
+                        .follow(client_state().entities())
+                        .iter()
+                        .find(|entity| entity.get_entity_id() == entity_id);
 
-                    self.effect_holder.render(&mut self.effect_renderer, current_camera);
-
-                    if let Some(PickerTarget::Tile { x, y }) = mouse_target
-                        && !self.client_state.try_follow(this_entity()).is_some()
-                    {
-                        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_indicators))]
-                        map.render_walk_indicator(
-                            &mut indicator_instruction,
-                            walk_indicator_color,
-                            Vector2::new(x as usize, y as usize),
-                        );
-                    } else if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
-                        let entity = self
-                            .client_state
-                            .follow(client_state().entities())
-                            .iter()
-                            .find(|entity| entity.get_entity_id() == entity_id);
-
-                        if let Some(entity) = entity {
-                            entity.render_status(
-                                &self.middle_interface_renderer,
-                                current_camera,
-                                self.client_state.follow(client_state().game_theme_2()),
-                                screen_size,
-                            );
-
-                            if let Some(name) = &entity.get_details() {
-                                let name = name.split('#').next().unwrap();
-
-                                let offset = ScreenPosition {
-                                    left: 15.0 * scaling.get_factor(),
-                                    top: 15.0 * scaling.get_factor(),
-                                };
-
-                                self.middle_interface_renderer.render_text(
-                                    name,
-                                    mouse_position + offset,
-                                    Color::WHITE,
-                                    FontSize(16.0),
-                                    AlignHorizontal::Mid,
-                                );
-                            }
-                        }
-                    }
-
-                    if let Some(player) = self.client_state.try_follow(this_entity()) {
-                        #[cfg(feature = "debug")]
-                        profile_block!("render player status");
-
-                        player.render_status(
+                    if let Some(entity) = entity {
+                        entity.render_status(
                             &self.middle_interface_renderer,
                             current_camera,
                             self.client_state.follow(client_state().game_theme_2()),
                             screen_size,
                         );
-                    }
 
-                    let mut built_ui = {
-                        #[cfg(feature = "debug")]
-                        profile_block!("user interface");
+                        if let Some(name) = &entity.get_details() {
+                            let name = name.split('#').next().unwrap();
 
-                        let mut built_ui = self.interface.do_layouts(&self.client_state, mouse_position);
+                            let offset = ScreenPosition {
+                                left: 15.0 * scaling.get_factor(),
+                                top: 15.0 * scaling.get_factor(),
+                            };
 
-                        if let Some(click_position) = self.input_system.get_left_click_position() {
-                            built_ui.click(&self.client_state, click_position);
+                            self.middle_interface_renderer.render_text(
+                                name,
+                                mouse_position + offset,
+                                Color::WHITE,
+                                FontSize(16.0),
+                                AlignHorizontal::Mid,
+                            );
                         }
-
-                        if let Some((mouse_position, delta)) = self.input_system.get_scroll_delta() {
-                            built_ui.scroll(mouse_position, delta);
-                        }
-
-                        if let Some(characters) = self.input_system.get_input_characters() {
-                            built_ui.input_characters(&self.client_state, &characters);
-                        }
-
-                        built_ui
-                    };
-
-                    built_ui.render(&self.interface_renderer);
-
-                    self.interface.render_overlay(
-                        &self.interface_renderer,
-                        // TODO: Get the right theme (and maybe pass this better).
-                        *self.client_state.get(&client_state().menu_theme().window().anchor_color()),
-                        // TODO: Get the right theme (and maybe pass this better).
-                        *self.client_state.get(&client_state().menu_theme().window().closest_anchor_color()),
-                    );
-
-                    if let Some(delta) = self.input_system.get_drag() {
-                        self.interface.handle_drag(delta);
-                    }
-
-                    // #[cfg(feature = "debug")]
-                    // if render_settings.show_frames_per_second {
-                    //     let game_theme = self.client_state .get_game_theme();
-                    //
-                    //     self.top_interface_renderer.render_text(
-                    //         &self.game_timer.last_frames_per_second().to_string(),
-                    //         game_theme.overlay.text_offset.get(),
-                    //         game_theme.overlay.foreground_color.get(),
-                    //         game_theme.overlay.font_size.get(),
-                    //         AlignHorizontal::Left,
-                    //     );
-                    // }
-
-                    if self.show_interface {
-                        self.mouse_cursor.render(
-                            &self.top_interface_renderer,
-                            mouse_position,
-                            self.input_system.get_mouse_mode().grabbed(),
-                            *self.client_state.follow(client_state().game_theme_2().cursor().color()),
-                            self.client_state.follow(client_state().interface_scale()).get_factor(),
-                        );
                     }
                 }
 
-                #[cfg(feature = "debug")]
-                collect_instructions_measurement.stop();
+                if let Some(player) = self.client_state.try_follow(this_entity()) {
+                    #[cfg(feature = "debug")]
+                    profile_block!("render player status");
 
-                #[cfg(feature = "debug")]
-                let render_frame_measurement = Profiler::start_measurement("render next frame");
+                    player.render_status(
+                        &self.middle_interface_renderer,
+                        current_camera,
+                        self.client_state.follow(client_state().game_theme_2()),
+                        screen_size,
+                    );
+                }
 
-                let interface_instructions = self.interface_renderer.get_instructions();
-                let bottom_layer_instructions = self.bottom_interface_renderer.get_instructions();
-                let middle_layer_instructions = self.middle_interface_renderer.get_instructions();
-                let top_layer_instructions = self.top_interface_renderer.get_instructions();
+                let mut built_ui = {
+                    #[cfg(feature = "debug")]
+                    profile_block!("user interface");
 
-                let render_instruction = RenderInstruction {
-                    show_interface: self.show_interface,
-                    picker_position,
-                    uniforms: Uniforms {
-                        view_matrix,
-                        projection_matrix,
-                        camera_position,
-                        animation_timer,
-                        day_timer,
-                        ambient_light_color,
-                        enhanced_lighting: lighting_mode == LightingMode::Enhanced,
-                        shadow_quality,
-                    },
-                    indicator: indicator_instruction,
-                    interface: interface_instructions.as_slice(),
-                    bottom_layer_rectangles: bottom_layer_instructions.as_slice(),
-                    middle_layer_rectangles: middle_layer_instructions.as_slice(),
-                    top_layer_rectangles: top_layer_instructions.as_slice(),
-                    directional_light_with_shadow: DirectionalShadowCasterInstruction {
-                        view_projection_matrix: directional_light_view_projection_matrix,
-                        view_matrix: directional_light_view_matrix,
-                        direction: directional_light_direction,
-                        color: directional_light_color,
-                    },
-                    point_light_shadow_caster: &self.point_light_with_shadow_instructions,
-                    point_light: &self.point_light_instructions,
-                    model_batches: &self.model_batches,
-                    models: &mut self.model_instructions,
-                    entities: &mut self.entity_instructions,
-                    directional_model_batches: &self.directional_shadow_model_batches,
-                    directional_shadow_models: &self.directional_shadow_model_instructions,
-                    directional_shadow_entities: &self.directional_shadow_entity_instructions,
-                    point_shadow_models: &self.point_shadow_model_instructions,
-                    point_shadow_entities: &self.point_shadow_entity_instructions,
-                    effects: self.effect_renderer.get_instructions(),
-                    water: water_instruction,
-                    map_picker_tile_vertex_buffer: Some(map.get_tile_picker_vertex_buffer()),
-                    font_map_texture: Some(self.font_loader.get_font_map()),
-                    #[cfg(feature = "debug")]
-                    render_settings,
-                    #[cfg(feature = "debug")]
-                    aabb: &self.aabb_instructions,
-                    #[cfg(feature = "debug")]
-                    circles: &self.circle_instructions,
-                    #[cfg(feature = "debug")]
-                    rectangles: &self.rectangle_instructions,
-                    #[cfg(feature = "debug")]
-                    marker: self.debug_marker_renderer.get_instructions(),
+                    let mut built_ui = self.interface.do_layouts(&self.client_state, mouse_position);
+
+                    if let Some((click_position, mouse_button)) = self.input_system.get_click_position() {
+                        built_ui.click(&self.client_state, click_position, mouse_button);
+                    }
+
+                    if let Some((mouse_position, delta)) = self.input_system.get_scroll_delta() {
+                        built_ui.scroll(mouse_position, delta);
+                    }
+
+                    if let Some(characters) = self.input_system.get_input_characters() {
+                        built_ui.input_characters(&self.client_state, &characters);
+                    }
+
+                    built_ui
                 };
 
-                self.graphics_engine.render_next_frame(frame, render_instruction);
+                built_ui.render(&self.interface_renderer);
+
+                self.interface.render_overlay(
+                    &self.interface_renderer,
+                    // TODO: Get the right theme (and maybe pass this better).
+                    *self.client_state.get(&client_state().menu_theme().window().anchor_color()),
+                    // TODO: Get the right theme (and maybe pass this better).
+                    *self.client_state.get(&client_state().menu_theme().window().closest_anchor_color()),
+                );
+
+                if let Some(delta) = self.input_system.get_drag() {
+                    self.interface.handle_drag(delta);
+                }
 
                 #[cfg(feature = "debug")]
-                render_frame_measurement.stop();
+                if render_settings.show_frames_per_second {
+                    let game_theme = self.client_state.follow(client_state().game_theme_2());
+
+                    self.top_interface_renderer.render_text(
+                        &self.game_timer.last_frames_per_second().to_string(),
+                        game_theme.overlay.text_offset,
+                        game_theme.overlay.foreground_color,
+                        game_theme.overlay.font_size,
+                        AlignHorizontal::Left,
+                    );
+                }
+
+                if self.show_interface {
+                    self.mouse_cursor.render(
+                        &self.top_interface_renderer,
+                        mouse_position,
+                        self.input_system.get_mouse_mode().grabbed(),
+                        *self.client_state.follow(client_state().game_theme_2().cursor().color()),
+                        self.client_state.follow(client_state().interface_scale()).get_factor(),
+                    );
+                }
             }
-            _ => {
-                #[cfg(feature = "debug")]
-                let render_frame_measurement = Profiler::start_measurement("render next frame");
 
-                self.graphics_engine.render_next_frame(frame, RenderInstruction::default());
+            #[cfg(feature = "debug")]
+            collect_instructions_measurement.stop();
 
+            #[cfg(feature = "debug")]
+            let render_frame_measurement = Profiler::start_measurement("render next frame");
+
+            let interface_instructions = self.interface_renderer.get_instructions();
+            let bottom_layer_instructions = self.bottom_interface_renderer.get_instructions();
+            let middle_layer_instructions = self.middle_interface_renderer.get_instructions();
+            let top_layer_instructions = self.top_interface_renderer.get_instructions();
+
+            let render_instruction = RenderInstruction {
+                show_interface: self.show_interface,
+                picker_position,
+                uniforms: Uniforms {
+                    view_matrix,
+                    projection_matrix,
+                    camera_position,
+                    animation_timer,
+                    day_timer,
+                    ambient_light_color,
+                    enhanced_lighting: lighting_mode == LightingMode::Enhanced,
+                    shadow_quality,
+                },
+                indicator: indicator_instruction,
+                interface: interface_instructions.as_slice(),
+                bottom_layer_rectangles: bottom_layer_instructions.as_slice(),
+                middle_layer_rectangles: middle_layer_instructions.as_slice(),
+                top_layer_rectangles: top_layer_instructions.as_slice(),
+                directional_light_with_shadow: DirectionalShadowCasterInstruction {
+                    view_projection_matrix: directional_light_view_projection_matrix,
+                    view_matrix: directional_light_view_matrix,
+                    direction: directional_light_direction,
+                    color: directional_light_color,
+                },
+                point_light_shadow_caster: &self.point_light_with_shadow_instructions,
+                point_light: &self.point_light_instructions,
+                model_batches: &self.model_batches,
+                models: &mut self.model_instructions,
+                entities: &mut self.entity_instructions,
+                directional_model_batches: &self.directional_shadow_model_batches,
+                directional_shadow_models: &self.directional_shadow_model_instructions,
+                directional_shadow_entities: &self.directional_shadow_entity_instructions,
+                point_shadow_models: &self.point_shadow_model_instructions,
+                point_shadow_entities: &self.point_shadow_entity_instructions,
+                effects: self.effect_renderer.get_instructions(),
+                water: water_instruction,
+                map_picker_tile_vertex_buffer: Some(map.get_tile_picker_vertex_buffer()),
+                font_map_texture: Some(self.font_loader.get_font_map()),
                 #[cfg(feature = "debug")]
-                render_frame_measurement.stop();
-            }
+                render_settings,
+                #[cfg(feature = "debug")]
+                aabb: &self.aabb_instructions,
+                #[cfg(feature = "debug")]
+                circles: &self.circle_instructions,
+                #[cfg(feature = "debug")]
+                rectangles: &self.rectangle_instructions,
+                #[cfg(feature = "debug")]
+                marker: self.debug_marker_renderer.get_instructions(),
+            };
+
+            self.graphics_engine.render_next_frame(frame, render_instruction);
+
+            #[cfg(feature = "debug")]
+            render_frame_measurement.stop();
+        } else {
+            #[cfg(feature = "debug")]
+            let render_frame_measurement = Profiler::start_measurement("render next frame");
+
+            self.graphics_engine.render_next_frame(frame, RenderInstruction::default());
+
+            #[cfg(feature = "debug")]
+            render_frame_measurement.stop();
         }
 
         // Apply the game state after all the UI work + rendering is done.
@@ -3403,45 +2740,52 @@ impl Client {
     fn update_graphic_settings(&mut self) {
         let graphics_settings = self.client_state.follow(client_state().graphics_settings());
 
-        // if self.vsync.consume_changed() {
-        //     self.graphics_engine.set_vsync(*self.vsync.get());
-        // }
-        //
-        // if self.limit_framerate.consume_changed() {
-        //     self.graphics_engine.set_limit_framerate(*self.limit_framerate.
-        // get()); }
-        //
-        // if self.triple_buffering.consume_changed() {
-        //     self.graphics_engine.set_triple_buffering(*self.triple_buffering.
-        // get()); }
-        //
-        // if self.texture_filtering.consume_changed() {
-        //     self.graphics_engine.set_texture_sampler_type(*self.
-        // texture_filtering.get()); }
-        //
-        // if self.msaa.consume_changed() {
-        //     self.graphics_engine.set_msaa(*self.msaa.get());
-        // }
-        //
-        // if self.ssaa.consume_changed() {
-        //     self.graphics_engine.set_ssaa(*self.ssaa.get());
-        // }
-        //
-        // if self.screen_space_anti_aliasing.consume_changed() {
-        //     self.graphics_engine
-        //         .set_screen_space_anti_aliasing(*self.
-        // screen_space_anti_aliasing.get()); }
-        //
-        // if self.shadow_detail.consume_changed() {
-        //     self.graphics_engine.set_shadow_detail(*self.shadow_detail.
-        // get()); }
-        //
-        // if self.high_quality_interface.consume_changed() {
-        //     let high_quality_interface = *self.high_quality_interface.get();
-        //     self.interface_renderer.
-        // update_high_quality_interface(high_quality_interface);
-        //     self.graphics_engine.
-        // set_high_quality_interface(high_quality_interface); }
+        if self.active_graphics_settings.vsync != graphics_settings.vsync {
+            self.graphics_engine.set_vsync(graphics_settings.vsync);
+            self.active_graphics_settings.vsync = graphics_settings.vsync;
+        }
+
+        if self.active_graphics_settings.limit_framerate != graphics_settings.limit_framerate {
+            self.graphics_engine.set_limit_framerate(graphics_settings.limit_framerate);
+            self.active_graphics_settings.limit_framerate = graphics_settings.limit_framerate;
+        }
+
+        if self.active_graphics_settings.triple_buffering != graphics_settings.triple_buffering {
+            self.graphics_engine.set_triple_buffering(graphics_settings.triple_buffering);
+            self.active_graphics_settings.triple_buffering = graphics_settings.triple_buffering;
+        }
+
+        if self.active_graphics_settings.texture_filtering != graphics_settings.texture_filtering {
+            self.graphics_engine.set_texture_sampler_type(graphics_settings.texture_filtering);
+            self.active_graphics_settings.texture_filtering = graphics_settings.texture_filtering;
+        }
+
+        if self.active_graphics_settings.msaa != graphics_settings.msaa {
+            self.graphics_engine.set_msaa(graphics_settings.msaa);
+            self.active_graphics_settings.msaa = graphics_settings.msaa;
+        }
+
+        if self.active_graphics_settings.ssaa != graphics_settings.ssaa {
+            self.graphics_engine.set_ssaa(graphics_settings.ssaa);
+            self.active_graphics_settings.ssaa = graphics_settings.ssaa;
+        }
+
+        if self.active_graphics_settings.screen_space_anti_aliasing != graphics_settings.screen_space_anti_aliasing {
+            self.graphics_engine
+                .set_screen_space_anti_aliasing(graphics_settings.screen_space_anti_aliasing);
+            self.active_graphics_settings.screen_space_anti_aliasing = graphics_settings.screen_space_anti_aliasing;
+        }
+
+        if self.active_graphics_settings.shadow_detail != graphics_settings.shadow_detail {
+            self.graphics_engine.set_shadow_detail(graphics_settings.shadow_detail);
+            self.active_graphics_settings.shadow_detail = graphics_settings.shadow_detail;
+        }
+
+        if self.active_graphics_settings.high_quality_interface != graphics_settings.high_quality_interface {
+            self.graphics_engine
+                .set_high_quality_interface(graphics_settings.high_quality_interface);
+            self.active_graphics_settings.high_quality_interface = graphics_settings.high_quality_interface;
+        }
     }
 }
 

@@ -4,7 +4,7 @@ use cgmath::{Array, Vector2};
 use derive_new::new;
 use korangar_audio::SoundEffectKey;
 use korangar_interface::application::ClipTrait;
-use korangar_interface::element::{Element, PrototypeElement};
+use korangar_interface::element::{Element, StateElement};
 use korangar_util::container::Cacheable;
 use ragnarok_formats::action::Action;
 #[cfg(feature = "debug")]
@@ -43,15 +43,15 @@ pub enum ActionEvent {
     Unknown,
 }
 
-impl PrototypeElement<ClientState> for ActionEvent {
-    type Layouted = impl std::any::Any;
-    type LayoutedMut = impl std::any::Any;
+impl StateElement<ClientState> for ActionEvent {
+    type LayoutInfo = impl std::any::Any;
+    type LayoutInfoMut = impl std::any::Any;
     type Return<P>
-        = impl korangar_interface::element::Element<ClientState, Layouted = Self::Layouted>
+        = impl korangar_interface::element::Element<ClientState, LayoutInfo = Self::LayoutInfo>
     where
         P: rust_state::Path<ClientState, Self>;
     type ReturnMut<P>
-        = impl korangar_interface::element::Element<ClientState, Layouted = Self::LayoutedMut>
+        = impl korangar_interface::element::Element<ClientState, LayoutInfo = Self::LayoutInfoMut>
     where
         P: rust_state::Path<ClientState, Self>;
 
@@ -68,10 +68,10 @@ impl PrototypeElement<ClientState> for ActionEvent {
             },
         }
         // match self {
-        //     Self::Sound { .. } => PrototypeElement::to_element(&"Sound",
+        //     Self::Sound { .. } => StateElement::to_element(&"Sound",
         // display),     Self::Attack =>
-        // PrototypeElement::to_element(&"Attack", display),
-        //     Self::Unknown => PrototypeElement::to_element(&"Unknown",
+        // StateElement::to_element(&"Attack", display),
+        //     Self::Unknown => StateElement::to_element(&"Unknown",
         // display), }
     }
 
@@ -88,15 +88,15 @@ impl PrototypeElement<ClientState> for ActionEvent {
             },
         }
         // match self {
-        //     Self::Sound { .. } => PrototypeElement::to_element(&"Sound",
+        //     Self::Sound { .. } => StateElement::to_element(&"Sound",
         // display),     Self::Attack =>
-        // PrototypeElement::to_element(&"Attack", display),
-        //     Self::Unknown => PrototypeElement::to_element(&"Unknown",
+        // StateElement::to_element(&"Attack", display),
+        //     Self::Unknown => StateElement::to_element(&"Unknown",
         // display), }
     }
 }
 
-#[derive(Debug, RustState, PrototypeElement)]
+#[derive(Debug, RustState, StateElement)]
 pub struct Actions {
     pub actions: Vec<Action>,
     pub delays: Vec<f32>,

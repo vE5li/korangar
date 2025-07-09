@@ -1,4 +1,4 @@
-use korangar_interface::window::{CustomWindow, PrototypeWindow, Window, WindowTrait};
+use korangar_interface::window::{CustomWindow, StateWindow, Window, WindowTrait};
 use ragnarok_packets::TilePosition;
 use rust_state::Context;
 

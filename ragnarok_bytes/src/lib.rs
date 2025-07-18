@@ -21,6 +21,7 @@ pub use self::writer::ByteWriter;
 
 #[cfg(test)]
 mod conversion {
+    use crate::from_bytes::FromBytesExt;
     use crate::{ByteReader, ByteWriter, FromBytes, ToBytes};
 
     fn encode_decode<T: FromBytes + ToBytes>(input: &[u8]) {

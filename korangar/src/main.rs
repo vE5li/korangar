@@ -2598,6 +2598,10 @@ impl Client {
                     );
                 }
 
+                if self.input_system.get_mouse_released() {
+                    self.interface.reset_mouse_mode();
+                }
+
                 let mut built_ui = {
                     #[cfg(feature = "debug")]
                     profile_block!("user interface");

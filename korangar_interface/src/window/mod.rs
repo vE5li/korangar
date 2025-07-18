@@ -213,7 +213,7 @@ where
 
         // Adjust position
         let real_position = {
-            let anchor_position = data.anchor.to_position(window_size, real_size);
+            let anchor_position = data.anchor.to_position(window_size);
             let half_width = real_size.width() / 2.0;
 
             App::Position::new(

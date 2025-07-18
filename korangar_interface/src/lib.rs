@@ -219,79 +219,6 @@ where
         new_window_index
     }
 
-    // #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    // pub fn left_click_element(&mut self, hovered_element: &ElementCell<App>,
-    // window_index: usize) -> Vec<ClickAction<App>> {     let (_, post_update)
-    // = &mut self.windows[window_index];     let mut resolve = false;
-    //
-    //     let action = hovered_element.borrow_mut().left_click(&mut resolve); //
-    // TODO: add same change_event check as for input character ?
-    //
-    //     if resolve {
-    //         post_update.resolve();
-    //     }
-    //
-    //     action
-    // }
-    //
-    // #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    // pub fn right_click_element(&mut self, hovered_element: &ElementCell<App>,
-    // window_index: usize) -> Vec<ClickAction<App>> {     let (_, post_update)
-    // = &mut self.windows[window_index];     let mut resolve = false;
-    //
-    //     let action = hovered_element.borrow_mut().right_click(&mut resolve); //
-    // TODO: add same change_event check as for input character ?
-    //
-    //     if resolve {
-    //         post_update.resolve();
-    //     }
-    //
-    //     action
-    // }
-    //
-    // #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    // pub fn drag_element(&mut self, element: &ElementCell<App>, _window_index:
-    // usize, mouse_delta: App::Position) {     //let (_window, post_update) =
-    // &mut self.windows[window_index];
-    //
-    //     if let Some(change_event) = element.borrow_mut().drag(mouse_delta) {
-    //         // TODO: Use the window post_update here (?)
-    //         Self::handle_change_event(&mut self.post_update, &mut
-    // PostUpdate::new(), change_event);     }
-    // }
-    //
-    // #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    // pub fn scroll_element(&mut self, element: &ElementCell<App>, window_index:
-    // usize, scroll_delta: f32) {     let (_, post_update) = &mut
-    // self.windows[window_index];
-    //
-    //     if let Some(change_event) = element.borrow_mut().scroll(scroll_delta) {
-    //         Self::handle_change_event(&mut self.post_update, post_update,
-    // change_event);     }
-    // }
-
-    // #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    // pub fn input_character_element(
-    //     &mut self,
-    //     element: &ElementCell<App>,
-    //     window_index: usize,
-    //     character: char,
-    // ) -> (bool, Vec<ClickAction<App>>) {
-    //     let (_, post_update) = &mut self.windows[window_index];
-    //     let mut propagated_actions = Vec::new();
-    //
-    //     let (key_handled, actions) =
-    // element.borrow_mut().input_character(character);     for action in
-    // actions {         match action {
-    //             ClickAction::ChangeEvent(change_event) =>
-    // Self::handle_change_event(&mut self.post_update, post_update, change_event),
-    //             other => propagated_actions.push(other),
-    //         }
-    //     }
-    //
-    //     (key_handled, propagated_actions)
-    // }
-
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn handle_drag(&mut self, delta: App::Size) {
         match self.mouse_mode {
@@ -303,10 +230,12 @@ where
                         wrapper.display_information.real_position.top() + delta.height(),
                     );
 
-                    wrapper
-                        .data
-                        .anchor
-                        .update(self.window_size, new_position, wrapper.display_information.real_size);
+                    wrapper.data.anchor.update(
+                        self.window_size,
+                        new_position,
+                        wrapper.display_information.real_size,
+                        wrapper.display_information.display_height,
+                    );
 
                     if let Some(window_class) = wrapper.window.get_window_class() {
                         self.window_cache.update_anchor(window_class, wrapper.data.anchor);
@@ -327,37 +256,6 @@ where
             }
         }
     }
-
-    // #[cfg_attr(feature = "debug", korangar_debug::profile("render user
-    // interface"))] pub fn render(
-    //     &mut self,
-    //     renderer: &App::Renderer,
-    //     application: &App,
-    //     hovered_element: Option<ElementCell<App>>,
-    //     focused_element: Option<ElementCell<App>>,
-    //     mouse_mode: &App::MouseInputMode,
-    // ) {
-    //     let hovered_element = hovered_element.map(|element| unsafe {
-    // &*element.as_ptr() });     let focused_element =
-    // focused_element.map(|element| unsafe { &*element.as_ptr() });
-    //
-    //     for (index, (window, post_update)) in self.windows.iter_mut().enumerate()
-    // {         if post_update.take_render() || self.post_update.needs_render()
-    // {             #[cfg(feature = "debug")]
-    //             profile_block!("render window");
-    //
-    //             let kind = window.get_theme_kind();
-    //             let theme = application.get_theme(kind);
-    //
-    //             window.render(renderer, application, theme, hovered_element,
-    // focused_element, mouse_mode);
-    //
-    //             if mouse_mode.is_moving_window(index) {
-    //                 window.render_anchors(renderer, theme, self.available_space);
-    //             }
-    //         }
-    //     }
-    // }
 
     pub fn is_window_with_class_open(&self, window_class: App::WindowClass) -> bool {
         self.windows
@@ -395,7 +293,10 @@ where
                 display_height: 0.0,
             },
         });
-        // focus_state.set_focused_window(self.windows.len() - 1);
+    }
+
+    pub fn reset_mouse_mode(&mut self) {
+        self.mouse_mode = MouseMode::Default;
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
@@ -431,30 +332,6 @@ where
         }
     }
 
-    // #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    // pub fn open_popup(
-    //     &mut self,
-    //     element: ElementCell<App>,
-    //     position_tracker: Tracker<App::Position>,
-    //     size_tracker: Tracker<App::Size>,
-    //     window_index: usize,
-    // ) {
-    //     let entry = &mut self.windows[window_index];
-    //     entry.0.open_popup(element, position_tracker, size_tracker);
-    //     entry.1.resolve();
-    // }
-
-    // #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    // pub fn close_popup(&mut self, window_index: usize) {
-    //     let entry = &mut self.windows[window_index];
-    //     entry.0.close_popup();
-    //     entry.1.render();
-    // }
-
-    // pub fn get_window(&self, window_index: usize) -> &dyn Window<App> {
-    //     &self.windows[window_index].0
-    // }
-
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn close_window_with_class(&mut self, window_class: App::WindowClass) {
         if let Some(index_from_back) = self
@@ -469,13 +346,6 @@ where
             self.windows.remove(index);
         }
     }
-
-    // #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    // pub fn close_window_with_id(&mut self, window_id: u64) {
-    //     if let Some(index) = self.windows.iter().position(|(_, window_data)|
-    // window_data.id == window_id) {         self.close_window(index);
-    //     }
-    // }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn close_all_windows(&mut self) {
@@ -606,43 +476,6 @@ where
 
         application_events
     }
-
-    // #[cfg_attr(feature = "debug", korangar_debug::profile("get first focused
-    // element"))] pub fn first_focused_element(&self) {
-    //     if self.windows.is_empty() {
-    //         return;
-    //     }
-    //
-    //     let window_index = self.windows.len() - 1;
-    //     let element = self.windows.last().unwrap().0.first_focused_element();
-    //
-    //     focus_state.set_focused_element(element, window_index);
-    // }
-    //
-    // #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    // pub fn restore_focus(&self, focus_state: &mut FocusState<App>) {
-    //     if self.windows.is_empty() {
-    //         return;
-    //     }
-    //
-    //     let window_index = self.windows.len() - 1;
-    //     let element = self.windows.last().unwrap().0.restore_focus();
-    //
-    //     focus_state.set_focused_element(element, window_index);
-    // }
-    //
-    // #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    // pub fn focus_window_with_class(&self, focus_state: &mut FocusState<App>,
-    // window_class: &str) {     if let Some(index) = self
-    //         .windows
-    //         .iter()
-    //         .map(|(window, ..)| window.get_window_class())
-    //         .position(|class_option| class_option.contains(&window_class))
-    //     {
-    //         let element = self.windows[index].0.first_focused_element();
-    //         focus_state.set_focused_element(element, index);
-    //     }
-    // }
 }
 
 pub struct BuiltUi<'a, App: Application> {

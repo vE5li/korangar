@@ -688,6 +688,10 @@ impl InputSystem {
             })
     }
 
+    pub fn get_mouse_released(&self) -> bool {
+        self.left_mouse_button.released()
+    }
+
     // TODO: Temp
     pub fn get_drag(&self) -> Option<ScreenSize> {
         self.left_mouse_button.down().then_some(self.mouse_delta)

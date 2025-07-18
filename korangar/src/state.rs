@@ -220,8 +220,8 @@ impl ThemeDefault<DefaultMenu> for ClientTheme {
                 font_size: FontSize(20.0),
                 text_alignment: HorizontalAlignment::Center { offset: 0.0 },
                 vertical_alignment: VerticalAlignment::Center { offset: 0.0 },
-                anchor_color: Color::rgba_u8(255, 80, 200, 40),
-                closest_anchor_color: Color::rgb_u8(255, 80, 200),
+                anchor_color: Color::rgb_u8(130, 105, 160),
+                closest_anchor_color: Color::rgb_u8(255, 175, 30),
             },
             text: TextTheme {
                 color: Color::monochrome_u8(220),
@@ -327,8 +327,8 @@ impl ThemeDefault<DefaultGame> for ClientTheme {
                 font_size: FontSize(14.0),
                 text_alignment: HorizontalAlignment::Center { offset: 0.0 },
                 vertical_alignment: VerticalAlignment::Center { offset: 0.0 },
-                anchor_color: Color::rgba_u8(255, 80, 200, 40),
-                closest_anchor_color: Color::rgb_u8(255, 80, 200),
+                anchor_color: Color::rgb_u8(140, 105, 130),
+                closest_anchor_color: Color::rgb_u8(255, 175, 30),
             },
             text: TextTheme {
                 color: Color::monochrome_u8(220),

@@ -274,7 +274,7 @@ where
             Some(saved_state) => saved_state,
             None => {
                 let anchor = Anchor::default();
-                let size = App::Size::new(0.0, 500.0);
+                let size = App::Size::new(0.0, f32::MAX);
 
                 if let Some(window_class) = window_class {
                     self.window_cache.register_window(window_class, anchor, size);
@@ -387,7 +387,7 @@ where
             wrapper.display_information = wrapper.window.create_layout_info(
                 state,
                 &mut self.window_store,
-                &wrapper.data,
+                &mut wrapper.data,
                 &mut self.generator,
                 self.window_size,
             );

@@ -52,7 +52,7 @@ pub trait WindowTrait<App: Application> {
         &mut self,
         state: &Context<App>,
         store: &mut WindowStore,
-        data: &WindowData<App>,
+        data: &mut WindowData<App>,
         generator: &mut ElementIdGenerator,
         window_size: App::Size,
     ) -> DisplayInformation<App>;
@@ -188,7 +188,7 @@ where
         &mut self,
         state: &Context<App>,
         store: &mut WindowStore,
-        data: &WindowData<App>,
+        data: &mut WindowData<App>,
         generator: &mut ElementIdGenerator,
         window_size: App::Size,
     ) -> DisplayInformation<App> {
@@ -210,6 +210,10 @@ where
                 data.size.height().min(maximum_height).max(minimum_height),
             )
         };
+
+        if data.anchor.is_initializing() {
+            data.anchor.initialize(window_size, real_size);
+        }
 
         // Adjust position
         let real_position = {

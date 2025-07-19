@@ -34,6 +34,7 @@ where
 {
     anchor_point: AnchorPoint,
     offset: App::Position,
+    initializing: bool,
 }
 
 impl<App> Default for Anchor<App>
@@ -41,10 +42,10 @@ where
     App: Application,
 {
     fn default() -> Self {
-        // By default, windows start out in the middle of the screen.
         Self {
             anchor_point: AnchorPoint::Center,
             offset: App::Position::new(0.0, 0.0),
+            initializing: true,
         }
     }
 }
@@ -64,6 +65,23 @@ impl<App> Anchor<App>
 where
     App: Application,
 {
+    fn initialized(anchor_point: AnchorPoint, offset: App::Position) -> Self {
+        Self {
+            anchor_point,
+            offset,
+            initializing: false,
+        }
+    }
+
+    pub fn is_initializing(&self) -> bool {
+        self.initializing
+    }
+
+    pub fn initialize(&mut self, window_size: App::Size, real_size: App::Size) {
+        self.offset = App::Position::new(-real_size.width() / 2.0, -window_size.height() / 4.0);
+        self.initializing = false;
+    }
+
     pub fn to_position(&self, window_space: App::Size) -> App::Position {
         let half_width = window_space.width() / 2.0;
         let half_height = window_space.height() / 2.0;
@@ -86,32 +104,26 @@ where
 
     pub fn update(&mut self, window_space: App::Size, position: App::Position, window_size: App::Size, display_height: f32) {
         let center = (
-            Anchor {
-                offset: App::Position::new(
+            Anchor::initialized(
+                AnchorPoint::Center,
+                App::Position::new(
                     position.left() - window_space.width() / 2.0,
                     position.top() - window_space.height() / 2.0,
                 ),
-                anchor_point: AnchorPoint::Center,
-            },
+            ),
             App::Position::new(
                 position.left() - (window_space.width() - window_size.width()) / 2.0,
                 position.top() - (window_space.height() - display_height) / 2.0,
             ),
         );
 
-        let top_left = (
-            Anchor {
-                offset: position,
-                anchor_point: AnchorPoint::TopLeft,
-            },
-            position,
-        );
+        let top_left = (Anchor::initialized(AnchorPoint::TopLeft, position), position);
 
         let top_center = (
-            Anchor {
-                offset: App::Position::new(position.left() - window_space.width() / 2.0, position.top()),
-                anchor_point: AnchorPoint::TopCenter,
-            },
+            Anchor::initialized(
+                AnchorPoint::TopCenter,
+                App::Position::new(position.left() - window_space.width() / 2.0, position.top()),
+            ),
             App::Position::new(
                 position.left() - (window_space.width() - window_size.width()) / 2.0,
                 position.top(),
@@ -119,21 +131,21 @@ where
         );
 
         let top_right = (
-            Anchor {
-                offset: App::Position::new(position.left() - window_space.width(), position.top()),
-                anchor_point: AnchorPoint::TopRight,
-            },
+            Anchor::initialized(
+                AnchorPoint::TopRight,
+                App::Position::new(position.left() - window_space.width(), position.top()),
+            ),
             App::Position::new(position.left() - window_space.width() + window_size.width(), position.top()),
         );
 
         let center_right = (
-            Anchor {
-                offset: App::Position::new(
+            Anchor::initialized(
+                AnchorPoint::CenterRight,
+                App::Position::new(
                     position.left() - window_space.width(),
                     position.top() - window_space.height() / 2.0,
                 ),
-                anchor_point: AnchorPoint::CenterRight,
-            },
+            ),
             App::Position::new(
                 position.left() - window_space.width() + window_size.width(),
                 position.top() - (window_space.height() - display_height) / 2.0,
@@ -141,10 +153,10 @@ where
         );
 
         let bottom_right = (
-            Anchor {
-                offset: App::Position::new(position.left() - window_space.width(), position.top() - window_space.height()),
-                anchor_point: AnchorPoint::BottomRight,
-            },
+            Anchor::initialized(
+                AnchorPoint::BottomRight,
+                App::Position::new(position.left() - window_space.width(), position.top() - window_space.height()),
+            ),
             App::Position::new(
                 position.left() - window_space.width() + window_size.width(),
                 position.top() - window_space.height() + display_height,
@@ -152,13 +164,13 @@ where
         );
 
         let bottom_center = (
-            Anchor {
-                offset: App::Position::new(
+            Anchor::initialized(
+                AnchorPoint::BottomCenter,
+                App::Position::new(
                     position.left() - window_space.width() / 2.0,
                     position.top() - window_space.height(),
                 ),
-                anchor_point: AnchorPoint::BottomCenter,
-            },
+            ),
             App::Position::new(
                 position.left() - (window_space.width() - window_size.width()) / 2.0,
                 position.top() - window_space.height() + display_height,
@@ -166,18 +178,18 @@ where
         );
 
         let bottom_left = (
-            Anchor {
-                offset: App::Position::new(position.left(), position.top() - window_space.height()),
-                anchor_point: AnchorPoint::BottomLeft,
-            },
+            Anchor::initialized(
+                AnchorPoint::BottomLeft,
+                App::Position::new(position.left(), position.top() - window_space.height()),
+            ),
             App::Position::new(position.left(), position.top() - window_space.height() + display_height),
         );
 
         let center_left = (
-            Anchor {
-                offset: App::Position::new(position.left(), position.top() - window_space.height() / 2.0),
-                anchor_point: AnchorPoint::CenterLeft,
-            },
+            Anchor::initialized(
+                AnchorPoint::CenterLeft,
+                App::Position::new(position.left(), position.top() - window_space.height() / 2.0),
+            ),
             App::Position::new(position.left(), position.top() - (window_space.height() - display_height) / 2.0),
         );
 

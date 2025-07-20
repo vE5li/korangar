@@ -142,6 +142,23 @@ struct LayoutLayer<'a, App: Application> {
     input_handlers: Vec<&'a dyn InputHandler<App>>,
 }
 
+impl<App: Application> LayoutLayer<'_, App> {
+    fn clear(&mut self) {
+        self.rectangles.clear();
+        self.texts.clear();
+        self.checkboxes.clear();
+        self.custom_instructions.clear();
+        self.click_areas.clear();
+        self.window_move_areas.clear();
+        self.window_resize_areas.clear();
+        self.window_close_areas.clear();
+        self.scroll_areas.clear();
+        self.toggles.clear();
+        self.focus_areas.clear();
+        self.input_handlers.clear();
+    }
+}
+
 impl<App: Application> Default for LayoutLayer<'_, App> {
     fn default() -> Self {
         Self {
@@ -179,7 +196,7 @@ impl<App: Application> ClipLayer<App> {
 impl<App: Application> Clone for ClipLayer<App> {
     fn clone(&self) -> Self {
         Self {
-            parent: self.parent.clone(),
+            parent: self.parent,
             clip: self.clip,
         }
     }
@@ -209,12 +226,12 @@ pub struct Layout<'a, App: Application> {
     use_secondary_color: bool,
 }
 
-impl<'a, App: Application> Layout<'a, App> {
-    pub fn new(mouse_position: App::Position, focused_element: Option<ElementId>, can_hover: bool) -> Self {
+impl<App: Application> Default for Layout<'_, App> {
+    fn default() -> Self {
         Self {
             layers: vec![LayoutLayer::default()],
             current_layer: 0,
-            can_hover,
+            can_hover: false,
 
             clip_layers: vec![ClipLayer {
                 parent: None,
@@ -222,11 +239,35 @@ impl<'a, App: Application> Layout<'a, App> {
             }],
             active_clip_layers: vec![ClipLayerId(0)],
 
-            mouse_position,
-            focused_element,
+            mouse_position: App::Position::new(0.0, 0.0),
+            focused_element: None,
 
             use_secondary_color: false,
         }
+    }
+}
+
+impl<'a, App: Application> Layout<'a, App> {
+    /// This function is responsible for clearing any state that are captured by
+    /// the 'a lifetime. Ideally, this function does not deallocate any
+    /// memory since it will very likely need to be re-allocated on the next
+    /// frame.
+    ///
+    /// This function is the reason that the `transmute` in the `Interface` is
+    /// safe, so it should be implemented with care.
+    pub fn clear(&mut self) {
+        self.layers.iter_mut().for_each(LayoutLayer::clear);
+        self.clip_layers.clear();
+        self.clip_layers.push(ClipLayer {
+            parent: None,
+            clip: App::Clip::unbound(),
+        });
+    }
+
+    pub fn update(&mut self, mouse_position: App::Position, focused_element: Option<ElementId>, can_hover: bool) {
+        self.focused_element = focused_element;
+        self.mouse_position = mouse_position;
+        self.can_hover = can_hover;
     }
 
     pub fn is_hovered(&self) -> bool {
@@ -311,6 +352,16 @@ impl<'a, App: Application> Layout<'a, App> {
 
     pub fn get_active_clip_layer(&self) -> ClipLayerId {
         self.active_clip_layers.last().copied().unwrap()
+    }
+
+    pub fn with_secondary_background(&mut self, f: impl Fn(&mut Self)) -> bool {
+        let previous = self.use_secondary_color;
+        self.use_secondary_color = !self.use_secondary_color;
+
+        f(self);
+
+        self.use_secondary_color = previous;
+        previous
     }
 
     pub fn add_click_area(&mut self, area: Area, button: MouseButton, action: &'a dyn ClickAction<App>) {
@@ -435,14 +486,8 @@ impl<'a, App: Application> Layout<'a, App> {
         self.layers[self.current_layer].custom_instructions.push(instruction);
     }
 
-    pub fn with_secondary_background(&mut self, f: impl Fn(&mut Self)) -> bool {
-        let previous = self.use_secondary_color;
-        self.use_secondary_color = !self.use_secondary_color;
 
-        f(self);
 
-        self.use_secondary_color = previous;
-        previous
     }
 
     pub fn render(&mut self, renderer: &App::Renderer) {

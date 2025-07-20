@@ -21,9 +21,9 @@ pub mod window;
 // Re-export self as korangar_interface so we can use proc macros in this crate.
 extern crate self as korangar_interface;
 
-use std::any::Any;
+use std::collections::BTreeMap;
 
-use application::{Application, PositionTrait, SizeTrait, WindowCache};
+use application::{Application, ClipTrait, FontSizeTrait, PositionTrait, RenderLayer, SizeTrait, WindowCache};
 use element::id::{ElementId, ElementIdGenerator};
 use element::store::ElementStore;
 use element::{Element, ElementBox};
@@ -34,8 +34,9 @@ use layout::area::Area;
 use layout::{Layout, MouseButton, Resolver};
 use option_ext::OptionExt;
 use rust_state::Context;
+use theme::ThemePathGetter;
 use window::store::WindowStore;
-use window::{Anchor, CustomWindow, DisplayInformation, StateWindow, WindowData, WindowTrait};
+use window::{Anchor, CustomWindow, DisplayInformation, StateWindow, WindowData, WindowThemePathExt, WindowTrait};
 
 pub mod prelude {
     // Re-export proc macros.
@@ -164,7 +165,7 @@ where
     display_information: DisplayInformation<App>,
 }
 
-pub struct Interface<App>
+pub struct Interface<'a, App>
 where
     App: Application,
 {
@@ -179,10 +180,19 @@ where
     event_queue: EventQueue<App>,
     overlay_element: Option<(ElementBox<App>, ElementStore, App::Position, App::Size)>,
 
+    /// Cached window layouts. This is mostly an optimization to avoid
+    /// re-allocating the every frame but also serves to store some information
+    /// between frames like the tooltip timers.
+    window_layouts: BTreeMap<u64, Layout<'a, App>>,
+    /// Cached overlay layout. This is mostly an optimization to avoid
+    /// re-allocating the every frame but also serves to store some information
+    /// between frames like the tooltip timers.
+    overlay_layout: Option<Layout<'a, App>>,
+
     next_window_id: u64,
 }
 
-impl<App> Interface<App>
+impl<App> Interface<'static, App>
 where
     App: Application,
 {
@@ -200,6 +210,9 @@ where
             mouse_mode: MouseMode::Default,
             event_queue: EventQueue::default(),
             overlay_element: None,
+
+            window_layouts: BTreeMap::new(),
+            overlay_layout: None,
 
             next_window_id: 0,
         }
@@ -332,6 +345,12 @@ where
         }
     }
 
+    fn remove_window(&mut self, index: usize) {
+        // Remove the cached window layout to avoid growing the cache indefinitely.
+        self.window_layouts.remove(&self.windows[index].data.id);
+        self.windows.remove(index);
+    }
+
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn close_window_with_class(&mut self, window_class: App::WindowClass) {
         if let Some(index_from_back) = self
@@ -342,14 +361,15 @@ where
             .position(|class_option| class_option.contains(&window_class))
         {
             let index = self.windows.len() - 1 - index_from_back;
-
-            self.windows.remove(index);
+            self.remove_window(index);
         }
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn close_all_windows(&mut self) {
-        self.windows.clear();
+        for index in (0..self.windows.len()).rev() {
+            self.remove_window(index);
+        }
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
@@ -361,7 +381,7 @@ where
                 .map(|class| !exceptions.contains(&class))
                 .unwrap_or(true)
             {
-                self.windows.remove(index);
+                self.remove_window(index);
             }
         }
     }
@@ -383,49 +403,48 @@ where
             element.create_layout_info(state, store, &mut self.generator, &mut resolver);
         }
 
-        self.windows.iter_mut().for_each(|wrapper| {
+        // SAFETY:
+        //
+        // This is safe as long as the `Drop` implementation of the `BuiltUi` clears the
+        // `Layout`s, removing any references with the lifetime 'a from the
+        // struct. If drop does not clear the layout or the clear implementation
+        // of drop is incorrect we will end up with dangling references.
+        let this = unsafe { std::mem::transmute::<&'a mut Interface<'static, App>, &'a mut Interface<'a, App>>(self) };
+
+        this.windows.iter_mut().for_each(|wrapper| {
             wrapper.display_information = wrapper.window.create_layout_info(
                 state,
-                &mut self.window_store,
+                &mut this.window_store,
                 &mut wrapper.data,
-                &mut self.generator,
-                self.window_size,
+                &mut this.generator,
+                this.window_size,
             );
         });
 
-        let overlay_layout = self.overlay_element.as_ref().map(|(element, store, ..)| {
-            let mut layout = Layout::new(mouse_position, self.focused_element, !is_ui_hovered);
+        if let Some((element, store, ..)) = &this.overlay_element {
+            let layout = this.overlay_layout.get_or_insert_default();
+            layout.update(mouse_position, this.focused_element, !is_ui_hovered);
 
-            element.layout_element(state, store, &(), &mut layout);
+            element.layout_element(state, store, &(), layout);
 
             is_ui_hovered |= layout.is_hovered();
-
-            layout
-        });
-
-        let mut layouts = self
-            .windows
-            .iter()
-            .map(|wrapper| {
-                let mut layout = Layout::new(mouse_position, self.focused_element, !is_ui_hovered);
-
-                wrapper.window.do_layout(state, &self.window_store, &wrapper.data, &mut layout);
-
-                is_ui_hovered |= layout.is_hovered();
-
-                layout
-            })
-            .collect::<Vec<_>>();
-
-        if let Some(layout) = overlay_layout {
-            layouts.insert(0, layout);
         }
 
+        this.windows.iter().for_each(|wrapper| {
+            let layout = this.window_layouts.entry(wrapper.data.id).or_default();
+            layout.update(mouse_position, this.focused_element, !is_ui_hovered);
+
+            wrapper.window.do_layout(state, &this.window_store, &wrapper.data, layout);
+
+            is_ui_hovered |= layout.is_hovered();
+        });
+
         BuiltUi {
-            layouts,
-            focused_element: &mut self.focused_element,
-            mouse_mode: &mut self.mouse_mode,
-            event_queue: &mut self.event_queue,
+            window_layouts: &mut this.window_layouts,
+            overlay_layout: &mut this.overlay_layout,
+            focused_element: &mut this.focused_element,
+            mouse_mode: &mut this.mouse_mode,
+            event_queue: &mut this.event_queue,
         }
     }
 
@@ -470,7 +489,10 @@ where
                         self.windows.remove(index);
                     }
                 }
-                event::Event::CloseOverlay => self.overlay_element = None,
+                event::Event::CloseOverlay => {
+                    self.overlay_element = None;
+                    self.overlay_layout = None;
+                }
             }
         }
 
@@ -479,7 +501,8 @@ where
 }
 
 pub struct BuiltUi<'a, App: Application> {
-    layouts: Vec<Layout<'a, App>>,
+    window_layouts: &'a mut BTreeMap<u64, Layout<'a, App>>,
+    overlay_layout: &'a mut Option<Layout<'a, App>>,
     focused_element: &'a mut Option<ElementId>,
     mouse_mode: &'a mut MouseMode,
     event_queue: &'a mut EventQueue<App>,
@@ -488,9 +511,16 @@ pub struct BuiltUi<'a, App: Application> {
 impl<App: Application> BuiltUi<'_, App> {
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn render(&mut self, renderer: &App::Renderer) {
-        self.layouts.iter_mut().rev().for_each(|layout| {
+        // FIX: Window order.
+        // Most likely we want to include another vector that keeps the ids of the
+        // windows in order.
+        self.window_layouts.values_mut().for_each(|layout| {
             layout.render(renderer);
         });
+
+        if let Some(layout) = &mut self.overlay_layout {
+            layout.render(renderer);
+        }
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
@@ -499,7 +529,7 @@ impl<App: Application> BuiltUi<'_, App> {
         // to unfocus correctly.
         let mut ui_clicked = false;
 
-        for layout in &self.layouts {
+        if let Some(layout) = &self.overlay_layout {
             if layout.do_click(
                 state,
                 self.event_queue,
@@ -509,7 +539,22 @@ impl<App: Application> BuiltUi<'_, App> {
                 mouse_button,
             ) {
                 ui_clicked = true;
-                break;
+            }
+        }
+
+        if !ui_clicked {
+            for layout in self.window_layouts.values() {
+                if layout.do_click(
+                    state,
+                    self.event_queue,
+                    self.focused_element,
+                    self.mouse_mode,
+                    click_position,
+                    mouse_button,
+                ) {
+                    ui_clicked = true;
+                    break;
+                }
             }
         }
 
@@ -520,7 +565,13 @@ impl<App: Application> BuiltUi<'_, App> {
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn scroll(&self, mouse_position: App::Position, delta: f32) {
-        for layout in &self.layouts {
+        if let Some(layout) = &self.overlay_layout {
+            if layout.do_scroll(mouse_position, delta) {
+                return;
+            }
+        }
+
+        for layout in self.window_layouts.values() {
             if layout.do_scroll(mouse_position, delta) {
                 break;
             }
@@ -529,10 +580,26 @@ impl<App: Application> BuiltUi<'_, App> {
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn input_characters(&self, state: &Context<App>, characters: &[char]) {
-        for layout in &self.layouts {
+        if let Some(layout) = &self.overlay_layout {
             for character in characters {
                 layout.input_character(state, *character);
             }
+        }
+
+        for layout in self.window_layouts.values() {
+            for character in characters {
+                layout.input_character(state, *character);
+            }
+        }
+    }
+}
+
+impl<App: Application> Drop for BuiltUi<'_, App> {
+    fn drop(&mut self) {
+        self.window_layouts.values_mut().for_each(|layout| layout.clear());
+
+        if let Some(layout) = self.overlay_layout {
+            layout.clear();
         }
     }
 }

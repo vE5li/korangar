@@ -370,7 +370,7 @@ struct Client {
 
     input_system: InputSystem,
 
-    interface: Interface<ClientState>,
+    interface: Interface<'static, ClientState>,
     mouse_cursor: MouseCursor,
     show_interface: bool,
     game_timer: GameTimer,
@@ -2624,6 +2624,8 @@ impl Client {
                 };
 
                 built_ui.render(&self.interface_renderer);
+
+                std::mem::drop(built_ui);
 
                 self.interface.render_overlay(
                     &self.interface_renderer,

@@ -1,11 +1,14 @@
 mod resolver;
 
 use std::cell::RefCell;
+use std::collections::BTreeMap;
+use std::time::{Duration, Instant};
 
 use alignment::{HorizontalAlignment, VerticalAlignment};
 use area::Area;
 use num::Signed;
 use rust_state::Context;
+use tooltip::{Tooltip, TooltipId};
 
 pub use self::resolver::{HeightBound, Resolver};
 use crate::MouseMode;
@@ -212,6 +215,49 @@ impl Drop for ClipLayerHandle {
     }
 }
 
+pub mod tooltip {
+    use std::any::{Any, TypeId};
+
+    use rust_state::RustState;
+
+    use crate::application::Application;
+
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    pub struct TooltipId(TypeId);
+
+    pub trait TooltipExt {
+        fn tooltip_id(&self) -> TooltipId;
+    }
+
+    impl<T> TooltipExt for T
+    where
+        T: Any,
+    {
+        fn tooltip_id(&self) -> TooltipId {
+            TooltipId(T::type_id(&self))
+        }
+    }
+
+    #[derive(RustState)]
+    pub struct TooltipTheme<App>
+    where
+        App: Application + 'static,
+    {
+        pub background_color: App::Color,
+        pub foreground_color: App::Color,
+        pub font_size: App::FontSize,
+        pub corner_radius: App::CornerRadius,
+        pub border: f32,
+        pub gap: f32,
+        pub mouse_offset: f32,
+    }
+
+    pub struct Tooltip<'a> {
+        pub text: &'a str,
+        pub id: TooltipId,
+    }
+}
+
 pub struct Layout<'a, App: Application> {
     layers: Vec<LayoutLayer<'a, App>>,
     current_layer: usize,
@@ -224,6 +270,9 @@ pub struct Layout<'a, App: Application> {
     focused_element: Option<ElementId>,
 
     use_secondary_color: bool,
+
+    tooltips: Vec<Tooltip<'a>>,
+    tooltip_timers: BTreeMap<TooltipId, Instant>,
 }
 
 impl<App: Application> Default for Layout<'_, App> {
@@ -243,6 +292,9 @@ impl<App: Application> Default for Layout<'_, App> {
             focused_element: None,
 
             use_secondary_color: false,
+
+            tooltips: Vec::new(),
+            tooltip_timers: BTreeMap::new(),
         }
     }
 }
@@ -257,11 +309,14 @@ impl<'a, App: Application> Layout<'a, App> {
     /// safe, so it should be implemented with care.
     pub fn clear(&mut self) {
         self.layers.iter_mut().for_each(LayoutLayer::clear);
+
         self.clip_layers.clear();
         self.clip_layers.push(ClipLayer {
             parent: None,
             clip: App::Clip::unbound(),
         });
+
+        self.tooltips.clear();
     }
 
     pub fn update(&mut self, mouse_position: App::Position, focused_element: Option<ElementId>, can_hover: bool) {
@@ -486,8 +541,29 @@ impl<'a, App: Application> Layout<'a, App> {
         self.layers[self.current_layer].custom_instructions.push(instruction);
     }
 
+    pub fn add_tooltip(&mut self, text: &'a str, id: TooltipId) {
+        let tooltip = Tooltip { text, id };
+        self.tooltips.push(tooltip);
 
+        // If the tooltip was not present last frame start the timer now.
+        self.tooltip_timers.entry(id).or_insert_with(Instant::now);
+    }
 
+    /// Update tooltips and collect those that have been registered for some
+    /// time. Those are the tooltips that will be rendered to the screen.
+    pub fn update_tooltips(&mut self, tooltips: &mut Vec<&'a str>) {
+        self.tooltip_timers.retain(|id, timer| {
+            if let Some(tooltip) = self.tooltips.iter().find(|tooltip| tooltip.id == *id) {
+                if timer.elapsed() > Duration::from_secs(1) {
+                    tooltips.push(tooltip.text);
+                }
+
+                true
+            } else {
+                // Remove any timers for tooltips that are no longer registered.
+                false
+            }
+        });
     }
 
     pub fn render(&mut self, renderer: &App::Renderer) {

@@ -29,6 +29,11 @@ macro_rules! time_phase {
     }
 }
 
+// TODO: Rename render settings to render options.
+// TODO: Rename viewer to inspector.
+// TODO: Rename area x and y to width and height.
+// TODO: Rename the whole game theme thing.
+
 mod graphics;
 mod input;
 mod state;
@@ -62,7 +67,7 @@ use korangar_debug::profile_block;
 #[cfg(feature = "debug")]
 use korangar_debug::profiling::Profiler;
 use korangar_interface::Interface;
-use korangar_interface::application::{FontSizeTrait, PositionTrait, ScalingTrait};
+use korangar_interface::application::{Application, FontSizeTrait, PositionTrait, ScalingTrait};
 use korangar_interface::element::StateElement;
 use korangar_interface::element::id::ElementId;
 use korangar_interface::event::EventQueue;
@@ -82,8 +87,8 @@ use renderer::InterfaceRenderer;
 use rust_state::{BoxedExt, Context, ManuallyAssertExt, OptionExt, Path, RustState};
 use settings::{AudioSettings, AudioSettingsPathExt, GraphicsSettingsCapabilities, GraphicsSettingsPathExt};
 use state::{
-    ClientState, ClientStatePathExt, ClientStateRootExt, ClientTheme, ClientThemePathExt, DefaultGame, DefaultMenu, LoginWindowState,
-    ThemeDefault, client_state, client_theme, this_entity, this_player,
+    ClientState, ClientStatePathExt, ClientStateRootExt, ClientTheme, ClientThemePathExt, ClientThemeType, DefaultGame, DefaultMenu,
+    LoginWindowState, ThemeDefault, client_state, client_theme, this_entity, this_player,
 };
 #[cfg(feature = "debug")]
 use wgpu::Device;
@@ -2612,7 +2617,7 @@ impl Client {
                         built_ui.click(&self.client_state, click_position, mouse_button);
                     }
 
-                    if let Some((mouse_position, delta)) = self.input_system.get_scroll_delta() {
+                    if let Some(delta) = self.input_system.get_scroll_delta() {
                         built_ui.scroll(mouse_position, delta);
                     }
 
@@ -2623,7 +2628,14 @@ impl Client {
                     built_ui
                 };
 
-                built_ui.render(&self.interface_renderer);
+                let tooltip_theme = match self.client_state.try_follow(this_player()).is_none() {
+                    true => ClientThemeType::Menu,
+                    false => ClientThemeType::Game,
+                };
+
+                // This is only needed for rendering the tooltips.
+                ClientState::set_current_theme_type(tooltip_theme);
+                built_ui.render(&self.client_state, &self.interface_renderer, mouse_position);
 
                 std::mem::drop(built_ui);
 

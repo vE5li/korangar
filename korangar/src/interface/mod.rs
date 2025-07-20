@@ -17,6 +17,7 @@ pub mod components {
         use korangar_interface::event::{ClickAction, Event, EventQueue};
         use korangar_interface::layout::alignment::{HorizontalAlignment, VerticalAlignment};
         use korangar_interface::layout::area::Area;
+        use korangar_interface::layout::tooltip::TooltipExt;
         use korangar_interface::layout::{Layout, MouseButton, Resolver};
         use ragnarok_packets::{CharacterInformation, CharacterInformationPathExt};
         use rust_state::{Context, ManuallyAssertExt, Path, RustState, Selector};
@@ -269,6 +270,11 @@ pub mod components {
                         layout.add_click_area(layout_info.area, MouseButton::Left, &self.click_handler.select_character);
                         layout.add_click_area(layout_info.area, MouseButton::Right, &self.overlay_handler);
                         layout.mark_hovered();
+
+                        {
+                            struct PrivateTooltipId;
+                            layout.add_tooltip(&character_information.name, PrivateTooltipId.tooltip_id());
+                        }
                     }
                 } else {
                     let is_hoverered = layout.is_area_hovered_and_active(layout_info.area);

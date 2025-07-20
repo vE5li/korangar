@@ -23,16 +23,17 @@ extern crate self as korangar_interface;
 
 use std::collections::BTreeMap;
 
-use application::{Application, ClipTrait, FontSizeTrait, PositionTrait, RenderLayer, SizeTrait, WindowCache};
+use application::{Application, ClipTrait, CornerRadiusTrait, PositionTrait, RenderLayer, SizeTrait, WindowCache};
+use element::ElementBox;
 use element::id::{ElementId, ElementIdGenerator};
 use element::store::ElementStore;
-use element::{Element, ElementBox};
 use event::EventQueue;
 #[cfg(feature = "debug")]
 use korangar_debug::profile_block;
 use layout::area::Area;
 use layout::{Layout, MouseButton, Resolver};
 use option_ext::OptionExt;
+use prelude::TooltipThemePathExt;
 use rust_state::Context;
 use theme::ThemePathGetter;
 use window::store::WindowStore;
@@ -53,6 +54,7 @@ pub mod prelude {
     // TODO: Should this really be here?
     pub use crate::layout::HeightBound;
     pub use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
+    pub use crate::layout::tooltip::TooltipThemePathExt;
     pub use crate::selector_helpers::*;
     pub use crate::theme::ThemePathGetter;
     pub use crate::window::WindowThemePathExt;
@@ -439,12 +441,17 @@ where
             is_ui_hovered |= layout.is_hovered();
         });
 
+        let tooltip_background_color = *state.get(&theme::theme().window().background_color());
+        let tooltip_text_color = *state.get(&theme::theme().window().title_color());
+        let tooltip_font_size = *state.get(&theme::theme().window().font_size());
+
         BuiltUi {
             window_layouts: &mut this.window_layouts,
             overlay_layout: &mut this.overlay_layout,
             focused_element: &mut this.focused_element,
             mouse_mode: &mut this.mouse_mode,
             event_queue: &mut this.event_queue,
+            window_size: this.window_size,
         }
     }
 
@@ -506,20 +513,89 @@ pub struct BuiltUi<'a, App: Application> {
     focused_element: &'a mut Option<ElementId>,
     mouse_mode: &'a mut MouseMode,
     event_queue: &'a mut EventQueue<App>,
+    window_size: App::Size,
 }
 
 impl<App: Application> BuiltUi<'_, App> {
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn render(&mut self, renderer: &App::Renderer) {
+    pub fn render(&mut self, state: &Context<App>, renderer: &App::Renderer, mouse_position: App::Position) {
+        // FIX: Don't allocate every frame. Move this to the interface as well.
+        let mut tooltips = Vec::new();
+
         // FIX: Window order.
         // Most likely we want to include another vector that keeps the ids of the
         // windows in order.
         self.window_layouts.values_mut().for_each(|layout| {
             layout.render(renderer);
+            layout.update_tooltips(&mut tooltips);
         });
 
         if let Some(layout) = &mut self.overlay_layout {
             layout.render(renderer);
+            layout.update_tooltips(&mut tooltips);
+        }
+
+        if !tooltips.is_empty() {
+            self.render_tooltips(state, renderer, &tooltips, mouse_position);
+        }
+    }
+
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
+    fn render_tooltips(&self, state: &Context<App>, renderer: &App::Renderer, tooltips: &[&str], mouse_position: App::Position) {
+        let background_color = *state.get(&theme::theme().tooltip().background_color());
+        let foreground_color = *state.get(&theme::theme().tooltip().foreground_color());
+        let font_size = *state.get(&theme::theme().tooltip().font_size());
+        let corner_radius = *state.get(&theme::theme().tooltip().corner_radius());
+        let border = *state.get(&theme::theme().tooltip().border());
+        let gap = *state.get(&theme::theme().tooltip().gap());
+        let mouse_offset = *state.get(&theme::theme().tooltip().mouse_offset());
+
+        let total_offset = border * 2.0 + mouse_offset;
+        let half_window_size = App::Size::new(self.window_size.width() / 2.0, self.window_size.height() / 2.0);
+        let available_width = match mouse_position.left() > half_window_size.width() {
+            true => mouse_position.left() - total_offset,
+            false => self.window_size.width() - mouse_position.left() - total_offset,
+        };
+
+        let mut vertical_offset = 0.0;
+        let mut forwards_iterator = tooltips.iter();
+        let mut backwards_iterator = tooltips.iter().rev();
+
+        let iterator: &mut dyn Iterator<Item = &&str> = match mouse_position.top() > half_window_size.height() {
+            true => &mut backwards_iterator,
+            false => &mut forwards_iterator,
+        };
+
+        for tooltip in iterator {
+            let text_dimensions = renderer.get_text_dimensions(tooltip, font_size, available_width);
+
+            let tooltip_left = match mouse_position.left() > half_window_size.width() {
+                true => mouse_position.left() - text_dimensions.width() - total_offset,
+                false => mouse_position.left() + mouse_offset,
+            };
+
+            let tooltip_top = match mouse_position.top() > half_window_size.height() {
+                true => mouse_position.top() - text_dimensions.height() / 2.0 - border - vertical_offset,
+                false => mouse_position.top() - text_dimensions.height() / 2.0 - border + vertical_offset,
+            };
+
+            vertical_offset += text_dimensions.height() + border * 2.0 + gap;
+
+            renderer.render_rectangle(
+                App::Position::new(tooltip_left, tooltip_top),
+                App::Size::new(text_dimensions.width() + border * 2.0, text_dimensions.height() + border * 2.0),
+                App::Clip::unbound(),
+                corner_radius,
+                background_color,
+            );
+
+            renderer.render_text(
+                tooltip,
+                App::Position::new(tooltip_left + border, tooltip_top + border),
+                App::Clip::unbound(),
+                foreground_color,
+                font_size,
+            );
         }
     }
 

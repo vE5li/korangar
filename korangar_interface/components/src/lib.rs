@@ -48,6 +48,7 @@ pub fn button(token_stream: TokenStream) -> TokenStream {
     create_component_macro!(korangar_interface::components::button::Button, {
         text_marker: { const std::marker::PhantomData },
         text: !,
+        tooltip: { "" },
         event: !,
         disabled: { false },
         foreground_color: { korangar_interface::theme::theme().button().foreground_color() },

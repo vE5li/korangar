@@ -54,6 +54,7 @@ impl CustomWindow<ClientState> for MapsWindow {
 
                 button! {
                     text: warp.0,
+                    tooltip: format!("Map: {}\nCoordinates: {}, {}", warp.0, warp.1.x, warp.1.y),
                     event: UserEvent::RequestWarpToMap(format!("{}.gat", warp.0), warp.1)
                 }
             }),

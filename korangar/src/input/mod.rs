@@ -698,8 +698,8 @@ impl InputSystem {
     }
 
     // TODO: Temp
-    pub fn get_scroll_delta(&self) -> Option<(ScreenPosition, f32)> {
-        (self.scroll_delta != 0.0).then_some((self.new_mouse_position, self.scroll_delta))
+    pub fn get_scroll_delta(&self) -> Option<f32> {
+        (self.scroll_delta != 0.0).then_some(self.scroll_delta)
     }
 
     // TODO: Temp

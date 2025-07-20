@@ -34,54 +34,63 @@ impl CustomWindow<ClientState> for MenuWindow {
                 #[cfg(feature = "debug")]
                 button! {
                     text: "Render settings",
+                    tooltip: "Special render options (only available in debug mode)",
                     event: UserEvent::OpenRenderSettingsWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
                 },
                 #[cfg(feature = "debug")]
                 button! {
                     text: "Map viewer",
+                    tooltip: "Inspect the raw map data (only available in debug mode)",
                     event: UserEvent::OpenMapDataWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
                 },
                 #[cfg(feature = "debug")]
                 button! {
                     text: "Client state viewer",
+                    tooltip: "Inspect and modify the internal client state (only available in debug mode)",
                     event: UserEvent::OpenClientStateViewerWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
                 },
                 #[cfg(feature = "debug")]
                 button! {
                     text: "Maps",
+                    tooltip: "List of maps used for testing (only available in debug mode)",
                     event: UserEvent::OpenMapsWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
                 },
                 #[cfg(feature = "debug")]
                 button! {
                     text: "Commands",
+                    tooltip: "List of commands used for testing (only available in debug mode)",
                     event: UserEvent::OpenCommandsWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
                 },
                 #[cfg(feature = "debug")]
                 button! {
                     text: "Time",
+                    tooltip: "Time control (only available in debug mode)",
                     event: UserEvent::OpenTimeWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
                 },
                 #[cfg(feature = "debug")]
                 button! {
                     text: "Theme viewer",
+                    tooltip: "Inspect and edit the theme (only available in debug mode)",
                     event: UserEvent::OpenThemeViewerWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
                 },
                 #[cfg(feature = "debug")]
                 button! {
                     text: "Profiler",
+                    tooltip: "Profile the client (only available in debug mode)",
                     event: UserEvent::OpenProfilerWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
                 },
                 #[cfg(feature = "debug")]
                 button! {
                     text: "Packets",
+                    tooltip: "Inspect all incoming and outgoing packets (only available in debug mode)",
                     event: UserEvent::OpenPacketWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
                 },

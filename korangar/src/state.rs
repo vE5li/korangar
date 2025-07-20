@@ -10,6 +10,7 @@ use korangar_interface::components::text_box::TextBoxTheme;
 use korangar_interface::element::StateElement;
 use korangar_interface::layout::alignment::{HorizontalAlignment, VerticalAlignment};
 use korangar_interface::layout::area::Area;
+use korangar_interface::layout::tooltip::TooltipTheme;
 use korangar_interface::layout::{ClipLayer, ClipLayerId, Layout};
 use korangar_interface::theme::ThemePathGetter;
 use korangar_interface::window::{StateWindow, WindowTheme};
@@ -184,6 +185,8 @@ pub struct ClientTheme {
     pub collapsable: CollapsableTheme<ClientState>,
     #[hidden_element]
     pub drop_down: DropDownTheme<ClientState>,
+    #[hidden_element]
+    pub tooltip: TooltipTheme<ClientState>,
     pub debug_button: DebugButtonTheme,
 }
 
@@ -302,6 +305,15 @@ impl ThemeDefault<DefaultMenu> for ClientTheme {
                 button_text_alignment: HorizontalAlignment::Center { offset: 0.0 },
                 button_vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
             },
+            tooltip: TooltipTheme {
+                background_color: Color::rgba_u8(15, 15, 15, 200),
+                foreground_color: Color::monochrome_u8(235),
+                font_size: FontSize(16.0),
+                corner_radius: CornerRadius::uniform(8.0),
+                border: 8.0,
+                gap: 4.0,
+                mouse_offset: 20.0,
+            },
             debug_button: DebugButtonTheme {
                 foreground_color: Color::rgb_u8(255, 100, 255),
             },
@@ -408,6 +420,15 @@ impl ThemeDefault<DefaultGame> for ClientTheme {
                 button_font_size: FontSize(16.0),
                 button_text_alignment: HorizontalAlignment::Center { offset: 0.0 },
                 button_vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
+            },
+            tooltip: TooltipTheme {
+                background_color: Color::rgba_u8(15, 15, 15, 200),
+                foreground_color: Color::monochrome_u8(235),
+                font_size: FontSize(14.0),
+                corner_radius: CornerRadius::uniform(5.0),
+                border: 4.0,
+                gap: 3.0,
+                mouse_offset: 16.0,
             },
             debug_button: DebugButtonTheme {
                 foreground_color: Color::rgb_u8(255, 100, 255),
@@ -526,6 +547,10 @@ impl ThemePathGetter<ClientState> for ClientThemeGetter {
 
     fn drop_down(self) -> impl Path<ClientState, DropDownTheme<ClientState>> {
         ThemePath.drop_down()
+    }
+
+    fn tooltip(self) -> impl Path<ClientState, TooltipTheme<ClientState>> {
+        ThemePath.tooltip()
     }
 }
 

@@ -8,6 +8,7 @@ use crate::element::id::ElementIdGenerator;
 use crate::element::store::ElementStore;
 use crate::event::ClickAction;
 use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
+use crate::layout::tooltip::TooltipExt;
 use crate::layout::{Layout, MouseButton, Resolver};
 use crate::theme::{ThemePathGetter, theme};
 
@@ -27,42 +28,45 @@ where
     pub vertical_alignment: VerticalAlignment,
 }
 
-pub struct Button<Text, A, B, C, D, E, F, G, H, I, J, K> {
-    pub text_marker: PhantomData<Text>,
+pub struct Button<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L> {
+    pub text_marker: PhantomData<(Text, Tooltip)>,
     pub text: A,
-    pub event: B,
-    pub disabled: C,
-    pub foreground_color: D,
-    pub background_color: E,
-    pub hovered_foreground_color: F,
-    pub hovered_background_color: G,
-    pub height: H,
-    pub corner_radius: I,
-    pub font_size: J,
-    pub text_alignment: K,
+    pub tooltip: B,
+    pub event: C,
+    pub disabled: D,
+    pub foreground_color: E,
+    pub background_color: F,
+    pub hovered_foreground_color: G,
+    pub hovered_background_color: H,
+    pub height: I,
+    pub corner_radius: J,
+    pub font_size: K,
+    pub text_alignment: L,
 }
 
-impl<App, Text, A, B, C, D, E, F, G, H, I, J, K> Element<App> for Button<Text, A, B, C, D, E, F, G, H, I, J, K>
+impl<App, Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L> Element<App> for Button<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L>
 where
     App: Application,
     Text: AsRef<str> + 'static,
+    Tooltip: AsRef<str> + 'static,
     A: Selector<App, Text>,
-    B: ClickAction<App> + 'static,
-    C: Selector<App, bool>,
-    D: Selector<App, App::Color>,
+    B: Selector<App, Tooltip>,
+    C: ClickAction<App> + 'static,
+    D: Selector<App, bool>,
     E: Selector<App, App::Color>,
     F: Selector<App, App::Color>,
     G: Selector<App, App::Color>,
-    H: Selector<App, f32>,
-    I: Selector<App, App::CornerRadius>,
-    J: Selector<App, App::FontSize>,
-    K: Selector<App, HorizontalAlignment>,
+    H: Selector<App, App::Color>,
+    I: Selector<App, f32>,
+    J: Selector<App, App::CornerRadius>,
+    K: Selector<App, App::FontSize>,
+    L: Selector<App, HorizontalAlignment>,
 {
     fn create_layout_info(
         &mut self,
         state: &Context<App>,
-        store: &mut ElementStore,
-        generator: &mut ElementIdGenerator,
+        _: &mut ElementStore,
+        _: &mut ElementIdGenerator,
         resolver: &mut Resolver,
     ) -> Self::LayoutInfo {
         let height = state.get(&self.height);
@@ -73,7 +77,7 @@ where
     fn layout_element<'a>(
         &'a self,
         state: &'a Context<App>,
-        store: &'a ElementStore,
+        _: &'a ElementStore,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, App>,
     ) {
@@ -82,6 +86,13 @@ where
         if is_hoverered {
             layout.add_click_area(layout_info.area, MouseButton::Left, &self.event);
             layout.mark_hovered();
+
+            let tooltip = state.get(&self.tooltip).as_ref();
+
+            if !tooltip.is_empty() {
+                struct ButtonTooltip;
+                layout.add_tooltip(tooltip, ButtonTooltip.tooltip_id());
+            }
         }
 
         let background_color = match is_hoverered {

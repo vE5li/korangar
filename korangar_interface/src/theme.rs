@@ -7,6 +7,7 @@ use crate::components::drop_down::DropDownTheme;
 use crate::components::state_button::StateButtonTheme;
 use crate::components::text::TextTheme;
 use crate::components::text_box::TextBoxTheme;
+use crate::layout::tooltip::TooltipTheme;
 use crate::window::WindowTheme;
 
 pub trait ThemePathGetter<App: Application>: Copy {
@@ -25,6 +26,8 @@ pub trait ThemePathGetter<App: Application>: Copy {
     fn collapsable(self) -> impl Path<App, CollapsableTheme<App>>;
 
     fn drop_down(self) -> impl Path<App, DropDownTheme<App>>;
+
+    fn tooltip(self) -> impl Path<App, TooltipTheme<App>>;
 }
 
 pub fn theme<App: Application>() -> impl ThemePathGetter<App> {

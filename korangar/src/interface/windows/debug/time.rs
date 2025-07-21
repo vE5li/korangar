@@ -17,7 +17,7 @@ impl CustomWindow<ClientState> for TimeWindow {
         use korangar_interface::prelude::*;
 
         window! {
-            title: "Graphics Settings",
+            title: "Time",
             class: Self::window_class(),
             theme: ClientThemeType::Game,
             closable: true,

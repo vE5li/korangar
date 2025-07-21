@@ -97,7 +97,7 @@ impl CustomWindow<ClientState> for MenuWindow {
                 },
                 #[cfg(feature = "debug")]
                 button! {
-                    text: "Packets",
+                    text: "Network packets",
                     tooltip: "Inspect all incoming and outgoing packets (only available in debug mode)",
                     event: UserEvent::OpenPacketWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),

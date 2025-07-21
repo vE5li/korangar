@@ -96,6 +96,7 @@ pub(super) fn this_entity() -> impl Path<ClientState, Entity, false> {
 // TODO: Make all of these private and load them internally
 #[derive(RustState, StateElement, StateWindow)]
 #[cfg_attr(feature = "debug", window_class(WindowClass::ClientState))]
+#[window_title("Client State Inspector")]
 #[state_root]
 pub struct ClientState {
     pub menu_theme: ClientTheme,
@@ -171,6 +172,7 @@ pub struct DebugButtonTheme {
 }
 
 #[derive(RustState, StateElement, StateWindow)]
+#[window_title("Theme Inspector")]
 pub struct ClientTheme {
     #[hidden_element]
     pub window: WindowTheme<ClientState>,

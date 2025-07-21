@@ -41,7 +41,7 @@ impl CustomWindow<ClientState> for MenuWindow {
                 },
                 #[cfg(feature = "debug")]
                 button! {
-                    text: "Map viewer",
+                    text: "Map inspector",
                     tooltip: "Inspect the raw map data (only available in debug mode)",
                     event: UserEvent::OpenMapDataWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
@@ -49,9 +49,9 @@ impl CustomWindow<ClientState> for MenuWindow {
                 },
                 #[cfg(feature = "debug")]
                 button! {
-                    text: "Client state viewer",
+                    text: "Client state inspector",
                     tooltip: "Inspect and modify the internal client state (only available in debug mode)",
-                    event: UserEvent::OpenClientStateViewerWindow,
+                    event: UserEvent::OpenClientStateInspectorWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
                     hovered_background_color: client_theme().debug_button().hovered_background_color(),
                 },
@@ -81,9 +81,9 @@ impl CustomWindow<ClientState> for MenuWindow {
                 },
                 #[cfg(feature = "debug")]
                 button! {
-                    text: "Theme viewer",
+                    text: "Theme inspector",
                     tooltip: "Inspect and edit the theme (only available in debug mode)",
-                    event: UserEvent::OpenThemeViewerWindow,
+                    event: UserEvent::OpenThemeInspectorWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
                     hovered_background_color: client_theme().debug_button().hovered_background_color(),
                 },

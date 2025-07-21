@@ -11,8 +11,8 @@ use crate::version::{InternalVersion, MajorFirst, Version};
 #[derive(Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[cfg_attr(feature = "interface", derive(korangar_interface::window::StateWindow))]
-#[cfg_attr(feature = "interface", window_title("Map Viewer"))]
-// #[cfg_attr(feature = "interface", window_class("map_viewer"))]
+#[cfg_attr(feature = "interface", window_title("Map Inspector"))]
+// #[cfg_attr(feature = "interface", window_class("map_inspector"))]
 pub struct MapData {
     #[new_default]
     pub signature: Signature<b"GRSW">,

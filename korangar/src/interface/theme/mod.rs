@@ -1222,8 +1222,8 @@ pub struct GameTheme {
 }
 //
 // #[derive(StateWindow)]
-// #[window_title("Theme Viewer")]
-// #[window_class("theme_viewer")]
+// #[window_title("Theme Inspector")]
+// #[window_class("theme_inspector")]
 // pub struct Themes {
 //     #[cfg(feature = "debug")]
 //     #[name("Actions")]

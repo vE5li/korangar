@@ -109,7 +109,7 @@ pub enum UserEvent {
     #[cfg(feature = "debug")]
     OpenMapDataWindow,
     #[cfg(feature = "debug")]
-    OpenClientStateViewerWindow,
+    OpenClientStateInspectorWindow,
     #[cfg(feature = "debug")]
     OpenMapsWindow,
     #[cfg(feature = "debug")]
@@ -126,7 +126,7 @@ pub enum UserEvent {
     #[cfg(feature = "debug")]
     SetMidnight,
     #[cfg(feature = "debug")]
-    OpenThemeViewerWindow,
+    OpenThemeInspectorWindow,
     #[cfg(feature = "debug")]
     OpenProfilerWindow,
     #[cfg(feature = "debug")]

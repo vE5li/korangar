@@ -29,7 +29,6 @@ macro_rules! time_phase {
     }
 }
 
-// TODO: Rename viewer to inspector.
 // TODO: Rename area x and y to width and height.
 // TODO: Rename the whole game theme thing.
 
@@ -2041,7 +2040,7 @@ impl Client {
                     }
                 }
                 #[cfg(feature = "debug")]
-                UserEvent::OpenClientStateViewerWindow => self.interface.open_state_window_mut(client_state()),
+                UserEvent::OpenClientStateInspectorWindow => self.interface.open_state_window_mut(client_state()),
                 #[cfg(feature = "debug")]
                 UserEvent::OpenMapsWindow => self.interface.open_window(MapsWindow),
                 #[cfg(feature = "debug")]
@@ -2057,7 +2056,7 @@ impl Client {
                 #[cfg(feature = "debug")]
                 UserEvent::SetMidnight => self.game_timer.set_day_timer(24.0 * 3600.0),
                 #[cfg(feature = "debug")]
-                UserEvent::OpenThemeViewerWindow => self.interface.open_state_window(client_state().game_theme()),
+                UserEvent::OpenThemeInspectorWindow => self.interface.open_state_window(client_state().game_theme()),
                 #[cfg(feature = "debug")]
                 UserEvent::OpenProfilerWindow => self
                     .interface

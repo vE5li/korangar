@@ -45,7 +45,7 @@ pub trait Packet: std::fmt::Debug + Clone {
     fn payload_to_bytes(&self, byte_writer: &mut ByteWriter) -> ConversionResult<usize>;
 
     // Implementation detail of Korangar. Can be used to convert a packet to an
-    // UI element in the packet viewer.
+    // UI element in the packet inspector.
     // #[cfg(feature = "packet-to-prototype-element")]
     // fn to_state_element<App: korangar_interface::application::Application>(
     //     &self,

@@ -7,7 +7,7 @@ use wgpu::BlendFactor;
 
 use super::color::Color;
 #[cfg(feature = "debug")]
-use super::settings::RenderSettings;
+use super::settings::RenderOptions;
 use super::vertices::ModelVertex;
 use super::{Buffer, ShadowQuality, Texture, TextureSet, TileVertex};
 use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
@@ -42,7 +42,7 @@ pub struct RenderInstruction<'a> {
     pub map_picker_tile_vertex_buffer: Option<&'a Buffer<TileVertex>>,
     pub font_map_texture: Option<&'a Texture>,
     #[cfg(feature = "debug")]
-    pub render_settings: RenderSettings,
+    pub render_options: RenderOptions,
     #[cfg(feature = "debug")]
     pub aabb: &'a [DebugAabbInstruction],
     #[cfg(feature = "debug")]
@@ -80,7 +80,7 @@ impl Default for RenderInstruction<'static> {
             map_picker_tile_vertex_buffer: None,
             font_map_texture: None,
             #[cfg(feature = "debug")]
-            render_settings: RenderSettings::default(),
+            render_options: RenderOptions::default(),
             #[cfg(feature = "debug")]
             aabb: &[],
             #[cfg(feature = "debug")]

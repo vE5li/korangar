@@ -33,7 +33,7 @@ use super::{LightSourceExt, Model, PointLightSet};
 #[cfg(feature = "debug")]
 use crate::graphics::ModelBatch;
 #[cfg(feature = "debug")]
-use crate::graphics::RenderSettings;
+use crate::graphics::RenderOptions;
 #[cfg(feature = "debug")]
 use crate::graphics::{DebugAabbInstruction, DebugCircleInstruction, DebugRectangleInstruction};
 use crate::graphics::{EntityInstruction, IndicatorInstruction, ModelInstruction, Texture, TextureSet, WaterInstruction};
@@ -473,7 +473,7 @@ impl Map {
         &self,
         renderer: &mut impl MarkerRenderer,
         camera: &dyn Camera,
-        render_settings: &RenderSettings,
+        render_options: &RenderOptions,
         entities: &[Entity],
         point_light_set: &PointLightSet,
         hovered_marker_identifier: Option<MarkerIdentifier>,
@@ -481,7 +481,7 @@ impl Map {
         use super::SoundSourceExt;
         use crate::EffectSourceExt;
 
-        if render_settings.show_object_markers {
+        if render_options.show_object_markers {
             self.objects.iter().for_each(|(object_key, object)| {
                 let marker_identifier = MarkerIdentifier::Object(object_key.key());
 
@@ -494,7 +494,7 @@ impl Map {
             });
         }
 
-        if render_settings.show_light_markers {
+        if render_options.show_light_markers {
             self.light_sources.iter().for_each(|(key, light_source)| {
                 let marker_identifier = MarkerIdentifier::LightSource(key.key());
 
@@ -507,7 +507,7 @@ impl Map {
             });
         }
 
-        if render_settings.show_sound_markers {
+        if render_options.show_sound_markers {
             self.sound_sources.iter().enumerate().for_each(|(index, sound_source)| {
                 let marker_identifier = MarkerIdentifier::SoundSource(index as u32);
 
@@ -520,7 +520,7 @@ impl Map {
             });
         }
 
-        if render_settings.show_effect_markers {
+        if render_options.show_effect_markers {
             self.effect_sources.iter().enumerate().for_each(|(index, effect_source)| {
                 let marker_identifier = MarkerIdentifier::EffectSource(index as u32);
 
@@ -533,7 +533,7 @@ impl Map {
             });
         }
 
-        if render_settings.show_entity_markers {
+        if render_options.show_entity_markers {
             entities.iter().enumerate().for_each(|(index, entity)| {
                 let marker_identifier = MarkerIdentifier::Entity(index as u32);
 
@@ -546,7 +546,7 @@ impl Map {
             });
         }
 
-        if render_settings.show_shadow_markers {
+        if render_options.show_shadow_markers {
             point_light_set
                 .with_shadow_iterator()
                 .enumerate()

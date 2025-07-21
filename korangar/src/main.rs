@@ -29,7 +29,6 @@ macro_rules! time_phase {
     }
 }
 
-// TODO: Rename render settings to render options.
 // TODO: Rename viewer to inspector.
 // TODO: Rename area x and y to width and height.
 // TODO: Rename the whole game theme thing.
@@ -54,7 +53,7 @@ use std::sync::{Arc, LazyLock};
 use cgmath::{Point3, Vector2, Vector3};
 use character_slots::CharacterSlots;
 #[cfg(feature = "debug")]
-use graphics::RenderSettings;
+use graphics::RenderOptions;
 use image::{EncodableLayout, ImageFormat, ImageReader};
 use interface::layout::CornerRadius;
 use interface::theme::{CursorThemePathExt, GameTheme, GameThemePathExt, IndicatorThemePathExt};
@@ -150,7 +149,7 @@ const DEBUG_WINDOWS: &[WindowClass] = &[
     WindowClass::ClientState,
     WindowClass::Packets,
     WindowClass::Profiler,
-    WindowClass::RenderSettings,
+    WindowClass::RenderOptions,
     WindowClass::Time,
 ];
 
@@ -443,7 +442,7 @@ impl Client {
             let graphics_settings = GraphicsSettings::new();
 
             #[cfg(feature = "debug")]
-            let render_settings = RenderSettings::new();
+            let render_options = RenderOptions::new();
         });
 
         time_phase!("create adapter", {
@@ -801,7 +800,7 @@ impl Client {
             graphics_settings: graphics_settings.clone(),
             graphics_settings_capabilities,
             #[cfg(feature = "debug")]
-            render_settings,
+            render_options,
             #[cfg(feature = "debug")]
             profiler_visible_thread: crate::threads::Enum::Main,
             #[cfg(feature = "debug")]
@@ -2031,9 +2030,9 @@ impl Client {
                     }
                 }
                 #[cfg(feature = "debug")]
-                UserEvent::OpenRenderSettingsWindow => self
+                UserEvent::OpenRenderOptionsWindow => self
                     .interface
-                    .open_window(RenderSettingsWindow::new(client_state().render_settings())),
+                    .open_window(RenderOptionsWindow::new(client_state().render_options())),
                 #[cfg(feature = "debug")]
                 UserEvent::OpenMapDataWindow => {
                     if let Some(map) = self.client_state.follow(client_state().map()) {
@@ -2188,10 +2187,10 @@ impl Client {
             }
 
             #[cfg(feature = "debug")]
-            let render_settings = *self.client_state.follow(client_state().render_settings());
+            let render_options = *self.client_state.follow(client_state().render_options());
 
             #[cfg(feature = "debug")]
-            if render_settings.use_debug_camera {
+            if render_options.use_debug_camera {
                 self.debug_camera.generate_view_projection(window_size);
             }
 
@@ -2204,7 +2203,7 @@ impl Client {
             {
                 let current_camera: &(dyn Camera + Send + Sync) = match self.client_state.try_follow(this_player()).is_none() {
                     #[cfg(feature = "debug")]
-                    _ if render_settings.use_debug_camera => &self.debug_camera,
+                    _ if render_options.use_debug_camera => &self.debug_camera,
                     true => &self.start_camera,
                     false => &self.player_camera,
                 };
@@ -2251,7 +2250,7 @@ impl Client {
 
             let current_camera: &(dyn Camera + Send + Sync) = match self.client_state.try_follow(this_player()).is_none() {
                 #[cfg(feature = "debug")]
-                _ if render_settings.use_debug_camera => &self.debug_camera,
+                _ if render_options.use_debug_camera => &self.debug_camera,
                 true => &self.start_camera,
                 false => &self.player_camera,
             };
@@ -2355,7 +2354,7 @@ impl Client {
                 map.render_markers(
                     &mut self.debug_marker_renderer,
                     current_camera,
-                    &render_settings,
+                    &render_options,
                     self.client_state.follow(client_state().entities()),
                     &point_light_set,
                     hovered_marker_identifier,
@@ -2365,7 +2364,7 @@ impl Client {
                 map.render_markers(
                     &mut self.middle_interface_renderer,
                     current_camera,
-                    &render_settings,
+                    &render_options,
                     self.client_state.follow(client_state().entities()),
                     &point_light_set,
                     hovered_marker_identifier,
@@ -2378,12 +2377,12 @@ impl Client {
                     &self.directional_shadow_camera,
                     &mut self.directional_shadow_object_set_buffer,
                     #[cfg(feature = "debug")]
-                    render_settings.frustum_culling,
+                    render_options.frustum_culling,
                 );
 
                 let offset = self.directional_shadow_model_instructions.len();
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_objects))]
                 map.render_objects(
                     &mut self.directional_shadow_model_instructions,
                     &object_set,
@@ -2391,7 +2390,7 @@ impl Client {
                     &self.directional_shadow_camera,
                 );
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_map))]
                 map.render_ground(&mut self.directional_shadow_model_instructions);
 
                 let count = self.directional_shadow_model_instructions.len() - offset;
@@ -2404,7 +2403,7 @@ impl Client {
                 });
 
                 #[cfg(feature = "debug")]
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map_tiles))]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_map_tiles))]
                 map.render_overlay_tiles(
                     &mut self.directional_shadow_model_instructions,
                     &mut self.directional_shadow_model_batches,
@@ -2412,7 +2411,7 @@ impl Client {
                 );
 
                 #[cfg(feature = "debug")]
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_pathing))]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_pathing))]
                 map.render_entity_pathing(
                     &mut self.directional_shadow_model_instructions,
                     &mut self.directional_shadow_model_batches,
@@ -2420,7 +2419,7 @@ impl Client {
                     &self.pathing_texture_set,
                 );
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_entities))]
                 map.render_entities(
                     &mut self.directional_shadow_entity_instructions,
                     self.client_state.follow(client_state().entities()),
@@ -2430,10 +2429,10 @@ impl Client {
 
             // Point Lights and Shadows
             {
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_point_lights))]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_point_lights))]
                 point_light_set.render_point_lights(&mut self.point_light_instructions);
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_point_lights))]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_point_lights))]
                 point_light_set.render_point_lights_with_shadows(
                     &map,
                     &mut self.point_shadow_camera,
@@ -2442,7 +2441,7 @@ impl Client {
                     &mut self.point_light_with_shadow_instructions,
                     client_tick,
                     #[cfg(feature = "debug")]
-                    &render_settings,
+                    &render_options,
                 );
             }
 
@@ -2452,15 +2451,15 @@ impl Client {
                     current_camera,
                     &mut self.deferred_object_set_buffer,
                     #[cfg(feature = "debug")]
-                    render_settings.frustum_culling,
+                    render_options.frustum_culling,
                 );
 
                 let offset = self.model_instructions.len();
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_objects))]
                 map.render_objects(&mut self.model_instructions, &object_set, client_tick, current_camera);
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_map))]
                 map.render_ground(&mut self.model_instructions);
 
                 let count = self.model_instructions.len() - offset;
@@ -2473,11 +2472,11 @@ impl Client {
                 });
 
                 #[cfg(feature = "debug")]
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map_tiles))]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_map_tiles))]
                 map.render_overlay_tiles(&mut self.model_instructions, &mut self.model_batches, &self.tile_texture_set);
 
                 #[cfg(feature = "debug")]
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_pathing))]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_pathing))]
                 map.render_entity_pathing(
                     &mut self.model_instructions,
                     &mut self.model_batches,
@@ -2487,12 +2486,12 @@ impl Client {
 
                 let entity_camera = match true {
                     #[cfg(feature = "debug")]
-                    _ if *self.client_state.follow(client_state().render_settings().show_entities_paper()) => &self.player_camera,
+                    _ if *self.client_state.follow(client_state().render_options().show_entities_paper()) => &self.player_camera,
                     _ => current_camera,
                 };
 
                 #[cfg_attr(feature = "debug",
-                    korangar_debug::debug_condition(render_settings.show_entities))]
+                    korangar_debug::debug_condition(render_options.show_entities))]
                 map.render_entities(
                     &mut self.entity_instructions,
                     self.client_state.follow(client_state().entities()),
@@ -2500,7 +2499,7 @@ impl Client {
                 );
 
                 #[cfg(feature = "debug")]
-                if render_settings.show_entities_debug {
+                if render_options.show_entities_debug {
                     map.render_entities_debug(
                         &mut self.rectangle_instructions,
                         self.client_state.follow(client_state().entities()),
@@ -2508,19 +2507,19 @@ impl Client {
                     );
                 }
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_water))]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_water))]
                 map.render_water(&mut water_instruction, client_tick);
 
                 #[cfg(feature = "debug")]
-                if render_settings.show_bounding_boxes {
+                if render_options.show_bounding_boxes {
                     let object_set = map.cull_objects_with_frustum(
                         &self.player_camera,
                         &mut self.bounding_box_object_set_buffer,
                         #[cfg(feature = "debug")]
-                        render_settings.frustum_culling,
+                        render_options.frustum_culling,
                     );
 
-                    map.render_bounding(&mut self.aabb_instructions, render_settings.frustum_culling, &object_set);
+                    map.render_bounding(&mut self.aabb_instructions, render_options.frustum_culling, &object_set);
                 }
             }
 
@@ -2551,7 +2550,7 @@ impl Client {
                 if let Some(PickerTarget::Tile { x, y }) = mouse_target
                     && !self.client_state.try_follow(this_entity()).is_some()
                 {
-                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_indicators))]
+                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_indicators))]
                     map.render_walk_indicator(
                         &mut indicator_instruction,
                         walk_indicator_color,
@@ -2652,7 +2651,7 @@ impl Client {
                 }
 
                 #[cfg(feature = "debug")]
-                if render_settings.show_frames_per_second {
+                if render_options.show_frames_per_second {
                     let game_theme = self.client_state.follow(client_state().game_theme_2());
 
                     self.top_interface_renderer.render_text(
@@ -2725,7 +2724,7 @@ impl Client {
                 map_picker_tile_vertex_buffer: Some(map.get_tile_picker_vertex_buffer()),
                 font_map_texture: Some(self.font_loader.get_font_map()),
                 #[cfg(feature = "debug")]
-                render_settings,
+                render_options,
                 #[cfg(feature = "debug")]
                 aabb: &self.aabb_instructions,
                 #[cfg(feature = "debug")]

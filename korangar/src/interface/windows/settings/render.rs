@@ -9,7 +9,7 @@ use korangar_interface::window::{CustomWindow, StateWindow, Window, WindowTrait}
 use rust_state::{Context, Path, Selector};
 
 use crate::client_state;
-use crate::graphics::{RenderSettings, RenderSettingsPathExt};
+use crate::graphics::{RenderOptions, RenderOptionsPathExt};
 use crate::interface::layout::{ScreenSize, ScreenSizePathExt};
 use crate::interface::windows::{WindowCache, WindowClass};
 use crate::state::{ClientState, ClientStatePathExt, ClientThemeType};
@@ -57,22 +57,22 @@ where
     }
 }
 
-pub struct RenderSettingsWindow<P> {
+pub struct RenderOptionsWindow<P> {
     path: P,
 }
 
-impl<P> RenderSettingsWindow<P> {
+impl<P> RenderOptionsWindow<P> {
     pub fn new(path: P) -> Self {
         Self { path }
     }
 }
 
-impl<P> CustomWindow<ClientState> for RenderSettingsWindow<P>
+impl<P> CustomWindow<ClientState> for RenderOptionsWindow<P>
 where
-    P: Path<ClientState, RenderSettings>,
+    P: Path<ClientState, RenderOptions>,
 {
     fn window_class() -> Option<WindowClass> {
-        Some(WindowClass::RenderSettings)
+        Some(WindowClass::RenderOptions)
     }
 
     fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
@@ -156,7 +156,7 @@ where
         );
 
         window! {
-            title: "Render Settings",
+            title: "Render Options",
             class: Self::window_class(),
             theme: ClientThemeType::Game,
             closable: true,

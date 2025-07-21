@@ -283,7 +283,7 @@ impl Display for ScreenSpaceAntiAliasing {
 
 #[cfg(feature = "debug")]
 #[derive(Copy, Clone, Default, RustState, StateElement, new)]
-pub struct RenderSettings {
+pub struct RenderOptions {
     #[new(value = "true")]
     pub show_frames_per_second: bool,
     #[new(value = "true")]
@@ -347,7 +347,7 @@ pub struct RenderSettings {
 }
 
 #[cfg(feature = "debug")]
-impl RenderSettings {
+impl RenderOptions {
     pub fn show_buffers(&self) -> bool {
         self.show_directional_shadow_map
             || self.show_picker_buffer

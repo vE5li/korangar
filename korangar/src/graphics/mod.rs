@@ -182,7 +182,7 @@ impl Prepare for GlobalContext {
         let mut ambient_light_color = instructions.uniforms.ambient_light_color;
 
         #[cfg(feature = "debug")]
-        if !instructions.render_settings.show_ambient_light {
+        if !instructions.render_options.show_ambient_light {
             ambient_light_color = Color::BLACK;
         };
 
@@ -190,7 +190,7 @@ impl Prepare for GlobalContext {
         let mut directional_light_color = instructions.directional_light_with_shadow.color;
 
         #[cfg(feature = "debug")]
-        if !instructions.render_settings.show_directional_light {
+        if !instructions.render_options.show_directional_light {
             directional_light_color = Color::BLACK;
         };
 
@@ -266,15 +266,15 @@ impl Prepare for GlobalContext {
         #[cfg(feature = "debug")]
         {
             self.debug_uniforms = DebugUniforms {
-                show_picker_buffer: instructions.render_settings.show_picker_buffer as u32,
-                show_directional_shadow_map: instructions.render_settings.show_directional_shadow_map as u32,
+                show_picker_buffer: instructions.render_options.show_picker_buffer as u32,
+                show_directional_shadow_map: instructions.render_options.show_directional_shadow_map as u32,
                 show_point_shadow_map: instructions
-                    .render_settings
+                    .render_options
                     .show_point_shadow_map
                     .map(|value| value.get())
                     .unwrap_or(0),
-                show_light_culling_count_buffer: instructions.render_settings.show_light_culling_count_buffer as u32,
-                show_font_map: instructions.render_settings.show_font_map as u32,
+                show_light_culling_count_buffer: instructions.render_options.show_light_culling_count_buffer as u32,
+                show_font_map: instructions.render_options.show_font_map as u32,
             };
         }
     }

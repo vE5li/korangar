@@ -6,7 +6,7 @@ use ragnarok_formats::map::LightSource;
 use ragnarok_packets::ClientTick;
 
 #[cfg(feature = "debug")]
-use crate::graphics::RenderSettings;
+use crate::graphics::RenderOptions;
 use crate::graphics::{Buffer, ModelInstruction, ModelVertex, PointLightInstruction, PointShadowCasterInstruction, TextureSet};
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
@@ -224,7 +224,7 @@ impl PointLightSet<'_> {
         point_shadow_model_instructions: &mut Vec<ModelInstruction>,
         point_light_with_shadow_instructions: &mut Vec<PointShadowCasterInstruction>,
         client_tick: ClientTick,
-        #[cfg(feature = "debug")] render_settings: &RenderSettings,
+        #[cfg(feature = "debug")] render_options: &RenderOptions,
     ) {
         for point_light in self.with_shadow_iterator() {
             point_shadow_camera.set_camera_position(point_light.position);
@@ -241,7 +241,7 @@ impl PointLightSet<'_> {
                 Sphere::new(point_light.position, point_light.range),
                 point_shadow_object_set_buffer,
                 #[cfg(feature = "debug")]
-                render_settings.frustum_culling,
+                render_options.frustum_culling,
             );
 
             // TODO: Create an entity set, similar to the object set for better performance.
@@ -254,10 +254,10 @@ impl PointLightSet<'_> {
 
                 let model_offset = point_shadow_model_instructions.len();
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_objects))]
                 map.render_objects(point_shadow_model_instructions, &object_set, client_tick, point_shadow_camera);
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_map))]
                 map.render_ground(point_shadow_model_instructions);
 
                 model_offsets[face_index as usize] = model_offset;

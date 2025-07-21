@@ -51,7 +51,7 @@ pub enum WindowClass {
     #[cfg(feature = "debug")]
     Packets,
     #[cfg(feature = "debug")]
-    RenderSettings,
+    RenderOptions,
     #[cfg(feature = "debug")]
     Commands,
     #[cfg(feature = "debug")]

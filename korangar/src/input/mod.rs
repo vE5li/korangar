@@ -19,7 +19,7 @@ pub use self::key::Key;
 pub use self::mode::{Grabbed, MouseInputMode};
 use crate::graphics::PickerTarget;
 #[cfg(feature = "debug")]
-use crate::graphics::RenderSettings;
+use crate::graphics::RenderOptions;
 use crate::interface::cursor::{MouseCursor, MouseCursorState};
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 use crate::interface::resource::PartialMove;
@@ -151,7 +151,7 @@ impl InputSystem {
         application: &InterfaceSettings,
         // focus_state: &mut FocusState<InterfaceSettings>,
         mouse_cursor: &mut MouseCursor,
-        #[cfg(feature = "debug")] render_settings: &PlainTrackedState<RenderSettings>,
+        #[cfg(feature = "debug")] render_options: &PlainTrackedState<RenderOptions>,
         client_tick: ClientTick,
     ) -> (
         Vec<UserEvent>,
@@ -165,7 +165,7 @@ impl InputSystem {
         let shift_down = self.get_key(KeyCode::ShiftLeft).down();
 
         #[cfg(feature = "debug")]
-        let lock_actions = render_settings.get().use_debug_camera;
+        let lock_actions = render_options.get().use_debug_camera;
         #[cfg(not(feature = "debug"))]
         let lock_actions = false;
 
@@ -540,7 +540,7 @@ impl InputSystem {
 
             #[cfg(feature = "debug")]
             if control_down && self.get_key(KeyCode::KeyR).pressed() {
-                events.push(UserEvent::OpenRenderSettingsWindow);
+                events.push(UserEvent::OpenRenderOptionsWindow);
             }
 
             #[cfg(feature = "debug")]
@@ -554,12 +554,12 @@ impl InputSystem {
             }
 
             #[cfg(feature = "debug")]
-            if self.get_key(KeyCode::ShiftLeft).pressed() && render_settings.get().use_debug_camera {
+            if self.get_key(KeyCode::ShiftLeft).pressed() && render_options.get().use_debug_camera {
                 events.push(UserEvent::CameraAccelerate);
             }
 
             #[cfg(feature = "debug")]
-            if self.get_key(KeyCode::ShiftLeft).released() && render_settings.get().use_debug_camera {
+            if self.get_key(KeyCode::ShiftLeft).released() && render_options.get().use_debug_camera {
                 events.push(UserEvent::CameraDecelerate);
             }
 
@@ -567,7 +567,7 @@ impl InputSystem {
             if self.right_mouse_button.down()
                 && !self.right_mouse_button.pressed()
                 && self.mouse_input_mode.is_none()
-                && render_settings.get().use_debug_camera
+                && render_options.get().use_debug_camera
             {
                 events.push(UserEvent::CameraLookAround(-Vector2::new(
                     self.mouse_delta.width,
@@ -576,27 +576,27 @@ impl InputSystem {
             }
 
             #[cfg(feature = "debug")]
-            if self.get_key(KeyCode::KeyW).down() && render_settings.get().use_debug_camera {
+            if self.get_key(KeyCode::KeyW).down() && render_options.get().use_debug_camera {
                 events.push(UserEvent::CameraMoveForward);
             }
 
             #[cfg(feature = "debug")]
-            if self.get_key(KeyCode::KeyS).down() && render_settings.get().use_debug_camera {
+            if self.get_key(KeyCode::KeyS).down() && render_options.get().use_debug_camera {
                 events.push(UserEvent::CameraMoveBackward);
             }
 
             #[cfg(feature = "debug")]
-            if self.get_key(KeyCode::KeyA).down() && render_settings.get().use_debug_camera {
+            if self.get_key(KeyCode::KeyA).down() && render_options.get().use_debug_camera {
                 events.push(UserEvent::CameraMoveLeft);
             }
 
             #[cfg(feature = "debug")]
-            if self.get_key(KeyCode::KeyD).down() && render_settings.get().use_debug_camera {
+            if self.get_key(KeyCode::KeyD).down() && render_options.get().use_debug_camera {
                 events.push(UserEvent::CameraMoveRight);
             }
 
             #[cfg(feature = "debug")]
-            if self.get_key(KeyCode::Space).down() && render_settings.get().use_debug_camera {
+            if self.get_key(KeyCode::Space).down() && render_options.get().use_debug_camera {
                 events.push(UserEvent::CameraMoveUp);
             }
         }

@@ -1028,7 +1028,7 @@ impl GraphicsEngine {
                     batches: instruction.model_batches,
                     instructions: instruction.models,
                     #[cfg(feature = "debug")]
-                    show_wireframe: instruction.render_settings.show_wireframe,
+                    show_wireframe: instruction.render_options.show_wireframe,
                 };
 
                 // Opaque
@@ -1191,7 +1191,7 @@ impl GraphicsEngine {
                 #[cfg(feature = "debug")]
                 {
                     let buffer_data = DebugBufferDrawData {
-                        render_settings: &instruction.render_settings,
+                        render_options: &instruction.render_options,
                         debug_bind_group: &engine_context.global_context.debug_bind_group,
                     };
 

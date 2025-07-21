@@ -6,4 +6,4 @@ mod render;
 pub use self::audio::AudioSettingsWindow;
 pub use self::graphics::GraphicsSettingsWindow;
 #[cfg(feature = "debug")]
-pub use self::render::RenderSettingsWindow;
+pub use self::render::RenderOptionsWindow;

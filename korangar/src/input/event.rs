@@ -105,7 +105,7 @@ pub enum UserEvent {
     #[cfg(feature = "debug")]
     OpenMarkerDetails(MarkerIdentifier),
     #[cfg(feature = "debug")]
-    OpenRenderSettingsWindow,
+    OpenRenderOptionsWindow,
     #[cfg(feature = "debug")]
     OpenMapDataWindow,
     #[cfg(feature = "debug")]

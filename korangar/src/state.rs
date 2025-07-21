@@ -20,7 +20,7 @@ use rust_state::{Path, RustState, Selector};
 
 use crate::character_slots::CharacterSlots;
 #[cfg(feature = "debug")]
-use crate::graphics::RenderSettings;
+use crate::graphics::RenderOptions;
 use crate::graphics::{Color, Texture};
 use crate::input::UserEvent;
 use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
@@ -146,7 +146,7 @@ pub struct ClientState {
     pub graphics_settings: GraphicsSettings,
     pub graphics_settings_capabilities: GraphicsSettingsCapabilities,
     #[cfg(feature = "debug")]
-    pub render_settings: RenderSettings,
+    pub render_options: RenderOptions,
     #[cfg(feature = "debug")]
     pub profiler_visible_thread: crate::threads::Enum,
     #[cfg(feature = "debug")]
@@ -167,6 +167,7 @@ pub struct LoginWindowState {
 #[derive(RustState, StateElement)]
 pub struct DebugButtonTheme {
     foreground_color: Color,
+    hovered_background_color: Color,
 }
 
 #[derive(RustState, StateElement, StateWindow)]
@@ -315,7 +316,8 @@ impl ThemeDefault<DefaultMenu> for ClientTheme {
                 mouse_offset: 20.0,
             },
             debug_button: DebugButtonTheme {
-                foreground_color: Color::rgb_u8(255, 100, 255),
+                foreground_color: Color::rgb_u8(255, 167, 89),
+                hovered_background_color: Color::rgb_u8(225, 199, 115),
             },
         }
     }
@@ -431,7 +433,8 @@ impl ThemeDefault<DefaultGame> for ClientTheme {
                 mouse_offset: 16.0,
             },
             debug_button: DebugButtonTheme {
-                foreground_color: Color::rgb_u8(255, 100, 255),
+                foreground_color: Color::rgb_u8(255, 167, 89),
+                hovered_background_color: Color::rgb_u8(225, 199, 115),
             },
         }
     }

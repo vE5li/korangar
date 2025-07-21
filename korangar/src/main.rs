@@ -29,7 +29,6 @@ macro_rules! time_phase {
     }
 }
 
-// TODO: Rename area x and y to width and height.
 // TODO: Rename the whole game theme thing.
 
 mod graphics;

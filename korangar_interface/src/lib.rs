@@ -394,8 +394,8 @@ where
 
         if let Some((element, store, position, size)) = &mut self.overlay_element {
             let available_area = Area {
-                x: position.left(),
-                y: position.top(),
+                left: position.left(),
+                top: position.top(),
                 width: size.width(),
                 height: size.height(),
             };

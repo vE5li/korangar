@@ -617,8 +617,8 @@ impl RenderLayer<ClientState> for crate::renderer::InterfaceRenderer {
                 smooth,
             }) => {
                 let position = ScreenPosition {
-                    left: area.x + area.width / 2.0,
-                    top: area.y + area.height / 2.0,
+                    left: area.left + area.width / 2.0,
+                    top: area.top + area.height / 2.0,
                 };
                 let screen_clip = clip_layers[clip_layer.0].get();
 
@@ -631,7 +631,10 @@ impl RenderLayer<ClientState> for crate::renderer::InterfaceRenderer {
                 color,
                 smooth,
             }) => {
-                let position = ScreenPosition { left: area.x, top: area.y };
+                let position = ScreenPosition {
+                    left: area.left,
+                    top: area.top,
+                };
                 let size = ScreenSize {
                     width: area.width,
                     height: area.height,

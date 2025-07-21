@@ -67,8 +67,8 @@ where
     fn create_layout_info(
         &mut self,
         state: &Context<App>,
-        store: &mut ElementStore,
-        generator: &mut ElementIdGenerator,
+        _: &mut ElementStore,
+        _: &mut ElementIdGenerator,
         resolver: &mut Resolver,
     ) -> Self::LayoutInfo {
         let height = state.get(&self.height);
@@ -79,7 +79,7 @@ where
     fn layout_element<'a>(
         &'a self,
         state: &'a Context<App>,
-        store: &'a ElementStore,
+        _: &'a ElementStore,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, App>,
     ) {
@@ -114,8 +114,8 @@ where
         let checkbox_size = layout_info.area.height - 6.0;
         layout.add_checkbox(
             Area {
-                x: layout_info.area.x + 8.0,
-                y: layout_info.area.y + 3.0,
+                left: layout_info.area.left + 8.0,
+                top: layout_info.area.top + 3.0,
                 width: checkbox_size,
                 height: checkbox_size,
             },

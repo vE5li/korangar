@@ -227,8 +227,8 @@ where
         };
 
         let available_area = Area {
-            x: real_position.left(),
-            y: real_position.top(),
+            left: real_position.left(),
+            top: real_position.top(),
             width: real_size.width(),
             height: real_size.height(),
         };
@@ -243,8 +243,8 @@ where
 
         // FIX: Content needs to respect the max size.
         let area = Area {
-            x: title_area.x,
-            y: title_area.y,
+            left: title_area.left,
+            top: title_area.top,
             width: title_area.width,
             height: title_area.height + area.height,
         };
@@ -274,8 +274,8 @@ where
 
         let close_button = if *state.get(&self.closable) {
             let close_button_area = Area {
-                x: layout_info.title_area.x + layout_info.title_area.width - 40.0,
-                y: layout_info.title_area.y,
+                left: layout_info.title_area.left + layout_info.title_area.width - 40.0,
+                top: layout_info.title_area.top,
                 width: 30.0,
                 height: layout_info.title_area.height,
             };
@@ -332,8 +332,8 @@ where
         if *state.get(&self.minimum_width) != *state.get(&self.maximum_width) {
             // TODO: Compute this better.
             let resize_area = Area {
-                x: layout_info.area.x + layout_info.area.width - 14.0,
-                y: layout_info.area.y + layout_info.area.height - 14.0,
+                left: layout_info.area.left + layout_info.area.width - 14.0,
+                top: layout_info.area.top + layout_info.area.height - 14.0,
                 width: 14.0,
                 height: 14.0,
             };

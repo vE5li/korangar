@@ -134,11 +134,16 @@ pub mod components {
             ) -> Self::LayoutInfo {
                 let area = resolver.with_height(180.0);
 
-                self.overlay_handler
-                    .set_position_size(ScreenPosition { left: area.x, top: area.y }, ScreenSize {
+                self.overlay_handler.set_position_size(
+                    ScreenPosition {
+                        left: area.left,
+                        top: area.top,
+                    },
+                    ScreenSize {
                         width: area.width,
                         height: area.height,
-                    });
+                    },
+                );
 
                 Self::LayoutInfo { area }
             }

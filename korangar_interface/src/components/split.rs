@@ -32,8 +32,8 @@ impl<'a> CellResolverSet<'a> {
 impl ResolverSet for CellResolverSet<'_> {
     fn with_index<C>(&mut self, index: usize, f: impl FnMut(&mut Resolver) -> C) -> C {
         let cell_area = PartialArea {
-            x: self.initial_available_area.x + self.cell_size * index as f32,
-            y: self.initial_available_area.y,
+            left: self.initial_available_area.left + self.cell_size * index as f32,
+            top: self.initial_available_area.top,
             width: self.cell_size,
             height: self.initial_available_area.height,
         };

@@ -24,7 +24,7 @@ impl Resolver {
 
     fn push_gaps(&mut self) {
         if self.used_height > 0.0 {
-            self.available_area.y += self.gaps;
+            self.available_area.top += self.gaps;
             self.used_height += self.gaps;
 
             if let Some(available_height) = &mut self.available_area.height {
@@ -43,13 +43,13 @@ impl Resolver {
         self.push_gaps();
 
         let returned = Area {
-            x: self.available_area.x,
-            y: self.available_area.y,
+            left: self.available_area.left,
+            top: self.available_area.top,
             width: self.available_area.width,
             height,
         };
 
-        self.available_area.y += height;
+        self.available_area.top += height;
         self.used_height += height;
 
         if let Some(available_height) = &mut self.available_area.height {
@@ -62,7 +62,7 @@ impl Resolver {
     pub fn push_top(&mut self, height: f32) {
         self.push_gaps();
 
-        self.available_area.y += height;
+        self.available_area.top += height;
         self.used_height += height;
 
         if let Some(available_height) = &mut self.available_area.height {
@@ -76,8 +76,8 @@ impl Resolver {
 
         let mut inner = Resolver {
             available_area: PartialArea {
-                x: self.available_area.x + border,
-                y: self.available_area.y + border,
+                left: self.available_area.left + border,
+                top: self.available_area.top + border,
                 width: self.available_area.width - border * 2.0,
                 height: self.available_area.height.map(|height| height - border * 2.0),
             },
@@ -88,13 +88,13 @@ impl Resolver {
         let layout_info = f(&mut inner);
 
         let returned = Area {
-            x: self.available_area.x,
-            y: self.available_area.y,
+            left: self.available_area.left,
+            top: self.available_area.top,
             width: self.available_area.width,
             height: inner.used_height + border * 2.0,
         };
 
-        self.available_area.y += returned.height;
+        self.available_area.top += returned.height;
         self.used_height += returned.height;
 
         if let Some(available_height) = &mut self.available_area.height {
@@ -114,8 +114,8 @@ impl Resolver {
 
         let mut inner = Resolver {
             available_area: PartialArea {
-                x: self.available_area.x,
-                y: self.available_area.y - scroll,
+                left: self.available_area.left,
+                top: self.available_area.top - scroll,
                 width: self.available_area.width,
                 height: None,
             },
@@ -136,13 +136,13 @@ impl Resolver {
         };
 
         let returned = Area {
-            x: self.available_area.x,
-            y: self.available_area.y,
+            left: self.available_area.left,
+            top: self.available_area.top,
             width: self.available_area.width,
             height,
         };
 
-        self.available_area.y += returned.height;
+        self.available_area.top += returned.height;
         self.used_height += returned.height;
 
         if let Some(available_height) = &mut self.available_area.height {
@@ -161,9 +161,9 @@ impl Resolver {
 
         let layout_info = f(&mut inner);
 
-        let delta = inner.available_area.y - self.available_area.y;
+        let delta = inner.available_area.top - self.available_area.top;
         if delta > 0.0 {
-            self.available_area.y = inner.available_area.y;
+            self.available_area.top = inner.available_area.top;
             self.used_height += delta;
         }
 

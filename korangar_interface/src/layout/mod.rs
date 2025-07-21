@@ -39,31 +39,29 @@ pub mod alignment {
 }
 
 pub mod area {
-    // TODO: left + top
     #[derive(Debug, Clone, Copy)]
     pub struct Area {
-        pub x: f32,
-        pub y: f32,
+        pub left: f32,
+        pub top: f32,
         pub width: f32,
         pub height: f32,
     }
 
-    // TODO: left + top
     #[derive(Debug, Clone, Copy)]
     pub struct PartialArea {
-        pub x: f32,
-        pub y: f32,
+        pub left: f32,
+        pub top: f32,
         pub width: f32,
         pub height: Option<f32>,
     }
 
     impl From<Area> for PartialArea {
-        fn from(value: Area) -> Self {
+        fn from(Area { left, top, width, height }: Area) -> Self {
             Self {
-                x: value.x,
-                y: value.y,
-                width: value.width,
-                height: Some(value.height),
+                left,
+                top,
+                width,
+                height: Some(height),
             }
         }
     }
@@ -337,17 +335,17 @@ impl<'a, App: Application> Layout<'a, App> {
     // caller combine these themselves.
     pub fn is_area_hovered_and_active(&self, area: Area) -> bool {
         self.can_hover
-            && self.mouse_position.left() >= area.x
-            && self.mouse_position.top() >= area.y
-            && self.mouse_position.left() <= area.x + area.width
-            && self.mouse_position.top() <= area.y + area.height
+            && self.mouse_position.left() >= area.left
+            && self.mouse_position.top() >= area.top
+            && self.mouse_position.left() <= area.left + area.width
+            && self.mouse_position.top() <= area.top + area.height
     }
 
     pub fn is_area_hovered(&self, area: Area) -> bool {
-        self.mouse_position.left() >= area.x
-            && self.mouse_position.top() >= area.y
-            && self.mouse_position.left() <= area.x + area.width
-            && self.mouse_position.top() <= area.y + area.height
+        self.mouse_position.left() >= area.left
+            && self.mouse_position.top() >= area.top
+            && self.mouse_position.left() <= area.left + area.width
+            && self.mouse_position.top() <= area.top + area.height
     }
 
     pub fn is_element_focused(&self, element_id: ElementId) -> bool {
@@ -388,7 +386,7 @@ impl<'a, App: Application> Layout<'a, App> {
     }
 
     fn set_layer_clip(&mut self, handle: ClipLayerHandle, area: Area) {
-        let clip = App::Clip::new(area.x, area.y, area.x + area.width, area.y + area.height);
+        let clip = App::Clip::new(area.left, area.top, area.left + area.width, area.top + area.height);
 
         self.clip_layers[handle.0.0].clip = clip;
 
@@ -598,7 +596,7 @@ impl<'a, App: Application> Layout<'a, App> {
                     let clip = self.clip_layers[clip_layer.0].clip;
 
                     renderer.render_rectangle(
-                        App::Position::new(area.x, area.y),
+                        App::Position::new(area.left, area.top),
                         App::Size::new(area.width, area.height),
                         clip,
                         corner_radius,
@@ -617,7 +615,7 @@ impl<'a, App: Application> Layout<'a, App> {
                     let clip = self.clip_layers[clip_layer.0].clip;
 
                     renderer.render_checkbox(
-                        App::Position::new(area.x, area.y),
+                        App::Position::new(area.left, area.top),
                         App::Size::new(area.width, area.height),
                         clip,
                         color,
@@ -669,7 +667,7 @@ impl<'a, App: Application> Layout<'a, App> {
 
                     renderer.render_text(
                         text,
-                        App::Position::new(area.x + left_offset, area.y + top_offset),
+                        App::Position::new(area.left + left_offset, area.top + top_offset),
                         clip,
                         color,
                         font_size,
@@ -694,10 +692,10 @@ impl<'a, App: Application> Layout<'a, App> {
             for click_area in &layer.click_areas {
                 // TODO: Check clip layer as well
 
-                if click_position.left() >= click_area.area.x
-                    && click_position.left() <= click_area.area.x + click_area.area.width
-                    && click_position.top() >= click_area.area.y
-                    && click_position.top() <= click_area.area.y + click_area.area.height
+                if click_position.left() >= click_area.area.left
+                    && click_position.left() <= click_area.area.left + click_area.area.width
+                    && click_position.top() >= click_area.area.top
+                    && click_position.top() <= click_area.area.top + click_area.area.height
                     && click_area.mouse_button == mouse_button
                 {
                     click_area.action.execute(state, queue);
@@ -706,10 +704,10 @@ impl<'a, App: Application> Layout<'a, App> {
             }
 
             for toggle in &layer.toggles {
-                if click_position.left() >= toggle.area.x
-                    && click_position.left() <= toggle.area.x + toggle.area.width
-                    && click_position.top() >= toggle.area.y
-                    && click_position.top() <= toggle.area.y + toggle.area.height
+                if click_position.left() >= toggle.area.left
+                    && click_position.left() <= toggle.area.left + toggle.area.width
+                    && click_position.top() >= toggle.area.top
+                    && click_position.top() <= toggle.area.top + toggle.area.height
                 {
                     let mut reference = toggle.cell.borrow_mut();
                     *reference = !*reference;
@@ -720,10 +718,10 @@ impl<'a, App: Application> Layout<'a, App> {
             for window_move_area in &layer.window_move_areas {
                 // TODO: Check clip layer as well
 
-                if click_position.left() >= window_move_area.area.x
-                    && click_position.left() <= window_move_area.area.x + window_move_area.area.width
-                    && click_position.top() >= window_move_area.area.y
-                    && click_position.top() <= window_move_area.area.y + window_move_area.area.height
+                if click_position.left() >= window_move_area.area.left
+                    && click_position.left() <= window_move_area.area.left + window_move_area.area.width
+                    && click_position.top() >= window_move_area.area.top
+                    && click_position.top() <= window_move_area.area.top + window_move_area.area.height
                 {
                     *mouse_mode = MouseMode::MovingWindow {
                         window_id: window_move_area.window_id,
@@ -735,10 +733,10 @@ impl<'a, App: Application> Layout<'a, App> {
             for window_resize_area in &layer.window_resize_areas {
                 // TODO: Check clip layer as well
 
-                if click_position.left() >= window_resize_area.area.x
-                    && click_position.left() <= window_resize_area.area.x + window_resize_area.area.width
-                    && click_position.top() >= window_resize_area.area.y
-                    && click_position.top() <= window_resize_area.area.y + window_resize_area.area.height
+                if click_position.left() >= window_resize_area.area.left
+                    && click_position.left() <= window_resize_area.area.left + window_resize_area.area.width
+                    && click_position.top() >= window_resize_area.area.top
+                    && click_position.top() <= window_resize_area.area.top + window_resize_area.area.height
                 {
                     *mouse_mode = MouseMode::ResizingWindow {
                         window_id: window_resize_area.window_id,
@@ -750,10 +748,10 @@ impl<'a, App: Application> Layout<'a, App> {
             for window_close_area in &layer.window_close_areas {
                 // TODO: Check clip layer as well
 
-                if click_position.left() >= window_close_area.area.x
-                    && click_position.left() <= window_close_area.area.x + window_close_area.area.width
-                    && click_position.top() >= window_close_area.area.y
-                    && click_position.top() <= window_close_area.area.y + window_close_area.area.height
+                if click_position.left() >= window_close_area.area.left
+                    && click_position.left() <= window_close_area.area.left + window_close_area.area.width
+                    && click_position.top() >= window_close_area.area.top
+                    && click_position.top() <= window_close_area.area.top + window_close_area.area.height
                 {
                     queue.queue(Event::CloseWindow {
                         window_id: window_close_area.window_id,
@@ -765,10 +763,10 @@ impl<'a, App: Application> Layout<'a, App> {
             for focus_area in &layer.focus_areas {
                 // TODO: Check clip layer as well
 
-                if click_position.left() >= focus_area.area.x
-                    && click_position.left() <= focus_area.area.x + focus_area.area.width
-                    && click_position.top() >= focus_area.area.y
-                    && click_position.top() <= focus_area.area.y + focus_area.area.height
+                if click_position.left() >= focus_area.area.left
+                    && click_position.left() <= focus_area.area.left + focus_area.area.width
+                    && click_position.top() >= focus_area.area.top
+                    && click_position.top() <= focus_area.area.top + focus_area.area.height
                 {
                     *focused_element = Some(focus_area.element_id);
                     clicked = true;
@@ -784,10 +782,10 @@ impl<'a, App: Application> Layout<'a, App> {
             for scroll_area in &layer.scroll_areas {
                 // TODO: Check clip layer as well
 
-                if mouse_position.left() >= scroll_area.area.x
-                    && mouse_position.left() <= scroll_area.area.x + scroll_area.area.width
-                    && mouse_position.top() >= scroll_area.area.y
-                    && mouse_position.top() <= scroll_area.area.y + scroll_area.area.height
+                if mouse_position.left() >= scroll_area.area.left
+                    && mouse_position.left() <= scroll_area.area.left + scroll_area.area.width
+                    && mouse_position.top() >= scroll_area.area.top
+                    && mouse_position.top() <= scroll_area.area.top + scroll_area.area.height
                 {
                     let mut current_scroll = scroll_area.cell.borrow_mut();
 

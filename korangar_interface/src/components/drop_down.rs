@@ -363,7 +363,7 @@ where
         let border = *state.get(&theme().drop_down().list_border());
 
         self.click_handler.set_position_size(
-            App::Position::new(area.x - border, area.y - border),
+            App::Position::new(area.left - border, area.top - border),
             App::Size::new(area.width + border * 2.0, list_maximum_height + border * 2.0),
         );
 

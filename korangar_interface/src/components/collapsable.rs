@@ -156,8 +156,8 @@ where
         let title_height = *state.get(&self.title_height);
 
         let title_area = Area {
-            x: layout_info.area.x,
-            y: layout_info.area.y,
+            left: layout_info.area.left,
+            top: layout_info.area.top,
             width: layout_info.area.width,
             height: title_height,
         };

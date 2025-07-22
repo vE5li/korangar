@@ -15,8 +15,10 @@ use crate::graphics::Texture;
 use crate::loaders::AsyncLoader;
 use crate::world::{Library, ResourceMetadata};
 
-#[derive(Default, RustState)]
+#[derive(Default, RustState, StateElement)]
 pub struct Inventory {
+    // TODO: Unhide this.
+    #[hidden_element]
     items: Vec<InventoryItem<ResourceMetadata>>,
 }
 

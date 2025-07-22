@@ -8,7 +8,7 @@ use rust_state::RustState;
 
 use super::Skill;
 
-#[derive(Default, RustState)]
+#[derive(Default, RustState, StateElement)]
 pub struct Hotbar {
     skills: [Option<Skill>; 10],
 }
@@ -89,9 +89,5 @@ impl Hotbar {
 
     pub fn get_skill_in_slot(&self, slot: HotbarSlot) -> &Option<Skill> {
         &self.skills[slot.0 as usize]
-    }
-
-    pub fn get_skills(&self) -> &[Option<Skill>; 10] {
-        &self.skills
     }
 }

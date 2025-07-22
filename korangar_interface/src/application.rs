@@ -1,5 +1,3 @@
-use rust_state::Path;
-
 use crate::layout::ClipLayer;
 use crate::theme::ThemePathGetter;
 use crate::window::Anchor;

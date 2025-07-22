@@ -130,9 +130,7 @@ pub enum UserEvent {
     #[cfg(feature = "debug")]
     OpenProfilerWindow,
     #[cfg(feature = "debug")]
-    OpenPacketWindow,
-    #[cfg(feature = "debug")]
-    ClearPacketHistory,
+    OpenPacketInspectorWindow,
     #[cfg(feature = "debug")]
     CameraLookAround(Vector2<f32>),
     #[cfg(feature = "debug")]

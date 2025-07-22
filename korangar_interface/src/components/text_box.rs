@@ -3,11 +3,11 @@ use std::marker::PhantomData;
 use rust_state::{Context, RustState, Selector};
 
 use crate::application::Application;
+use crate::element::Element;
 use crate::element::id::ElementIdGenerator;
-use crate::element::store::{ElementStore, Persistent, PersistentExt};
-use crate::element::{Element, ElementSet};
+use crate::element::store::ElementStore;
 use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
-use crate::layout::{HeightBound, InputHandler, Layout, Resolver};
+use crate::layout::{InputHandler, Layout, Resolver};
 use crate::theme::ThemePathGetter;
 
 #[derive(RustState)]
@@ -62,8 +62,8 @@ where
     fn create_layout_info(
         &mut self,
         state: &Context<App>,
-        store: &mut ElementStore,
-        generator: &mut ElementIdGenerator,
+        _: &mut ElementStore,
+        _: &mut ElementIdGenerator,
         resolver: &mut Resolver,
     ) -> Self::LayoutInfo {
         let height = state.get(&self.height);

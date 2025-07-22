@@ -18,7 +18,7 @@ use crate::loaders::Sprite;
 use crate::renderer::SpriteRenderer;
 use crate::state::ClientState;
 
-#[derive(Clone, Debug, new)]
+#[derive(Clone, Debug, new, RustState, StateElement)]
 pub struct SpriteAnimationState {
     #[new(default)]
     pub action_base_offset: usize,

@@ -4,7 +4,7 @@ use rust_state::Context;
 use crate::input::UserEvent;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::{WindowCache, WindowClass};
-use crate::state::{ClientState, ClientThemePathExt, ClientThemeType, DebugButtonThemePathExt, client_theme};
+use crate::state::{ClientState, ClientThemeType, DebugButtonThemePathExt, InterfaceThemePathExt, client_theme};
 
 #[derive(Default)]
 pub struct MenuWindow;
@@ -97,9 +97,9 @@ impl CustomWindow<ClientState> for MenuWindow {
                 },
                 #[cfg(feature = "debug")]
                 button! {
-                    text: "Network packets",
+                    text: "Packet inspector",
                     tooltip: "Inspect all incoming and outgoing packets (only available in debug mode)",
-                    event: UserEvent::OpenPacketWindow,
+                    event: UserEvent::OpenPacketInspectorWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
                     hovered_background_color: client_theme().debug_button().hovered_background_color(),
                 },

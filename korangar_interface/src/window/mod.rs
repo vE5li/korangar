@@ -1,4 +1,3 @@
-use std::any::Any;
 use std::marker::PhantomData;
 
 pub use interface_macros::StateWindow;
@@ -6,8 +5,8 @@ use rust_state::{Context, Path, RustState, Selector};
 use store::WindowStore;
 
 use crate::application::{Application, CornerRadiusTrait, PositionTrait, SizeTrait};
+use crate::element::ElementSet;
 use crate::element::id::ElementIdGenerator;
-use crate::element::{DefaultLayoutInfoSet, ElementSet};
 use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
 use crate::layout::area::Area;
 use crate::layout::{Layout, Resolver};
@@ -18,7 +17,6 @@ mod anchor;
 pub use anchor::{Anchor, AnchorPoint};
 
 pub mod store {
-    use std::cell::UnsafeCell;
     use std::collections::HashMap;
 
     use crate::element::id::ElementIdGenerator;

@@ -28,7 +28,7 @@ pub struct PacketHeader(pub u16);
 /// followed by the packet data. If the packet does not have a fixed size,
 /// the first two bytes will be the size of the packet in bytes *including* the
 /// header. Packets are sent in little endian.
-pub trait Packet: std::fmt::Debug + Clone {
+pub trait Packet: std::fmt::Debug + Send + Clone + 'static {
     /// Any scheduled packet that does not depend on in-game events should be
     /// marked as a ping. This is mostly for filtering when logging
     /// packet traffic.
@@ -46,10 +46,11 @@ pub trait Packet: std::fmt::Debug + Clone {
 
     // Implementation detail of Korangar. Can be used to convert a packet to an
     // UI element in the packet inspector.
-    // #[cfg(feature = "packet-to-prototype-element")]
-    // fn to_state_element<App: korangar_interface::application::Application>(
-    //     &self,
-    // ) -> Box<dyn korangar_interface::element::StateElement<App> + Send>;
+    #[cfg(feature = "packet-to-state-element")]
+    fn to_element<App: korangar_interface::application::Application>(
+        self_path: impl rust_state::Path<App, Self>,
+        name: String,
+    ) -> Box<dyn korangar_interface::element::Element<App, LayoutInfo = ()>>;
 }
 
 /// Extension trait for reading and writing packets with the header.
@@ -1382,7 +1383,9 @@ pub struct UpdateAttackRangePacket {
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x08D4)]
 pub struct SwitchCharacterSlotPacket {
+    // TODO: Type this more strongly.
     pub origin_slot: u16,
+    // TODO: Type this more strongly.
     pub destination_slot: u16,
     /// 1 instead of default, just in case the sever actually uses this value
     /// (rAthena does not)

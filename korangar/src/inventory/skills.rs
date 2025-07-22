@@ -1,23 +1,28 @@
 use std::sync::Arc;
 
+use korangar_interface::element::StateElement;
 use ragnarok_packets::{ClientTick, SkillId, SkillInformation, SkillLevel, SkillType};
 use rust_state::RustState;
 
 use crate::loaders::{ActionLoader, Sprite, SpriteLoader};
 use crate::world::{Actions, SpriteAnimationState};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, RustState, StateElement)]
 pub struct Skill {
     pub skill_id: SkillId,
     pub skill_level: SkillLevel,
     pub skill_type: SkillType,
     pub skill_name: String,
+    // TODO: Unhide this
+    #[hidden_element]
     pub sprite: Arc<Sprite>,
+    // TODO: Unhide this
+    #[hidden_element]
     pub actions: Arc<Actions>,
     pub animation_state: SpriteAnimationState,
 }
 
-#[derive(Default, RustState)]
+#[derive(Default, RustState, StateElement)]
 pub struct SkillTree {
     skills: Vec<Skill>,
 }

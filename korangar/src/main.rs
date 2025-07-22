@@ -29,8 +29,6 @@ macro_rules! time_phase {
     }
 }
 
-// TODO: Rename the whole game theme thing.
-
 mod graphics;
 mod input;
 mod state;
@@ -38,6 +36,8 @@ mod state;
 mod interface;
 mod inventory;
 mod loaders;
+#[cfg(feature = "debug")]
+mod networking;
 mod renderer;
 mod settings;
 mod system;
@@ -74,6 +74,8 @@ use korangar_networking::{
     ShopItem,
 };
 use korangar_util::pathing::PathFinder;
+#[cfg(feature = "debug")]
+use networking::{PacketHistory, PacketHistoryCallback};
 // #[cfg(not(feature = "debug"))]
 use ragnarok_packets::handler::NoPacketCallback;
 use ragnarok_packets::{
@@ -84,8 +86,8 @@ use renderer::InterfaceRenderer;
 use rust_state::{BoxedExt, Context, ManuallyAssertExt, OptionExt, Path, RustState};
 use settings::{AudioSettings, AudioSettingsPathExt, GraphicsSettingsCapabilities, GraphicsSettingsPathExt};
 use state::{
-    ClientState, ClientStatePathExt, ClientStateRootExt, ClientTheme, ClientThemePathExt, ClientThemeType, DefaultGame, DefaultMenu,
-    LoginWindowState, ThemeDefault, client_state, client_theme, this_entity, this_player,
+    ChatMessage, ClientState, ClientStatePathExt, ClientStateRootExt, ClientThemeType, DefaultMenu, DefaultPlaying, InterfaceTheme,
+    InterfaceThemePathExt, LoginWindowState, ThemeDefault, client_state, client_theme, this_entity, this_player,
 };
 #[cfg(feature = "debug")]
 use wgpu::Device;
@@ -105,13 +107,13 @@ use crate::graphics::*;
 use crate::input::{InputSystem, UserEvent};
 use crate::interface::cursor::{MouseCursor, MouseCursorState};
 // use crate::interface::dialog::DialogSystem;
-// #[cfg(feature = "debug")]
-// use crate::interface::elements::PacketHistoryCallback;
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 use crate::interface::resource::{ItemSource, Move, SkillSource};
 use crate::interface::windows::*;
 use crate::inventory::{Hotbar, Inventory, SkillTree};
 use crate::loaders::*;
+#[cfg(feature = "debug")]
+use crate::networking::PacketHistoryPathExt;
 #[cfg(feature = "debug")]
 use crate::renderer::DebugMarkerRenderer;
 use crate::renderer::{AlignHorizontal, EffectRenderer, GameInterfaceRenderer};
@@ -144,8 +146,8 @@ pub static SHUTDOWN_SIGNAL: LazyLock<AtomicBool> = LazyLock::new(|| AtomicBool::
 
 #[cfg(feature = "debug")]
 const DEBUG_WINDOWS: &[WindowClass] = &[
-    WindowClass::ClientState,
-    WindowClass::Packets,
+    WindowClass::ClientStateInspector,
+    WindowClass::PacketInspector,
     WindowClass::Profiler,
     WindowClass::RenderOptions,
     WindowClass::Time,
@@ -322,20 +324,6 @@ fn initialize_shutdown_signal() {
     .expect("Error setting Ctrl-C handler");
 }
 
-// TODO: Move
-#[derive(Debug, Clone)]
-pub struct ChatMessage {
-    pub text: String,
-    pub color: MessageColor,
-}
-
-// TODO: Move
-#[derive(RustState, StateElement)]
-pub struct PacketState {
-    update: bool,
-    show_pings: bool,
-}
-
 struct Client {
     action_loader: Arc<ActionLoader>,
     async_loader: Arc<AsyncLoader>,
@@ -415,11 +403,9 @@ struct Client {
 
     main_menu_click_sound_effect: SoundEffectKey,
 
-    // #[cfg(feature = "debug")]
-    // packet_history_callback: PacketHistoryCallback,
-    // #[cfg(feature = "debug")]
-    // networking_system: NetworkingSystem<PacketHistoryCallback>,
-    // #[cfg(not(feature = "debug"))]
+    #[cfg(feature = "debug")]
+    networking_system: NetworkingSystem<PacketHistoryCallback>,
+    #[cfg(not(feature = "debug"))]
     networking_system: NetworkingSystem<NoPacketCallback>,
     audio_engine: Arc<AudioEngine<GameFileLoader>>,
     active_graphics_settings: GraphicsSettings,
@@ -438,9 +424,6 @@ impl Client {
             let picker_value = Arc::new(AtomicU64::new(0));
             let input_system = InputSystem::new(picker_value.clone());
             let graphics_settings = GraphicsSettings::new();
-
-            #[cfg(feature = "debug")]
-            let render_options = RenderOptions::new();
         });
 
         time_phase!("create adapter", {
@@ -510,8 +493,6 @@ impl Client {
         });
 
         time_phase!("create audio engine", {
-            let audio_settings = AudioSettings::new();
-
             let audio_engine = Arc::new(AudioEngine::new(game_file_loader.clone()));
             audio_engine.set_background_music_volume(0.1);
         });
@@ -659,63 +640,30 @@ impl Client {
             directional_shadow_camera.set_focus_point(start_camera.focus_point(), start_camera.view_direction());
         });
 
-        let friend_list: Vec<Friend> = Vec::default();
+        // TODO: Move all of these to the ClientState
         let saved_login_data: Option<LoginServerLoginData> = None;
         let saved_character_server: Option<CharacterServerInformation> = None;
-        let character_slots = CharacterSlots::default();
-        let shop_items: Vec<ShopItem<ResourceMetadata>> = Vec::default();
-        let sell_items: Vec<SellItem<(ResourceMetadata, u16)>> = Vec::default();
-        let currently_deleting: Option<CharacterId> = None;
-        let player_name = String::new();
-        let switch_request: Option<usize> = None;
         let saved_login_server_address = None;
         let saved_password = String::new();
         let saved_username = String::new();
 
-        let welcome_string = format!(
-            "Welcome to ^ff8800Korangar^000000 version ^ff8800{}^000000!",
-            env!("CARGO_PKG_VERSION")
-        );
-        let chat_messages = vec![ChatMessage {
-            text: welcome_string,
-            color: MessageColor::Server,
-        }];
-
         time_phase!("initialize networking", {
-            let client_info = load_client_info(&game_file_loader);
-
-            // #[cfg(not(feature = "debug"))]
+            #[cfg(not(feature = "debug"))]
             let (networking_system, network_event_buffer) = NetworkingSystem::spawn();
-            // #[cfg(feature = "debug")]
-            // let packet_history_callback =
-            // PacketHistoryCallback::get_static_instance();
-            // #[cfg(feature = "debug")]
-            // let (networking_system, network_event_buffer) =
-            // NetworkingSystem::spawn_with_callback(packet_history_callback.
-            // clone());
+
+            #[cfg(feature = "debug")]
+            let (packet_history, packet_history_callback) = PacketHistory::new();
+            #[cfg(feature = "debug")]
+            let (networking_system, network_event_buffer) = NetworkingSystem::spawn_with_callback(packet_history_callback);
         });
-
-        let login_settings = settings::LoginSettings::new();
-
-        // FIX: This will fail if not services are present.
-        let selected_service = login_settings.recent_service_id.unwrap_or(client_info.services[0].service_id());
-        let service_settings = login_settings.service_settings.get(&selected_service).cloned().unwrap_or_default();
-
-        let login_window = LoginWindowState {
-            username: service_settings.username,
-            password: service_settings.password,
-            remember_username: service_settings.remember_username,
-            remember_password: service_settings.remember_password,
-            selected_service,
-        };
 
         time_phase!("create resources", {
             let particle_holder = ParticleHolder::default();
             let point_light_manager = PointLightManager::new();
             let effect_holder = EffectHolder::default();
-            let player_inventory = Inventory::default();
-            let player_skill_tree = SkillTree::default();
-            let hotbar = Hotbar::default();
+            // let inventory = Inventory::default();
+            // let skill_tree = SkillTree::default();
+            // let hotbar = Hotbar::default();
             let path_finder = PathFinder::default();
 
             let point_light_set_buffer = ResourceSetBuffer::default();
@@ -765,49 +713,15 @@ impl Client {
             map.set_ambient_sound_sources(&audio_engine);
         });
 
-        let client_state = Context::new(ClientState {
-            menu_theme: <ClientTheme as ThemeDefault<DefaultMenu>>::default(),
-            game_theme: <ClientTheme as ThemeDefault<DefaultGame>>::default(),
-            game_theme_2: GameTheme::default(),
-            interface_scale: Scaling::new(1.0),
-
-            client_info,
-            login_settings,
-            login_window,
-            character_servers: Vec::new(),
-
-            chat_messages,
-            friend_list,
-            character_slots,
-            shop_items,
-            sell_items,
-            currently_deleting,
-            player_name,
-            switch_request: None,
-
-            map: Some(map),
-            entities: Vec::new(),
-
-            hotbar,
-            player_inventory,
-            player_skill_tree,
-
-            audio_settings,
-
-            window_size: ScreenSize::default(),
-            graphics_settings: graphics_settings.clone(),
-            graphics_settings_capabilities,
-            #[cfg(feature = "debug")]
-            render_options,
-            #[cfg(feature = "debug")]
-            profiler_visible_thread: crate::threads::Enum::Main,
-            #[cfg(feature = "debug")]
-            packet_state: PacketState {
-                update: true,
-                show_pings: false,
-            },
-
-            create_character_name: String::new(),
+        time_phase!("create client state", {
+            let client_state = Context::new(ClientState::new(
+                &game_file_loader,
+                map,
+                graphics_settings.clone(),
+                graphics_settings_capabilities,
+                #[cfg(feature = "debug")]
+                packet_history,
+            ));
         });
 
         interface.open_window(LoginWindow::new(
@@ -880,8 +794,6 @@ impl Client {
             #[cfg(feature = "debug")]
             tile_texture_set,
             main_menu_click_sound_effect,
-            // #[cfg(feature = "debug")]
-            // packet_history_callback,
             networking_system,
             audio_engine,
             active_graphics_settings: graphics_settings,
@@ -1399,12 +1311,12 @@ impl Client {
                 NetworkEvent::RemoveQuestEffect(entity_id) => self.particle_holder.remove_quest_icon(entity_id),
                 NetworkEvent::SetInventory { items } => {
                     self.client_state
-                        .follow_mut(client_state().player_inventory())
+                        .follow_mut(client_state().inventory())
                         .fill(&self.async_loader, &self.library, items);
                 }
                 NetworkEvent::IventoryItemAdded { item } => {
                     self.client_state
-                        .follow_mut(client_state().player_inventory())
+                        .follow_mut(client_state().inventory())
                         .add_item(&self.async_loader, &self.library, item);
 
                     // TODO: Update the selling items. If you pick up an item
@@ -1417,12 +1329,10 @@ impl Client {
                     index,
                     amount,
                 } => {
-                    self.client_state
-                        .follow_mut(client_state().player_inventory())
-                        .remove_item(index, amount);
+                    self.client_state.follow_mut(client_state().inventory()).remove_item(index, amount);
                 }
                 NetworkEvent::SkillTree(skill_information) => {
-                    self.client_state.follow_mut(client_state().player_skill_tree()).fill(
+                    self.client_state.follow_mut(client_state().skill_tree()).fill(
                         &self.sprite_loader,
                         &self.action_loader,
                         skill_information,
@@ -1431,7 +1341,7 @@ impl Client {
                 }
                 NetworkEvent::UpdateEquippedPosition { index, equipped_position } => {
                     self.client_state
-                        .follow_mut(client_state().player_inventory())
+                        .follow_mut(client_state().inventory())
                         .update_equipped_position(index, equipped_position);
                 }
                 NetworkEvent::ChangeJob { account_id, job_id } => {
@@ -1578,7 +1488,7 @@ impl Client {
                             HotkeyState::Bound(hotkey) => {
                                 let Some(mut skill) = self
                                     .client_state
-                                    .follow(client_state().player_skill_tree())
+                                    .follow(client_state().skill_tree())
                                     .find_skill(SkillId(hotkey.skill_id as u16))
                                 else {
                                     self.client_state
@@ -1641,7 +1551,7 @@ impl Client {
                     }
                 },
                 NetworkEvent::SellItemList { items } => {
-                    // let inventory_items = self.player_inventory.get_items();
+                    // let inventory_items = self.inventory.get_items();
 
                     // self.sell_items.mutate(|sell_items| {
                     //     *sell_items = items
@@ -1768,20 +1678,18 @@ impl Client {
                 }
                 UserEvent::OpenInventoryWindow => {
                     if self.client_state.try_follow(this_entity()).is_some() {
-                        self.interface
-                            .open_window(InventoryWindow::new(client_state().player_inventory().items()));
+                        self.interface.open_window(InventoryWindow::new(client_state().inventory().items()));
                     }
                 }
                 UserEvent::OpenEquipmentWindow => {
                     if self.client_state.try_follow(this_entity()).is_some() {
-                        self.interface
-                            .open_window(EquipmentWindow::new(client_state().player_inventory().items()));
+                        self.interface.open_window(EquipmentWindow::new(client_state().inventory().items()));
                     }
                 }
                 UserEvent::OpenSkillTreeWindow => {
                     if self.client_state.try_follow(this_entity()).is_some() {
                         self.interface
-                            .open_window(SkillTreeWindow::new(client_state().player_skill_tree().skills()))
+                            .open_window(SkillTreeWindow::new(client_state().skill_tree().skills()))
                     }
                 }
                 UserEvent::OpenGraphicsSettingsWindow => self.interface.open_window(GraphicsSettingsWindow::new(
@@ -2055,15 +1963,16 @@ impl Client {
                 #[cfg(feature = "debug")]
                 UserEvent::SetMidnight => self.game_timer.set_day_timer(24.0 * 3600.0),
                 #[cfg(feature = "debug")]
-                UserEvent::OpenThemeInspectorWindow => self.interface.open_state_window(client_state().game_theme()),
+                UserEvent::OpenThemeInspectorWindow => {
+                    // TODO: Themporary value
+                    self.interface.open_state_window(client_state().menu_theme())
+                }
                 #[cfg(feature = "debug")]
                 UserEvent::OpenProfilerWindow => self
                     .interface
                     .open_window(ProfilerWindow::new(client_state().profiler_visible_thread())),
                 #[cfg(feature = "debug")]
-                UserEvent::OpenPacketWindow => self.interface.open_window(PacketWindow::new(client_state().packet_state())),
-                #[cfg(feature = "debug")]
-                UserEvent::ClearPacketHistory => {} //self.packet_history_callback.clear_all(),
+                UserEvent::OpenPacketInspectorWindow => self.interface.open_window(PacketInspector::new(client_state().packet_history())),
                 #[cfg(feature = "debug")]
                 UserEvent::CameraLookAround(offset) => self.debug_camera.look_around(offset),
                 #[cfg(feature = "debug")]
@@ -2104,7 +2013,7 @@ impl Client {
                 (LoaderId::ItemSprite(item_id), LoadableResource::ItemSprite { texture, location }) => match location {
                     ItemLocation::Inventory => {
                         self.client_state
-                            .follow_mut(client_state().player_inventory())
+                            .follow_mut(client_state().inventory())
                             .update_item_sprite(item_id, texture);
                     }
                     ItemLocation::Shop => {
@@ -2167,6 +2076,16 @@ impl Client {
 
         #[cfg(feature = "debug")]
         loads_measurement.stop();
+
+        // Update the packet history callback.
+        #[cfg(feature = "debug")]
+        {
+            profile_block!("update packet history");
+
+            let apply_updates = *self.client_state.follow(client_state().packet_history().update());
+
+            self.client_state.follow_mut(client_state().packet_history()).update(apply_updates);
+        }
 
         // Main map update and render loop
         if self.client_state.follow(client_state().map()).is_some() {
@@ -2305,7 +2224,7 @@ impl Client {
 
             self.mouse_cursor.update(client_tick);
 
-            let walk_indicator_color = *self.client_state.follow(client_state().game_theme_2().indicator().walking());
+            let walk_indicator_color = *self.client_state.follow(client_state().game_theme().indicator().walking());
 
             #[cfg(feature = "debug")]
             let hovered_marker_identifier = match mouse_target {
@@ -2565,7 +2484,7 @@ impl Client {
                         entity.render_status(
                             &self.middle_interface_renderer,
                             current_camera,
-                            self.client_state.follow(client_state().game_theme_2()),
+                            self.client_state.follow(client_state().game_theme()),
                             screen_size,
                         );
 
@@ -2595,7 +2514,7 @@ impl Client {
                     player.render_status(
                         &self.middle_interface_renderer,
                         current_camera,
-                        self.client_state.follow(client_state().game_theme_2()),
+                        self.client_state.follow(client_state().game_theme()),
                         screen_size,
                     );
                 }
@@ -2650,7 +2569,7 @@ impl Client {
 
                 #[cfg(feature = "debug")]
                 if render_options.show_frames_per_second {
-                    let game_theme = self.client_state.follow(client_state().game_theme_2());
+                    let game_theme = self.client_state.follow(client_state().game_theme());
 
                     self.top_interface_renderer.render_text(
                         &self.game_timer.last_frames_per_second().to_string(),
@@ -2666,7 +2585,7 @@ impl Client {
                         &self.top_interface_renderer,
                         mouse_position,
                         self.input_system.get_mouse_mode().grabbed(),
-                        *self.client_state.follow(client_state().game_theme_2().cursor().color()),
+                        *self.client_state.follow(client_state().game_theme().cursor().color()),
                         self.client_state.follow(client_state().interface_scale()).get_factor(),
                     );
                 }

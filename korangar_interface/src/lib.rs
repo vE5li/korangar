@@ -23,7 +23,7 @@ extern crate self as korangar_interface;
 
 use std::collections::BTreeMap;
 
-use application::{Application, ClipTrait, CornerRadiusTrait, PositionTrait, RenderLayer, SizeTrait, WindowCache};
+use application::{Application, ClipTrait, PositionTrait, RenderLayer, SizeTrait, WindowCache};
 use element::ElementBox;
 use element::id::{ElementId, ElementIdGenerator};
 use element::store::ElementStore;
@@ -440,10 +440,6 @@ where
 
             is_ui_hovered |= layout.is_hovered();
         });
-
-        let tooltip_background_color = *state.get(&theme::theme().window().background_color());
-        let tooltip_text_color = *state.get(&theme::theme().window().title_color());
-        let tooltip_font_size = *state.get(&theme::theme().window().font_size());
 
         BuiltUi {
             window_layouts: &mut this.window_layouts,

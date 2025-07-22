@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize, Serializer};
 
 use crate::loaders::ServiceId;
 
-// TODO: Can likely be removed.
 #[derive(Clone, Default, RustState, Serialize, Deserialize, StateElement)]
 pub struct LoginSettings {
     pub service: String,

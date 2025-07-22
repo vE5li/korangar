@@ -550,7 +550,7 @@ impl InputSystem {
 
             #[cfg(feature = "debug")]
             if control_down && self.get_key(KeyCode::KeyP).pressed() {
-                events.push(UserEvent::OpenPacketWindow);
+                events.push(UserEvent::OpenPacketInspectorWindow);
             }
 
             #[cfg(feature = "debug")]

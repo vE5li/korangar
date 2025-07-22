@@ -5,7 +5,7 @@ use rust_state::Context;
 use crate::application::Application;
 use crate::element::id::ElementIdGenerator;
 use crate::element::store::{ElementStore, Persistent, PersistentExt};
-use crate::element::{DefaultLayoutInfoSet, Element, ElementSet};
+use crate::element::{Element, ElementSet};
 use crate::layout::area::Area;
 use crate::layout::{HeightBound, Layout, Resolver};
 

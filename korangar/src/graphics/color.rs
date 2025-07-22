@@ -323,7 +323,7 @@ impl StateElement<ClientState> for Color {
                 generator: &mut korangar_interface::element::id::ElementIdGenerator,
                 resolver: &mut korangar_interface::layout::Resolver,
             ) -> Self::LayoutInfo {
-                let area = resolver.with_height(30.0);
+                let area = resolver.with_height(18.0);
 
                 DefaultLayoutInfo { area }
             }

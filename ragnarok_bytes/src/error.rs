@@ -6,7 +6,7 @@ pub enum ConversionErrorType {
     Specific { message: String },
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct ConversionError {
     error_type: ConversionErrorType,
     stack: Vec<&'static str>,

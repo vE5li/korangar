@@ -4,7 +4,7 @@ use crate::application::Application;
 use crate::element::id::ElementIdGenerator;
 use crate::element::store::ElementStore;
 use crate::element::{Element, ElementSet, ResolverSet};
-use crate::layout::area::{Area, PartialArea};
+use crate::layout::area::PartialArea;
 use crate::layout::{Layout, Resolver};
 
 pub struct Split<Children> {

@@ -47,9 +47,9 @@ pub enum WindowClass {
     #[cfg(feature = "debug")]
     Maps,
     #[cfg(feature = "debug")]
-    ClientState,
+    ClientStateInspector,
     #[cfg(feature = "debug")]
-    Packets,
+    PacketInspector,
     #[cfg(feature = "debug")]
     RenderOptions,
     #[cfg(feature = "debug")]

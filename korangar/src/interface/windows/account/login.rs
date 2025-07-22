@@ -44,9 +44,6 @@ where
     fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
         use korangar_interface::prelude::*;
 
-        // TODO: Move this to the main function where the ClientState is created.
-        let mut login_settings = LoginSettings::new();
-
         let disabled = move |state: &Context<ClientState>| {
             !state.get(&self.window_state_path.username()).is_empty() && !state.get(&self.window_state_path.password()).is_empty()
         };

@@ -64,7 +64,7 @@ where
     fn layout_element<'a>(
         &'a self,
         state: &'a Context<App>,
-        store: &'a ElementStore,
+        _: &'a ElementStore,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, App>,
     ) {

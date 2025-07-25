@@ -49,7 +49,7 @@ rayon = "1"
 reqwest = "0.12"
 ron = "0.10"
 serde = "1"
-sevenz-rust2 = { version = "0.16", default-features = false }
+sevenz-rust2 = { version = "0.17", default-features = false }
 smallvec = "1"
 spin_sleep = "1"
 syn = "2"

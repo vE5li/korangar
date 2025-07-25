@@ -6,16 +6,19 @@
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::BufWriter;
+use std::num::NonZeroUsize;
 use std::path::Path;
 
-use sevenz_rust2::{ArchiveEntry, ArchiveWriter, EncoderConfiguration, EncoderMethod, NtTime};
+use sevenz_rust2::encoder_options::LZMA2Options;
+use sevenz_rust2::{ArchiveEntry, ArchiveWriter, EncoderMethod, NtTime};
 
 use super::SevenZipArchive;
-use crate::loaders::archive::{Compression, Writable};
+use crate::loaders::archive::{Archive, Compression, Writable};
 
 pub struct SevenZipArchiveBuilder {
     writer: Option<ArchiveWriter<BufWriter<File>>>,
     seen_directories: HashSet<String>,
+    thread_count: u32,
 }
 
 impl SevenZipArchiveBuilder {
@@ -23,25 +26,26 @@ impl SevenZipArchiveBuilder {
         let file = File::create(path).expect("can't create archive file");
         let writer = ArchiveWriter::new(BufWriter::new(file)).unwrap();
 
+        let thread_count = std::thread::available_parallelism().unwrap_or(NonZeroUsize::new(1).unwrap()).get() as u32;
+
         Self {
             writer: Some(writer),
             seen_directories: HashSet::default(),
+            thread_count,
         }
     }
 
-    pub fn copy_file_from_archive(&mut self, archive: &SevenZipArchive, path: &str) {
+    #[must_use]
+    pub fn copy_file_from_archive(&mut self, archive: &SevenZipArchive, path: &str) -> bool {
         let Some(mut compression) = archive.file_is_compressed(path) else {
-            return;
+            return false;
+        };
+
+        let Some(data) = archive.get_file_by_path(path) else {
+            return false;
         };
 
         let path_with_slash = path.replace('\\', "/").to_string();
-
-        let data = archive
-            .reader
-            .lock()
-            .unwrap()
-            .read_file(&path_with_slash)
-            .expect("unable to read file from archive");
 
         get_parent_directories(&path_with_slash)
             .iter()
@@ -54,6 +58,8 @@ impl SevenZipArchiveBuilder {
         }
 
         self.add_file(path, data, compression);
+
+        true
     }
 
     fn add_directory(&mut self, path: &str) {
@@ -83,9 +89,17 @@ impl Writable for SevenZipArchiveBuilder {
             file_entry.has_access_date = true;
             file_entry.access_date = now;
 
+            // Since we want to enable multithreaded decoding, we will slice the file when
+            // compressing. This is a LZMA2 feature to enable multithreaded decompression.
+            // The smaller we make this, the less efficient the compression
+            // ratio is, but the better the parallelization can be.
+            let stream_size = file_entry.size / 16;
+
             match compression {
-                Compression::Off => writer.set_content_methods(vec![EncoderConfiguration::new(EncoderMethod::COPY)]),
-                Compression::Default => writer.set_content_methods(vec![EncoderConfiguration::new(EncoderMethod::LZMA)]),
+                Compression::Off => writer.set_content_methods(vec![EncoderMethod::COPY.into()]),
+                Compression::Default => {
+                    writer.set_content_methods(vec![LZMA2Options::from_level_mt(7, self.thread_count, stream_size).into()])
+                }
             };
 
             writer

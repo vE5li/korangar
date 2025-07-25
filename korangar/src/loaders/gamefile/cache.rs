@@ -261,8 +261,10 @@ fn copy_existing_files(
                 MediaType::Video => "encoded video",
             };
 
-            println!("Copying existing {} `{}`", file_type, target_file);
-            builder.copy_file_from_archive(current_archive, &target_file);
+            println!("Copying existing {file_type} `{target_file}`");
+            if !builder.copy_file_from_archive(current_archive, &target_file) {
+                println!("Can't copy existing file `{target_file}`");
+            }
         }
     }
 }

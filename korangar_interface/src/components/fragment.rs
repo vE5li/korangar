@@ -1,4 +1,4 @@
-use rust_state::Context;
+use rust_state::{Context, Selector};
 
 use crate::application::Application;
 use crate::element::id::ElementIdGenerator;
@@ -6,13 +6,17 @@ use crate::element::store::ElementStore;
 use crate::element::{Element, ElementSet};
 use crate::layout::{Layout, Resolver};
 
-pub struct Fragment<Children> {
+pub struct Fragment<A, B, Children> {
+    pub gaps: A,
+    pub border: B,
     pub children: Children,
 }
 
-impl<App, Children> Element<App> for Fragment<Children>
+impl<App, A, B, Children> Element<App> for Fragment<A, B, Children>
 where
     App: Application,
+    A: Selector<App, f32>,
+    B: Selector<App, f32>,
     Children: ElementSet<App>,
 {
     type LayoutInfo = Children::LayoutInfo;
@@ -24,7 +28,11 @@ where
         generator: &mut ElementIdGenerator,
         resolver: &mut Resolver,
     ) -> Self::LayoutInfo {
-        self.children.create_layout_info(state, store, generator, resolver)
+        let (_, children) = resolver.with_derived(*state.get(&self.gaps), *state.get(&self.border), |resolver| {
+            self.children.create_layout_info(state, store, generator, resolver)
+        });
+
+        children
     }
 
     fn layout_element<'a>(

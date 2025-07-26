@@ -132,6 +132,8 @@ pub fn collapsable(token_stream: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn fragment(token_stream: TokenStream) -> TokenStream {
     create_component_macro!(korangar_interface::components::fragment::Fragment, {
+        gaps: { 0.0 },
+        border: { 0.0 },
         children: !,
     });
 
@@ -164,11 +166,13 @@ pub fn text_box(token_stream: TokenStream) -> TokenStream {
         text: !,
         state: !,
         input_handler: !,
-        disabled: { false },
+        hidable: { false },
         foreground_color: { korangar_interface::theme::theme().text_box().foreground_color() },
         background_color: { korangar_interface::theme::theme().text_box().background_color() },
         hovered_foreground_color: { korangar_interface::theme::theme().text_box().hovered_foreground_color() },
         hovered_background_color: { korangar_interface::theme::theme().text_box().hovered_background_color() },
+        focused_foreground_color: { korangar_interface::theme::theme().text_box().focused_foreground_color() },
+        focused_background_color: { korangar_interface::theme::theme().text_box().focused_background_color() },
         height: { korangar_interface::theme::theme().text_box().height() },
         corner_radius: { korangar_interface::theme::theme().text_box().corner_radius() },
         font_size: { korangar_interface::theme::theme().text_box().font_size() },

@@ -207,7 +207,7 @@ impl ClientState {
         #[cfg(feature = "debug")] packet_history: PacketHistory,
     ) -> Self {
         time_phase!("load settings", {
-            let login_settings = LoginSettings::new();
+            let mut login_settings = LoginSettings::new();
             let audio_settings = AudioSettings::new();
         });
 
@@ -220,17 +220,28 @@ impl ClientState {
         time_phase!("create login window state", {
             let client_info = load_client_info(&game_file_loader);
 
-            // FIX: This will fail if not services are present.
-            let selected_service = login_settings.recent_service_id.unwrap_or(client_info.services[0].service_id());
-            let service_settings = login_settings.service_settings.get(&selected_service).cloned().unwrap_or_default();
+            let selected_service = login_settings
+                .recent_service_id
+                // Make sure that the recent service id is still valid.
+                .and_then(|service_id| {
+                    client_info
+                        .services
+                        .iter()
+                        .any(|service| service.service_id() == service_id)
+                        .then_some(service_id)
+                })
+                // If there is no recent service id or it was no longer valid, select the first
+                // service instead.
+                .or_else(|| Some(client_info.services.get(0)?.service_id()))
+                .expect("There are no services available. Check your sclientinfo.yaml.");
 
-            let login_window = LoginWindowState {
-                username: service_settings.username,
-                password: service_settings.password,
-                remember_username: service_settings.remember_username,
-                remember_password: service_settings.remember_password,
-                selected_service,
-            };
+            // Make sure that every service has a service settings entry. Without a service
+            // settings entry the login window will panic.
+            for service in &client_info.services {
+                login_settings.service_settings.entry(service.service_id()).or_default();
+            }
+
+            let login_window = LoginWindowState { selected_service };
         });
 
         time_phase!("create chat messages", {
@@ -322,10 +333,6 @@ impl ClientState {
 
 #[derive(RustState, StateElement)]
 pub struct LoginWindowState {
-    pub username: String,
-    pub password: String,
-    pub remember_username: bool,
-    pub remember_password: bool,
     pub selected_service: ServiceId,
 }
 
@@ -379,9 +386,9 @@ impl ThemeDefault<DefaultMenu> for InterfaceTheme {
                 title_color: Color::rgb_u8(200, 150, 150),
                 hovered_title_color: Color::rgb_u8(250, 200, 200),
                 background_color: Color::monochrome_u8(30),
-                gaps: 15.0,
-                border: 20.0,
-                corner_radius: CornerRadius::uniform(20.0),
+                gaps: 25.0,
+                border: 30.0,
+                corner_radius: CornerRadius::uniform(40.0),
                 minimum_width: 400.0,
                 maximum_width: 600.0,
                 minimum_height: 80.0,
@@ -396,7 +403,7 @@ impl ThemeDefault<DefaultMenu> for InterfaceTheme {
             text: TextTheme {
                 color: Color::monochrome_u8(220),
                 height: 15.0,
-                font_size: FontSize(14.0),
+                font_size: FontSize(18.0),
                 horizontal_alignment: HorizontalAlignment::Left { offset: 0.0 },
                 vertical_alignment: VerticalAlignment::Center { offset: 0.0 },
             },
@@ -417,20 +424,22 @@ impl ThemeDefault<DefaultMenu> for InterfaceTheme {
                 hovered_background_color: Color::monochrome_u8(120),
                 hovered_foreground_color: Color::monochrome_u8(220),
                 checkbox_color: Color::rgb_u8(255, 100, 100),
-                height: 30.0,
+                height: 24.0,
                 corner_radius: CornerRadius::uniform(20.0),
                 font_size: FontSize(16.0),
                 text_alignment: HorizontalAlignment::Center { offset: 0.0 },
                 vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
             },
             text_box: TextBoxTheme {
-                background_color: Color::monochrome_u8(80),
+                background_color: Color::monochrome_u8(60),
                 foreground_color: Color::monochrome_u8(180),
-                hovered_background_color: Color::monochrome_u8(120),
+                hovered_background_color: Color::monochrome_u8(90),
                 hovered_foreground_color: Color::monochrome_u8(220),
+                focused_background_color: Color::monochrome_u8(120),
+                focused_foreground_color: Color::monochrome_u8(255),
                 height: 30.0,
                 corner_radius: CornerRadius::uniform(20.0),
-                font_size: FontSize(20.0),
+                font_size: FontSize(16.0),
                 text_alignment: HorizontalAlignment::Center { offset: 0.0 },
                 vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
             },
@@ -545,6 +554,8 @@ impl ThemeDefault<DefaultPlaying> for InterfaceTheme {
                 foreground_color: Color::monochrome_u8(220),
                 hovered_background_color: Color::monochrome_u8(150),
                 hovered_foreground_color: Color::monochrome_u8(250),
+                focused_background_color: Color::monochrome_u8(140),
+                focused_foreground_color: Color::monochrome_u8(255),
                 height: 20.0,
                 corner_radius: CornerRadius::uniform(10.0),
                 font_size: FontSize(15.0),

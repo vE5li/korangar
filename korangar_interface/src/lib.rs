@@ -27,7 +27,7 @@ use application::{Application, ClipTrait, PositionTrait, RenderLayer, SizeTrait,
 use element::ElementBox;
 use element::id::{ElementId, ElementIdGenerator};
 use element::store::ElementStore;
-use event::EventQueue;
+use event::{Event, EventQueue};
 #[cfg(feature = "debug")]
 use korangar_debug::profile_block;
 use layout::area::Area;
@@ -597,9 +597,8 @@ impl<App: Application> BuiltUi<'_, App> {
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn click(&mut self, state: &Context<App>, click_position: App::Position, mouse_button: MouseButton) {
-        // TODO: Rework all of this. We need more granular control over what was clicked
-        // to unfocus correctly.
-        let mut ui_clicked = false;
+        *self.focused_element = None;
+        self.event_queue.queue(Event::CloseOverlay);
 
         if let Some(layout) = &self.overlay_layout {
             if layout.do_click(
@@ -610,28 +609,21 @@ impl<App: Application> BuiltUi<'_, App> {
                 click_position,
                 mouse_button,
             ) {
-                ui_clicked = true;
+                return;
             }
         }
 
-        if !ui_clicked {
-            for layout in self.window_layouts.values() {
-                if layout.do_click(
-                    state,
-                    self.event_queue,
-                    self.focused_element,
-                    self.mouse_mode,
-                    click_position,
-                    mouse_button,
-                ) {
-                    ui_clicked = true;
-                    break;
-                }
+        for layout in self.window_layouts.values() {
+            if layout.do_click(
+                state,
+                self.event_queue,
+                self.focused_element,
+                self.mouse_mode,
+                click_position,
+                mouse_button,
+            ) {
+                return;
             }
-        }
-
-        if !ui_clicked {
-            *self.focused_element = None;
         }
     }
 

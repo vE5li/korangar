@@ -5,7 +5,7 @@ use korangar_components::character_slot_preview;
 use korangar_interface::element::id::ElementIdGenerator;
 use korangar_interface::element::store::ElementStore;
 use korangar_interface::element::{DefaultLayoutInfo, DefaultLayoutInfoSet, Element, ElementSet, ResolverSet};
-use korangar_interface::layout::Layout;
+use korangar_interface::layout::{Layout, Resolver};
 use korangar_interface::window::{CustomWindow, WindowTrait};
 use rust_state::{Context, Path};
 
@@ -124,44 +124,37 @@ where
             }
         }
 
-        impl<C, M> ElementSet<ClientState> for CharacterWrapper<C, M>
+        impl<C, M> Element<ClientState> for CharacterWrapper<C, M>
         where
             C: Path<ClientState, CharacterSlots>,
             M: Path<ClientState, Option<usize>>,
         {
             type LayoutInfo = Vec<RowLayoutInfo>;
 
-            fn get_element_count(&self) -> usize {
-                unimplemented!()
-            }
-
             fn create_layout_info(
                 &mut self,
                 state: &Context<ClientState>,
                 store: &mut ElementStore,
                 generator: &mut ElementIdGenerator,
-                mut resolver_set: impl ResolverSet,
+                resolver: &mut Resolver,
             ) -> Self::LayoutInfo {
                 self.correct_element_size(state);
-                // FIX: Make this right. Maybe with_derived should expect a resolver set as well
-                resolver_set.with_index(0, |resolver| {
-                    let (area, layout_info) = resolver.with_derived(2.0, 4.0, |resolver| {
-                        self.item_boxes
-                            .iter_mut()
-                            .enumerate()
-                            .map(|(index, item_box)| {
-                                item_box.create_layout_info(
-                                    state,
-                                    store.get_or_create_child_store(index as u64, generator),
-                                    generator,
-                                    resolver,
-                                )
-                            })
-                            .collect()
-                    });
+                let (area, layout_info) = resolver.with_derived(10.0, 0.0, |resolver| {
+                    self.item_boxes
+                        .iter_mut()
+                        .enumerate()
+                        .map(|(index, item_box)| {
+                            item_box.create_layout_info(
+                                state,
+                                store.get_or_create_child_store(index as u64, generator),
+                                generator,
+                                resolver,
+                            )
+                        })
+                        .collect()
+                });
 
-                    layout_info
-                })
+                layout_info
             }
 
             fn layout_element<'a>(
@@ -185,7 +178,9 @@ where
             theme: ClientThemeType::Menu,
             minimum_width: 900.0,
             maximum_width: 900.0,
-            elements: CharacterWrapper::new(self.character_slots, self.switch_request),
+            elements: (
+                CharacterWrapper::new(self.character_slots, self.switch_request),
+            ),
         }
     }
 }

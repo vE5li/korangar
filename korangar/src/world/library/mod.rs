@@ -84,12 +84,14 @@ impl Library {
 
         let item_table = Self::load_item_table(&state)?;
 
-        let data = game_file_loader
-            .get("data\\luafiles514\\lua files\\mapskydata\\mapskydata.lub")
-            .unwrap();
-        state.load(&data).exec()?;
-
-        let map_sky_data_table = Self::load_map_sky_data_table(&state)?;
+        let map_sky_data_table = match game_file_loader.get("data\\luafiles514\\lua files\\mapskydata\\mapskydata.lub") {
+            Ok(data) => {
+                let state = Lua::new();
+                state.load(&data).exec()?;
+                Self::load_map_sky_data_table(&state)?
+            }
+            Err(_) => HashMap::new(),
+        };
 
         Ok(Self {
             job_identity_table,

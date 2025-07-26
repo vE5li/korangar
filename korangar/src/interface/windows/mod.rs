@@ -3,6 +3,7 @@ mod cache;
 mod character_creation;
 mod character_overview;
 mod character_selection;
+mod chat;
 #[cfg(feature = "debug")]
 mod commands;
 mod equipment;
@@ -37,6 +38,7 @@ pub use self::cache::WindowCache;
 pub use self::character_creation::CharacterCreationWindow;
 pub use self::character_overview::CharacterOverviewWindow;
 pub use self::character_selection::CharacterSelectionWindow;
+pub use self::chat::{ChatTextBox, ChatWindow};
 #[cfg(feature = "debug")]
 pub use self::commands::CommandsWindow;
 pub use self::equipment::EquipmentWindow;
@@ -68,6 +70,7 @@ pub use self::time::TimeWindow;
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum WindowClass {
     AudioSettings,
+    Chat,
     CharacterCreation,
     CharacterOverview,
     CharacterSelection,

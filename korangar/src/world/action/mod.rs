@@ -114,6 +114,7 @@ impl Actions {
         animation_state: &SpriteAnimationState,
         position: ScreenPosition,
         camera_direction: usize,
+        screen_clip: ScreenClip,
         color: Color,
         scaling: f32,
     ) {
@@ -158,8 +159,6 @@ impl Actions {
                 left: final_position.x,
                 top: final_position.y,
             };
-
-            let screen_clip = ScreenClip::unbound();
 
             renderer.render_sprite(texture.clone(), final_position, final_size, screen_clip, color, false);
         }

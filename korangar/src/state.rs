@@ -131,6 +131,8 @@ pub struct ClientState {
     client_info: ClientInfo,
     /// Internal state of the login window.
     login_window: LoginWindowState,
+    /// Internal state of the chat window.
+    chat_window: ChatWindowState,
 
     /// The current map.
     // TODO: These are currently pub due to some code in the main render update loop. Ideally these
@@ -244,7 +246,7 @@ impl ClientState {
             let login_window = LoginWindowState { selected_service };
         });
 
-        time_phase!("create chat messages", {
+        time_phase!("create window state", {
             let welcome_string = format!(
                 "Welcome to ^ff8800Korangar^000000 version ^ff8800{}^000000!",
                 env!("CARGO_PKG_VERSION")
@@ -253,6 +255,10 @@ impl ClientState {
                 text: welcome_string,
                 color: MessageColor::Server,
             }];
+
+            let chat_window = ChatWindowState {
+                current_message: String::new(),
+            };
         });
 
         time_phase!("create character server resources", {
@@ -304,6 +310,7 @@ impl ClientState {
             game_theme,
             client_info,
             login_window,
+            chat_window,
             map: Some(map),
             entities: Vec::new(),
             chat_messages,
@@ -337,9 +344,20 @@ pub struct LoginWindowState {
 }
 
 #[derive(RustState, StateElement)]
+pub struct ChatWindowState {
+    pub current_message: String,
+}
+
+#[derive(RustState, StateElement)]
 pub struct DebugButtonTheme {
     foreground_color: Color,
     hovered_background_color: Color,
+}
+
+#[derive(RustState, StateElement)]
+pub struct ChatTheme {
+    window_color: Color,
+    text_box_background_color: Color,
 }
 
 #[derive(RustState, StateElement, StateWindow)]
@@ -362,6 +380,7 @@ pub struct InterfaceTheme {
     #[hidden_element]
     pub tooltip: TooltipTheme<ClientState>,
     pub debug_button: DebugButtonTheme,
+    pub chat: ChatTheme,
 }
 
 /// Marker trait to specialize the [`ThemeDefault`] trait.
@@ -498,6 +517,10 @@ impl ThemeDefault<DefaultMenu> for InterfaceTheme {
                 foreground_color: Color::rgb_u8(255, 167, 89),
                 hovered_background_color: Color::rgb_u8(225, 199, 115),
             },
+            chat: ChatTheme {
+                window_color: Color::TRANSPARENT,
+                text_box_background_color: Color::TRANSPARENT,
+            },
         }
     }
 }
@@ -565,7 +588,7 @@ impl ThemeDefault<DefaultPlaying> for InterfaceTheme {
                 height: 20.0,
                 corner_radius: CornerRadius::uniform(10.0),
                 font_size: FontSize(15.0),
-                text_alignment: HorizontalAlignment::Center { offset: 0.0 },
+                text_alignment: HorizontalAlignment::Left { offset: 15.0 },
                 vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
             },
             collapsable: CollapsableTheme {
@@ -620,6 +643,10 @@ impl ThemeDefault<DefaultPlaying> for InterfaceTheme {
             debug_button: DebugButtonTheme {
                 foreground_color: Color::rgb_u8(255, 167, 89),
                 hovered_background_color: Color::rgb_u8(225, 199, 115),
+            },
+            chat: ChatTheme {
+                window_color: Color::rgba_u8(0, 0, 0, 200),
+                text_box_background_color: Color::rgba_u8(0, 0, 0, 150),
             },
         }
     }
@@ -807,7 +834,7 @@ impl RenderLayer<ClientState> for crate::renderer::InterfaceRenderer {
                 };
                 let screen_clip = clip_layers[clip_layer.0].get();
 
-                actions.render_sprite(self, sprite, animation_state, position, 0, color, 1.0);
+                actions.render_sprite(self, sprite, animation_state, position, 0, screen_clip, color, 1.0);
             }
             CustomInstruction::Texture(TextureInstruction {
                 texture,

@@ -12,6 +12,9 @@ use crate::layout::area::Area;
 use crate::layout::{Icon, Layout, Resolver};
 use crate::theme::{ThemePathGetter, theme};
 
+const CHILDREN_STORE_ID: u64 = 0;
+const EXTRA_STORE_ID: u64 = 1;
+
 #[derive(RustState)]
 pub struct CollapsableTheme<App>
 where
@@ -118,7 +121,13 @@ where
         let (mut area, children) = match expanded {
             true => resolver.with_derived(*state.get(&self.gaps), *state.get(&self.border), |resolver| {
                 resolver.push_top(title_height);
-                Some(self.children.create_layout_info(state, store, generator, resolver))
+
+                // We need to create a separate store so that the children and the extra
+                // elements don't interfere. We need to make sure they both have
+                // different ids.
+                let children_store = store.get_or_create_child_store(CHILDREN_STORE_ID, generator);
+
+                Some(self.children.create_layout_info(state, children_store, generator, resolver))
             }),
             false => (resolver.with_height(title_height), None),
         };
@@ -132,10 +141,23 @@ where
             area = resolver.with_height(title_height);
         }
 
-        // TODO: Custom resolver set that allocates in the title area
-        // FIX: Will use the same store entry as the elements inside. We need to split
-        // the store again here.
-        let extra_elements = self.extra_elements.create_layout_info(state, store, generator, resolver);
+        // TODO: Figure out a better way to space the elements from the right.
+        let extra_space = 40.0;
+        let extra_area = Area {
+            left: area.left + area.width - extra_space,
+            top: area.top,
+            width: extra_space,
+            height: title_height,
+        };
+        let mut extra_resolver = Resolver::new(extra_area, 0.0);
+
+        // We need to create a separate store so that the children and the extra
+        // elements don't interfere. We need to make sure they both have
+        // different ids.
+        let extra_store = store.get_or_create_child_store(EXTRA_STORE_ID, generator);
+        let extra_elements = self
+            .extra_elements
+            .create_layout_info(state, extra_store, generator, &mut extra_resolver);
 
         MyLayoutInfo {
             area,
@@ -154,7 +176,8 @@ where
         let use_secondary_color = layout.with_secondary_background(|layout| {
             if let Some(layout_info) = &layout_info.children {
                 layout.with_layer(|layout| {
-                    self.children.layout_element(state, store, layout_info, layout);
+                    let children_store = store.child_store(CHILDREN_STORE_ID);
+                    self.children.layout_element(state, children_store, layout_info, layout);
                 });
             }
         });
@@ -194,8 +217,9 @@ where
         );
 
         layout.with_layer(|layout| {
+            let extra_store = store.child_store(EXTRA_STORE_ID);
             self.extra_elements
-                .layout_element(state, store, &layout_info.extra_elements, layout);
+                .layout_element(state, extra_store, &layout_info.extra_elements, layout);
         });
 
         let is_title_hovered = layout.is_area_hovered_and_active(title_area);

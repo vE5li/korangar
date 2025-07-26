@@ -170,27 +170,24 @@ where
 
         let title_height = *state.get(&self.title_height);
 
-        // Adjust size
-        let real_size = {
-            let minimum_width = *state.get(&self.minimum_width);
-            let maximum_width = *state.get(&self.maximum_width);
-            let minimum_height = *state.get(&self.minimum_height);
-            let maximum_height = *state.get(&self.maximum_height);
+        let minimum_width = *state.get(&self.minimum_width);
+        let maximum_width = *state.get(&self.maximum_width);
+        let minimum_height = *state.get(&self.minimum_height);
+        let maximum_height = *state.get(&self.maximum_height);
 
-            App::Size::new(
-                data.size.width().min(maximum_width).max(minimum_width),
-                data.size.height().min(maximum_height).max(minimum_height),
-            )
-        };
+        let adjusted_size = App::Size::new(
+            data.size.width().min(maximum_width).max(minimum_width),
+            data.size.height().min(maximum_height).max(minimum_height),
+        );
 
         if data.anchor.is_initializing() {
-            data.anchor.initialize(window_size, real_size);
+            data.anchor.initialize(window_size, adjusted_size);
         }
 
         // Adjust position
         let real_position = {
             let anchor_position = data.anchor.to_position(window_size);
-            let half_width = real_size.width() / 2.0;
+            let half_width = adjusted_size.width() / 2.0;
 
             App::Position::new(
                 anchor_position.left().max(-half_width).min(window_size.width() - half_width),
@@ -201,8 +198,8 @@ where
         let available_area = Area {
             left: real_position.left(),
             top: real_position.top(),
-            width: real_size.width(),
-            height: real_size.height(),
+            width: adjusted_size.width(),
+            height: adjusted_size.height(),
         };
 
         let mut resolver = Resolver::new(available_area, 0.0);
@@ -213,12 +210,11 @@ where
             self.elements.create_layout_info(state, store, generator, resolver)
         });
 
-        // FIX: Content needs to respect the max size.
         let area = Area {
             left: title_area.left,
             top: title_area.top,
             width: title_area.width,
-            height: title_area.height + area.height,
+            height: (title_area.height + area.height).min(maximum_height).max(minimum_height),
         };
 
         self.layout_info = Some(WindowLayoutInfoSet {
@@ -231,7 +227,7 @@ where
 
         DisplayInformation {
             real_position,
-            real_size,
+            real_size: App::Size::new(area.width, area.height),
             display_height,
         }
     }

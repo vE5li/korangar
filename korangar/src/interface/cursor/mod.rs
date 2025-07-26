@@ -102,9 +102,16 @@ impl MouseCursor {
                     Color::WHITE,
                     false,
                 ),
-                Grabbed::Action(sprite, actions, animation_state) => {
-                    actions.render_sprite(renderer, &sprite, &animation_state, mouse_position, 0, Color::WHITE, scaling)
-                }
+                Grabbed::Action(sprite, actions, animation_state) => actions.render_sprite(
+                    renderer,
+                    &sprite,
+                    &animation_state,
+                    mouse_position,
+                    0,
+                    ScreenClip::unbound(),
+                    Color::WHITE,
+                    scaling,
+                ),
             }
         }
 
@@ -120,6 +127,7 @@ impl MouseCursor {
             &self.animation_state,
             mouse_position,
             direction,
+            ScreenClip::unbound(),
             color,
             scaling,
         );

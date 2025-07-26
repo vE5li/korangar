@@ -1,17 +1,18 @@
+use std::any::Any;
 use std::cell::{RefCell, UnsafeCell};
 use std::marker::PhantomData;
 
-use rust_state::{Context, RustState, Selector};
+use rust_state::{Context, Path, RustState, Selector};
 
-use super::button::ButtonThemePathExt;
 use crate::application::Application;
 use crate::element::Element;
-use crate::element::id::ElementIdGenerator;
+use crate::element::id::{ElementIdGenerator, FocusIdExt};
 use crate::element::store::{ElementStore, Persistent, PersistentData, PersistentExt};
+use crate::event::{ClickAction, Event, EventQueue};
 use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
 use crate::layout::area::Area;
 use crate::layout::{Icon, InputHandler, Layout, Resolver};
-use crate::theme::{ThemePathGetter, theme};
+use crate::theme::ThemePathGetter;
 
 #[derive(RustState)]
 pub struct TextBoxTheme<App>
@@ -49,7 +50,7 @@ impl PersistentData for TextBoxData {
     }
 }
 
-pub struct TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P> {
+pub struct TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Id> {
     pub text_marker: PhantomData<Text>,
     pub text: A,
     pub state: B,
@@ -67,14 +68,17 @@ pub struct TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P> {
     pub corner_radius: N,
     pub font_size: O,
     pub text_alignment: P,
+    pub focus_id: Id,
 }
 
-impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P> Persistent for TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P> {
+impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Id> Persistent
+    for TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Id>
+{
     type Data = TextBoxData;
 }
 
-impl<App, Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P> Element<App>
-    for TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P>
+impl<App, Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Id> Element<App>
+    for TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Id>
 where
     App: Application,
     Text: AsRef<str> + 'static,
@@ -94,6 +98,7 @@ where
     N: Selector<App, App::CornerRadius>,
     O: Selector<App, App::FontSize>,
     P: Selector<App, HorizontalAlignment>,
+    Id: Any,
 {
     fn create_layout_info(
         &mut self,
@@ -116,6 +121,9 @@ where
         layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, App>,
     ) {
+        let element_id = store.get_element_id();
+        let is_focused = layout.is_element_focused(element_id);
+
         let hide_button = state.get(&self.hidable).then(|| {
             let button_area = Area {
                 left: layout_info.area.left + layout_info.area.width - layout_info.area.height,
@@ -130,16 +138,22 @@ where
             if is_hoverered {
                 layout.add_toggle(button_area, &persistent_data.is_hidden);
                 layout.mark_hovered();
+
+                // If the text field is already focused, we don't want to unfocus it when
+                // clicking the hide button. So we add another focus area to
+                // re-focus if the button is clicked.
+                if is_focused {
+                    layout.add_focus_area(button_area, element_id);
+                }
             }
 
             (button_area, is_hoverered, persistent_data)
         });
 
         let is_hovered = layout.is_area_hovered_and_active(layout_info.area);
-        let is_focused = layout.is_element_focused(store.get_element_id());
 
         if is_hovered {
-            layout.add_focus_area(layout_info.area, store.get_element_id());
+            layout.add_focus_area(layout_info.area, element_id);
             layout.mark_hovered();
         }
 
@@ -199,6 +213,8 @@ where
         //     *state.get(&theme().text_box().vertical_alignment()),
         // );
 
+        layout.register_focus_id(self.focus_id.focus_id(), element_id);
+
         layout.add_text(
             layout_info.area,
             display_text,
@@ -210,22 +226,41 @@ where
     }
 }
 
-pub struct DefaultHandler<P>(pub P);
+pub struct DefaultHandler<P, A, const INPUT_LENGTH: usize> {
+    path: P,
+    action: A,
+}
 
-impl<App, P> InputHandler<App> for DefaultHandler<P>
+impl<P, A, const INPUT_LENGTH: usize> DefaultHandler<P, A, INPUT_LENGTH> {
+    pub fn new(path: P, action: A) -> Self {
+        Self { path, action }
+    }
+}
+
+impl<App, P, A, const INPUT_LENGTH: usize> InputHandler<App> for DefaultHandler<P, A, INPUT_LENGTH>
 where
-    P: rust_state::Path<App, String>,
+    App: Application,
+    P: Path<App, String>,
+    A: ClickAction<App>,
 {
-    fn handle_character(&self, state: &Context<App>, character: char) {
-        if character == '\x08' {
-            state.update_value_with(self.0, move |current_text| {
+    fn handle_character(&self, state: &Context<App>, queue: &mut EventQueue<App>, character: char) {
+        if character == '\x09' || character == '\x0d' {
+            // On tab or enter
+            self.action.execute(state, queue);
+        } else if character == '\x1b' {
+            // On escape
+            queue.queue(Event::Unfocus);
+        } else if character == '\x08' {
+            state.update_value_with(self.path, move |current_text| {
                 if !current_text.is_empty() {
                     current_text.pop();
                 }
             });
-        } else {
-            state.update_value_with(self.0, move |current_text| {
-                current_text.push(character);
+        } else if !character.is_control() {
+            state.update_value_with(self.path, move |current_text| {
+                if current_text.len() < INPUT_LENGTH {
+                    current_text.push(character);
+                }
             });
         }
     }

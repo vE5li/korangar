@@ -529,10 +529,6 @@ impl InputSystem {
                 events.push(UserEvent::StopSkill(HotbarSlot(2)));
             }
 
-            if self.get_key(KeyCode::Enter).pressed() {
-                events.push(UserEvent::FocusChatWindow);
-            }
-
             #[cfg(feature = "debug")]
             if control_down && self.get_key(KeyCode::KeyM).pressed() {
                 events.push(UserEvent::OpenMapsWindow);

@@ -3,6 +3,7 @@ use std::ops::Not;
 use derive_new::new;
 use korangar_interface::components::drop_down::DefaultClickHandler;
 use korangar_interface::components::text_box::DefaultHandler;
+use korangar_interface::element::id::FocusIdExt;
 use korangar_interface::event::{ClickAction, Event, EventQueue, Toggle};
 use korangar_interface::window::{CustomWindow, StateWindow, Window, WindowTrait};
 use rust_state::{Context, ManuallyAssertExt, MapLookupExt, Path, Selector};
@@ -14,6 +15,9 @@ use crate::interface::windows::{WindowCache, WindowClass};
 use crate::loaders::{ClientInfo, ClientInfoPathExt};
 use crate::settings::{LoginSettings, LoginSettingsPathExt, ServiceSettings, ServiceSettingsPathExt};
 use crate::state::{ClientState, ClientThemeType, LoginWindowState, LoginWindowStatePathExt};
+
+const MAXIMUM_USERNAME_LENGTH: usize = 24;
+const MAXIMUM_PASSWORD_LENGTH: usize = 24;
 
 struct SelectedServicePath<P, S> {
     window_state_path: P,
@@ -158,9 +162,14 @@ where
             });
         };
 
+        struct UsernameTextBox;
+        struct PasswordTextBox;
+
         let username_action = move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
             if !state.get(&username_path).is_empty() {
-                queue.queue(Event::FocusNext);
+                queue.queue(Event::FocusElement {
+                    focus_id: PasswordTextBox.focus_id(),
+                });
             }
         };
 
@@ -168,23 +177,13 @@ where
             let username = state.get(&username_path);
 
             if username.is_empty() {
-                queue.queue(Event::FocusPrevious);
+                queue.queue(Event::FocusElement {
+                    focus_id: UsernameTextBox.focus_id(),
+                });
                 return;
             }
 
-            let selected_service_path = self.window_state_path.selected_service();
-            let selected_service_id = state.get(&selected_service_path);
-            let password = state.get(&password_path);
-
-            // Remember which service was selected so we can select it next time the client
-            // starts.
-            state.update_value(self.service_settings_path.recent_service_id(), Some(*selected_service_id));
-
-            queue.queue(UserEvent::LogIn {
-                service_id: *selected_service_id,
-                username: username.clone(),
-                password: password.clone(),
-            });
+            login_action(state, queue);
         };
 
         window! {
@@ -207,16 +206,14 @@ where
                         text_box! {
                             text: "Username",
                             state: username_path,
-                            input_handler: DefaultHandler(username_path),
-                            // event: username_action,
-                            // length: 24,
+                            input_handler: DefaultHandler::<_, _, MAXIMUM_USERNAME_LENGTH>::new(username_path, username_action),
+                            focus_id: UsernameTextBox,
                         },
                         text_box! {
                             text: "Password",
                             state: password_path,
-                            input_handler: DefaultHandler(password_path),
-                            // event: password_action,
-                            // length: 24,
+                            input_handler: DefaultHandler::<_, _, MAXIMUM_PASSWORD_LENGTH>::new(password_path, password_action),
+                            focus_id: PasswordTextBox,
                             hidable: true,
                         },
                         state_button! {

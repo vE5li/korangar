@@ -42,39 +42,44 @@ where
         use korangar_interface::prelude::*;
 
         let elements = (
-            split! {
+            fragment! {
+                gaps: 4.0,
                 children: (
-                    text! {
-                        text: "Name",
+                    split! {
+                        children: (
+                            text! {
+                                text: "Name",
+                            },
+                            text! {
+                                text: self.player_name,
+                                color: Color::rgb_u8(255, 144, 13),
+                                horizontal_alignment: HorizontalAlignment::Right { offset: 0.0 },
+                            },
+                        ),
                     },
-                    text! {
-                        text: self.player_name,
-                        color: Color::rgb_u8(255, 144, 13),
-                        horizontal_alignment: HorizontalAlignment::Right { offset: 0.0 },
+                    split! {
+                        children: (
+                            text! {
+                                text: "Base level",
+                            },
+                            text! {
+                                text: PartialEqDisplaySelector::new(self.base_level),
+                                color: Color::rgb_u8(13, 231, 255),
+                                horizontal_alignment: HorizontalAlignment::Right { offset: 0.0 },
+                            },
+                        ),
                     },
-                ),
-            },
-            split! {
-                children: (
-                    text! {
-                        text: "Base level",
-                    },
-                    text! {
-                        text: PartialEqDisplaySelector::new(self.base_level),
-                        color: Color::rgb_u8(13, 231, 255),
-                        horizontal_alignment: HorizontalAlignment::Right { offset: 0.0 },
-                    },
-                ),
-            },
-            split! {
-                children: (
-                    text! {
-                        text: "Job level",
-                    },
-                    text! {
-                        text: PartialEqDisplaySelector::new(self.job_level),
-                        color: Color::rgb_u8(13, 231, 255),
-                        horizontal_alignment: HorizontalAlignment::Right { offset: 0.0 },
+                    split! {
+                        children: (
+                            text! {
+                                text: "Job level",
+                            },
+                            text! {
+                                text: PartialEqDisplaySelector::new(self.job_level),
+                                color: Color::rgb_u8(13, 231, 255),
+                                horizontal_alignment: HorizontalAlignment::Right { offset: 0.0 },
+                            },
+                        ),
                     },
                 ),
             },

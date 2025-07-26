@@ -17,7 +17,7 @@ use tooltip::{Tooltip, TooltipId};
 pub use self::resolver::{HeightBound, Resolver};
 use crate::MouseMode;
 use crate::application::{Application, ClipTrait, PositionTrait, RenderLayer, SizeTrait};
-use crate::element::id::ElementId;
+use crate::element::id::{ElementId, FocusId};
 use crate::event::{ClickAction, Event, EventQueue};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -91,8 +91,8 @@ struct FocusArea {
 }
 
 /// Handler for receiving keyboard input.
-pub trait InputHandler<App> {
-    fn handle_character(&self, state: &Context<App>, character: char);
+pub trait InputHandler<App: Application> {
+    fn handle_character(&self, state: &Context<App>, queue: &mut EventQueue<App>, character: char);
 }
 
 // TODO: Rename most of these fields to include "_instructions".
@@ -196,6 +196,8 @@ pub struct Layout<'a, App: Application> {
 
     tooltips: Vec<Tooltip<'a>>,
     tooltip_timers: BTreeMap<TooltipId, Instant>,
+
+    focus_id_lookup: BTreeMap<FocusId, ElementId>,
 }
 
 impl<App: Application> Default for Layout<'_, App> {
@@ -218,6 +220,8 @@ impl<App: Application> Default for Layout<'_, App> {
 
             tooltips: Vec::new(),
             tooltip_timers: BTreeMap::new(),
+
+            focus_id_lookup: BTreeMap::new(),
         }
     }
 }
@@ -240,6 +244,7 @@ impl<'a, App: Application> Layout<'a, App> {
         });
 
         self.tooltips.clear();
+        self.focus_id_lookup.clear();
     }
 
     pub fn update(&mut self, mouse_position: App::Position, focused_element: Option<ElementId>, can_hover: bool) {
@@ -258,6 +263,9 @@ impl<'a, App: Application> Layout<'a, App> {
 
     // TODO: Just expose `can_hover` as `mouse_free` or something hand have the
     // caller combine these themselves.
+    /// This currently doesn't respect the clip since we don't have the clip
+    /// when performing this check. Maybe this will be changed in the
+    /// future.
     pub fn is_area_hovered_and_active(&self, area: Area) -> bool {
         self.can_hover
             && self.mouse_position.left() >= area.left
@@ -472,6 +480,14 @@ impl<'a, App: Application> Layout<'a, App> {
         self.tooltip_timers.entry(id).or_insert_with(Instant::now);
     }
 
+    pub fn register_focus_id(&mut self, focus_id: FocusId, element_id: ElementId) {
+        self.focus_id_lookup.insert(focus_id, element_id);
+    }
+
+    pub fn try_resolve_focus_id(&self, focus_id: FocusId) -> Option<ElementId> {
+        self.focus_id_lookup.get(&focus_id).copied()
+    }
+
     /// Update tooltips and collect those that have been registered for some
     /// time. Those are the tooltips that will be rendered to the screen.
     pub fn update_tooltips(&mut self, tooltips: &mut Vec<&'a str>) {
@@ -613,14 +629,24 @@ impl<'a, App: Application> Layout<'a, App> {
     ) -> bool {
         let mut clicked = false;
 
+        fn apply_clip<T: ClipTrait>(clip: T, area: Area) -> T {
+            T::new(
+                area.left.max(clip.left()),
+                area.top.max(clip.top()),
+                (area.left + area.width).min(clip.right()),
+                (area.top + area.height).min(clip.bottom()),
+            )
+        }
+
         for layer in self.layers.iter().rev() {
             for click_area in &layer.click_areas {
-                // TODO: Check clip layer as well
+                let clip = self.clip_layers[click_area.clip_layer.0].clip;
+                let clip = apply_clip(clip, click_area.area);
 
-                if click_position.left() >= click_area.area.left
-                    && click_position.left() <= click_area.area.left + click_area.area.width
-                    && click_position.top() >= click_area.area.top
-                    && click_position.top() <= click_area.area.top + click_area.area.height
+                if click_position.left() >= clip.left()
+                    && click_position.left() <= clip.right()
+                    && click_position.top() >= clip.top()
+                    && click_position.top() <= clip.bottom()
                     && click_area.mouse_button == mouse_button
                 {
                     click_area.action.execute(state, queue);
@@ -629,10 +655,13 @@ impl<'a, App: Application> Layout<'a, App> {
             }
 
             for toggle in &layer.toggles {
-                if click_position.left() >= toggle.area.left
-                    && click_position.left() <= toggle.area.left + toggle.area.width
-                    && click_position.top() >= toggle.area.top
-                    && click_position.top() <= toggle.area.top + toggle.area.height
+                let clip = self.clip_layers[toggle.clip_layer.0].clip;
+                let clip = apply_clip(clip, toggle.area);
+
+                if click_position.left() >= clip.left()
+                    && click_position.left() <= clip.right()
+                    && click_position.top() >= clip.top()
+                    && click_position.top() <= clip.bottom()
                 {
                     let mut reference = toggle.cell.borrow_mut();
                     *reference = !*reference;
@@ -641,12 +670,13 @@ impl<'a, App: Application> Layout<'a, App> {
             }
 
             for window_move_area in &layer.window_move_areas {
-                // TODO: Check clip layer as well
+                let clip = self.clip_layers[window_move_area.clip_layer.0].clip;
+                let clip = apply_clip(clip, window_move_area.area);
 
-                if click_position.left() >= window_move_area.area.left
-                    && click_position.left() <= window_move_area.area.left + window_move_area.area.width
-                    && click_position.top() >= window_move_area.area.top
-                    && click_position.top() <= window_move_area.area.top + window_move_area.area.height
+                if click_position.left() >= clip.left()
+                    && click_position.left() <= clip.right()
+                    && click_position.top() >= clip.top()
+                    && click_position.top() <= clip.bottom()
                 {
                     *mouse_mode = MouseMode::MovingWindow {
                         window_id: window_move_area.window_id,
@@ -656,12 +686,13 @@ impl<'a, App: Application> Layout<'a, App> {
             }
 
             for window_resize_area in &layer.window_resize_areas {
-                // TODO: Check clip layer as well
+                let clip = self.clip_layers[window_resize_area.clip_layer.0].clip;
+                let clip = apply_clip(clip, window_resize_area.area);
 
-                if click_position.left() >= window_resize_area.area.left
-                    && click_position.left() <= window_resize_area.area.left + window_resize_area.area.width
-                    && click_position.top() >= window_resize_area.area.top
-                    && click_position.top() <= window_resize_area.area.top + window_resize_area.area.height
+                if click_position.left() >= clip.left()
+                    && click_position.left() <= clip.right()
+                    && click_position.top() >= clip.top()
+                    && click_position.top() <= clip.bottom()
                 {
                     *mouse_mode = MouseMode::ResizingWindow {
                         window_id: window_resize_area.window_id,
@@ -671,12 +702,13 @@ impl<'a, App: Application> Layout<'a, App> {
             }
 
             for window_close_area in &layer.window_close_areas {
-                // TODO: Check clip layer as well
+                let clip = self.clip_layers[window_close_area.clip_layer.0].clip;
+                let clip = apply_clip(clip, window_close_area.area);
 
-                if click_position.left() >= window_close_area.area.left
-                    && click_position.left() <= window_close_area.area.left + window_close_area.area.width
-                    && click_position.top() >= window_close_area.area.top
-                    && click_position.top() <= window_close_area.area.top + window_close_area.area.height
+                if click_position.left() >= clip.left()
+                    && click_position.left() <= clip.right()
+                    && click_position.top() >= clip.top()
+                    && click_position.top() <= clip.bottom()
                 {
                     queue.queue(Event::CloseWindow {
                         window_id: window_close_area.window_id,
@@ -686,12 +718,13 @@ impl<'a, App: Application> Layout<'a, App> {
             }
 
             for focus_area in &layer.focus_areas {
-                // TODO: Check clip layer as well
+                let clip = self.clip_layers[focus_area.clip_layer.0].clip;
+                let clip = apply_clip(clip, focus_area.area);
 
-                if click_position.left() >= focus_area.area.left
-                    && click_position.left() <= focus_area.area.left + focus_area.area.width
-                    && click_position.top() >= focus_area.area.top
-                    && click_position.top() <= focus_area.area.top + focus_area.area.height
+                if click_position.left() >= clip.left()
+                    && click_position.left() <= clip.right()
+                    && click_position.top() >= clip.top()
+                    && click_position.top() <= clip.bottom()
                 {
                     *focused_element = Some(focus_area.element_id);
                     clicked = true;
@@ -729,11 +762,16 @@ impl<'a, App: Application> Layout<'a, App> {
         false
     }
 
-    pub fn input_character(&self, state: &Context<App>, character: char) {
+    pub fn input_character(&self, state: &Context<App>, queue: &mut EventQueue<App>, character: char) -> bool {
+        let mut input_handled = false;
+
         for layer in &self.layers {
             for input_handler in &layer.input_handlers {
-                input_handler.handle_character(state, character);
+                input_handler.handle_character(state, queue, character);
+                input_handled = true;
             }
         }
+
+        input_handled
     }
 }

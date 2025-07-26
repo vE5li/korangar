@@ -5,11 +5,24 @@ use rust_state::Context;
 use super::ClickAction;
 use crate::application::Application;
 use crate::element::ElementBox;
+use crate::element::id::{ElementId, FocusId};
 
 pub enum Event<App: Application> {
-    FocusNext,
-    FocusPrevious,
-    Application(App::Event),
+    FocusElement {
+        focus_id: FocusId,
+    },
+    /// This is an internal variant used to replace FocusElement in the event
+    /// queue after the UI was built. Since we can only do the lookup form
+    /// FocusId to ElementId while the Layout still exists.
+    ///
+    /// This is a bit hacky and might be reworked in the future.
+    FocusElementPost {
+        element_id: ElementId,
+    },
+    Unfocus,
+    Application {
+        application_event: App::Event,
+    },
     OpenOverlay {
         element: ElementBox<App>,
         position: App::Position,
@@ -24,9 +37,12 @@ pub enum Event<App: Application> {
 impl<App: Application> Clone for Event<App> {
     fn clone(&self) -> Self {
         match self {
-            Self::FocusNext => Self::FocusNext,
-            Self::FocusPrevious => Self::FocusPrevious,
-            Self::Application(event) => Self::Application(event.clone()),
+            Self::FocusElement { focus_id } => Self::FocusElement { focus_id: *focus_id },
+            Self::FocusElementPost { element_id } => Self::FocusElementPost { element_id: *element_id },
+            Self::Unfocus => Self::Unfocus,
+            Self::Application { application_event } => Self::Application {
+                application_event: application_event.clone(),
+            },
             Self::OpenOverlay { .. } => unimplemented!(),
             Self::CloseWindow { window_id } => Self::CloseWindow { window_id: *window_id },
             Self::CloseOverlay => Self::CloseOverlay,
@@ -55,6 +71,10 @@ impl<App: Application> Default for EventQueue<App> {
 impl<App: Application> EventQueue<App> {
     pub fn queue(&mut self, event: impl Into<Event<App>>) {
         self.events.push(event.into());
+    }
+
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Event<App>> {
+        self.events.iter_mut()
     }
 
     pub fn drain(&mut self) -> Drain<'_, Event<App>> {

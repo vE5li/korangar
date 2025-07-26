@@ -87,7 +87,7 @@ use rust_state::{BoxedExt, Context, ManuallyAssertExt, OptionExt, Path, RustStat
 use settings::{AudioSettings, AudioSettingsPathExt, GraphicsSettingsCapabilities, GraphicsSettingsPathExt};
 use state::{
     ChatMessage, ClientState, ClientStatePathExt, ClientStateRootExt, ClientThemeType, DefaultMenu, DefaultPlaying, InterfaceTheme,
-    InterfaceThemePathExt, LoginWindowState, ThemeDefault, client_state, client_theme, this_entity, this_player,
+    InterfaceThemePathExt, LoginWindowState, ThemeDefault, client_state, this_entity, this_player,
 };
 #[cfg(feature = "debug")]
 use wgpu::Device;
@@ -1096,11 +1096,8 @@ impl Client {
                         // be open while the player is selected.
                         this_player().manually_asserted().job_level(),
                     ));
-                    // self.interface.open_window(
-                    //     &self.client_state,
-                    //     &mut self.focus_state,
-                    //     &ChatWindow::new(client_state().chat_messages(),
-                    // self.font_loader.clone()), );
+                    self.interface
+                        .open_window(ChatWindow::new(client_state().chat_window(), client_state().chat_messages()));
                     self.interface.open_window(HotbarWindow::new(client_state().hotbar().skills()));
 
                     // Put the dialog system in a well-defined state.
@@ -1920,11 +1917,6 @@ impl Client {
                 UserEvent::SellItems { items } => {
                     let _ = self.networking_system.sell_items(items);
                 }
-                UserEvent::FocusChatWindow => {
-                    // self.interface
-                    //     .focus_window_with_class(&mut self.focus_state,
-                    // ChatWindow::WINDOW_CLASS);
-                }
                 #[cfg(feature = "debug")]
                 UserEvent::OpenMarkerDetails(marker_identifier) => {
                     if let Some(map) = self.client_state.follow(client_state().map()) {
@@ -2527,6 +2519,8 @@ impl Client {
                     #[cfg(feature = "debug")]
                     profile_block!("user interface");
 
+                    let is_chat_open = self.interface.is_window_with_class_open(WindowClass::Chat);
+
                     let mut built_ui = self.interface.do_layouts(&self.client_state, mouse_position);
 
                     if let Some((click_position, mouse_button)) = self.input_system.get_click_position() {
@@ -2538,7 +2532,14 @@ impl Client {
                     }
 
                     if let Some(characters) = self.input_system.get_input_characters() {
-                        built_ui.input_characters(&self.client_state, &characters);
+                        // Focus the chat window when pressing enter. This might be reworked to be
+                        // more customizable.
+                        if !built_ui.input_characters(&self.client_state, &characters)
+                            && characters.iter().any(|character| *character == '\x0d')
+                            && is_chat_open
+                        {
+                            built_ui.focus_element(ChatTextBox);
+                        }
                     }
 
                     built_ui

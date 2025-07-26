@@ -33,6 +33,17 @@ where
     fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
         use korangar_interface::prelude::*;
 
+        struct CharacterName;
+
+        let create_action = move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
+            let name = state.get(&self.path).clone();
+
+            // TODO: Give some sort of error if the name is too short.
+            if name.len() >= MINIMUM_NAME_LENGTH {
+                queue.queue(UserEvent::CreateCharacter { slot: self.slot, name });
+            }
+        };
+
         window! {
             title: "Create Character",
             class: Self::window_class(),
@@ -42,14 +53,14 @@ where
                 text_box! {
                     text: "Character name",
                     state: self.path,
-                    input_handler: DefaultHandler(self.path),
+                    input_handler: DefaultHandler::<_, _, MAXIMUM_NAME_LENGTH>::new(self.path, create_action),
+                    focus_id: CharacterName,
                 },
                 button! {
                     text: "Create",
-                    event: move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
-                        let name = state.get(&self.path).clone();
-                        queue.queue(UserEvent::CreateCharacter { slot: self.slot, name });
-                    }
+                    // TODO: Disable if the name is too short.
+                    // disabled: selector,
+                    event: create_action,
                 }
             ),
         }

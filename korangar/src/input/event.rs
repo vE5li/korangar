@@ -101,7 +101,6 @@ pub enum UserEvent {
     SellItems {
         items: Vec<SoldItemInformation>,
     },
-    FocusChatWindow,
     #[cfg(feature = "debug")]
     OpenMarkerDetails(MarkerIdentifier),
     #[cfg(feature = "debug")]
@@ -150,8 +149,8 @@ pub enum UserEvent {
 }
 
 impl From<UserEvent> for Event<ClientState> {
-    fn from(event: UserEvent) -> Self {
-        Event::Application(event)
+    fn from(application_event: UserEvent) -> Self {
+        Event::Application { application_event }
     }
 }
 

@@ -21,6 +21,7 @@ pub mod window;
 // Re-export self as korangar_interface so we can use proc macros in this crate.
 extern crate self as korangar_interface;
 
+use std::any::Any;
 use std::collections::BTreeMap;
 
 use application::{Application, ClipTrait, PositionTrait, RenderLayer, SizeTrait, WindowCache};
@@ -37,7 +38,9 @@ use prelude::TooltipThemePathExt;
 use rust_state::Context;
 use theme::ThemePathGetter;
 use window::store::WindowStore;
-use window::{Anchor, CustomWindow, DisplayInformation, StateWindow, WindowData, WindowThemePathExt, WindowTrait};
+use window::{Anchor, CustomWindow, DisplayInformation, StateWindow, WindowData, WindowTrait};
+
+use crate::element::id::FocusIdExt;
 
 pub mod prelude {
     // Re-export proc macros.
@@ -481,9 +484,12 @@ where
 
         for event in self.event_queue.drain() {
             match event {
-                event::Event::FocusNext => todo!(),
-                event::Event::FocusPrevious => todo!(),
-                event::Event::Application(application_event) => application_events.push(application_event),
+                // This case should never be hit. FocusElement needs to be converted to
+                // FocusElementPost in the event queue while the layout is still alive.
+                event::Event::FocusElement { .. } => {}
+                event::Event::FocusElementPost { element_id } => self.focused_element = Some(element_id),
+                event::Event::Unfocus => self.focused_element = None,
+                event::Event::Application { application_event } => application_events.push(application_event),
                 event::Event::OpenOverlay { element, position, size } => {
                     self.overlay_element = Some((element, ElementStore::root(&mut self.generator), position, size))
                 }
@@ -643,23 +649,47 @@ impl<App: Application> BuiltUi<'_, App> {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn input_characters(&self, state: &Context<App>, characters: &[char]) {
+    pub fn input_characters(&mut self, state: &Context<App>, characters: &[char]) -> bool {
+        let mut input_handled = false;
+
         if let Some(layout) = &self.overlay_layout {
             for character in characters {
-                layout.input_character(state, *character);
+                input_handled |= layout.input_character(state, self.event_queue, *character);
             }
         }
 
         for layout in self.window_layouts.values() {
             for character in characters {
-                layout.input_character(state, *character);
+                input_handled |= layout.input_character(state, self.event_queue, *character);
             }
         }
+
+        input_handled
+    }
+
+    pub fn focus_element(&mut self, focus_id: impl Any) {
+        self.event_queue.queue(event::Event::FocusElement {
+            focus_id: focus_id.focus_id(),
+        });
     }
 }
 
 impl<App: Application> Drop for BuiltUi<'_, App> {
     fn drop(&mut self) {
+        // Convert FocusElement to FocusElementPost. This needs to be done before the
+        // layouts are cleared. If a focus id could not be resolved we leave the event
+        // as is, it will be ignored when processing the events.
+        self.event_queue.iter_mut().for_each(|event| {
+            if let event::Event::FocusElement { focus_id } = event {
+                for layout in self.window_layouts.values() {
+                    if let Some(element_id) = layout.try_resolve_focus_id(*focus_id) {
+                        *event = event::Event::FocusElementPost { element_id };
+                        return;
+                    }
+                }
+            }
+        });
+
         self.window_layouts.values_mut().for_each(|layout| layout.clear());
 
         if let Some(layout) = self.overlay_layout {

@@ -13,7 +13,9 @@ use crate::layout::area::Area;
 use crate::layout::{Layout, Resolver};
 
 pub mod id {
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    use std::any::{Any, TypeId};
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
     pub struct ElementId(usize);
 
     #[derive(Clone)]
@@ -32,6 +34,22 @@ pub mod id {
             self.next_free_id += 1;
 
             id
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    pub struct FocusId(TypeId);
+
+    pub trait FocusIdExt {
+        fn focus_id(&self) -> FocusId;
+    }
+
+    impl<T> FocusIdExt for T
+    where
+        T: Any,
+    {
+        fn focus_id(&self) -> FocusId {
+            FocusId(self.type_id())
         }
     }
 }

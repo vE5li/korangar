@@ -3,27 +3,6 @@ use rust_state::{Context, Path};
 use super::EventQueue;
 use crate::application::Application;
 
-// pub enum ClickAction<App>
-// where
-//     App: Application,
-// {
-//     FocusElement,
-//     FocusNext(FocusMode),
-//     ChangeEvent(ChangeEvent),
-//     DragElement,
-//     Move(App::DropResource),
-//     MoveInterface,
-//     OpenWindow(Box<dyn StateWindow<App>>),
-//     CloseWindow,
-//     OpenPopup {
-//         element: ElementCell<App>,
-//         position_tracker: Tracker<App::Position>,
-//         size_tracker: Tracker<App::Size>,
-//     },
-//     ClosePopup,
-//     Custom(App::CustomEvent),
-// }
-
 pub trait ClickAction<App: Application> {
     fn execute(&self, state: &Context<App>, queue: &mut EventQueue<App>);
 }

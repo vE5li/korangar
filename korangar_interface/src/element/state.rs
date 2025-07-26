@@ -10,10 +10,11 @@ use rust_state::{ArrayLookupExt, Context, ManuallyAssertExt, OptionExt, Path, Se
 
 use super::Element;
 use crate::application::Application;
+use crate::components::text_box::DefaultHandler;
 use crate::element::id::ElementIdGenerator;
 use crate::element::store::ElementStore;
 use crate::element::{ElementSet, ResolverSet};
-use crate::event::EventQueue;
+use crate::event::{Event, EventQueue};
 use crate::layout::{Layout, Resolver};
 
 pub trait StateElement<App: Application> {
@@ -148,7 +149,6 @@ impl<T> !NoPrototype for Vec<T> {}
 impl<T> !NoPrototype for Rc<T> {}
 
 impl NoPrototype for &str {}
-impl NoPrototype for String {}
 
 impl<App, T> StateElement<App> for T
 where
@@ -251,6 +251,67 @@ where
             text: name,
             state: self_path,
             event: Toggle(self_path),
+        }
+    }
+}
+
+impl<App> StateElement<App> for String
+where
+    App: Application,
+{
+    type LayoutInfo = impl Any;
+    type LayoutInfoMut = impl Any;
+    type Return<P>
+        = impl Element<App, LayoutInfo = Self::LayoutInfo>
+    where
+        P: Path<App, Self>;
+    type ReturnMut<P>
+        = impl Element<App, LayoutInfo = Self::LayoutInfoMut>
+    where
+        P: Path<App, Self>;
+
+    fn to_element<P>(self_path: P, name: String) -> Self::Return<P>
+    where
+        P: Path<App, Self>,
+    {
+        use korangar_interface::prelude::*;
+
+        split! {
+            children: (
+                text! {
+                    text: name,
+                },
+                text! {
+                    text: self_path,
+                },
+            ),
+        }
+    }
+
+    fn to_element_mut<P>(self_path: P, name: String) -> Self::ReturnMut<P>
+    where
+        P: Path<App, Self>,
+    {
+        use korangar_interface::prelude::*;
+
+        struct PrivateFocusId;
+
+        let action = move |_: &Context<App>, queue: &mut EventQueue<App>| {
+            queue.queue(Event::Unfocus);
+        };
+
+        split! {
+            children: (
+                text! {
+                    text: name,
+                },
+                text_box! {
+                    text: "Dummy",
+                    state: self_path,
+                    input_handler: DefaultHandler::<_, _, { usize::MAX }>::new(self_path, action),
+                    focus_id: PrivateFocusId,
+                },
+            ),
         }
     }
 }

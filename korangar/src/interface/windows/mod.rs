@@ -65,9 +65,6 @@ pub use self::skill_tree::SkillTreeWindow;
 #[cfg(feature = "debug")]
 pub use self::time::TimeWindow;
 
-// TODO: Small issue with excluding window classes based on the debug build is
-// that deserialization of the window cache will fail when going from a debug
-// build to a release build. Not sure what the correct approach is yet.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum WindowClass {
     AudioSettings,

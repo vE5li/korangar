@@ -174,6 +174,8 @@ pub trait ElementSet<App: Application> {
         &mut self,
         state: &Context<App>,
         store: &mut ElementStore,
+        // TODO: I think that we don't need this here anymore as of now. It could be bundled with
+        // the ElementStore to make an ElementStoreMut or simlar.
         generator: &mut ElementIdGenerator,
         resolver_set: impl ResolverSet,
     ) -> Self::LayoutInfo;

@@ -23,13 +23,20 @@ pub struct WindowCache {
 }
 
 impl WindowCache {
+    // Since `WindowClass` has some variants with debug features enabled, we use a
+    // differen file to store the window cache. This avoids failing to load and
+    // thereby wiping the previous window cache when switching between debug and
+    // non-debug builds.
+    #[cfg(not(feature = "debug"))]
     const FILE_NAME: &'static str = "client/window_cache.ron";
+    #[cfg(feature = "debug")]
+    const FILE_NAME: &'static str = "client/window_cache_debug.ron";
 
     fn load() -> Option<Self> {
         #[cfg(feature = "debug")]
         print_debug!("loading window cache from {}", Self::FILE_NAME.magenta());
 
-        std::fs::read_to_string("client/window_cache.ron")
+        std::fs::read_to_string(Self::FILE_NAME)
             .ok()
             .and_then(|data| ron::from_str(&data).ok())
             .map(|entries| Self { entries })

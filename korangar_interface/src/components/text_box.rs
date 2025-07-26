@@ -26,7 +26,7 @@ where
     pub focused_foreground_color: App::Color,
     pub focused_background_color: App::Color,
     pub hide_icon_color: App::Color,
-    pub hide_background_color: App::Color,
+    pub hovered_hide_icon_color: App::Color,
     pub height: f32,
     pub corner_radius: App::CornerRadius,
     pub font_size: App::FontSize,
@@ -63,7 +63,7 @@ pub struct TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Id> {
     pub focused_foreground_color: I,
     pub focused_background_color: J,
     pub hide_icon_color: K,
-    pub hide_background_color: L,
+    pub hovered_hide_icon_color: L,
     pub height: M,
     pub corner_radius: N,
     pub font_size: O,
@@ -126,9 +126,9 @@ where
 
         let hide_button = state.get(&self.hidable).then(|| {
             let button_area = Area {
-                left: layout_info.area.left + layout_info.area.width - layout_info.area.height,
+                left: layout_info.area.left + layout_info.area.width - layout_info.area.height - layout_info.area.height / 2.0,
                 top: layout_info.area.top,
-                width: layout_info.area.height,
+                width: layout_info.area.height + layout_info.area.height / 2.0,
                 height: layout_info.area.height,
             };
 
@@ -197,11 +197,18 @@ where
                 display_text = hidden_text;
             }
 
-            if is_hovered {
-                layout.add_rectangle(button_area, corner_radius, *state.get(&self.hide_background_color));
+            let icon_area = Area {
+                left: button_area.left + 4.0 + layout_info.area.height / 4.0,
+                top: button_area.top + 4.0,
+                width: button_area.height - 8.0,
+                height: button_area.height - 8.0,
+            };
+            let icon_color = match is_hovered {
+                true => *state.get(&self.hovered_hide_icon_color),
+                false => *state.get(&self.hide_icon_color),
             };
 
-            layout.add_icon(button_area, Icon::Eye { open: is_hidden }, *state.get(&self.hide_icon_color));
+            layout.add_icon(icon_area, Icon::Eye { open: is_hidden }, icon_color);
         }
 
         // layout.add_text(

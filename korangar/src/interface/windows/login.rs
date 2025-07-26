@@ -201,7 +201,7 @@ where
                 },
                 text! { text: "Account data" },
                 fragment! {
-                    gaps: 5.0,
+                    gaps: 8.0,
                     children: (
                         text_box! {
                             text: "Username",
@@ -216,13 +216,17 @@ where
                             focus_id: PasswordTextBox,
                             hidable: true,
                         },
+                    ),
+                },
+                fragment! {
+                    gaps: 8.0,
+                    children: (
                         state_button! {
                             text: "Remember username",
                             state: remember_username_path,
                             event: Toggle(remember_username_path),
                             background_color: Color::TRANSPARENT,
                             hovered_background_color: Color::TRANSPARENT,
-                            text_alignment: HorizontalAlignment::Left { offset: 50.0 },
                         },
                         state_button! {
                             text: "Remember password",
@@ -230,7 +234,6 @@ where
                             event: Toggle(remember_password_path),
                             background_color: Color::TRANSPARENT,
                             hovered_background_color: Color::TRANSPARENT,
-                            text_alignment: HorizontalAlignment::Left { offset: 50.0 },
                         },
                     ),
                 },

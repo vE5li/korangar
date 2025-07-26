@@ -104,6 +104,40 @@ impl Resolver {
         (returned, layout_info)
     }
 
+    #[cfg_attr(feature = "debug", korangar_debug::profile("derived"))]
+    pub fn with_derived_borderless<L>(&mut self, gaps: f32, border: f32, once_gap: f32, f: impl FnOnce(&mut Resolver) -> L) -> (Area, L) {
+        self.push_gaps();
+
+        let mut inner = Resolver {
+            available_area: PartialArea {
+                left: self.available_area.left + border,
+                top: self.available_area.top + once_gap,
+                width: self.available_area.width - border * 2.0,
+                height: self.available_area.height.map(|height| height - border - once_gap),
+            },
+            used_height: 0.0,
+            gaps,
+        };
+
+        let layout_info = f(&mut inner);
+
+        let returned = Area {
+            left: self.available_area.left,
+            top: self.available_area.top,
+            width: self.available_area.width,
+            height: inner.used_height + border + once_gap,
+        };
+
+        self.available_area.top += returned.height;
+        self.used_height += returned.height;
+
+        if let Some(available_height) = &mut self.available_area.height {
+            *available_height -= returned.height;
+        }
+
+        (returned, layout_info)
+    }
+
     pub fn with_derived_scrolled<L>(
         &mut self,
         scroll: f32,

@@ -94,37 +94,42 @@ where
             theme: ClientThemeType::Game,
             closable: true,
             elements: (
-                split! {
+                fragment! {
+                    gaps: 2.0,
                     children: (
-                        button! {
-                            text: "Clear",
-                            event: move |state: &Context<ClientState>, _: &mut EventQueue<ClientState>| {
-                                state.update_value_with(self.packet_history_path.entries(), |buffer| buffer.clear());
-                            }
+                        split! {
+                            children: (
+                                button! {
+                                    text: "Clear",
+                                    event: move |state: &Context<ClientState>, _: &mut EventQueue<ClientState>| {
+                                        state.update_value_with(self.packet_history_path.entries(), |buffer| buffer.clear());
+                                    }
+                                },
+                                state_button! {
+                                    text: "Update",
+                                    state: self.packet_history_path.update(),
+                                    event: Toggle(self.packet_history_path.update()),
+                                },
+                            ),
                         },
-                        state_button! {
-                            text: "Update",
-                            state: self.packet_history_path.update(),
-                            event: Toggle(self.packet_history_path.update()),
-                        },
-                    ),
-                },
-                split! {
-                    children: (
-                        state_button! {
-                            text: "Show incoming",
-                            state: self.packet_history_path.show_incoming(),
-                            event: Toggle(self.packet_history_path.show_incoming()),
-                        },
-                        state_button! {
-                            text: "Show outgoing",
-                            state: self.packet_history_path.show_outgoing(),
-                            event: Toggle(self.packet_history_path.show_outgoing()),
-                        },
-                        state_button! {
-                            text: "Show pings",
-                            state: self.packet_history_path.show_pings(),
-                            event: Toggle(self.packet_history_path.show_pings()),
+                        split! {
+                            children: (
+                                state_button! {
+                                    text: "Show incoming",
+                                    state: self.packet_history_path.show_incoming(),
+                                    event: Toggle(self.packet_history_path.show_incoming()),
+                                },
+                                state_button! {
+                                    text: "Show outgoing",
+                                    state: self.packet_history_path.show_outgoing(),
+                                    event: Toggle(self.packet_history_path.show_outgoing()),
+                                },
+                                state_button! {
+                                    text: "Show pings",
+                                    state: self.packet_history_path.show_pings(),
+                                    event: Toggle(self.packet_history_path.show_pings()),
+                                },
+                            ),
                         },
                     ),
                 },

@@ -68,11 +68,14 @@ where
     pub gaps: f32,
     pub border: f32,
     pub corner_radius: App::CornerRadius,
+    pub close_button_size: App::Size,
+    pub close_button_corner_radius: App::CornerRadius,
     pub minimum_width: f32,
     pub maximum_width: f32,
     pub minimum_height: f32,
     pub maximum_height: f32,
     pub title_height: f32,
+    pub title_gap: f32,
     pub font_size: App::FontSize,
     pub text_alignment: HorizontalAlignment,
     pub vertical_alignment: VerticalAlignment,
@@ -104,7 +107,7 @@ pub struct WindowLayoutInfoSet<T> {
     children: T,
 }
 
-pub struct Window<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, Elements>
+pub struct Window<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, Elements>
 where
     App: Application,
     Elements: ElementSet<App>,
@@ -115,23 +118,26 @@ where
     pub hovered_title_color: C,
     pub background_color: D,
     pub title_height: E,
-    pub font_size: F,
-    pub gaps: G,
-    pub border: H,
-    pub corner_radius: I,
-    pub closable: J,
-    pub minimum_width: K,
-    pub maximum_width: L,
-    pub minimum_height: M,
-    pub maximum_height: N,
+    pub title_gap: F,
+    pub font_size: G,
+    pub gaps: H,
+    pub border: I,
+    pub corner_radius: J,
+    pub closable: K,
+    pub close_button_size: L,
+    pub close_button_corner_radius: M,
+    pub minimum_width: N,
+    pub maximum_width: O,
+    pub minimum_height: P,
+    pub maximum_height: Q,
     pub theme: App::ThemeType,
     pub class: Option<App::WindowClass>,
     pub elements: Elements,
     pub layout_info: Option<WindowLayoutInfoSet<<Elements as ElementSet<App>>::LayoutInfo>>,
 }
 
-impl<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, Elements> WindowTrait<App>
-    for Window<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, Elements>
+impl<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, Elements> WindowTrait<App>
+    for Window<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, Elements>
 where
     App: Application,
     Title: AsRef<str>,
@@ -140,15 +146,18 @@ where
     C: Selector<App, App::Color>,
     D: Selector<App, App::Color>,
     E: Selector<App, f32>,
-    F: Selector<App, App::FontSize>,
-    G: Selector<App, f32>,
+    F: Selector<App, f32>,
+    G: Selector<App, App::FontSize>,
     H: Selector<App, f32>,
-    I: Selector<App, App::CornerRadius>,
-    J: Selector<App, bool>,
-    K: Selector<App, f32>,
-    L: Selector<App, f32>,
-    M: Selector<App, f32>,
+    I: Selector<App, f32>,
+    J: Selector<App, App::CornerRadius>,
+    K: Selector<App, bool>,
+    L: Selector<App, App::Size>,
+    M: Selector<App, App::CornerRadius>,
     N: Selector<App, f32>,
+    O: Selector<App, f32>,
+    P: Selector<App, f32>,
+    Q: Selector<App, f32>,
     Elements: ElementSet<App>,
     <Elements as ElementSet<App>>::LayoutInfo: 'static,
 {
@@ -169,6 +178,7 @@ where
         App::set_current_theme_type(self.theme);
 
         let title_height = *state.get(&self.title_height);
+        let title_gap = *state.get(&self.title_gap);
 
         let minimum_width = *state.get(&self.minimum_width);
         let maximum_width = *state.get(&self.maximum_width);
@@ -206,7 +216,7 @@ where
 
         let title_area = resolver.with_height(title_height);
 
-        let (area, children) = resolver.with_derived(*state.get(&self.gaps), *state.get(&self.border), |resolver| {
+        let (area, children) = resolver.with_derived_borderless(*state.get(&self.gaps), *state.get(&self.border), title_gap, |resolver| {
             self.elements.create_layout_info(state, store, generator, resolver)
         });
 
@@ -241,11 +251,14 @@ where
         App::set_current_theme_type(self.theme);
 
         let close_button = if *state.get(&self.closable) {
+            let close_button_size = *state.get(&self.close_button_size);
+            let offset = layout_info.title_area.height - close_button_size.height();
+
             let close_button_area = Area {
-                left: layout_info.title_area.left + layout_info.title_area.width - 40.0,
-                top: layout_info.title_area.top,
-                width: 30.0,
-                height: layout_info.title_area.height,
+                left: layout_info.title_area.left + layout_info.title_area.width - close_button_size.width() - *state.get(&self.border),
+                top: layout_info.title_area.top + offset / 2.0,
+                width: close_button_size.width(),
+                height: layout_info.title_area.height - offset,
             };
 
             let close_button_color = match layout.is_area_hovered_and_active(close_button_area) {
@@ -316,7 +329,7 @@ where
             if let Some((close_button_area, close_button_color)) = close_button {
                 layout.add_rectangle(
                     close_button_area,
-                    App::CornerRadius::new(0.0, 0.0, 0.0, 0.0),
+                    *state.get(&self.close_button_corner_radius),
                     close_button_color,
                 );
 

@@ -870,25 +870,20 @@ where
                     layout.add_tooltip("Clear the entire vector", ClearTooltip.tooltip_id());
                 }
 
-                if is_hoverered {
-                    // TODO: Use a better background color.
-                    layout.add_rectangle(
-                        layout_info.area,
-                        *state.get(&theme().collapsable().corner_radius()),
-                        *state.get(&theme().collapsable().foreground_color()),
-                    );
-                }
-
                 // TODO: Don't hardcode distance.
                 let icon_area = Area {
-                    left: layout_info.area.left + 2.0,
-                    top: layout_info.area.top + 2.0,
-                    width: layout_info.area.width - 4.0,
-                    height: layout_info.area.height - 4.0,
+                    left: layout_info.area.left + 4.0,
+                    top: layout_info.area.top + 4.0,
+                    width: layout_info.area.width - 8.0,
+                    height: layout_info.area.height - 8.0,
                 };
 
-                // TODO: Use a better icon color.
-                layout.add_icon(icon_area, Icon::TrashCan, *state.get(&theme().collapsable().foreground_color()));
+                let icon_color = match is_hoverered {
+                    true => *state.get(&theme().collapsable().hovered_foreground_color()),
+                    false => *state.get(&theme().collapsable().foreground_color()),
+                };
+
+                layout.add_icon(icon_area, Icon::TrashCan, icon_color);
             }
         }
 

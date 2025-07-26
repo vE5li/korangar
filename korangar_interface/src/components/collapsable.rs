@@ -119,7 +119,7 @@ where
         let fallback_resolver = resolver.clone();
 
         let (mut area, children) = match expanded {
-            true => resolver.with_derived(*state.get(&self.gaps), *state.get(&self.border), |resolver| {
+            true => resolver.with_derived_borderless(*state.get(&self.gaps), *state.get(&self.border), 0.0, |resolver| {
                 resolver.push_top(title_height);
 
                 // We need to create a separate store so that the children and the extra

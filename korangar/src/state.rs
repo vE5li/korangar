@@ -813,6 +813,7 @@ impl RenderLayer<ClientState> for crate::renderer::InterfaceRenderer {
             Icon::ExpandArrow { expanded } => self.render_expand_arrow(position, size, clip, color, expanded),
             Icon::Checkbox { checked } => self.render_checkbox(position, size, clip, color, checked),
             Icon::Eye { open } => self.render_eye(position, size, clip, color, open),
+            Icon::TrashCan => self.render_trash_can(position, size, clip, color),
             Icon::Custom(_) => (),
         }
     }

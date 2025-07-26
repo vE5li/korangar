@@ -14,8 +14,12 @@ use crate::components::text_box::DefaultHandler;
 use crate::element::id::ElementIdGenerator;
 use crate::element::store::ElementStore;
 use crate::element::{ElementSet, ResolverSet};
-use crate::event::{Event, EventQueue};
-use crate::layout::{Layout, Resolver};
+use crate::event::{ClickAction, Event, EventQueue};
+use crate::layout::area::Area;
+use crate::layout::tooltip::TooltipExt;
+use crate::layout::{Icon, Layout, MouseButton, Resolver};
+use crate::prelude::CollapsableThemePathExt;
+use crate::theme::{ThemePathGetter, theme};
 
 pub trait StateElement<App: Application> {
     type Return<P>: Element<App, LayoutInfo = Self::LayoutInfo>
@@ -822,6 +826,72 @@ where
             }
         }
 
+        struct ClearButton<A> {
+            pub event: A,
+        }
+
+        impl<App, A> Element<App> for ClearButton<A>
+        where
+            App: Application,
+            A: ClickAction<App> + 'static,
+        {
+            fn create_layout_info(
+                &mut self,
+                state: &Context<App>,
+                _: &mut ElementStore,
+                _: &mut ElementIdGenerator,
+                resolver: &mut Resolver,
+            ) -> Self::LayoutInfo {
+                let height = *state.get(&theme().collapsable().title_height());
+                let mut area = resolver.with_height(height);
+
+                // This is making the button square and sit to the right of the title.
+                // It's a bit hacky but it does the job for now.
+                area.left += area.width - area.height;
+                area.width = area.height;
+
+                Self::LayoutInfo { area }
+            }
+
+            fn layout_element<'a>(
+                &'a self,
+                state: &'a Context<App>,
+                _: &'a ElementStore,
+                layout_info: &'a Self::LayoutInfo,
+                layout: &mut Layout<'a, App>,
+            ) {
+                let is_hoverered = layout.is_area_hovered_and_active(layout_info.area);
+
+                if is_hoverered {
+                    layout.add_click_area(layout_info.area, MouseButton::Left, &self.event);
+                    layout.mark_hovered();
+
+                    struct ClearTooltip;
+                    layout.add_tooltip("Clear the entire vector", ClearTooltip.tooltip_id());
+                }
+
+                if is_hoverered {
+                    // TODO: Use a better background color.
+                    layout.add_rectangle(
+                        layout_info.area,
+                        *state.get(&theme().collapsable().corner_radius()),
+                        *state.get(&theme().collapsable().foreground_color()),
+                    );
+                }
+
+                // TODO: Don't hardcode distance.
+                let icon_area = Area {
+                    left: layout_info.area.left + 2.0,
+                    top: layout_info.area.top + 2.0,
+                    width: layout_info.area.width - 4.0,
+                    height: layout_info.area.height - 4.0,
+                };
+
+                // TODO: Use a better icon color.
+                layout.add_icon(icon_area, Icon::TrashCan, *state.get(&theme().collapsable().foreground_color()));
+            }
+        }
+
         collapsable! {
             text: name,
             children: VecWrapper {
@@ -830,11 +900,10 @@ where
                 _marker: PhantomData,
             },
             extra_elements: (
-                button! {
-                    text: "clear",
+                ClearButton {
                     event: move |state: &rust_state::Context<App>, _: &mut korangar_interface::event::EventQueue<App>| {
                         state.update_value_with(self_path, |vector| vector.clear());
-                    },
+                    }
                 },
             ),
         }

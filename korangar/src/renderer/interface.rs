@@ -19,6 +19,7 @@ pub struct InterfaceRenderer {
     collapsed_arrow_texture: Arc<Texture>,
     eye_open_texture: Arc<Texture>,
     eye_closed_texture: Arc<Texture>,
+    trash_can_texture: Arc<Texture>,
     window_size: ScreenSize,
     interface_size: ScreenSize,
     high_quality_interface: bool,
@@ -40,6 +41,7 @@ impl InterfaceRenderer {
         let collapsed_arrow_texture = texture_loader.get_or_load("collapsed_arrow.png", ImageType::Sdf).unwrap();
         let eye_open_texture = texture_loader.get_or_load("eye_open.png", ImageType::Sdf).unwrap();
         let eye_closed_texture = texture_loader.get_or_load("eye_closed.png", ImageType::Sdf).unwrap();
+        let trash_can_texture = texture_loader.get_or_load("trash_can.png", ImageType::Sdf).unwrap();
 
         let interface_size = if high_quality_interface { window_size * 2.0 } else { window_size };
 
@@ -53,6 +55,7 @@ impl InterfaceRenderer {
             collapsed_arrow_texture,
             eye_open_texture,
             eye_closed_texture,
+            trash_can_texture,
             window_size,
             interface_size,
             high_quality_interface,
@@ -217,6 +220,10 @@ impl InterfaceRenderer {
         };
 
         self.render_sdf(texture, position, size, clip, color);
+    }
+
+    pub fn render_trash_can(&self, position: ScreenPosition, size: ScreenSize, clip: ScreenClip, color: Color) {
+        self.render_sdf(self.trash_can_texture.clone(), position, size, clip, color);
     }
 }
 

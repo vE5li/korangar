@@ -31,6 +31,7 @@ pub enum Icon<App: Application> {
     ExpandArrow { expanded: bool },
     Checkbox { checked: bool },
     Eye { open: bool },
+    TrashCan,
     Custom(<App::Renderer as RenderLayer<App>>::CustomIcon),
 }
 

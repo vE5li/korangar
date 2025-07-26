@@ -1,4 +1,4 @@
-use crate::layout::ClipLayer;
+use crate::layout::{ClipLayer, Icon};
 use crate::theme::ThemePathGetter;
 use crate::window::Anchor;
 
@@ -50,6 +50,7 @@ pub trait ScalingExt {
 
 pub trait RenderLayer<App: Application> {
     type CustomInstruction<'a>;
+    type CustomIcon: Clone + Copy;
 
     fn render_rectangle(
         &self,
@@ -60,13 +61,11 @@ pub trait RenderLayer<App: Application> {
         color: App::Color,
     );
 
-    fn render_checkbox(&self, position: App::Position, size: App::Size, clip: App::Clip, color: App::Color, state: bool);
-
     fn get_text_dimensions(&self, text: &str, font_size: App::FontSize, available_width: f32) -> App::Size;
 
     fn render_text(&self, text: &str, position: App::Position, clip: App::Clip, color: App::Color, font_size: App::FontSize);
 
-    fn render_expand_arrow(&self, position: App::Position, size: App::Size, clip: App::Clip, color: App::Color, expanded: bool);
+    fn render_icon(&self, position: App::Position, size: App::Size, clip: App::Clip, icon: Icon<App>, color: App::Color);
 
     fn render_custom(&self, instruction: Self::CustomInstruction<'_>, clip_layers: &[ClipLayer<App>]);
 }

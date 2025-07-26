@@ -26,6 +26,14 @@ pub enum MouseButton {
     Right,
 }
 
+#[derive(Clone, Copy)]
+pub enum Icon<App: Application> {
+    ExpandArrow { expanded: bool },
+    Checkbox { checked: bool },
+    Eye { open: bool },
+    Custom(<App::Renderer as RenderLayer<App>>::CustomIcon),
+}
+
 struct RectangleInsturction<App: Application> {
     clip_layer: ClipLayerId,
     area: Area,
@@ -33,11 +41,11 @@ struct RectangleInsturction<App: Application> {
     color: App::Color,
 }
 
-struct CheckboxInstruction<App: Application> {
+struct IconInstruction<App: Application> {
     clip_layer: ClipLayerId,
+    icon: Icon<App>,
     area: Area,
     color: App::Color,
-    state: bool,
 }
 
 struct TextInstruction<'a, App: Application> {
@@ -87,10 +95,11 @@ pub trait InputHandler<App> {
     fn handle_character(&self, state: &Context<App>, character: char);
 }
 
+// TODO: Rename most of these fields to include "_instructions".
 struct LayoutLayer<'a, App: Application> {
     rectangles: Vec<RectangleInsturction<App>>,
     texts: Vec<TextInstruction<'a, App>>,
-    checkboxes: Vec<CheckboxInstruction<App>>,
+    icons: Vec<IconInstruction<App>>,
     custom_instructions: Vec<<App::Renderer as RenderLayer<App>>::CustomInstruction<'a>>,
     click_areas: Vec<ClickArea<'a, App>>,
     window_move_areas: Vec<WindowArea>,
@@ -106,7 +115,7 @@ impl<App: Application> LayoutLayer<'_, App> {
     fn clear(&mut self) {
         self.rectangles.clear();
         self.texts.clear();
-        self.checkboxes.clear();
+        self.icons.clear();
         self.custom_instructions.clear();
         self.click_areas.clear();
         self.window_move_areas.clear();
@@ -124,7 +133,7 @@ impl<App: Application> Default for LayoutLayer<'_, App> {
         Self {
             rectangles: Default::default(),
             texts: Default::default(),
-            checkboxes: Default::default(),
+            icons: Default::default(),
             custom_instructions: Default::default(),
             click_areas: Default::default(),
             window_move_areas: Default::default(),
@@ -440,14 +449,14 @@ impl<'a, App: Application> Layout<'a, App> {
         });
     }
 
-    pub fn add_checkbox(&mut self, area: Area, color: App::Color, state: bool) {
+    pub fn add_icon(&mut self, area: Area, icon: Icon<App>, color: App::Color) {
         let clip_layer = self.get_active_clip_layer();
 
-        self.layers[self.current_layer].checkboxes.push(CheckboxInstruction {
+        self.layers[self.current_layer].icons.push(IconInstruction {
             clip_layer,
             area,
+            icon,
             color,
-            state,
         });
     }
 
@@ -521,21 +530,21 @@ impl<'a, App: Application> Layout<'a, App> {
                 },
             );
 
-            layer.checkboxes.drain(..).for_each(
-                |CheckboxInstruction {
+            layer.icons.drain(..).for_each(
+                |IconInstruction {
                      clip_layer,
+                     icon,
                      area,
                      color,
-                     state,
-                 }: CheckboxInstruction<App>| {
+                 }: IconInstruction<App>| {
                     let clip = self.clip_layers[clip_layer.0].clip;
 
-                    renderer.render_checkbox(
+                    renderer.render_icon(
                         App::Position::new(area.left, area.top),
                         App::Size::new(area.width, area.height),
                         clip,
+                        icon,
                         color,
-                        state,
                     );
                 },
             );

@@ -9,7 +9,7 @@ use crate::element::store::ElementStore;
 use crate::event::ClickAction;
 use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
 use crate::layout::area::Area;
-use crate::layout::{Layout, MouseButton, Resolver};
+use crate::layout::{Icon, Layout, MouseButton, Resolver};
 use crate::theme::{ThemePathGetter, theme};
 
 #[derive(RustState)]
@@ -112,15 +112,18 @@ where
         );
 
         let checkbox_size = layout_info.area.height - 6.0;
-        layout.add_checkbox(
+
+        layout.add_icon(
             Area {
                 left: layout_info.area.left + 8.0,
                 top: layout_info.area.top + 3.0,
                 width: checkbox_size,
                 height: checkbox_size,
             },
+            Icon::Checkbox {
+                checked: *state.get(&self.state),
+            },
             *state.get(&self.checkbox_color),
-            *state.get(&self.state),
         );
     }
 }

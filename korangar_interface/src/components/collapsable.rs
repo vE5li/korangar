@@ -9,7 +9,7 @@ use crate::element::store::{ElementStore, Persistent, PersistentData, Persistent
 use crate::element::{Element, ElementSet};
 use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
 use crate::layout::area::Area;
-use crate::layout::{Layout, Resolver};
+use crate::layout::{Icon, Layout, Resolver};
 use crate::theme::{ThemePathGetter, theme};
 
 #[derive(RustState)]
@@ -21,6 +21,8 @@ where
     pub hovered_foreground_color: App::Color,
     pub background_color: App::Color,
     pub secondary_background_color: App::Color,
+    pub icon_color: App::Color,
+    pub icon_size: f32,
     pub gaps: f32,
     pub border: f32,
     pub corner_radius: App::CornerRadius,
@@ -44,26 +46,28 @@ impl PersistentData for CollapsableData {
     }
 }
 
-pub struct Collapsable<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, Children> {
+pub struct Collapsable<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, Children> {
     pub text_marker: PhantomData<Text>,
     pub text: A,
     pub foreground_color: B,
     pub hovered_foreground_color: C,
     pub background_color: D,
     pub secondary_background_color: E,
-    pub gaps: F,
-    pub border: G,
-    pub corner_radius: H,
-    pub title_height: I,
-    pub font_size: J,
-    pub text_alignment: K,
-    pub initially_expanded: L,
-    pub extra_elements: M,
+    pub icon_color: F,
+    pub icon_size: G,
+    pub gaps: H,
+    pub border: I,
+    pub corner_radius: J,
+    pub title_height: K,
+    pub font_size: L,
+    pub text_alignment: M,
+    pub initially_expanded: N,
+    pub extra_elements: O,
     pub children: Children,
 }
 
-impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, Children> Persistent
-    for Collapsable<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, Children>
+impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, Children> Persistent
+    for Collapsable<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, Children>
 {
     type Data = CollapsableData;
 }
@@ -74,8 +78,8 @@ pub struct MyLayoutInfo<C, E> {
     extra_elements: E,
 }
 
-impl<App, Text, A, B, C, D, E, F, G, H, I, J, K, L, M, Children> Element<App>
-    for Collapsable<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, Children>
+impl<App, Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, Children> Element<App>
+    for Collapsable<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, Children>
 where
     App: Application,
     Text: AsRef<str>,
@@ -84,17 +88,19 @@ where
     C: Selector<App, App::Color>,
     D: Selector<App, App::Color>,
     E: Selector<App, App::Color>,
-    F: Selector<App, f32>,
+    F: Selector<App, App::Color>,
     G: Selector<App, f32>,
-    H: Selector<App, App::CornerRadius>,
+    H: Selector<App, f32>,
     I: Selector<App, f32>,
-    J: Selector<App, App::FontSize>,
-    K: Selector<App, HorizontalAlignment>,
-    L: Selector<App, bool>,
-    M: ElementSet<App>,
+    J: Selector<App, App::CornerRadius>,
+    K: Selector<App, f32>,
+    L: Selector<App, App::FontSize>,
+    M: Selector<App, HorizontalAlignment>,
+    N: Selector<App, bool>,
+    O: ElementSet<App>,
     Children: ElementSet<App>,
 {
-    type LayoutInfo = MyLayoutInfo<Children::LayoutInfo, M::LayoutInfo>;
+    type LayoutInfo = MyLayoutInfo<Children::LayoutInfo, O::LayoutInfo>;
 
     fn create_layout_info(
         &mut self,
@@ -169,6 +175,24 @@ where
 
         layout.add_rectangle(layout_info.area, *state.get(&self.corner_radius), background_color);
 
+        let icon_size = *state.get(&self.icon_size);
+        let icon_spacing = (title_area.height - icon_size) / 2.0;
+
+        let icon_area = Area {
+            left: title_area.left + icon_spacing * 2.0,
+            top: title_area.top + icon_spacing,
+            width: icon_size,
+            height: icon_size,
+        };
+
+        layout.add_icon(
+            icon_area,
+            Icon::ExpandArrow {
+                expanded: layout_info.children.is_some(),
+            },
+            *state.get(&self.icon_color),
+        );
+
         layout.with_layer(|layout| {
             self.extra_elements
                 .layout_element(state, store, &layout_info.extra_elements, layout);
@@ -182,13 +206,21 @@ where
             layout.mark_hovered();
         }
 
+        let icon_offset = icon_size + icon_spacing * 4.0;
+        let text_area = Area {
+            left: title_area.left + icon_offset,
+            top: title_area.top,
+            height: title_area.height,
+            width: title_area.width - icon_offset,
+        };
+
         let foreground_color = match is_title_hovered {
             true => *state.get(&self.hovered_foreground_color),
             false => *state.get(&self.foreground_color),
         };
 
         layout.add_text(
-            title_area,
+            text_area,
             state.get(&self.text).as_ref(),
             *state.get(&self.font_size),
             foreground_color,

@@ -11,7 +11,7 @@ use korangar_interface::element::StateElement;
 use korangar_interface::layout::alignment::{HorizontalAlignment, VerticalAlignment};
 use korangar_interface::layout::area::Area;
 use korangar_interface::layout::tooltip::TooltipTheme;
-use korangar_interface::layout::{ClipLayer, ClipLayerId, Layout};
+use korangar_interface::layout::{ClipLayer, ClipLayerId, Icon, Layout};
 use korangar_interface::theme::ThemePathGetter;
 use korangar_interface::window::{StateWindow, WindowTheme};
 use korangar_networking::{MessageColor, SellItem, ShopItem};
@@ -437,6 +437,8 @@ impl ThemeDefault<DefaultMenu> for InterfaceTheme {
                 hovered_foreground_color: Color::monochrome_u8(220),
                 focused_background_color: Color::monochrome_u8(120),
                 focused_foreground_color: Color::monochrome_u8(255),
+                hide_icon_color: Color::monochrome_u8(140),
+                hide_background_color: Color::monochrome_u8(90),
                 height: 30.0,
                 corner_radius: CornerRadius::uniform(20.0),
                 font_size: FontSize(16.0),
@@ -449,11 +451,13 @@ impl ThemeDefault<DefaultMenu> for InterfaceTheme {
                 foreground_color: Color::monochrome_u8(200),
                 hovered_foreground_color: Color::rgb_u8(250, 200, 200),
                 corner_radius: CornerRadius::uniform(20.0),
+                icon_color: Color::monochrome_u8(170),
+                icon_size: 15.0,
                 gaps: 5.0,
                 border: 10.0,
                 title_height: 30.0,
                 font_size: FontSize(16.0),
-                text_alignment: HorizontalAlignment::Left { offset: 20.0 },
+                text_alignment: HorizontalAlignment::Left { offset: 0.0 },
                 vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
             },
             drop_down: DropDownTheme {
@@ -556,6 +560,8 @@ impl ThemeDefault<DefaultPlaying> for InterfaceTheme {
                 hovered_foreground_color: Color::monochrome_u8(250),
                 focused_background_color: Color::monochrome_u8(140),
                 focused_foreground_color: Color::monochrome_u8(255),
+                hide_icon_color: Color::monochrome_u8(180),
+                hide_background_color: Color::monochrome_u8(150),
                 height: 20.0,
                 corner_radius: CornerRadius::uniform(10.0),
                 font_size: FontSize(15.0),
@@ -568,11 +574,13 @@ impl ThemeDefault<DefaultPlaying> for InterfaceTheme {
                 foreground_color: Color::monochrome_u8(180),
                 hovered_foreground_color: Color::rgb_u8(250, 200, 200),
                 corner_radius: CornerRadius::uniform(10.0),
+                icon_color: Color::monochrome_u8(150),
+                icon_size: 10.0,
                 gaps: 3.0,
                 border: 5.0,
                 title_height: 20.0,
                 font_size: FontSize(14.0),
-                text_alignment: HorizontalAlignment::Left { offset: 15.0 },
+                text_alignment: HorizontalAlignment::Left { offset: 0.0 },
                 vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
             },
             drop_down: DropDownTheme {
@@ -758,14 +766,11 @@ pub enum CustomInstruction<'a> {
 }
 
 impl RenderLayer<ClientState> for crate::renderer::InterfaceRenderer {
+    type CustomIcon = ();
     type CustomInstruction<'a> = CustomInstruction<'a>;
 
     fn render_rectangle(&self, position: ScreenPosition, size: ScreenSize, clip: ScreenClip, corner_radius: CornerRadius, color: Color) {
         self.render_rectangle(position, size, clip, corner_radius, color);
-    }
-
-    fn render_checkbox(&self, position: ScreenPosition, size: ScreenSize, clip: ScreenClip, color: Color, state: bool) {
-        self.render_checkbox(position, size, clip, color, state);
     }
 
     fn get_text_dimensions(&self, text: &str, font_size: FontSize, available_width: f32) -> ScreenSize {
@@ -776,8 +781,13 @@ impl RenderLayer<ClientState> for crate::renderer::InterfaceRenderer {
         self.render_text(text, position, clip, color, font_size);
     }
 
-    fn render_expand_arrow(&self, position: ScreenPosition, size: ScreenSize, clip: ScreenClip, color: Color, expanded: bool) {
-        todo!()
+    fn render_icon(&self, position: ScreenPosition, size: ScreenSize, clip: ScreenClip, icon: Icon<ClientState>, color: Color) {
+        match icon {
+            Icon::ExpandArrow { expanded } => self.render_expand_arrow(position, size, clip, color, expanded),
+            Icon::Checkbox { checked } => self.render_checkbox(position, size, clip, color, checked),
+            Icon::Eye { open } => self.render_eye(position, size, clip, color, open),
+            Icon::Custom(_) => (),
+        }
     }
 
     fn render_custom(&self, instruction: Self::CustomInstruction<'_>, clip_layers: &[ClipLayer<ClientState>]) {

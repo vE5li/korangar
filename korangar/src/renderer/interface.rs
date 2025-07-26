@@ -17,6 +17,8 @@ pub struct InterfaceRenderer {
     unfilled_box_texture: Arc<Texture>,
     expanded_arrow_texture: Arc<Texture>,
     collapsed_arrow_texture: Arc<Texture>,
+    eye_open_texture: Arc<Texture>,
+    eye_closed_texture: Arc<Texture>,
     window_size: ScreenSize,
     interface_size: ScreenSize,
     high_quality_interface: bool,
@@ -36,6 +38,8 @@ impl InterfaceRenderer {
         let unfilled_box_texture = texture_loader.get_or_load("unfilled_box.png", ImageType::Sdf).unwrap();
         let expanded_arrow_texture = texture_loader.get_or_load("expanded_arrow.png", ImageType::Sdf).unwrap();
         let collapsed_arrow_texture = texture_loader.get_or_load("collapsed_arrow.png", ImageType::Sdf).unwrap();
+        let eye_open_texture = texture_loader.get_or_load("eye_open.png", ImageType::Sdf).unwrap();
+        let eye_closed_texture = texture_loader.get_or_load("eye_closed.png", ImageType::Sdf).unwrap();
 
         let interface_size = if high_quality_interface { window_size * 2.0 } else { window_size };
 
@@ -47,6 +51,8 @@ impl InterfaceRenderer {
             unfilled_box_texture,
             expanded_arrow_texture,
             collapsed_arrow_texture,
+            eye_open_texture,
+            eye_closed_texture,
             window_size,
             interface_size,
             high_quality_interface,
@@ -199,6 +205,15 @@ impl InterfaceRenderer {
         let texture = match expanded {
             true => self.expanded_arrow_texture.clone(),
             false => self.collapsed_arrow_texture.clone(),
+        };
+
+        self.render_sdf(texture, position, size, clip, color);
+    }
+
+    pub fn render_eye(&self, position: ScreenPosition, size: ScreenSize, clip: ScreenClip, color: Color, open: bool) {
+        let texture = match open {
+            true => self.eye_open_texture.clone(),
+            false => self.eye_closed_texture.clone(),
         };
 
         self.render_sdf(texture, position, size, clip, color);

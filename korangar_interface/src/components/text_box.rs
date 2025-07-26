@@ -10,7 +10,7 @@ use crate::element::id::ElementIdGenerator;
 use crate::element::store::{ElementStore, Persistent, PersistentData, PersistentExt};
 use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
 use crate::layout::area::Area;
-use crate::layout::{InputHandler, Layout, Resolver};
+use crate::layout::{Icon, InputHandler, Layout, Resolver};
 use crate::theme::{ThemePathGetter, theme};
 
 #[derive(RustState)]
@@ -24,6 +24,8 @@ where
     pub hovered_background_color: App::Color,
     pub focused_foreground_color: App::Color,
     pub focused_background_color: App::Color,
+    pub hide_icon_color: App::Color,
+    pub hide_background_color: App::Color,
     pub height: f32,
     pub corner_radius: App::CornerRadius,
     pub font_size: App::FontSize,
@@ -47,7 +49,7 @@ impl PersistentData for TextBoxData {
     }
 }
 
-pub struct TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N> {
+pub struct TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P> {
     pub text_marker: PhantomData<Text>,
     pub text: A,
     pub state: B,
@@ -59,17 +61,20 @@ pub struct TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N> {
     pub hovered_background_color: H,
     pub focused_foreground_color: I,
     pub focused_background_color: J,
-    pub height: K,
-    pub corner_radius: L,
-    pub font_size: M,
-    pub text_alignment: N,
+    pub hide_icon_color: K,
+    pub hide_background_color: L,
+    pub height: M,
+    pub corner_radius: N,
+    pub font_size: O,
+    pub text_alignment: P,
 }
 
-impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N> Persistent for TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N> {
+impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P> Persistent for TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P> {
     type Data = TextBoxData;
 }
 
-impl<App, Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N> Element<App> for TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N>
+impl<App, Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P> Element<App>
+    for TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P>
 where
     App: Application,
     Text: AsRef<str> + 'static,
@@ -83,10 +88,12 @@ where
     H: Selector<App, App::Color>,
     I: Selector<App, App::Color>,
     J: Selector<App, App::Color>,
-    K: Selector<App, f32>,
-    L: Selector<App, App::CornerRadius>,
-    M: Selector<App, App::FontSize>,
-    N: Selector<App, HorizontalAlignment>,
+    K: Selector<App, App::Color>,
+    L: Selector<App, App::Color>,
+    M: Selector<App, f32>,
+    N: Selector<App, App::CornerRadius>,
+    O: Selector<App, App::FontSize>,
+    P: Selector<App, HorizontalAlignment>,
 {
     fn create_layout_info(
         &mut self,
@@ -110,12 +117,11 @@ where
         layout: &mut Layout<'a, App>,
     ) {
         let hide_button = state.get(&self.hidable).then(|| {
-            let button_size = layout_info.area.height - 6.0;
             let button_area = Area {
-                left: layout_info.area.left + layout_info.area.width - button_size - 3.0,
-                top: layout_info.area.top + 3.0,
-                width: button_size,
-                height: button_size,
+                left: layout_info.area.left + layout_info.area.width - layout_info.area.height,
+                top: layout_info.area.top,
+                width: layout_info.area.height,
+                height: layout_info.area.height,
             };
 
             let is_hoverered = layout.is_area_hovered_and_active(button_area);
@@ -147,7 +153,9 @@ where
             false => *state.get(&self.background_color),
         };
 
-        layout.add_rectangle(layout_info.area, *state.get(&self.corner_radius), background_color);
+        let corner_radius = *state.get(&self.corner_radius);
+
+        layout.add_rectangle(layout_info.area, corner_radius, background_color);
 
         let foreground_color = match is_hovered {
             _ if is_focused => *state.get(&self.focused_foreground_color),
@@ -158,12 +166,9 @@ where
         let mut display_text = state.get(&self.state).as_str();
 
         if let Some((button_area, is_hovered, persistent_data)) = hide_button {
-            let background_color = match is_hovered {
-                true => *state.get(&theme().button().hovered_background_color()),
-                false => *state.get(&theme().button().background_color()),
-            };
+            let is_hidden = *persistent_data.is_hidden.borrow();
 
-            if *persistent_data.is_hidden.borrow() {
+            if is_hidden {
                 // SAFETY:
                 //
                 // This is only used here to create a string with all '*' characters, so this
@@ -178,7 +183,11 @@ where
                 display_text = hidden_text;
             }
 
-            layout.add_rectangle(button_area, *state.get(&theme().button().corner_radius()), background_color);
+            if is_hovered {
+                layout.add_rectangle(button_area, corner_radius, *state.get(&self.hide_background_color));
+            };
+
+            layout.add_icon(button_area, Icon::Eye { open: is_hidden }, *state.get(&self.hide_icon_color));
         }
 
         // layout.add_text(

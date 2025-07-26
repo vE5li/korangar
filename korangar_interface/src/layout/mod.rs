@@ -1,5 +1,9 @@
 mod resolver;
 
+pub mod alignment;
+pub mod area;
+pub mod tooltip;
+
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
@@ -20,51 +24,6 @@ use crate::event::{ClickAction, Event, EventQueue};
 pub enum MouseButton {
     Left,
     Right,
-}
-
-pub mod alignment {
-    #[derive(Clone, Copy)]
-    pub enum HorizontalAlignment {
-        Left { offset: f32 },
-        Center { offset: f32 },
-        Right { offset: f32 },
-    }
-
-    #[derive(Clone, Copy)]
-    pub enum VerticalAlignment {
-        Top { offset: f32 },
-        Center { offset: f32 },
-        Bottom { offset: f32 },
-    }
-}
-
-pub mod area {
-    #[derive(Debug, Clone, Copy)]
-    pub struct Area {
-        pub left: f32,
-        pub top: f32,
-        pub width: f32,
-        pub height: f32,
-    }
-
-    #[derive(Debug, Clone, Copy)]
-    pub struct PartialArea {
-        pub left: f32,
-        pub top: f32,
-        pub width: f32,
-        pub height: Option<f32>,
-    }
-
-    impl From<Area> for PartialArea {
-        fn from(Area { left, top, width, height }: Area) -> Self {
-            Self {
-                left,
-                top,
-                width,
-                height: Some(height),
-            }
-        }
-    }
 }
 
 struct RectangleInsturction<App: Application> {
@@ -210,49 +169,6 @@ pub struct ClipLayerHandle(ClipLayerId);
 impl Drop for ClipLayerHandle {
     fn drop(&mut self) {
         panic!("Clip layer was not applied");
-    }
-}
-
-pub mod tooltip {
-    use std::any::{Any, TypeId};
-
-    use rust_state::RustState;
-
-    use crate::application::Application;
-
-    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-    pub struct TooltipId(TypeId);
-
-    pub trait TooltipExt {
-        fn tooltip_id(&self) -> TooltipId;
-    }
-
-    impl<T> TooltipExt for T
-    where
-        T: Any,
-    {
-        fn tooltip_id(&self) -> TooltipId {
-            TooltipId(T::type_id(&self))
-        }
-    }
-
-    #[derive(RustState)]
-    pub struct TooltipTheme<App>
-    where
-        App: Application + 'static,
-    {
-        pub background_color: App::Color,
-        pub foreground_color: App::Color,
-        pub font_size: App::FontSize,
-        pub corner_radius: App::CornerRadius,
-        pub border: f32,
-        pub gap: f32,
-        pub mouse_offset: f32,
-    }
-
-    pub struct Tooltip<'a> {
-        pub text: &'a str,
-        pub id: TooltipId,
     }
 }
 

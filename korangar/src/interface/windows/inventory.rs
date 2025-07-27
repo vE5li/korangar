@@ -6,7 +6,8 @@ use rust_state::{Path, VecIndexExt};
 use crate::ItemSource;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::{WindowCache, WindowClass};
-use crate::state::{ClientState, ClientThemeType};
+use crate::state::ClientState;
+use crate::state::theme::InterfaceThemeType;
 use crate::world::ResourceMetadata;
 
 pub struct InventoryWindow<P> {
@@ -37,7 +38,7 @@ where
         window! {
             title: "Inventory",
             class: Self::window_class(),
-            theme: ClientThemeType::Game,
+            theme: InterfaceThemeType::Game,
             closable: true,
             elements: std::array::from_fn::<_, INVENTORY_ROWS, _>(|row| {
                 split! {

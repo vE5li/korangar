@@ -10,7 +10,8 @@ use crate::graphics::Color;
 use crate::input::UserEvent;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::{WindowCache, WindowClass};
-use crate::state::{ClientState, ClientThemeType};
+use crate::state::ClientState;
+use crate::state::theme::InterfaceThemeType;
 
 pub struct CharacterOverviewWindow<P, L, J> {
     player_name: P,
@@ -108,7 +109,7 @@ where
         window! {
             title: "Character Overview",
             class: Self::window_class(),
-            theme: ClientThemeType::Game,
+            theme: InterfaceThemeType::Game,
             minimum_width: 300.0,
             maximum_width: 300.0,
             elements: elements,

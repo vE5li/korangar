@@ -5,7 +5,8 @@ use rust_state::{Context, Path};
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::{WindowCache, WindowClass};
 use crate::settings::{AudioSettings, AudioSettingsPathExt};
-use crate::state::{ClientState, ClientThemeType};
+use crate::state::ClientState;
+use crate::state::theme::InterfaceThemeType;
 
 #[derive(Default)]
 pub struct AudioSettingsWindow<P> {
@@ -32,7 +33,7 @@ where
         window! {
             title: "Audio Settings",
             class: Self::window_class(),
-            theme: ClientThemeType::Game,
+            theme: InterfaceThemeType::Game,
             closable: true,
             elements: (
                 state_button! {

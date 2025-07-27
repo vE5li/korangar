@@ -7,7 +7,8 @@ use crate::interface::layout::ScreenSize;
 use crate::interface::resource::SkillSource;
 use crate::interface::windows::{WindowCache, WindowClass};
 use crate::inventory::Skill;
-use crate::state::{ClientState, ClientThemeType};
+use crate::state::ClientState;
+use crate::state::theme::InterfaceThemeType;
 
 pub struct HotbarWindow<P, const N: usize> {
     skills_path: P,
@@ -33,7 +34,7 @@ where
         window! {
             title: "Hotbar",
             class: Self::window_class(),
-            theme: ClientThemeType::Game,
+            theme: InterfaceThemeType::Game,
             elements: (
                 split! {
                     children: std::array::from_fn::<_, N, _>(|slot| {

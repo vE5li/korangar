@@ -20,7 +20,6 @@ use crate::graphics::EntityInstruction;
 #[cfg(feature = "debug")]
 use crate::graphics::{BindlessSupport, DebugRectangleInstruction};
 use crate::interface::layout::{ScreenPosition, ScreenSize};
-use crate::interface::theme::GameTheme;
 use crate::interface::windows::WindowCache;
 use crate::loaders::GameFileLoader;
 #[cfg(feature = "debug")]
@@ -28,6 +27,7 @@ use crate::loaders::split_mesh_by_texture;
 use crate::renderer::GameInterfaceRenderer;
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
+use crate::state::theme::GameTheme;
 use crate::world::{ActionEvent, AnimationActionType, AnimationData, AnimationState, Camera, Library, Map};
 #[cfg(feature = "debug")]
 use crate::world::{MarkerIdentifier, SubMesh};

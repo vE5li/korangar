@@ -6,7 +6,8 @@ use crate::SkillSource;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::{WindowCache, WindowClass};
 use crate::inventory::Skill;
-use crate::state::{ClientState, ClientThemeType};
+use crate::state::ClientState;
+use crate::state::theme::InterfaceThemeType;
 
 pub struct SkillTreeWindow<P> {
     skills_path: P,
@@ -36,7 +37,7 @@ where
         window! {
             title: "Skill tree",
             class: Self::window_class(),
-            theme: ClientThemeType::Game,
+            theme: InterfaceThemeType::Game,
             closable: true,
             elements: std::array::from_fn::<_, SKILL_TREE_ROWS, _>(|row| {
                 split! {

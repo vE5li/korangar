@@ -14,7 +14,8 @@ use crate::interface::layout::ScreenSize;
 use crate::interface::windows::{WindowCache, WindowClass};
 use crate::loaders::{ClientInfo, ClientInfoPathExt};
 use crate::settings::{LoginSettings, LoginSettingsPathExt, ServiceSettings, ServiceSettingsPathExt};
-use crate::state::{ClientState, ClientThemeType, LoginWindowState, LoginWindowStatePathExt};
+use crate::state::theme::InterfaceThemeType;
+use crate::state::{ClientState, LoginWindowState, LoginWindowStatePathExt};
 
 const MAXIMUM_USERNAME_LENGTH: usize = 24;
 const MAXIMUM_PASSWORD_LENGTH: usize = 24;
@@ -189,7 +190,7 @@ where
         window! {
             title: "Log In",
             class: Self::window_class(),
-            theme: ClientThemeType::Menu,
+            theme: InterfaceThemeType::Menu,
             minimum_width: 450.0,
             maximum_width: 450.0,
             elements: (

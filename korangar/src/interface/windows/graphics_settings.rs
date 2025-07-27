@@ -10,7 +10,8 @@ use crate::graphics::{
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::{WindowCache, WindowClass};
 use crate::settings::{GraphicsSettingsCapabilitiesPathExt, GraphicsSettingsPathExt, LightingMode};
-use crate::state::{ClientState, ClientThemeType};
+use crate::state::ClientState;
+use crate::state::theme::InterfaceThemeType;
 use crate::{GraphicsSettings, GraphicsSettingsCapabilities};
 
 pub struct GraphicsSettingsWindow<A, B> {
@@ -160,7 +161,7 @@ where
         window! {
             title: "Graphics Settings",
             class: Self::window_class(),
-            theme: ClientThemeType::Game,
+            theme: InterfaceThemeType::Game,
             closable: true,
             elements: elements,
         }

@@ -54,7 +54,6 @@ use character_slots::CharacterSlots;
 use graphics::RenderOptions;
 use image::{EncodableLayout, ImageFormat, ImageReader};
 use interface::layout::CornerRadius;
-use interface::theme::{CursorThemePathExt, GameTheme, GameThemePathExt, IndicatorThemePathExt};
 use inventory::{HotbarPathExt, InventoryPathExt, SkillTreePathExt};
 use korangar_audio::{AudioEngine, SoundEffectKey};
 #[cfg(feature = "debug")]
@@ -85,10 +84,11 @@ use ragnarok_packets::{
 use renderer::InterfaceRenderer;
 use rust_state::{BoxedExt, Context, ManuallyAssertExt, OptionExt, Path, RustState};
 use settings::{AudioSettings, AudioSettingsPathExt, GraphicsSettingsCapabilities, GraphicsSettingsPathExt};
-use state::{
-    ChatMessage, ClientState, ClientStatePathExt, ClientStateRootExt, ClientThemeType, DefaultMenu, DefaultPlaying, InterfaceTheme,
-    InterfaceThemePathExt, LoginWindowState, ThemeDefault, client_state, this_entity, this_player,
+use state::theme::{
+    CursorThemePathExt, GameTheme, GameThemePathExt, IndicatorThemePathExt, InterfaceTheme, InterfaceThemePathExt, InterfaceThemeType,
+    ThemeDefault,
 };
+use state::{ChatMessage, ClientState, ClientStatePathExt, ClientStateRootExt, LoginWindowState, client_state, this_entity, this_player};
 #[cfg(feature = "debug")]
 use wgpu::Device;
 use wgpu::util::initialize_adapter_from_env_or_default;
@@ -661,9 +661,6 @@ impl Client {
             let particle_holder = ParticleHolder::default();
             let point_light_manager = PointLightManager::new();
             let effect_holder = EffectHolder::default();
-            // let inventory = Inventory::default();
-            // let skill_tree = SkillTree::default();
-            // let hotbar = Hotbar::default();
             let path_finder = PathFinder::default();
 
             let point_light_set_buffer = ResourceSetBuffer::default();
@@ -2546,8 +2543,8 @@ impl Client {
                 };
 
                 let tooltip_theme = match self.client_state.try_follow(this_player()).is_none() {
-                    true => ClientThemeType::Menu,
-                    false => ClientThemeType::Game,
+                    true => InterfaceThemeType::Menu,
+                    false => InterfaceThemeType::Game,
                 };
 
                 // This is only needed for rendering the tooltips.

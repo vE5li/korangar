@@ -13,7 +13,8 @@ use crate::character_slots::{CharacterSlots, CharacterSlotsExt};
 use crate::interface::components::character_slot_preview::CharacterSlotPreviewHandler;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::{WindowCache, WindowClass};
-use crate::state::{ClientState, ClientThemeType};
+use crate::state::ClientState;
+use crate::state::theme::InterfaceThemeType;
 
 pub struct CharacterSelectionWindow<C, M> {
     character_slots: C,
@@ -175,7 +176,7 @@ where
         window! {
             title: "Select Character",
             class: Self::window_class(),
-            theme: ClientThemeType::Menu,
+            theme: InterfaceThemeType::Menu,
             minimum_width: 900.0,
             maximum_width: 900.0,
             elements: (

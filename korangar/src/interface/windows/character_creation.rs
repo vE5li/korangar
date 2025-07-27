@@ -6,7 +6,8 @@ use rust_state::{Context, Path};
 use crate::input::UserEvent;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::{WindowCache, WindowClass};
-use crate::state::{ClientState, ClientThemeType};
+use crate::state::ClientState;
+use crate::state::theme::InterfaceThemeType;
 
 const MINIMUM_NAME_LENGTH: usize = 4;
 const MAXIMUM_NAME_LENGTH: usize = 24;
@@ -47,7 +48,7 @@ where
         window! {
             title: "Create Character",
             class: Self::window_class(),
-            theme: ClientThemeType::Menu,
+            theme: InterfaceThemeType::Menu,
             closable: true,
             elements: (
                 text_box! {

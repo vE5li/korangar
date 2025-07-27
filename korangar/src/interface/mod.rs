@@ -1,7 +1,5 @@
-pub mod application;
 pub mod cursor;
 pub mod layout;
-pub mod theme;
 // pub mod dialog;
 pub mod resource;
 pub mod windows;
@@ -428,7 +426,6 @@ pub mod components {
     }
 
     pub mod item_box {
-        use korangar_interface::application::FontSizeTrait;
         use korangar_interface::element::Element;
         use korangar_interface::element::id::ElementIdGenerator;
         use korangar_interface::element::store::ElementStore;
@@ -526,7 +523,6 @@ pub mod components {
     }
 
     pub mod skill_box {
-        use korangar_interface::application::FontSizeTrait;
         use korangar_interface::element::Element;
         use korangar_interface::element::id::ElementIdGenerator;
         use korangar_interface::element::store::ElementStore;

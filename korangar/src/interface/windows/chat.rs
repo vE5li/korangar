@@ -18,10 +18,8 @@ use crate::input::UserEvent;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
 use crate::loaders::{FontLoader, FontSize};
-use crate::state::{
-    ChatMessage, ChatThemePathExt, ChatWindowState, ChatWindowStatePathExt, ClientState, ClientThemeType, InterfaceThemePathExt,
-    client_theme,
-};
+use crate::state::theme::{ChatThemePathExt, InterfaceThemePathExt, InterfaceThemeType};
+use crate::state::{ChatMessage, ChatWindowState, ChatWindowStatePathExt, ClientState, client_theme};
 
 const MAXIMUM_CHAT_MESSAGE_LENGTH: usize = 80;
 
@@ -156,7 +154,7 @@ where
         window! {
             title: "Chat",
             class: Self::window_class(),
-            theme: ClientThemeType::Game,
+            theme: InterfaceThemeType::Game,
             background_color: client_theme().chat().window_color(),
             minimum_height: 150.0,
             maximum_height: 800.0,

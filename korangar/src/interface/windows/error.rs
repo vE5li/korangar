@@ -2,7 +2,8 @@ use derive_new::new;
 use korangar_interface::window::{CustomWindow, WindowTrait};
 
 use crate::graphics::Color;
-use crate::state::{ClientState, ClientThemeType};
+use crate::state::ClientState;
+use crate::state::theme::InterfaceThemeType;
 
 #[derive(new)]
 pub struct ErrorWindow {
@@ -15,7 +16,7 @@ impl CustomWindow<ClientState> for ErrorWindow {
 
         window! {
             title: "Error",
-            theme: ClientThemeType::Menu,
+            theme: InterfaceThemeType::Menu,
             closable: true,
             elements: (text! {
                 text: self.message,

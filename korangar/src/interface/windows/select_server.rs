@@ -17,7 +17,8 @@ use crate::input::UserEvent;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::{WindowCache, WindowClass};
 use crate::loaders::ServiceId;
-use crate::state::{ClientState, ClientThemeType};
+use crate::state::ClientState;
+use crate::state::theme::InterfaceThemeType;
 
 pub struct SelectServerWindow<P> {
     path: P,
@@ -141,7 +142,7 @@ where
         window! {
             title: "Select Server",
             class: Self::window_class(),
-            theme: ClientThemeType::Menu,
+            theme: InterfaceThemeType::Menu,
             minimum_width: 450.0,
             maximum_width: 450.0,
             elements: ServerWrapper::new(self.path),

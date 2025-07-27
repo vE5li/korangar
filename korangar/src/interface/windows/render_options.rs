@@ -12,7 +12,8 @@ use crate::client_state;
 use crate::graphics::{RenderOptions, RenderOptionsPathExt};
 use crate::interface::layout::{ScreenSize, ScreenSizePathExt};
 use crate::interface::windows::{WindowCache, WindowClass};
-use crate::state::{ClientState, ClientStatePathExt, ClientThemeType};
+use crate::state::theme::InterfaceThemeType;
+use crate::state::{ClientState, ClientStatePathExt};
 
 // TODO: Remove once event can be implied.
 fn render_state_button(text: &'static str, path: impl Path<ClientState, bool>) -> impl Element<ClientState> {
@@ -158,7 +159,7 @@ where
         window! {
             title: "Render Options",
             class: Self::window_class(),
-            theme: ClientThemeType::Game,
+            theme: InterfaceThemeType::Game,
             closable: true,
             minimum_height: 300.0,
             // Set the maximum window height to be 80% of the main window height.

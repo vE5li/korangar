@@ -4,7 +4,8 @@ use rust_state::{Context, Path};
 
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
-use crate::state::{ClientState, ClientThemeType};
+use crate::state::ClientState;
+use crate::state::theme::InterfaceThemeType;
 
 pub struct FrameInspectorWindow<P> {
     path: P,
@@ -25,7 +26,7 @@ where
 
         window! {
             title: "Frame Inspector",
-            theme: ClientThemeType::Game,
+            theme: InterfaceThemeType::Game,
             closable: true,
             elements: (),
         }

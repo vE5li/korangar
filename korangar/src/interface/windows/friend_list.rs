@@ -6,7 +6,8 @@ use rust_state::Path;
 use crate::input::UserEvent;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::{WindowCache, WindowClass};
-use crate::state::{ClientState, ClientThemeType};
+use crate::state::ClientState;
+use crate::state::theme::InterfaceThemeType;
 
 pub struct FriendListWindow<A> {
     friend_list_path: A,
@@ -32,7 +33,7 @@ where
         window! {
             title: "Friend list",
             class: Self::window_class(),
-            theme: ClientThemeType::Game,
+            theme: InterfaceThemeType::Game,
             closable: true,
             minimum_height: 300.0,
             elements: (

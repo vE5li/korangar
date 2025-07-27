@@ -4,7 +4,8 @@ use rust_state::Context;
 use crate::input::UserEvent;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::{WindowCache, WindowClass};
-use crate::state::{ClientState, ClientThemeType};
+use crate::state::ClientState;
+use crate::state::theme::InterfaceThemeType;
 
 pub struct TimeWindow;
 
@@ -19,7 +20,7 @@ impl CustomWindow<ClientState> for TimeWindow {
         window! {
             title: "Time",
             class: Self::window_class(),
-            theme: ClientThemeType::Game,
+            theme: InterfaceThemeType::Game,
             closable: true,
             elements: (
                 button! {

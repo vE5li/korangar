@@ -6,7 +6,8 @@ use crate::graphics::Color;
 use crate::input::UserEvent;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::{WindowCache, WindowClass};
-use crate::state::{ClientState, ClientThemeType};
+use crate::state::ClientState;
+use crate::state::theme::InterfaceThemeType;
 
 pub struct FriendRequestWindow {
     friend: Friend,
@@ -25,7 +26,7 @@ impl CustomWindow<ClientState> for FriendRequestWindow {
         window! {
             title: "Friend request",
             class: Some(WindowClass::FriendRequest),
-            theme: ClientThemeType::Menu,
+            theme: InterfaceThemeType::Menu,
             closable: true,
             elements: (
                 text! {

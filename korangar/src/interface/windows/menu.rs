@@ -4,7 +4,8 @@ use rust_state::Context;
 use crate::input::UserEvent;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::{WindowCache, WindowClass};
-use crate::state::{ClientState, ClientThemeType, DebugButtonThemePathExt, InterfaceThemePathExt, client_theme};
+use crate::state::theme::{DebugButtonThemePathExt, InterfaceThemePathExt, InterfaceThemeType};
+use crate::state::{ClientState, client_theme};
 
 #[derive(Default)]
 pub struct MenuWindow;
@@ -20,7 +21,7 @@ impl CustomWindow<ClientState> for MenuWindow {
         window! {
             title: "Menu",
             class: Self::window_class(),
-            theme: ClientThemeType::Game,
+            theme: InterfaceThemeType::Game,
             closable: true,
             elements: (
                 button! {

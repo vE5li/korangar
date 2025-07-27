@@ -4,7 +4,8 @@ use rust_state::{Context, Path};
 
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::{WindowCache, WindowClass};
-use crate::state::{ClientState, ClientThemeType};
+use crate::state::ClientState;
+use crate::state::theme::InterfaceThemeType;
 
 pub struct ProfilerWindow<V> {
     visible_thread_path: V,
@@ -30,7 +31,7 @@ where
         window! {
             title: "Profiler",
             class: Self::window_class(),
-            theme: ClientThemeType::Game,
+            theme: InterfaceThemeType::Game,
             closable: true,
             elements: (),
         }

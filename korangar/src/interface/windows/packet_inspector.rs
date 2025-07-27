@@ -10,7 +10,8 @@ use crate::input::UserEvent;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::{WindowCache, WindowClass};
 use crate::networking::{PacketHistory, PacketHistoryPathExt};
-use crate::state::{ClientState, ClientThemeType};
+use crate::state::ClientState;
+use crate::state::theme::InterfaceThemeType;
 
 pub struct PacketInspector<A> {
     packet_history_path: A,
@@ -91,7 +92,7 @@ where
         window! {
             title: "Packet Inspector",
             class: Self::window_class(),
-            theme: ClientThemeType::Game,
+            theme: InterfaceThemeType::Game,
             closable: true,
             elements: (
                 fragment! {

@@ -8,7 +8,8 @@ use rust_state::{Path, Selector};
 use crate::ItemSource;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::{WindowCache, WindowClass};
-use crate::state::{ClientState, ClientThemeType};
+use crate::state::ClientState;
+use crate::state::theme::InterfaceThemeType;
 use crate::world::ResourceMetadata;
 
 struct EquipmentPath<P> {
@@ -101,7 +102,7 @@ where
         window! {
             title: "Equipment",
             class: Self::window_class(),
-            theme: ClientThemeType::Game,
+            theme: InterfaceThemeType::Game,
             closable: true,
             elements: [
                 equip_box(self.items_path, EquipPosition::HEAD_TOP),

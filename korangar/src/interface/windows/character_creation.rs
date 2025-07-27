@@ -51,7 +51,7 @@ where
             closable: true,
             elements: (
                 text_box! {
-                    text: "Character name",
+                    ghost_text: "Character name",
                     state: self.path,
                     input_handler: DefaultHandler::<_, _, MAXIMUM_NAME_LENGTH>::new(self.path, create_action),
                     focus_id: CharacterName,

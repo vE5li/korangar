@@ -162,7 +162,7 @@ where
             maximum_height: 800.0,
             elements: (
                 text_box! {
-                    text: "Chat message",
+                    ghost_text: "Enter chat message or command",
                     state: current_message_path,
                     input_handler: DefaultHandler::<_, _, MAXIMUM_CHAT_MESSAGE_LENGTH>::new(current_message_path, send_action),
                     background_color: client_theme().chat().text_box_background_color(),

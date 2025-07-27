@@ -204,13 +204,13 @@ where
                     gaps: 8.0,
                     children: (
                         text_box! {
-                            text: "Username",
+                            ghost_text: "Username",
                             state: username_path,
                             input_handler: DefaultHandler::<_, _, MAXIMUM_USERNAME_LENGTH>::new(username_path, username_action),
                             focus_id: UsernameTextBox,
                         },
                         text_box! {
-                            text: "Password",
+                            ghost_text: "Password",
                             state: password_path,
                             input_handler: DefaultHandler::<_, _, MAXIMUM_PASSWORD_LENGTH>::new(password_path, password_action),
                             focus_id: PasswordTextBox,

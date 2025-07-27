@@ -25,6 +25,7 @@ where
     pub hovered_background_color: App::Color,
     pub focused_foreground_color: App::Color,
     pub focused_background_color: App::Color,
+    pub ghost_foreground_color: App::Color,
     pub hide_icon_color: App::Color,
     pub hovered_hide_icon_color: App::Color,
     pub height: f32,
@@ -50,9 +51,9 @@ impl PersistentData for TextBoxData {
     }
 }
 
-pub struct TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Id> {
+pub struct TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, Id> {
     pub text_marker: PhantomData<Text>,
-    pub text: A,
+    pub ghost_text: A,
     pub state: B,
     pub input_handler: C,
     pub hidable: D,
@@ -62,23 +63,24 @@ pub struct TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Id> {
     pub hovered_background_color: H,
     pub focused_foreground_color: I,
     pub focused_background_color: J,
-    pub hide_icon_color: K,
-    pub hovered_hide_icon_color: L,
-    pub height: M,
-    pub corner_radius: N,
-    pub font_size: O,
-    pub text_alignment: P,
+    pub ghost_foreground_color: K,
+    pub hide_icon_color: L,
+    pub hovered_hide_icon_color: M,
+    pub height: N,
+    pub corner_radius: O,
+    pub font_size: P,
+    pub text_alignment: Q,
     pub focus_id: Id,
 }
 
-impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Id> Persistent
-    for TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Id>
+impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, Id> Persistent
+    for TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, Id>
 {
     type Data = TextBoxData;
 }
 
-impl<App, Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Id> Element<App>
-    for TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Id>
+impl<App, Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, Id> Element<App>
+    for TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, Id>
 where
     App: Application,
     Text: AsRef<str> + 'static,
@@ -94,10 +96,11 @@ where
     J: Selector<App, App::Color>,
     K: Selector<App, App::Color>,
     L: Selector<App, App::Color>,
-    M: Selector<App, f32>,
-    N: Selector<App, App::CornerRadius>,
-    O: Selector<App, App::FontSize>,
-    P: Selector<App, HorizontalAlignment>,
+    M: Selector<App, App::Color>,
+    N: Selector<App, f32>,
+    O: Selector<App, App::CornerRadius>,
+    P: Selector<App, App::FontSize>,
+    Q: Selector<App, HorizontalAlignment>,
     Id: Any,
 {
     fn create_layout_info(
@@ -171,12 +174,6 @@ where
 
         layout.add_rectangle(layout_info.area, corner_radius, background_color);
 
-        let foreground_color = match is_hovered {
-            _ if is_focused => *state.get(&self.focused_foreground_color),
-            true => *state.get(&self.hovered_foreground_color),
-            false => *state.get(&self.foreground_color),
-        };
-
         let mut display_text = state.get(&self.state).as_str();
 
         if let Some((button_area, is_hovered, persistent_data)) = hide_button {
@@ -211,16 +208,18 @@ where
             layout.add_icon(icon_area, Icon::Eye { open: is_hidden }, icon_color);
         }
 
-        // layout.add_text(
-        //     area,
-        //     state.get(&self.text).as_ref(),
-        //     *state.get(&self.font_size),
-        //     foreground_color,
-        //     *state.get(&self.text_alignment),
-        //     *state.get(&theme().text_box().vertical_alignment()),
-        // );
+        let show_ghost_text = display_text.is_empty() && !is_focused;
 
-        layout.register_focus_id(self.focus_id.focus_id(), element_id);
+        if show_ghost_text {
+            display_text = state.get(&self.ghost_text).as_ref();
+        }
+
+        let foreground_color = match is_hovered {
+            _ if show_ghost_text => *state.get(&self.ghost_foreground_color),
+            _ if is_focused => *state.get(&self.focused_foreground_color),
+            true => *state.get(&self.hovered_foreground_color),
+            false => *state.get(&self.foreground_color),
+        };
 
         layout.add_text(
             layout_info.area,
@@ -230,6 +229,8 @@ where
             *state.get(&self.text_alignment),
             *state.get(&crate::theme::theme().text_box().vertical_alignment()),
         );
+
+        layout.register_focus_id(self.focus_id.focus_id(), element_id);
     }
 }
 

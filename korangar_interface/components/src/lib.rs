@@ -168,7 +168,7 @@ pub fn scroll_view(token_stream: TokenStream) -> TokenStream {
 pub fn text_box(token_stream: TokenStream) -> TokenStream {
     create_component_macro!(korangar_interface::components::text_box::TextBox, {
         text_marker: { const std::marker::PhantomData },
-        text: !,
+        ghost_text: !,
         state: !,
         input_handler: !,
         hidable: { false },
@@ -178,6 +178,7 @@ pub fn text_box(token_stream: TokenStream) -> TokenStream {
         hovered_background_color: { korangar_interface::theme::theme().text_box().hovered_background_color() },
         focused_foreground_color: { korangar_interface::theme::theme().text_box().focused_foreground_color() },
         focused_background_color: { korangar_interface::theme::theme().text_box().focused_background_color() },
+        ghost_foreground_color: { korangar_interface::theme::theme().text_box().ghost_foreground_color() },
         hide_icon_color: { korangar_interface::theme::theme().text_box().hide_icon_color() },
         hovered_hide_icon_color: { korangar_interface::theme::theme().text_box().hovered_hide_icon_color() },
         height: { korangar_interface::theme::theme().text_box().height() },

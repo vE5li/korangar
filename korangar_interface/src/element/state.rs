@@ -310,7 +310,7 @@ where
                     text: name,
                 },
                 text_box! {
-                    text: "Dummy",
+                    ghost_text: "Empty string",
                     state: self_path,
                     input_handler: DefaultHandler::<_, _, { usize::MAX }>::new(self_path, action),
                     focus_id: PrivateFocusId,

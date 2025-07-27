@@ -12,7 +12,7 @@ use std::sync::Arc;
 use cgmath::Point3;
 pub use effect::EffectRenderer;
 pub use game_interface::{AlignHorizontal, GameInterfaceRenderer};
-pub use interface::InterfaceRenderer;
+pub use interface::{InterfaceRenderer, LayoutExt};
 #[cfg(feature = "debug")]
 pub use marker::DebugMarkerRenderer;
 

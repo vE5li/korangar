@@ -443,8 +443,8 @@ pub mod components {
         use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
         use crate::interface::resource::{ItemSource, Move, PartialMove};
         use crate::loaders::{FontSize, Scaling};
-        use crate::renderer::{InterfaceRenderer, SpriteRenderer};
-        use crate::state::{ClientState, LayoutExt};
+        use crate::renderer::{InterfaceRenderer, LayoutExt, SpriteRenderer};
+        use crate::state::ClientState;
         use crate::world::ResourceMetadata;
 
         #[derive(Default)]
@@ -543,8 +543,8 @@ pub mod components {
         use crate::interface::resource::{ItemSource, Move, PartialMove, SkillSource};
         use crate::inventory::Skill;
         use crate::loaders::{FontSize, Scaling};
-        use crate::renderer::{InterfaceRenderer, SpriteRenderer};
-        use crate::state::{ClientState, LayoutExt};
+        use crate::renderer::{InterfaceRenderer, LayoutExt, SpriteRenderer};
+        use crate::state::ClientState;
         use crate::world::ResourceMetadata;
 
         pub struct LevelDisplay {

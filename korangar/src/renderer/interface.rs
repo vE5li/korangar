@@ -2,11 +2,16 @@ use std::cell::{Ref, RefCell};
 use std::sync::Arc;
 
 use cgmath::EuclideanSpace;
+use korangar_interface::application::RenderLayer;
+use korangar_interface::layout::area::Area;
+use korangar_interface::layout::{ClipLayer, ClipLayerId, Icon, Layout};
 
 use crate::graphics::{Color, InterfaceRectangleInstruction, Texture};
 use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
-use crate::loaders::{FontLoader, FontSize, GlyphInstruction, ImageType, TextureLoader};
+use crate::loaders::{FontLoader, FontSize, GlyphInstruction, ImageType, Sprite, TextureLoader};
 use crate::renderer::SpriteRenderer;
+use crate::state::ClientState;
+use crate::world::{Actions, SpriteAnimationState};
 
 /// Renders the interface provided by 'korangar_interface'.
 pub struct InterfaceRenderer {
@@ -275,5 +280,146 @@ impl SpriteRenderer for InterfaceRenderer {
             corner_radius,
             texture,
         });
+    }
+}
+
+struct TextureInstruction {
+    texture: Arc<Texture>,
+    clip_layer: ClipLayerId,
+    area: Area,
+    color: Color,
+    smooth: bool,
+}
+
+struct SpriteInstruction<'a> {
+    actions: &'a Actions,
+    sprite: &'a Sprite,
+    animation_state: &'a SpriteAnimationState,
+    clip_layer: ClipLayerId,
+    area: Area,
+    color: Color,
+    smooth: bool,
+}
+
+pub enum CustomInstruction<'a> {
+    Texture(TextureInstruction),
+    Sprite(SpriteInstruction<'a>),
+}
+
+impl RenderLayer<ClientState> for InterfaceRenderer {
+    type CustomIcon = ();
+    type CustomInstruction<'a> = CustomInstruction<'a>;
+
+    fn render_rectangle(&self, position: ScreenPosition, size: ScreenSize, clip: ScreenClip, corner_radius: CornerRadius, color: Color) {
+        self.render_rectangle(position, size, clip, corner_radius, color);
+    }
+
+    fn get_text_dimensions(&self, text: &str, font_size: FontSize, available_width: f32) -> ScreenSize {
+        self.get_text_dimensions(text, font_size, available_width)
+    }
+
+    fn render_text(&self, text: &str, position: ScreenPosition, clip: ScreenClip, color: Color, font_size: FontSize) {
+        self.render_text(text, position, clip, color, font_size);
+    }
+
+    fn render_icon(&self, position: ScreenPosition, size: ScreenSize, clip: ScreenClip, icon: Icon<ClientState>, color: Color) {
+        match icon {
+            Icon::ExpandArrow { expanded } => self.render_expand_arrow(position, size, clip, color, expanded),
+            Icon::Checkbox { checked } => self.render_checkbox(position, size, clip, color, checked),
+            Icon::Eye { open } => self.render_eye(position, size, clip, color, open),
+            Icon::TrashCan => self.render_trash_can(position, size, clip, color),
+            Icon::Custom(_) => (),
+        }
+    }
+
+    fn render_custom(&self, instruction: Self::CustomInstruction<'_>, clip_layers: &[ClipLayer<ClientState>]) {
+        match instruction {
+            CustomInstruction::Sprite(SpriteInstruction {
+                actions,
+                sprite,
+                animation_state,
+                clip_layer,
+                area,
+                color,
+                smooth,
+            }) => {
+                let position = ScreenPosition {
+                    left: area.left + area.width / 2.0,
+                    top: area.top + area.height / 2.0,
+                };
+                let screen_clip = clip_layers[clip_layer.0].get();
+
+                actions.render_sprite(self, sprite, animation_state, position, 0, screen_clip, color, 1.0);
+            }
+            CustomInstruction::Texture(TextureInstruction {
+                texture,
+                clip_layer,
+                area,
+                color,
+                smooth,
+            }) => {
+                let position = ScreenPosition {
+                    left: area.left,
+                    top: area.top,
+                };
+                let size = ScreenSize {
+                    width: area.width,
+                    height: area.height,
+                };
+                let screen_clip = clip_layers[clip_layer.0].get();
+
+                self.render_sprite(texture, position, size, screen_clip, color, smooth);
+            }
+        }
+    }
+}
+
+pub trait LayoutExt<'a> {
+    fn add_texture(&mut self, texture: Arc<Texture>, area: Area, color: Color, smooth: bool);
+
+    fn add_sprite(
+        &mut self,
+        actions: &'a Actions,
+        sprite: &'a Sprite,
+        animation_state: &'a SpriteAnimationState,
+        area: Area,
+        color: Color,
+        smooth: bool,
+    );
+}
+
+impl<'a> LayoutExt<'a> for Layout<'a, ClientState> {
+    fn add_texture(&mut self, texture: Arc<Texture>, area: Area, color: Color, smooth: bool) {
+        let clip_layer = self.get_active_clip_layer();
+
+        self.add_custom_instruction(CustomInstruction::Texture(TextureInstruction {
+            texture,
+            clip_layer,
+            area,
+            color,
+            smooth,
+        }));
+    }
+
+    fn add_sprite(
+        &mut self,
+        actions: &'a Actions,
+        sprite: &'a Sprite,
+        animation_state: &'a SpriteAnimationState,
+        area: Area,
+        color: Color,
+        smooth: bool,
+    ) {
+        let clip_layer = self.get_active_clip_layer();
+
+        self.add_custom_instruction(CustomInstruction::Sprite(SpriteInstruction {
+            actions,
+            sprite,
+            animation_state,
+            clip_layer,
+            area,
+            color,
+            smooth,
+        }));
     }
 }

@@ -10,33 +10,40 @@ use crate::components::text_box::TextBoxTheme;
 use crate::layout::tooltip::TooltipTheme;
 use crate::window::WindowTheme;
 
+/// Glue between [`korangar_interface`] and the final application. This trait
+/// allows the final application to define the theme with any layout and with
+/// additional fields, so long is it can return paths to all of the themes this
+/// crate needs to render the basic components.
 pub trait ThemePathGetter<App: Application>: Copy {
+    /// Create a new path. This is only used in [`theme`].
     fn new() -> Self;
 
+    /// Path to the window theme.
     fn window(self) -> impl Path<App, WindowTheme<App>>;
 
+    /// Path to the text theme.
     fn text(self) -> impl Path<App, TextTheme<App>>;
 
+    /// Path to the button theme.
     fn button(self) -> impl Path<App, ButtonTheme<App>>;
 
+    /// Path to the state button theme.
     fn state_button(self) -> impl Path<App, StateButtonTheme<App>>;
 
+    /// Path to the text box theme.
     fn text_box(self) -> impl Path<App, TextBoxTheme<App>>;
 
+    /// Path to the collapsable theme.
     fn collapsable(self) -> impl Path<App, CollapsableTheme<App>>;
 
+    /// Path to the drop down theme.
     fn drop_down(self) -> impl Path<App, DropDownTheme<App>>;
 
+    /// Path to the tooltip theme.
     fn tooltip(self) -> impl Path<App, TooltipTheme<App>>;
 }
 
+/// Path to the theme of the window.
 pub fn theme<App: Application>() -> impl ThemePathGetter<App> {
     App::ThemeGetter::new()
 }
-
-// TODO: Rename `theme` to `theme_internal` or something and expose theme like
-// this. We want to do that be cause impl ThemePathGetter will not allow the
-// end user to get custom themes but without it this crate is unable to
-// infer the types. pub fn theme<App: Application>() -> App::ThemeGetter {
-//     App::ThemeGetter::new()
-// }

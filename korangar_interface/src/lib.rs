@@ -43,6 +43,9 @@ use window::{Anchor, CustomWindow, DisplayInformation, StateWindow, WindowData, 
 use crate::element::id::FocusIdExt;
 
 pub mod prelude {
+    //! Prelude for implementing elements or windows. Mainly to reduce the
+    //! number of `*PathExt` imports.
+
     // Re-export proc macros.
     pub use interface_component_macros::create_component_macro;
     pub use interface_components::*;

@@ -32,15 +32,21 @@ use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenS
 use crate::interface::windows::{WindowCache, WindowClass};
 use crate::inventory::{Hotbar, Inventory, SkillTree};
 use crate::loaders::{ClientInfo, FontSize, GameFileLoader, Scaling, ServiceId, Sprite, load_client_info};
-use crate::renderer::SpriteRenderer;
+use crate::renderer::{InterfaceRenderer, SpriteRenderer};
 use crate::settings::{GraphicsSettingsCapabilities, LoginSettings};
 use crate::state::theme::{GameTheme, ThemeDefault};
 use crate::world::{Actions, AnimationState, Entity, Map, Player, ResourceMetadata, SpriteAnimationState};
 use crate::{AudioSettings, GraphicsSettings};
 
+/// A message in the in-game chat.
+///
+/// The message stores the color separatly rather than baking it into the
+/// message so the chat window can use the correct colors when switching themes.
 #[derive(Debug, Clone, RustState, StateElement)]
 pub struct ChatMessage {
+    /// Raw message.
     pub text: String,
+    /// Color of the message.
     // TODO: Unhide
     #[hidden_element]
     pub color: MessageColor,
@@ -58,6 +64,9 @@ pub struct ChatWindowState {
     pub current_message: String,
 }
 
+/// Internal state of the client. Everything that can be viewed or modified via
+/// the user interface should be in here. State that takes care of managing OS
+/// or rendering resources should be in [`Client`](super::Client).
 #[derive(RustState, StateElement, StateWindow)]
 #[cfg_attr(feature = "debug", window_class(WindowClass::ClientStateInspector))]
 #[window_title("Client State Inspector")]
@@ -291,8 +300,11 @@ impl ClientState {
     }
 }
 
+/// Static used to create a path without arguments that points the the current
+/// theme when creating the layout for a given window.
 static mut CURRENT_THEME: InterfaceThemeType = InterfaceThemeType::Game;
 
+/// Path resolving to the selected theme for the window.
 #[derive(Clone, Copy)]
 pub struct ThemePath;
 
@@ -318,6 +330,7 @@ impl Selector<ClientState, InterfaceTheme> for ThemePath {
     }
 }
 
+/// Glue between our [`InterfaceTheme`] and [`korangar_interface`].
 #[derive(Clone, Copy)]
 pub struct ClientThemeGetter;
 
@@ -367,7 +380,7 @@ impl Application for ClientState {
     type Event = UserEvent;
     type FontSize = FontSize;
     type Position = ScreenPosition;
-    type Renderer = crate::renderer::InterfaceRenderer;
+    type Renderer = InterfaceRenderer;
     type Size = ScreenSize;
     type ThemeGetter = ClientThemeGetter;
     type ThemeType = InterfaceThemeType;
@@ -384,14 +397,18 @@ impl Application for ClientState {
     }
 }
 
+/// Path to the [`ClientState`] root.
 pub fn client_state() -> impl Path<ClientState, ClientState> {
     ClientState::path()
 }
 
+/// Path to the current theme, same as [`korangar_interface::theme::theme`] but
+/// more strongly typed so we can use the additional fields.
 pub fn client_theme() -> impl Path<ClientState, InterfaceTheme> {
     ThemePath
 }
 
+/// Path to the player as [`Player`].
 pub fn this_player() -> impl Path<ClientState, Player, false> {
     #[derive(Clone, Copy)]
     struct CustomPath;
@@ -423,6 +440,7 @@ pub fn this_player() -> impl Path<ClientState, Player, false> {
     CustomPath
 }
 
+/// Path to the player as [`Entity`].
 pub fn this_entity() -> impl Path<ClientState, Entity, false> {
     #[derive(Clone, Copy)]
     struct CustomPath;

@@ -283,6 +283,11 @@ impl SpriteRenderer for InterfaceRenderer {
     }
 }
 
+/// An instruction to render a texture.
+///
+/// These are not used outside this module but are exposed through
+/// [`CustomInstruction`]. Thus we explicitly allow a private interface.
+#[allow(private_interfaces)]
 struct TextureInstruction {
     texture: Arc<Texture>,
     clip_layer: ClipLayerId,
@@ -291,6 +296,11 @@ struct TextureInstruction {
     smooth: bool,
 }
 
+/// An instruction to render a sprite.
+///
+/// These are not used outside this module but are exposed through
+/// [`CustomInstruction`]. Thus we explicitly allow a private interface.
+#[allow(private_interfaces)]
 struct SpriteInstruction<'a> {
     actions: &'a Actions,
     sprite: &'a Sprite,

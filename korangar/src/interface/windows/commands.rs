@@ -28,6 +28,7 @@ impl CustomWindow<ClientState> for CommandsWindow {
                     text: "Base level",
                 },
                 split! {
+                    gaps: 5.0,
                     children: (
                         button! {
                             text: "+1",
@@ -55,6 +56,7 @@ impl CustomWindow<ClientState> for CommandsWindow {
                     text: "Job level",
                 },
                 split! {
+                    gaps: 5.0,
                     children: (
                         button! {
                             text: "+1",

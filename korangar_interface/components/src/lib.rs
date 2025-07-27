@@ -148,6 +148,7 @@ pub fn fragment(token_stream: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn split(token_stream: TokenStream) -> TokenStream {
     create_component_macro!(korangar_interface::components::split::Split, {
+        gaps: { 0.0 },
         children: !,
     });
 

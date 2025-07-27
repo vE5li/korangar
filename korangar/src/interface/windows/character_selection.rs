@@ -82,6 +82,7 @@ where
                         let path = self.character_slots;
 
                         self.item_boxes.push(Box::new(split! {
+                            gaps: 12.0,
                             children: (
                                 character_slot_preview! {
                                     character_information: path.in_slot(slot),

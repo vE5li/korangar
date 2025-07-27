@@ -99,6 +99,7 @@ where
                     gaps: 2.0,
                     children: (
                         split! {
+                            gaps: 5.0,
                             children: (
                                 button! {
                                     text: "Clear",
@@ -114,6 +115,7 @@ where
                             ),
                         },
                         split! {
+                            gaps: 5.0,
                             children: (
                                 state_button! {
                                     text: "Show incoming",

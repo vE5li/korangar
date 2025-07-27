@@ -2714,6 +2714,8 @@ impl Client {
         }
 
         if self.active_graphics_settings.high_quality_interface != graphics_settings.high_quality_interface {
+            self.interface_renderer
+                .update_high_quality_interface(graphics_settings.high_quality_interface);
             self.graphics_engine
                 .set_high_quality_interface(graphics_settings.high_quality_interface);
             self.active_graphics_settings.high_quality_interface = graphics_settings.high_quality_interface;

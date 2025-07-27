@@ -4,7 +4,7 @@ use proc_macro2::{Delimiter, TokenStream};
 use quote::{format_ident, quote};
 use syn::{DataStruct, Field};
 
-use crate::utils::{Version, get_unique_attribute};
+use crate::utils::{Version, VersionAndBuildVersion, get_unique_attribute};
 
 pub fn byte_convertable_helper(data_struct: DataStruct) -> (TokenStream, Vec<TokenStream>, Vec<TokenStream>, Vec<TokenStream>, Delimiter) {
     let mut from_bytes_implementations = vec![];
@@ -26,6 +26,7 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (TokenStream, Vec<Tok
         let field_type = field.ty.clone();
 
         let is_version = get_unique_attribute(&mut field.attrs, "version").is_some();
+        let is_build_version = get_unique_attribute(&mut field.attrs, "build_version").is_some();
 
         let length = get_unique_attribute(&mut field.attrs, "length").map(|attribute| match attribute.meta {
             syn::Meta::List(list) => list.tokens,
@@ -93,11 +94,18 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (TokenStream, Vec<Tok
             .map(|version: Version| (version.major, version.minor))
             .map(|(major, minor)| quote!(equals_or_above(#major, #minor)));
 
+        let version_and_build_version_equals_or_above = get_unique_attribute(&mut field.attrs, "version_and_build_version_equals_or_above")
+            .map(|attribute| attribute.parse_args().expect("failed to parse build version"))
+            .map(|element: VersionAndBuildVersion| (element.version.major, element.version.minor, element.build_version))
+            .map(|(major, minor, build)| quote!(and_build_version_equals_or_above(#major, #minor, #build)));
+
         assert!(
-            version_smaller.is_none() || version_equals_or_above.is_none(),
+            version_smaller.is_none() || version_equals_or_above.is_none() || version_and_build_version_equals_or_above.is_none(),
             "version restriction may only be specified once"
         );
-        let version_function = version_smaller.or(version_equals_or_above);
+        let version_function = version_smaller
+            .or(version_equals_or_above)
+            .or(version_and_build_version_equals_or_above);
         let version_restricted = version_function.is_some();
 
         // base from bytes implementation
@@ -193,8 +201,20 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (TokenStream, Vec<Tok
 
         if is_version {
             from_bytes_implementations.push(
-                quote!(*byte_reader.get_metadata_mut::<Self, Option<ragnarok_formats::version::InternalVersion>>()? = Some(ragnarok_formats::version::InternalVersion::from(#field_variable));),
-            );
+                quote!(
+                    *byte_reader.get_metadata_mut::<Self, Option<ragnarok_formats::version::InternalVersion>>()? = Some(ragnarok_formats::version::InternalVersion::from(#field_variable));
+                ));
+        }
+
+        if is_build_version {
+            from_bytes_implementations.push(quote!(
+                if let Some(build_version) = #field_variable {
+                    byte_reader
+                        .get_metadata_mut::<Self, Option<ragnarok_formats::version::InternalVersion>>()?
+                        .expect("tried to set build version without internal version")
+                        .build = build_version;
+                }
+            ));
         }
     }
 

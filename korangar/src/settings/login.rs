@@ -12,7 +12,6 @@ use crate::loaders::ServiceId;
 
 #[derive(Clone, Default, RustState, Serialize, Deserialize, StateElement)]
 pub struct LoginSettings {
-    pub service: String,
     // TODO: Unhide this element.
     #[hidden_element]
     pub service_settings: HashMap<ServiceId, ServiceSettings>,

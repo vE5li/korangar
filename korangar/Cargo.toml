@@ -23,7 +23,7 @@ image = { workspace = true, features = ["bmp", "jpeg", "png", "tga", "rayon"] }
 korangar_audio = { workspace = true }
 korangar_debug = { workspace = true, optional = true }
 korangar_interface = { workspace = true, features = ["serde", "cgmath"] }
-korangar_networking = { workspace = true, features = ["debug"] }
+korangar_networking = { workspace = true, features = ["interface"] }
 korangar_util = { workspace = true, features = ["interface"] }
 korangar_video = { workspace = true }
 lunify = { workspace = true }
@@ -49,7 +49,7 @@ wgpu = { workspace = true, features = ["static-dxc"] }
 winit = { workspace = true }
 
 [features]
-debug = ["korangar_debug", "korangar_audio/debug", "ragnarok_packets/debug"]
+debug = ["korangar_audio/debug", "korangar_debug", "korangar_networking/debug", "ragnarok_packets/debug"]
 plain = ["korangar_debug/plain"]
 unicode = ["korangar_debug/unicode"]
 flac = ["korangar_audio/flac"]

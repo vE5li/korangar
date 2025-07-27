@@ -1861,9 +1861,11 @@ name = "korangar_networking"
 version = "0.1.0"
 dependencies = [
  "korangar_debug",
+ "korangar_interface",
  "ragnarok_bytes",
  "ragnarok_packets",
  "reqwest",
+ "rust_state",
  "serde",
  "tokio",
 ]

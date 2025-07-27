@@ -47,8 +47,6 @@ pub struct ChatMessage {
     /// Raw message.
     pub text: String,
     /// Color of the message.
-    // TODO: Unhide
-    #[hidden_element]
     pub color: MessageColor,
 }
 

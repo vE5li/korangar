@@ -1,4 +1,5 @@
 #![feature(let_chains)]
+#![cfg_attr(feature = "interface", feature(impl_trait_in_assoc_type))]
 
 mod entity;
 mod event;

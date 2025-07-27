@@ -21,7 +21,7 @@ pub enum Event<App: Application> {
     },
     Unfocus,
     Application {
-        application_event: App::Event,
+        custom_event: App::CustomEvent,
     },
     OpenOverlay {
         element: ElementBox<App>,
@@ -40,8 +40,8 @@ impl<App: Application> Clone for Event<App> {
             Self::FocusElement { focus_id } => Self::FocusElement { focus_id: *focus_id },
             Self::FocusElementPost { element_id } => Self::FocusElementPost { element_id: *element_id },
             Self::Unfocus => Self::Unfocus,
-            Self::Application { application_event } => Self::Application {
-                application_event: application_event.clone(),
+            Self::Application { custom_event } => Self::Application {
+                custom_event: custom_event.clone(),
             },
             Self::OpenOverlay { .. } => unimplemented!(),
             Self::CloseWindow { window_id } => Self::CloseWindow { window_id: *window_id },

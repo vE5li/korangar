@@ -375,7 +375,7 @@ impl Application for ClientState {
     type Clip = ScreenClip;
     type Color = Color;
     type CornerRadius = CornerRadius;
-    type Event = UserEvent;
+    type CustomEvent = UserEvent;
     type FontSize = FontSize;
     type Position = ScreenPosition;
     type Renderer = InterfaceRenderer;

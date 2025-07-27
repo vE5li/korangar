@@ -482,33 +482,33 @@ where
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn process_events(&mut self) -> Vec<App::Event> {
-        let mut application_events = Vec::new();
+    pub fn process_events(&mut self) -> Vec<App::CustomEvent> {
+        let mut custom_events = Vec::new();
 
         for event in self.event_queue.drain() {
             match event {
                 // This case should never be hit. FocusElement needs to be converted to
                 // FocusElementPost in the event queue while the layout is still alive.
-                event::Event::FocusElement { .. } => {}
-                event::Event::FocusElementPost { element_id } => self.focused_element = Some(element_id),
-                event::Event::Unfocus => self.focused_element = None,
-                event::Event::Application { application_event } => application_events.push(application_event),
-                event::Event::OpenOverlay { element, position, size } => {
+                Event::FocusElement { .. } => {}
+                Event::FocusElementPost { element_id } => self.focused_element = Some(element_id),
+                Event::Unfocus => self.focused_element = None,
+                Event::Application { custom_event } => custom_events.push(custom_event),
+                Event::OpenOverlay { element, position, size } => {
                     self.overlay_element = Some((element, ElementStore::root(&mut self.generator), position, size))
                 }
-                event::Event::CloseWindow { window_id } => {
+                Event::CloseWindow { window_id } => {
                     if let Some(index) = self.windows.iter().position(|wrapper| wrapper.data.id == window_id) {
                         self.windows.remove(index);
                     }
                 }
-                event::Event::CloseOverlay => {
+                Event::CloseOverlay => {
                     self.overlay_element = None;
                     self.overlay_layout = None;
                 }
             }
         }
 
-        application_events
+        custom_events
     }
 }
 
@@ -671,7 +671,7 @@ impl<App: Application> BuiltUi<'_, App> {
     }
 
     pub fn focus_element(&mut self, focus_id: impl Any) {
-        self.event_queue.queue(event::Event::FocusElement {
+        self.event_queue.queue(Event::FocusElement {
             focus_id: focus_id.focus_id(),
         });
     }
@@ -683,10 +683,10 @@ impl<App: Application> Drop for BuiltUi<'_, App> {
         // layouts are cleared. If a focus id could not be resolved we leave the event
         // as is, it will be ignored when processing the events.
         self.event_queue.iter_mut().for_each(|event| {
-            if let event::Event::FocusElement { focus_id } = event {
+            if let Event::FocusElement { focus_id } = event {
                 for layout in self.window_layouts.values() {
                     if let Some(element_id) = layout.try_resolve_focus_id(*focus_id) {
-                        *event = event::Event::FocusElementPost { element_id };
+                        *event = Event::FocusElementPost { element_id };
                         return;
                     }
                 }

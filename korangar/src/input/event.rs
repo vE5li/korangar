@@ -149,8 +149,8 @@ pub enum UserEvent {
 }
 
 impl From<UserEvent> for Event<ClientState> {
-    fn from(application_event: UserEvent) -> Self {
-        Event::Application { application_event }
+    fn from(custom_event: UserEvent) -> Self {
+        Event::Application { custom_event }
     }
 }
 

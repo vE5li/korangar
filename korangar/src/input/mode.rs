@@ -3,7 +3,6 @@ use std::sync::Arc;
 use cgmath::Vector2;
 use korangar_interface::application::MouseInputModeTrait;
 use korangar_interface::element::id::ElementId;
-// use korangar_interface::element::{Element, ElementCell};
 use korangar_networking::InventoryItem;
 
 use crate::graphics::Texture;

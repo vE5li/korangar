@@ -63,7 +63,7 @@ use korangar_debug::profile_block;
 #[cfg(feature = "debug")]
 use korangar_debug::profiling::Profiler;
 use korangar_interface::Interface;
-use korangar_interface::application::{Application, FontSizeTrait, PositionTrait, ScalingTrait};
+use korangar_interface::application::{Application, PositionTrait, ScalingTrait};
 use korangar_interface::element::StateElement;
 use korangar_interface::element::id::ElementId;
 use korangar_interface::event::EventQueue;

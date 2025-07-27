@@ -13,7 +13,7 @@ use crate::renderer::SpriteRenderer;
 use crate::state::ClientState;
 use crate::world::{Actions, SpriteAnimationState};
 
-/// Renders the interface provided by 'korangar_interface'.
+/// Renders the interface provided by [`korangar_interface`].
 pub struct InterfaceRenderer {
     instructions: RefCell<Vec<InterfaceRectangleInstruction>>,
     glyphs: RefCell<Vec<GlyphInstruction>>,
@@ -31,6 +31,9 @@ pub struct InterfaceRenderer {
 }
 
 impl InterfaceRenderer {
+    /// Create a new interface renderer.
+    ///
+    /// This include loading the textures icons for rendering components.
     pub fn new(
         window_size: ScreenSize,
         font_loader: Arc<FontLoader>,
@@ -67,14 +70,17 @@ impl InterfaceRenderer {
         }
     }
 
+    /// Clear render instructions.
     pub fn clear(&self) {
         self.instructions.borrow_mut().clear();
     }
 
+    /// Get render instructions.
     pub fn get_instructions(&self) -> Ref<Vec<InterfaceRectangleInstruction>> {
         self.instructions.borrow()
     }
 
+    /// Inform the renderer of a change in the high quality interface setting.
     pub fn update_high_quality_interface(&mut self, high_quality_interface: bool) {
         self.high_quality_interface = high_quality_interface;
         self.interface_size = if self.high_quality_interface {
@@ -84,6 +90,7 @@ impl InterfaceRenderer {
         };
     }
 
+    /// Inform the renderer of new window size.
     pub fn update_window_size(&mut self, window_size: ScreenSize) {
         self.window_size = window_size;
         self.interface_size = if self.high_quality_interface {
@@ -93,6 +100,7 @@ impl InterfaceRenderer {
         };
     }
 
+    /// Get the bounds of a given text, respecting the loaded font.
     pub fn get_text_dimensions(&self, text: &str, mut font_size: FontSize, mut available_width: f32) -> ScreenSize {
         if self.high_quality_interface {
             // We need to adjust the font size, or else we would create glyphs for a font
@@ -110,6 +118,7 @@ impl InterfaceRenderer {
         size
     }
 
+    /// Add instruction for rendering a rectangle.
     pub fn render_rectangle(
         &self,
         position: ScreenPosition,
@@ -136,6 +145,7 @@ impl InterfaceRenderer {
         });
     }
 
+    /// Add instructions for rendering glyphs.
     pub fn render_text(
         &self,
         text: &str,
@@ -200,6 +210,7 @@ impl InterfaceRenderer {
         size.y
     }
 
+    /// Render a checkbox icon using an SDF.
     pub fn render_checkbox(&self, position: ScreenPosition, size: ScreenSize, clip: ScreenClip, color: Color, checked: bool) {
         let texture = match checked {
             true => self.filled_box_texture.clone(),
@@ -209,6 +220,7 @@ impl InterfaceRenderer {
         self.render_sdf(texture, position, size, clip, color);
     }
 
+    /// Render an expand arrow icon using an SDF.
     pub fn render_expand_arrow(&self, position: ScreenPosition, size: ScreenSize, clip: ScreenClip, color: Color, expanded: bool) {
         let texture = match expanded {
             true => self.expanded_arrow_texture.clone(),
@@ -218,6 +230,7 @@ impl InterfaceRenderer {
         self.render_sdf(texture, position, size, clip, color);
     }
 
+    /// Render an eye icon using an SDF.
     pub fn render_eye(&self, position: ScreenPosition, size: ScreenSize, clip: ScreenClip, color: Color, open: bool) {
         let texture = match open {
             true => self.eye_open_texture.clone(),
@@ -227,6 +240,7 @@ impl InterfaceRenderer {
         self.render_sdf(texture, position, size, clip, color);
     }
 
+    /// Render a trash can icon using an SDF.
     pub fn render_trash_can(&self, position: ScreenPosition, size: ScreenSize, clip: ScreenClip, color: Color) {
         self.render_sdf(self.trash_can_texture.clone(), position, size, clip, color);
     }
@@ -311,8 +325,13 @@ struct SpriteInstruction<'a> {
     smooth: bool,
 }
 
+/// A custom layout instruction.
+///
+/// Only pub to make the compiler happy, its not used outside of this module.
 pub enum CustomInstruction<'a> {
+    /// An instruction to render a texture.
     Texture(TextureInstruction),
+    /// An instruction to render a sprite.
     Sprite(SpriteInstruction<'a>),
 }
 
@@ -384,9 +403,13 @@ impl RenderLayer<ClientState> for InterfaceRenderer {
     }
 }
 
+/// Extension trait to make adding custom instructions to the [`Layout`]
+/// seamless by mirroring its API.
 pub trait LayoutExt<'a> {
+    /// Add an instruction to render a texture.
     fn add_texture(&mut self, texture: Arc<Texture>, area: Area, color: Color, smooth: bool);
 
+    /// Add an instruction to render a sprite.
     fn add_sprite(
         &mut self,
         actions: &'a Actions,

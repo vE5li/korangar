@@ -13,7 +13,6 @@ use image::{ImageBuffer, Rgba, RgbaImage, imageops};
 use korangar_debug::logging::Colorize;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::print_debug;
-use korangar_interface::application::FontSizeTrait;
 use korangar_interface::element::{ElementDisplay, StateElement};
 use korangar_util::Rectangle;
 use serde::{Deserialize, Serialize};
@@ -45,16 +44,6 @@ impl ArrayType for FontSize {
 impl ElementDisplay for FontSize {
     fn element_display(&self) -> String {
         format!("^FFBB00F^000000{}", self.0.element_display())
-    }
-}
-
-impl FontSizeTrait for FontSize {
-    // fn new(value: f32) -> Self {
-    //     Self(value)
-    // }
-
-    fn get_value(&self) -> f32 {
-        self.0
     }
 }
 

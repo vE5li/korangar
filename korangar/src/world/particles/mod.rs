@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use cgmath::{Point3, Vector2, Vector3};
 use derive_new::new;
-use korangar_interface::application::{ClipTrait, FontSizeTrait, ScalingTrait};
+use korangar_interface::application::{ClipTrait, ScalingTrait};
 use ragnarok_packets::{EntityId, QuestColor, QuestEffectPacket};
 use rand_aes::tls::rand_f32;
 

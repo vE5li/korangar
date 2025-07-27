@@ -2,31 +2,143 @@ use crate::layout::{ClipLayer, Icon};
 use crate::theme::ThemePathGetter;
 use crate::window::Anchor;
 
-// TODO: Maybe make Path<State: ?Sized>
+/// Glue between [`korangar_interface`] and the application.
+///
+/// This trait mostly consists of associated types so the application can call
+/// and integrate with this crate using its own types. This was a design
+/// decision to reduce the number of types and type conversion in the
+/// application but it makes most types in this crate generic over
+/// a `App: Application`, which makes code inside this crate harder to write. I
+/// feel this is a worthwhile trade-off but I might revisit this in the future.
 pub trait Application: Sized + 'static {
+    /// Window cache used to store window position and size.
+    ///
+    /// This can be implemented in a volatile manner so window positions are
+    /// only saved until the application is close or in a persistent manner
+    /// where the cache is saved to and loaded from a file.
     type Cache: WindowCache<Self>;
-    // TODO: Does this default bound really make sense or do we need a different way
-    // of deriving PrototyeWindow without specifying the theme in the
-    // beginning?
+
+    /// Type to specify the theme when creating a window.
+    ///
+    /// Typically this would be an enum with each variant being one of the
+    /// application themes but can also be a unit type if the application
+    /// only has a single theme.
+    ///
+    /// The [`Default`] bound is used when deriving
+    /// [`StateWindow`](crate::window::StateWindow).
     type ThemeType: Default + Copy;
+
+    /// Glue between [`korangar_interface`] and the final application theme. See
+    /// [`ThemePathGetter`] for more information.
     type ThemeGetter: ThemePathGetter<Self>;
+
+    /// Application color type.
+    ///
+    /// Ideally this should be the same type that the application renderer uses
+    /// to represent color.
     type Color: Copy;
+
+    /// Application corner radius type.
+    ///
+    /// Ideally this should be the same type that the application renderer uses
+    /// to represent corner radius.
     type CornerRadius: CornerRadiusTrait;
+
+    /// Application font size type.
+    ///
+    /// Ideally this should be the same type that the application renderer uses
+    /// to represent font size.
     type FontSize: Copy;
+
+    /// Application 2D position type.
+    ///
+    /// Ideally this should be the same type that the application renderer uses
+    /// to represent 2D positions. This might not be possible without conversion
+    /// if the application doesn't represent positions from the top left of
+    /// the screen.
+    type Position: PositionTrait;
+
+    /// Application 2D size type.
+    ///
+    /// Ideally this should be the same type that the application renderer uses
+    /// to represent 2D sizes.
+    type Size: SizeTrait;
+
+    /// Application clip type.
+    ///
+    /// The clip is used to avoid rendering outside the bounds of a parent
+    /// element or window.
+    ///
+    /// Ideally this should be the same type that the application renderer uses
+    /// to represent clips.
+    type Clip: ClipTrait;
+
+    /// Renderer of the application.
     type Renderer: RenderLayer<Self>;
 
-    type Position: PositionTrait;
-    type Size: SizeTrait;
-    type Clip: ClipTrait;
+    /// Application window classes.
+    ///
+    /// The application can define classes for its windows to enable behaviour
+    /// such as allowing only one window of a given class to be open at any
+    /// point in time, restoring window position and size when the window is
+    /// opened again (see [`WindowCache`], checking if a window with a given
+    /// class is currently open, and closing windows with a given class.
     type WindowClass: PartialEq + Copy;
 
-    type Event: Clone;
+    /// Custom application event.
+    ///
+    /// When processing interface events (see
+    /// [`process_events`](crate::Interface::process_events)) the interface will
+    /// pass any custom events to the application.
+    ///
+    /// This allows components in the application to use the internal
+    /// [`EventQueue`](crate::event::EventQueue) to register application
+    /// specific events as well.
+    type CustomEvent: Clone;
 
     // fn get_scaling_path() -> impl Path<Self, Scaling>;
 
     fn set_current_theme_type(theme: Self::ThemeType);
 }
 
+/// Glue between [`korangar_interface`] and the renderer of the application.
+pub trait RenderLayer<App: Application> {
+    /// Application specific instruction.
+    ///
+    /// This allows extending the [`Layout`](crate::layout::Layout) to render
+    /// application specific graphics.
+    type CustomInstruction<'a>;
+
+    /// Application specific icons.
+    type CustomIcon: Clone + Copy;
+
+    /// Get the bounds of a given text. The implementation should respect the
+    /// available_width and use the overflow behavior to adjust the font
+    /// size or insert line breaks if needed.
+    // TODO: Add overflow behavior parameter. E.g. shrink and break.
+    fn get_text_dimensions(&self, text: &str, font_size: App::FontSize, available_width: f32) -> App::Size;
+
+    /// Render a rectangle.
+    fn render_rectangle(
+        &self,
+        position: App::Position,
+        size: App::Size,
+        clip: App::Clip,
+        corner_radius: App::CornerRadius,
+        color: App::Color,
+    );
+
+    /// Render a str as text.
+    fn render_text(&self, text: &str, position: App::Position, clip: App::Clip, color: App::Color, font_size: App::FontSize);
+
+    /// Render an icon.
+    fn render_icon(&self, position: App::Position, size: App::Size, clip: App::Clip, icon: Icon<App>, color: App::Color);
+
+    /// Render a [`CustomInstruction`](RenderLayer::CustomInstruction).
+    fn render_custom(&self, instruction: Self::CustomInstruction<'_>, clip_layers: &[ClipLayer<App>]);
+}
+
+// TODO: Rename
 pub trait MouseInputModeTrait<App>
 where
     App: Application,
@@ -38,42 +150,12 @@ where
     fn is_moving_window(&self, window_index: usize) -> bool;
 }
 
-pub trait FontSizeTrait: Copy {
-    // fn new(value: f32) -> Self;
-
-    fn get_value(&self) -> f32;
-}
-
-pub trait ScalingExt {
-    fn scaled(&self, scaling: impl ScalingTrait) -> Self;
-}
-
-pub trait RenderLayer<App: Application> {
-    type CustomInstruction<'a>;
-    type CustomIcon: Clone + Copy;
-
-    fn render_rectangle(
-        &self,
-        position: App::Position,
-        size: App::Size,
-        clip: App::Clip,
-        corner_radius: App::CornerRadius,
-        color: App::Color,
-    );
-
-    fn get_text_dimensions(&self, text: &str, font_size: App::FontSize, available_width: f32) -> App::Size;
-
-    fn render_text(&self, text: &str, position: App::Position, clip: App::Clip, color: App::Color, font_size: App::FontSize);
-
-    fn render_icon(&self, position: App::Position, size: App::Size, clip: App::Clip, icon: Icon<App>, color: App::Color);
-
-    fn render_custom(&self, instruction: Self::CustomInstruction<'_>, clip_layers: &[ClipLayer<App>]);
-}
-
+// TODO: Rename
 pub trait ScalingTrait: Copy {
     fn get_factor(&self) -> f32;
 }
 
+// TODO: Rename
 pub trait CornerRadiusTrait: Copy {
     fn new(top_left: f32, top_right: f32, bottom_right: f32, bottom_left: f32) -> Self;
 

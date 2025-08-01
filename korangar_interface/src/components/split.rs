@@ -7,28 +7,26 @@ use crate::element::{Element, ElementSet, ResolverSet};
 use crate::layout::area::PartialArea;
 use crate::layout::{Layout, Resolver};
 
-struct CellResolverSet<'a> {
-    resolver: &'a mut Resolver,
+struct CellResolverSet {
     initial_available_area: PartialArea,
     cell_size: f32,
     gaps: f32,
+    used_height: f32,
 }
 
-impl<'a> CellResolverSet<'a> {
-    pub fn new(resolver: &'a mut Resolver, cell_size: f32, gaps: f32) -> Self {
-        let initial_available_area = resolver.push_available_area();
-
+impl CellResolverSet {
+    pub fn new(initial_available_area: PartialArea, cell_size: f32, gaps: f32) -> Self {
         Self {
-            resolver,
             initial_available_area,
             cell_size,
             gaps,
+            used_height: 0.0,
         }
     }
 }
 
-impl ResolverSet for CellResolverSet<'_> {
-    fn with_index<C>(&mut self, index: usize, f: impl FnMut(&mut Resolver) -> C) -> C {
+impl ResolverSet for &mut CellResolverSet {
+    fn with_index<C>(&mut self, index: usize, mut f: impl FnMut(&mut Resolver) -> C) -> C {
         let cell_area = PartialArea {
             left: self.initial_available_area.left + self.gaps * index as f32 + self.cell_size * index as f32,
             top: self.initial_available_area.top,
@@ -36,7 +34,13 @@ impl ResolverSet for CellResolverSet<'_> {
             height: self.initial_available_area.height,
         };
 
-        self.resolver.with_derived_custom(cell_area, f)
+        let mut resolver = Resolver::new(cell_area, self.gaps);
+
+        let layout_info = f(&mut resolver);
+
+        self.used_height = self.used_height.max(resolver.get_used_height());
+
+        layout_info
     }
 }
 
@@ -62,13 +66,20 @@ where
     ) -> Self::LayoutInfo {
         let gaps = *state.get(&self.gaps);
         let element_count = self.children.get_element_count();
-        let available_width = resolver.push_available_area().width - gaps * element_count.saturating_sub(1) as f32;
+
+        let available_area = resolver.push_available_area();
+        let available_width = available_area.width - gaps * element_count.saturating_sub(1) as f32;
         // TODO: This is obviously a divide by 0 if we don't have any child elements.
         // Should be protected somehow.
         let cell_size = available_width / element_count as f32;
-        let resolver_set = CellResolverSet::new(resolver, cell_size, gaps);
+        let mut resolver_set = CellResolverSet::new(available_area, cell_size, gaps);
 
-        self.children.create_layout_info(state, store, generator, resolver_set)
+        let layout_info = self.children.create_layout_info(state, store, generator, &mut resolver_set);
+
+        let used_height = resolver_set.used_height;
+        resolver.commit_used_height(used_height);
+
+        layout_info
     }
 
     fn layout_element<'a>(

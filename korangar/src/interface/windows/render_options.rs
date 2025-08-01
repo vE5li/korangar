@@ -1,60 +1,21 @@
-use std::cell::UnsafeCell;
-use std::num::NonZeroU32;
-
 use korangar_interface::components::drop_down::DefaultClickHandler;
 use korangar_interface::element::Element;
-use korangar_interface::event::Toggle;
-use korangar_interface::prelude::*;
-use korangar_interface::window::{CustomWindow, StateWindow, Window, WindowTrait};
-use rust_state::{Context, Path, Selector};
+use korangar_interface::window::{CustomWindow, WindowTrait};
+use rust_state::Path;
 
-use crate::client_state;
 use crate::graphics::{RenderOptions, RenderOptionsPathExt};
-use crate::interface::layout::{ScreenSize, ScreenSizePathExt};
-use crate::interface::windows::{WindowCache, WindowClass};
+use crate::interface::windows::WindowClass;
+use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
-use crate::state::{ClientState, ClientStatePathExt};
 
 // TODO: Remove once event can be implied.
 fn render_state_button(text: &'static str, path: impl Path<ClientState, bool>) -> impl Element<ClientState> {
+    use korangar_interface::prelude::*;
+
     state_button! {
         text: text,
         state: path,
         event: Toggle(path),
-    }
-}
-
-// TODO: Most likely move this.
-pub struct ScalingSelector<S> {
-    selector: S,
-    scaling: f32,
-    storage: UnsafeCell<f32>,
-}
-
-impl<S> ScalingSelector<S> {
-    pub fn new(selector: S, scaling: f32) -> Self {
-        Self {
-            selector,
-            scaling,
-            storage: UnsafeCell::new(0.0),
-        }
-    }
-}
-
-impl<S> Selector<ClientState, f32, true> for ScalingSelector<S>
-where
-    S: Selector<ClientState, f32>,
-{
-    fn select<'a>(&'a self, state: &'a ClientState) -> Option<&'a f32> {
-        // SAFETY
-        //
-        // It's safe to unwrap here because of the selector bound.
-        let value = *self.selector.select(state).unwrap();
-
-        let storage = unsafe { &mut *self.storage.get() };
-        *storage = value * self.scaling;
-
-        Some(storage)
     }
 }
 
@@ -161,10 +122,10 @@ where
             class: Self::window_class(),
             theme: InterfaceThemeType::Game,
             closable: true,
+            resizable: true,
             minimum_height: 300.0,
-            // Set the maximum window height to be 80% of the main window height.
-            maximum_height: ScalingSelector::new(client_state().window_size().height(), 0.8),
-            elements: (scroll_view! { children: elements, height_bound: HeightBound::WithMax, }, )
+            maximum_height: 900.0,
+            elements: (scroll_view! { children: elements }, )
         }
     }
 }

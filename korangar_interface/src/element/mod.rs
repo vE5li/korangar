@@ -382,4 +382,4 @@ where
     }
 }
 
-pub type ElementBox<App: Application> = Box<dyn Element<App, LayoutInfo = ()>>;
+pub type ElementBox<App> = Box<dyn Element<App, LayoutInfo = ()>>;

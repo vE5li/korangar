@@ -1,10 +1,7 @@
-use korangar_interface::event::ClickAction;
-use korangar_interface::window::{CustomWindow, StateWindow, Window, WindowTrait};
-use rust_state::Context;
+use korangar_interface::window::{CustomWindow, WindowTrait};
 
 use crate::input::UserEvent;
-use crate::interface::layout::ScreenSize;
-use crate::interface::windows::{WindowCache, WindowClass};
+use crate::interface::windows::WindowClass;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
 
@@ -28,7 +25,7 @@ impl CustomWindow<ClientState> for CommandsWindow {
                     text: "Base level",
                 },
                 split! {
-                    gaps: 5.0,
+                    gaps: theme().window().gaps(),
                     children: (
                         button! {
                             text: "+1",
@@ -56,7 +53,7 @@ impl CustomWindow<ClientState> for CommandsWindow {
                     text: "Job level",
                 },
                 split! {
-                    gaps: 5.0,
+                    gaps: theme().window().gaps(),
                     children: (
                         button! {
                             text: "+1",

@@ -23,6 +23,8 @@ pub struct Node {
     #[hidden_element]
     pub centroid: Point3<f32>,
     pub sub_meshes: Vec<SubMesh>,
+    // TODO: Unhide once this doesn't crash the compilation anymore.
+    #[hidden_element]
     pub child_nodes: Vec<Node>,
     pub animation_length: u32,
     pub scale_keyframes: Vec<ScaleKeyframeData>,

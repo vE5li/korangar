@@ -1,6 +1,7 @@
 pub mod button;
 pub mod collapsable;
 pub mod drop_down;
+pub mod field;
 pub mod fragment;
 pub mod scroll_view;
 pub mod split;

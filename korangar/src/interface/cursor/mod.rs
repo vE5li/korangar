@@ -92,6 +92,17 @@ impl MouseCursor {
             return;
         }
 
+        // Adjust the position of the mouse cursor based on the interface scale. At 1.0
+        // the cursos is in the perfect position but for everything else the
+        // sprite drifts from the mouse position. This might be cause by how we
+        // scale sprites, needs further investigation.
+        //
+        // Values picked by testing. Can this be derived somehow?
+        let mouse_position = ScreenPosition {
+            left: mouse_position.left + 10.0 * (scaling - 1.0),
+            top: mouse_position.top + 14.0 * (scaling - 1.0),
+        };
+
         if let Some(grabbed) = grabbed {
             match grabbed {
                 Grabbed::Texture(texture) => renderer.render_sprite(

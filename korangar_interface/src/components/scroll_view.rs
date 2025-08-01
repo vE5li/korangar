@@ -7,7 +7,7 @@ use crate::element::id::ElementIdGenerator;
 use crate::element::store::{ElementStore, Persistent, PersistentExt};
 use crate::element::{Element, ElementSet};
 use crate::layout::area::Area;
-use crate::layout::{HeightBound, Layout, Resolver};
+use crate::layout::{Layout, Resolver};
 
 #[derive(Default)]
 pub struct PersistentData {
@@ -23,7 +23,6 @@ pub struct ScrollViewLayoutInfo<L> {
 
 pub struct ScrollView<Children> {
     pub children: Children,
-    pub height_bound: HeightBound,
 }
 
 impl<Children> Persistent for ScrollView<Children> {
@@ -54,10 +53,9 @@ where
             // ugly and might be improved in the future.
             let mut cloned_resolver = resolver.clone();
 
-            let (area, children_height, layout_info) =
-                cloned_resolver.with_derived_scrolled(current_scroll, self.height_bound, |resolver| {
-                    self.children.create_layout_info(state, store, generator, resolver)
-                });
+            let (area, children_height, layout_info) = cloned_resolver.with_derived_scrolled(current_scroll, |resolver| {
+                self.children.create_layout_info(state, store, generator, resolver)
+            });
 
             let persistent = self.get_persistent_data(store, ());
             let mut current_scroll = persistent.scroll.borrow_mut();
@@ -93,10 +91,6 @@ where
         layout: &mut Layout<'a, App>,
     ) {
         let persistent = self.get_persistent_data(store, ());
-
-        if self.height_bound == HeightBound::Unbound {
-            println!("unbound scroll views don't do anything");
-        }
 
         layout.with_clip_layer(layout_info.area, |layout| {
             layout.with_layer(|layout| {

@@ -1,27 +1,44 @@
-use korangar_interface::event::ClickAction;
-use korangar_interface::window::{CustomWindow, StateWindow, Window, WindowTrait};
+use korangar_interface::components::text_box::DefaultHandler;
+use korangar_interface::element::StateElement;
+use korangar_interface::event::{Event, EventQueue};
+use korangar_interface::window::{CustomWindow, WindowTrait};
 use ragnarok_packets::Friend;
-use rust_state::Path;
+use rust_state::{Context, Path, RustState};
 
 use crate::input::UserEvent;
-use crate::interface::layout::ScreenSize;
-use crate::interface::windows::{WindowCache, WindowClass};
+use crate::interface::windows::WindowClass;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
 
-pub struct FriendListWindow<A> {
-    friend_list_path: A,
+// TODO: These constants are duplicated troughout the code base. Unify this
+// somewhere, maybe a `consts.rs` would be a good idea at this point?
+const MINIMUM_NAME_LENGTH: usize = 4;
+const MAXIMUM_NAME_LENGTH: usize = 24;
+
+/// Internal state of the chat window.
+#[derive(Default, RustState, StateElement)]
+pub struct FriendListWindowState {
+    currently_adding: String,
 }
 
-impl<A> FriendListWindow<A> {
-    pub fn new(friend_list_path: A) -> Self {
-        Self { friend_list_path }
+pub struct FriendListWindow<A, B> {
+    window_state_path: A,
+    friend_list_path: B,
+}
+
+impl<A, B> FriendListWindow<A, B> {
+    pub fn new(window_state_path: A, friend_list_path: B) -> Self {
+        Self {
+            window_state_path,
+            friend_list_path,
+        }
     }
 }
 
-impl<A> CustomWindow<ClientState> for FriendListWindow<A>
+impl<A, B> CustomWindow<ClientState> for FriendListWindow<A, B>
 where
-    A: Path<ClientState, Vec<Friend>>,
+    A: Path<ClientState, FriendListWindowState>,
+    B: Path<ClientState, Vec<Friend>>,
 {
     fn window_class() -> Option<WindowClass> {
         Some(WindowClass::FriendList)
@@ -30,6 +47,19 @@ where
     fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
         use korangar_interface::prelude::*;
 
+        struct AddFriendTextBox;
+
+        let add_action = move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
+            let character_name = state.get(&self.window_state_path.currently_adding()).clone();
+
+            // TODO: Give some sort of error if the name is too short.
+            if character_name.len() >= MINIMUM_NAME_LENGTH {
+                state.update_value_with(self.window_state_path.currently_adding(), |input| input.clear());
+                queue.queue(UserEvent::AddFriend { character_name });
+                queue.queue(Event::Unfocus);
+            }
+        };
+
         window! {
             title: "Friend list",
             class: Self::window_class(),
@@ -37,58 +67,13 @@ where
             closable: true,
             minimum_height: 300.0,
             elements: (
+                text_box! {
+                    ghost_text: "Add friend by name",
+                    state: self.window_state_path.currently_adding(),
+                    input_handler: DefaultHandler::<_, _, MAXIMUM_NAME_LENGTH>::new(self.window_state_path.currently_adding(), add_action),
+                    focus_id: AddFriendTextBox,
+                },
             )
         }
     }
 }
-
-// impl StateWindow<InterfaceSettings> for FriendsWindow {
-//     fn window_class(&self) -> Option<&str> {
-//         Some(Self::WINDOW_CLASS)
-//     }
-//
-//     fn to_window(
-//         &self,
-//     ) -> Window<InterfaceSettings> {
-//         let friend_name = PlainTrackedState::<String>::default();
-//
-//         let add_action = {
-//             let mut friend_name = friend_name.clone();
-//
-//             Box::new(move || {
-//                 let taken_string = friend_name.take();
-//
-//                 (!taken_string.is_empty())
-//
-// .then_some(vec![ClickAction::Custom(UserEvent::AddFriend(taken_string))])
-//                     .unwrap_or_default()
-//             })
-//         };
-//
-//         let elements = vec![
-//             InputFieldBuilder::new()
-//                 .with_state(friend_name)
-//                 .with_ghost_text("Name")
-//                 .with_enter_action(add_action.clone())
-//                 .with_length(24)
-//                 .with_width_bound(dimension_bound!(80%))
-//                 .build()
-//                 .wrap(),
-//             ButtonBuilder::new()
-//                 .with_text("Add")
-//                 .with_event(add_action)
-//                 .with_width_bound(dimension_bound!(!))
-//                 .build()
-//                 .wrap(),
-//             FriendView::new(self.friend_list.clone()).wrap(),
-//         ];
-//
-//         WindowBuilder::new()
-//             .with_title("Friends".to_string())
-//             .with_class(Self::WINDOW_CLASS.to_owned())
-//             .with_size_bound(size_bound!(200 > 300 < 400, ?))
-//             .with_elements(elements)
-//             .closable()
-//             .build(window_cache, application, available_space)
-//     }
-// }

@@ -1,7 +1,6 @@
 mod hotbar;
 mod skills;
 
-use std::cell::Ref;
 use std::sync::Arc;
 
 use korangar_interface::element::StateElement;

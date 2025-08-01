@@ -102,7 +102,7 @@ where
         }
     }
 
-    pub fn update(&mut self, window_space: App::Size, position: App::Position, window_size: App::Size, display_height: f32) {
+    pub fn update(&mut self, window_space: App::Size, position: App::Position, window_size: App::Size) {
         let center = (
             Anchor::initialized(
                 AnchorPoint::Center,
@@ -113,7 +113,7 @@ where
             ),
             App::Position::new(
                 position.left() - (window_space.width() - window_size.width()) / 2.0,
-                position.top() - (window_space.height() - display_height) / 2.0,
+                position.top() - (window_space.height() - window_size.height()) / 2.0,
             ),
         );
 
@@ -148,7 +148,7 @@ where
             ),
             App::Position::new(
                 position.left() - window_space.width() + window_size.width(),
-                position.top() - (window_space.height() - display_height) / 2.0,
+                position.top() - (window_space.height() - window_size.height()) / 2.0,
             ),
         );
 
@@ -159,7 +159,7 @@ where
             ),
             App::Position::new(
                 position.left() - window_space.width() + window_size.width(),
-                position.top() - window_space.height() + display_height,
+                position.top() - window_space.height() + window_size.height(),
             ),
         );
 
@@ -173,7 +173,7 @@ where
             ),
             App::Position::new(
                 position.left() - (window_space.width() - window_size.width()) / 2.0,
-                position.top() - window_space.height() + display_height,
+                position.top() - window_space.height() + window_size.height(),
             ),
         );
 
@@ -182,7 +182,7 @@ where
                 AnchorPoint::BottomLeft,
                 App::Position::new(position.left(), position.top() - window_space.height()),
             ),
-            App::Position::new(position.left(), position.top() - window_space.height() + display_height),
+            App::Position::new(position.left(), position.top() - window_space.height() + window_size.height()),
         );
 
         let center_left = (
@@ -190,7 +190,10 @@ where
                 AnchorPoint::CenterLeft,
                 App::Position::new(position.left(), position.top() - window_space.height() / 2.0),
             ),
-            App::Position::new(position.left(), position.top() - (window_space.height() - display_height) / 2.0),
+            App::Position::new(
+                position.left(),
+                position.top() - (window_space.height() - window_size.height()) / 2.0,
+            ),
         );
 
         *self = [

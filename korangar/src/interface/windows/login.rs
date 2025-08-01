@@ -1,21 +1,18 @@
-use std::ops::Not;
-
-use derive_new::new;
 use korangar_interface::components::drop_down::DefaultClickHandler;
 use korangar_interface::components::text_box::DefaultHandler;
+use korangar_interface::element::StateElement;
 use korangar_interface::element::id::FocusIdExt;
-use korangar_interface::event::{ClickAction, Event, EventQueue, Toggle};
-use korangar_interface::window::{CustomWindow, StateWindow, Window, WindowTrait};
-use rust_state::{Context, ManuallyAssertExt, MapLookupExt, Path, Selector};
+use korangar_interface::event::{Event, EventQueue};
+use korangar_interface::window::{CustomWindow, WindowTrait};
+use rust_state::{Context, Path, RustState, Selector};
 
 use crate::graphics::Color;
 use crate::input::UserEvent;
-use crate::interface::layout::ScreenSize;
-use crate::interface::windows::{WindowCache, WindowClass};
-use crate::loaders::{ClientInfo, ClientInfoPathExt};
+use crate::interface::windows::WindowClass;
+use crate::loaders::{ClientInfo, ClientInfoPathExt, ServiceId};
 use crate::settings::{LoginSettings, LoginSettingsPathExt, ServiceSettings, ServiceSettingsPathExt};
+use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
-use crate::state::{ClientState, LoginWindowState, LoginWindowStatePathExt};
 
 const MAXIMUM_USERNAME_LENGTH: usize = 24;
 const MAXIMUM_PASSWORD_LENGTH: usize = 24;
@@ -106,6 +103,18 @@ where
             .unwrap()
             .service_settings
             .get_mut(&selected_service)
+    }
+}
+
+/// Internal state of the login window.
+#[derive(RustState, StateElement)]
+pub struct LoginWindowState {
+    selected_service: ServiceId,
+}
+
+impl LoginWindowState {
+    pub fn new(selected_service: ServiceId) -> Self {
+        Self { selected_service }
     }
 }
 

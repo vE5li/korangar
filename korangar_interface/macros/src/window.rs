@@ -36,9 +36,11 @@ pub fn derive_state_window_struct(
                     window! {
                         title: #window_title.to_string(),
                         class: #window_class_option,
+                        minimum_height: 150.0,
                         theme: <#impl_for as korangar_interface::application::Application>::ThemeType::default(),
                         closable: true,
-                        elements: (scroll_view! { children: (#(#initializers,)*), height_bound: HeightBound::WithMax, }, )
+                        resizable: true,
+                        elements: (scroll_view! { children: (#(#initializers,)*), }, )
                     }
                 }
 
@@ -49,9 +51,11 @@ pub fn derive_state_window_struct(
                     window! {
                         title: #window_title.to_string(),
                         class: #window_class_option,
+                        minimum_height: 150.0,
                         theme: <#impl_for as korangar_interface::application::Application>::ThemeType::default(),
                         closable: true,
-                        elements: (scroll_view! { children: (#(#initializers_mut,)*), height_bound: HeightBound::WithMax, }, )
+                        resizable: true,
+                        elements: (scroll_view! { children: (#(#initializers_mut,)*), }, )
                     }
                 }
             }
@@ -71,9 +75,11 @@ pub fn derive_state_window_struct(
                 window! {
                     title: #window_title.to_string(),
                     class: #window_class_option,
+                    minimum_height: 150.0,
                     theme: App::ThemeType::default(),
                     closable: true,
-                    elements: (scroll_view! { children: (#(#initializers,)*), height_bound: HeightBound::WithMax, }, )
+                    resizable: true,
+                    elements: (scroll_view! { children: (#(#initializers,)*), }, )
                 }
             }
 
@@ -83,9 +89,11 @@ pub fn derive_state_window_struct(
                 window! {
                     title: #window_title.to_string(),
                     class: #window_class_option,
+                    minimum_height: 150.0,
                     theme: App::ThemeType::default(),
                     closable: true,
-                    elements: (scroll_view! { children: (#(#initializers_mut,)*), height_bound: HeightBound::WithMax, }, )
+                    resizable: true,
+                    elements: (scroll_view! { children: (#(#initializers_mut,)*), }, )
                 }
             }
         }

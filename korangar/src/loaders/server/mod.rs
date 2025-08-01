@@ -8,7 +8,7 @@ use korangar_util::FileLoader;
 use quick_xml::Reader;
 use quick_xml::de::from_str;
 use quick_xml::events::Event;
-use rust_state::{MapItem, RustState};
+use rust_state::RustState;
 use serde::{Deserialize, Serialize};
 
 pub use self::client_info::{ClientInfo, ClientInfoPathExt};

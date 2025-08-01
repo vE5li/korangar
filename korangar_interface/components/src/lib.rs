@@ -16,6 +16,7 @@ pub fn window(token_stream: TokenStream) -> TokenStream {
         border: { korangar_interface::theme::theme().window().border() },
         corner_radius: { korangar_interface::theme::theme().window().corner_radius() },
         closable: { false },
+        resizable: { false },
         close_button_size: { korangar_interface::theme::theme().window().close_button_size() },
         close_button_corner_radius: { korangar_interface::theme::theme().window().close_button_corner_radius() },
         minimum_width: { korangar_interface::theme::theme().window().minimum_width() },
@@ -146,6 +147,24 @@ pub fn fragment(token_stream: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
+pub fn field(token_stream: TokenStream) -> TokenStream {
+    create_component_macro!(korangar_interface::components::field::Field, {
+        text_marker: { const std::marker::PhantomData },
+        text: !,
+        tooltip: { "" },
+        foreground_color: { korangar_interface::theme::theme().field().foreground_color() },
+        background_color: { korangar_interface::theme::theme().field().background_color() },
+        height: { korangar_interface::theme::theme().field().height() },
+        corner_radius: { korangar_interface::theme::theme().field().corner_radius() },
+        font_size: { korangar_interface::theme::theme().field().font_size() },
+        horizontal_alignment: { korangar_interface::theme::theme().field().horizontal_alignment() },
+        vertical_alignment: { korangar_interface::theme::theme().field().vertical_alignment() },
+    });
+
+    macro_impl(token_stream.into()).into()
+}
+
+#[proc_macro]
 pub fn split(token_stream: TokenStream) -> TokenStream {
     create_component_macro!(korangar_interface::components::split::Split, {
         gaps: { 0.0 },
@@ -159,7 +178,6 @@ pub fn split(token_stream: TokenStream) -> TokenStream {
 pub fn scroll_view(token_stream: TokenStream) -> TokenStream {
     create_component_macro!(korangar_interface::components::scroll_view::ScrollView, {
         children: !,
-        height_bound: !,
     });
 
     macro_impl(token_stream.into()).into()

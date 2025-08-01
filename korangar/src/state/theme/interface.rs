@@ -1,6 +1,7 @@
 use korangar_interface::components::button::ButtonTheme;
 use korangar_interface::components::collapsable::CollapsableTheme;
 use korangar_interface::components::drop_down::DropDownTheme;
+use korangar_interface::components::field::FieldTheme;
 use korangar_interface::components::state_button::StateButtonTheme;
 use korangar_interface::components::text::TextTheme;
 use korangar_interface::components::text_box::TextBoxTheme;
@@ -45,6 +46,8 @@ pub struct InterfaceTheme {
     #[hidden_element]
     pub drop_down: DropDownTheme<ClientState>,
     #[hidden_element]
+    pub field: FieldTheme<ClientState>,
+    #[hidden_element]
     pub tooltip: TooltipTheme<ClientState>,
     pub debug_button: DebugButtonTheme,
     pub chat: ChatTheme,
@@ -75,9 +78,9 @@ impl ThemeDefault for InterfaceTheme {
                 corner_radius: CornerRadius::uniform(50.0),
                 close_button_size: ScreenSize { width: 45.0, height: 35.0 },
                 close_button_corner_radius: CornerRadius::uniform(25.0),
-                minimum_width: 400.0,
+                minimum_width: 300.0,
                 maximum_width: 600.0,
-                minimum_height: 80.0,
+                minimum_height: 50.0,
                 maximum_height: 700.0,
                 title_height: 45.0,
                 title_gap: 20.0,
@@ -91,7 +94,7 @@ impl ThemeDefault for InterfaceTheme {
                 color: Color::monochrome_u8(220),
                 height: 15.0,
                 font_size: FontSize(16.0),
-                horizontal_alignment: HorizontalAlignment::Left { offset: 0.0 },
+                horizontal_alignment: HorizontalAlignment::Left { offset: 6.0 },
                 vertical_alignment: VerticalAlignment::Center { offset: 0.0 },
             },
             button: ButtonTheme {
@@ -173,6 +176,15 @@ impl ThemeDefault for InterfaceTheme {
                 button_text_alignment: HorizontalAlignment::Center { offset: 0.0 },
                 button_vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
             },
+            field: FieldTheme {
+                background_color: Color::monochrome_u8(80),
+                foreground_color: Color::monochrome_u8(180),
+                height: 30.0,
+                corner_radius: CornerRadius::uniform(30.0),
+                font_size: FontSize(16.0),
+                horizontal_alignment: HorizontalAlignment::Center { offset: 0.0 },
+                vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
+            },
             tooltip: TooltipTheme {
                 background_color: Color::rgba_u8(15, 15, 15, 200),
                 foreground_color: Color::monochrome_u8(235),
@@ -200,13 +212,13 @@ impl ThemeDefault for InterfaceTheme {
                 hovered_title_color: Color::rgb_u8(240, 155, 155),
                 background_color: Color::monochrome_u8(50),
                 gaps: 8.0,
-                border: 15.0,
+                border: 10.0,
                 corner_radius: CornerRadius::uniform(14.0),
                 close_button_size: ScreenSize { width: 40.0, height: 18.0 },
                 close_button_corner_radius: CornerRadius::uniform(12.0),
-                minimum_width: 400.0,
+                minimum_width: 300.0,
                 maximum_width: 600.0,
-                minimum_height: 80.0,
+                minimum_height: 40.0,
                 maximum_height: 700.0,
                 title_height: 25.0,
                 title_gap: 2.0,
@@ -218,9 +230,9 @@ impl ThemeDefault for InterfaceTheme {
             },
             text: TextTheme {
                 color: Color::monochrome_u8(220),
-                height: 12.0,
+                height: 14.0,
                 font_size: FontSize(14.0),
-                horizontal_alignment: HorizontalAlignment::Left { offset: 0.0 },
+                horizontal_alignment: HorizontalAlignment::Left { offset: 3.0 },
                 vertical_alignment: VerticalAlignment::Center { offset: 0.0 },
             },
             button: ButtonTheme {
@@ -301,6 +313,15 @@ impl ThemeDefault for InterfaceTheme {
                 button_font_size: FontSize(14.0),
                 button_text_alignment: HorizontalAlignment::Center { offset: 0.0 },
                 button_vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
+            },
+            field: FieldTheme {
+                background_color: Color::monochrome_u8(100),
+                foreground_color: Color::monochrome_u8(220),
+                height: 20.0,
+                corner_radius: CornerRadius::uniform(10.0),
+                font_size: FontSize(14.0),
+                horizontal_alignment: HorizontalAlignment::Left { offset: 10.0 },
+                vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
             },
             tooltip: TooltipTheme {
                 background_color: Color::rgba_u8(15, 15, 15, 200),

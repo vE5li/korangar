@@ -14,16 +14,26 @@ use num::Signed;
 use rust_state::Context;
 use tooltip::{Tooltip, TooltipId};
 
-pub use self::resolver::{HeightBound, Resolver};
+pub use self::resolver::Resolver;
 use crate::MouseMode;
-use crate::application::{Application, ClipTrait, PositionTrait, RenderLayer, SizeTrait};
+use crate::application::{Application, ClipTrait, CornerRadiusTrait, FontSizeTrait, PositionTrait, RenderLayer, SizeTrait};
 use crate::element::id::{ElementId, FocusId};
 use crate::event::{ClickAction, Event, EventQueue};
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+// Rename this to ButtonPress or something.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MouseButton {
     Left,
     Right,
+    DoubleLeft,
+    DoubleRight,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum ResizeMode {
+    Horizontal,
+    Vertical,
+    Both,
 }
 
 #[derive(Clone, Copy)]
@@ -72,6 +82,13 @@ struct WindowArea {
     window_id: u64,
 }
 
+struct WindowResizeArea {
+    clip_layer: ClipLayerId,
+    area: Area,
+    resize_mode: ResizeMode,
+    window_id: u64,
+}
+
 struct ScrollArea<'a> {
     clip_layer: ClipLayerId,
     area: Area,
@@ -104,7 +121,7 @@ struct LayoutLayer<'a, App: Application> {
     custom_instructions: Vec<<App::Renderer as RenderLayer<App>>::CustomInstruction<'a>>,
     click_areas: Vec<ClickArea<'a, App>>,
     window_move_areas: Vec<WindowArea>,
-    window_resize_areas: Vec<WindowArea>,
+    window_resize_areas: Vec<WindowResizeArea>,
     window_close_areas: Vec<WindowArea>,
     scroll_areas: Vec<ScrollArea<'a>>,
     toggles: Vec<ToggleInstruction<'a>>,
@@ -199,6 +216,9 @@ pub struct Layout<'a, App: Application> {
     tooltip_timers: BTreeMap<TooltipId, Instant>,
 
     focus_id_lookup: BTreeMap<FocusId, ElementId>,
+
+    window_position: App::Position,
+    interface_scaling: f32,
 }
 
 impl<App: Application> Default for Layout<'_, App> {
@@ -223,6 +243,9 @@ impl<App: Application> Default for Layout<'_, App> {
             tooltip_timers: BTreeMap::new(),
 
             focus_id_lookup: BTreeMap::new(),
+
+            window_position: App::Position::new(0.0, 0.0),
+            interface_scaling: 1.0,
         }
     }
 }
@@ -248,10 +271,31 @@ impl<'a, App: Application> Layout<'a, App> {
         self.focus_id_lookup.clear();
     }
 
-    pub fn update(&mut self, mouse_position: App::Position, focused_element: Option<ElementId>, can_hover: bool) {
+    pub fn update(
+        &mut self,
+        interface_scaling: f32,
+        window_position: App::Position,
+        mouse_position: App::Position,
+        focused_element: Option<ElementId>,
+        can_hover: bool,
+    ) {
+        self.interface_scaling = interface_scaling;
+        self.window_position = window_position;
+        self.mouse_position = App::Position::new(
+            (mouse_position.left() - self.window_position.left()) / interface_scaling + self.window_position.left(),
+            (mouse_position.top() - self.window_position.top()) / interface_scaling + self.window_position.top(),
+        );
         self.focused_element = focused_element;
-        self.mouse_position = mouse_position;
         self.can_hover = can_hover;
+    }
+
+    pub fn scale_area(&self, area: Area) -> Area {
+        Area {
+            left: (area.left - self.window_position.left()) * self.interface_scaling + self.window_position.left(),
+            top: (area.top - self.window_position.top()) * self.interface_scaling + self.window_position.top(),
+            width: area.width * self.interface_scaling,
+            height: area.height * self.interface_scaling,
+        }
     }
 
     pub fn is_hovered(&self) -> bool {
@@ -320,6 +364,7 @@ impl<'a, App: Application> Layout<'a, App> {
     }
 
     fn set_layer_clip(&mut self, handle: ClipLayerHandle, area: Area) {
+        let area = self.scale_area(area);
         let clip = App::Clip::new(area.left, area.top, area.left + area.width, area.top + area.height);
 
         self.clip_layers[handle.0.0].clip = clip;
@@ -353,6 +398,7 @@ impl<'a, App: Application> Layout<'a, App> {
 
     pub fn add_click_area(&mut self, area: Area, button: MouseButton, action: &'a dyn ClickAction<App>) {
         let clip_layer = self.get_active_clip_layer();
+        let area = self.scale_area(area);
 
         self.layers[self.current_layer].click_areas.push(ClickArea {
             clip_layer,
@@ -364,6 +410,7 @@ impl<'a, App: Application> Layout<'a, App> {
 
     pub fn add_window_move_area(&mut self, area: Area, window_id: u64) {
         let clip_layer = self.get_active_clip_layer();
+        let area = self.scale_area(area);
 
         self.layers[self.current_layer].window_move_areas.push(WindowArea {
             clip_layer,
@@ -372,18 +419,21 @@ impl<'a, App: Application> Layout<'a, App> {
         });
     }
 
-    pub fn add_window_resize_area(&mut self, area: Area, window_id: u64) {
+    pub fn add_window_resize_area(&mut self, area: Area, resize_mode: ResizeMode, window_id: u64) {
         let clip_layer = self.get_active_clip_layer();
+        let area = self.scale_area(area);
 
-        self.layers[self.current_layer].window_resize_areas.push(WindowArea {
+        self.layers[self.current_layer].window_resize_areas.push(WindowResizeArea {
             clip_layer,
             area,
+            resize_mode,
             window_id,
         });
     }
 
     pub fn add_window_close_area(&mut self, area: Area, window_id: u64) {
         let clip_layer = self.get_active_clip_layer();
+        let area = self.scale_area(area);
 
         self.layers[self.current_layer].window_close_areas.push(WindowArea {
             clip_layer,
@@ -394,6 +444,7 @@ impl<'a, App: Application> Layout<'a, App> {
 
     pub fn add_scroll_area(&mut self, area: Area, max_scroll: f32, cell: &'a RefCell<f32>) {
         let clip_layer = self.get_active_clip_layer();
+        let area = self.scale_area(area);
 
         self.layers[self.current_layer].scroll_areas.push(ScrollArea {
             clip_layer,
@@ -405,6 +456,7 @@ impl<'a, App: Application> Layout<'a, App> {
 
     pub fn add_toggle(&mut self, area: Area, cell: &'a RefCell<bool>) {
         let clip_layer = self.get_active_clip_layer();
+        let area = self.scale_area(area);
 
         self.layers[self.current_layer]
             .toggles
@@ -413,6 +465,7 @@ impl<'a, App: Application> Layout<'a, App> {
 
     pub fn add_focus_area(&mut self, area: Area, element_id: ElementId) {
         let clip_layer = self.get_active_clip_layer();
+        let area = self.scale_area(area);
 
         self.layers[self.current_layer].focus_areas.push(FocusArea {
             clip_layer,
@@ -427,6 +480,8 @@ impl<'a, App: Application> Layout<'a, App> {
 
     pub fn add_rectangle(&mut self, area: Area, corner_radius: App::CornerRadius, color: App::Color) {
         let clip_layer = self.get_active_clip_layer();
+        let area = self.scale_area(area);
+        let corner_radius = corner_radius.scaled(self.interface_scaling);
 
         self.layers[self.current_layer].rectangles.push(RectangleInsturction {
             clip_layer,
@@ -446,6 +501,10 @@ impl<'a, App: Application> Layout<'a, App> {
         vertical_alignment: VerticalAlignment,
     ) {
         let clip_layer = self.get_active_clip_layer();
+        let area = self.scale_area(area);
+        let font_size = font_size.scaled(self.interface_scaling);
+        let horizontal_alignment = horizontal_alignment.scaled(self.interface_scaling);
+        let vertical_alignment = vertical_alignment.scaled(self.interface_scaling);
 
         self.layers[self.current_layer].texts.push(TextInstruction {
             clip_layer,
@@ -460,6 +519,7 @@ impl<'a, App: Application> Layout<'a, App> {
 
     pub fn add_icon(&mut self, area: Area, icon: Icon<App>, color: App::Color) {
         let clip_layer = self.get_active_clip_layer();
+        let area = self.scale_area(area);
 
         self.layers[self.current_layer].icons.push(IconInstruction {
             clip_layer,
@@ -493,16 +553,17 @@ impl<'a, App: Application> Layout<'a, App> {
     /// time. Those are the tooltips that will be rendered to the screen.
     pub fn update_tooltips(&mut self, tooltips: &mut Vec<&'a str>) {
         self.tooltip_timers.retain(|id, timer| {
-            if let Some(tooltip) = self.tooltips.iter().find(|tooltip| tooltip.id == *id) {
+            let mut found = false;
+
+            self.tooltips.iter().filter(|tooltip| tooltip.id == *id).for_each(|tooltip| {
                 if timer.elapsed() > Duration::from_secs(1) {
                     tooltips.push(tooltip.text);
                 }
 
-                true
-            } else {
-                // Remove any timers for tooltips that are no longer registered.
-                false
-            }
+                found = true;
+            });
+
+            found
         });
     }
 
@@ -624,7 +685,7 @@ impl<'a, App: Application> Layout<'a, App> {
         state: &Context<App>,
         queue: &mut EventQueue<App>,
         focused_element: &mut Option<ElementId>,
-        mouse_mode: &mut MouseMode,
+        mouse_mode: &mut MouseMode<App>,
         click_position: App::Position,
         mouse_button: MouseButton,
     ) -> bool {
@@ -644,11 +705,11 @@ impl<'a, App: Application> Layout<'a, App> {
                 let clip = self.clip_layers[click_area.clip_layer.0].clip;
                 let clip = apply_clip(clip, click_area.area);
 
-                if click_position.left() >= clip.left()
+                if click_area.mouse_button == mouse_button
+                    && click_position.left() >= clip.left()
                     && click_position.left() <= clip.right()
                     && click_position.top() >= clip.top()
                     && click_position.top() <= clip.bottom()
-                    && click_area.mouse_button == mouse_button
                 {
                     click_area.action.execute(state, queue);
                     clicked = true;
@@ -659,7 +720,8 @@ impl<'a, App: Application> Layout<'a, App> {
                 let clip = self.clip_layers[toggle.clip_layer.0].clip;
                 let clip = apply_clip(clip, toggle.area);
 
-                if click_position.left() >= clip.left()
+                if mouse_button == MouseButton::Left
+                    && click_position.left() >= clip.left()
                     && click_position.left() <= clip.right()
                     && click_position.top() >= clip.top()
                     && click_position.top() <= clip.bottom()
@@ -674,7 +736,8 @@ impl<'a, App: Application> Layout<'a, App> {
                 let clip = self.clip_layers[window_move_area.clip_layer.0].clip;
                 let clip = apply_clip(clip, window_move_area.area);
 
-                if click_position.left() >= clip.left()
+                if mouse_button == MouseButton::Left
+                    && click_position.left() >= clip.left()
                     && click_position.left() <= clip.right()
                     && click_position.top() >= clip.top()
                     && click_position.top() <= clip.bottom()
@@ -690,13 +753,15 @@ impl<'a, App: Application> Layout<'a, App> {
                 let clip = self.clip_layers[window_resize_area.clip_layer.0].clip;
                 let clip = apply_clip(clip, window_resize_area.area);
 
-                if click_position.left() >= clip.left()
+                if mouse_button == MouseButton::Left
+                    && click_position.left() >= clip.left()
                     && click_position.left() <= clip.right()
                     && click_position.top() >= clip.top()
                     && click_position.top() <= clip.bottom()
                 {
                     *mouse_mode = MouseMode::ResizingWindow {
                         window_id: window_resize_area.window_id,
+                        resize_mode: window_resize_area.resize_mode,
                     };
                     clicked = true;
                 }
@@ -706,7 +771,8 @@ impl<'a, App: Application> Layout<'a, App> {
                 let clip = self.clip_layers[window_close_area.clip_layer.0].clip;
                 let clip = apply_clip(clip, window_close_area.area);
 
-                if click_position.left() >= clip.left()
+                if mouse_button == MouseButton::Left
+                    && click_position.left() >= clip.left()
                     && click_position.left() <= clip.right()
                     && click_position.top() >= clip.top()
                     && click_position.top() <= clip.bottom()
@@ -737,14 +803,24 @@ impl<'a, App: Application> Layout<'a, App> {
     }
 
     pub fn do_scroll(&self, mouse_position: App::Position, delta: f32) -> bool {
+        fn apply_clip<T: ClipTrait>(clip: T, area: Area) -> T {
+            T::new(
+                area.left.max(clip.left()),
+                area.top.max(clip.top()),
+                (area.left + area.width).min(clip.right()),
+                (area.top + area.height).min(clip.bottom()),
+            )
+        }
+
         for layer in self.layers.iter().rev() {
             for scroll_area in &layer.scroll_areas {
-                // TODO: Check clip layer as well
+                let clip = self.clip_layers[scroll_area.clip_layer.0].clip;
+                let clip = apply_clip(clip, scroll_area.area);
 
-                if mouse_position.left() >= scroll_area.area.left
-                    && mouse_position.left() <= scroll_area.area.left + scroll_area.area.width
-                    && mouse_position.top() >= scroll_area.area.top
-                    && mouse_position.top() <= scroll_area.area.top + scroll_area.area.height
+                if mouse_position.left() >= clip.left()
+                    && mouse_position.left() <= clip.right()
+                    && mouse_position.top() >= clip.top()
+                    && mouse_position.top() <= clip.bottom()
                 {
                     let mut current_scroll = scroll_area.cell.borrow_mut();
 

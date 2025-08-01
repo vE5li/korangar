@@ -48,7 +48,7 @@ pub trait Application: Sized + 'static {
     ///
     /// Ideally this should be the same type that the application renderer uses
     /// to represent font size.
-    type FontSize: Copy;
+    type FontSize: FontSizeTrait;
 
     /// Application 2D position type.
     ///
@@ -96,7 +96,11 @@ pub trait Application: Sized + 'static {
     /// specific events as well.
     type CustomEvent: Clone;
 
-    // fn get_scaling_path() -> impl Path<Self, Scaling>;
+    /// Custom mouse mode.
+    ///
+    /// This allows the application to define additional mouse modes. E.g.
+    /// dragging a resource or rotating the camera.
+    type CustomMouseMode;
 
     fn set_current_theme_type(theme: Self::ThemeType);
 }
@@ -139,25 +143,15 @@ pub trait RenderLayer<App: Application> {
 }
 
 // TODO: Rename
-pub trait MouseInputModeTrait<App>
-where
-    App: Application,
-{
-    fn is_none(&self) -> bool;
-
-    // fn is_self_dragged(&self, element: &dyn Element<App>) -> bool;
-
-    fn is_moving_window(&self, window_index: usize) -> bool;
-}
-
-// TODO: Rename
-pub trait ScalingTrait: Copy {
-    fn get_factor(&self) -> f32;
+pub trait FontSizeTrait: Copy {
+    fn scaled(&self, scaling: f32) -> Self;
 }
 
 // TODO: Rename
 pub trait CornerRadiusTrait: Copy {
     fn new(top_left: f32, top_right: f32, bottom_right: f32, bottom_left: f32) -> Self;
+
+    fn scaled(&self, scaling: f32) -> Self;
 
     fn top_left(&self) -> f32;
 

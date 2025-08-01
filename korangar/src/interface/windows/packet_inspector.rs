@@ -1,14 +1,12 @@
+use korangar_interface::element::Element;
 use korangar_interface::element::id::ElementIdGenerator;
 use korangar_interface::element::store::ElementStore;
-use korangar_interface::element::{Element, ElementSet, ResolverSet};
-use korangar_interface::event::{ClickAction, EventQueue};
+use korangar_interface::event::EventQueue;
 use korangar_interface::layout::{Layout, Resolver};
-use korangar_interface::window::{CustomWindow, StateWindow, Window, WindowTrait};
+use korangar_interface::window::{CustomWindow, WindowTrait};
 use rust_state::{Context, Path};
 
-use crate::input::UserEvent;
-use crate::interface::layout::ScreenSize;
-use crate::interface::windows::{WindowCache, WindowClass};
+use crate::interface::windows::WindowClass;
 use crate::networking::{PacketHistory, PacketHistoryPathExt};
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
@@ -93,46 +91,33 @@ where
             title: "Packet Inspector",
             class: Self::window_class(),
             theme: InterfaceThemeType::Game,
+            minimum_height: 200.0,
             closable: true,
+            resizable: true,
             elements: (
-                fragment! {
-                    gaps: 2.0,
+                split! {
+                    gaps: theme().window().gaps(),
                     children: (
-                        split! {
-                            gaps: 5.0,
-                            children: (
-                                button! {
-                                    text: "Clear",
-                                    event: move |state: &Context<ClientState>, _: &mut EventQueue<ClientState>| {
-                                        state.update_value_with(self.packet_history_path.entries(), |buffer| buffer.clear());
-                                    }
-                                },
-                                state_button! {
-                                    text: "Update",
-                                    state: self.packet_history_path.update(),
-                                    event: Toggle(self.packet_history_path.update()),
-                                },
-                            ),
+                        button! {
+                            text: "Clear",
+                            event: move |state: &Context<ClientState>, _: &mut EventQueue<ClientState>| {
+                                state.update_value_with(self.packet_history_path.entries(), |buffer| buffer.clear());
+                            }
                         },
-                        split! {
-                            gaps: 5.0,
-                            children: (
-                                state_button! {
-                                    text: "Show incoming",
-                                    state: self.packet_history_path.show_incoming(),
-                                    event: Toggle(self.packet_history_path.show_incoming()),
-                                },
-                                state_button! {
-                                    text: "Show outgoing",
-                                    state: self.packet_history_path.show_outgoing(),
-                                    event: Toggle(self.packet_history_path.show_outgoing()),
-                                },
-                                state_button! {
-                                    text: "Show pings",
-                                    state: self.packet_history_path.show_pings(),
-                                    event: Toggle(self.packet_history_path.show_pings()),
-                                },
-                            ),
+                        state_button! {
+                            text: "Incoming",
+                            state: self.packet_history_path.show_incoming(),
+                            event: Toggle(self.packet_history_path.show_incoming()),
+                        },
+                        state_button! {
+                            text: "Outgoing",
+                            state: self.packet_history_path.show_outgoing(),
+                            event: Toggle(self.packet_history_path.show_outgoing()),
+                        },
+                        state_button! {
+                            text: "Pings",
+                            state: self.packet_history_path.show_pings(),
+                            event: Toggle(self.packet_history_path.show_pings()),
                         },
                     ),
                 },
@@ -142,7 +127,6 @@ where
                             packet_history_path: self.packet_history_path,
                         },
                     ),
-                    height_bound: HeightBound::WithMax,
                 },
             ),
         }

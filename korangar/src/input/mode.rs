@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use cgmath::Vector2;
-use korangar_interface::application::MouseInputModeTrait;
+use korangar_interface::MouseMode;
 use korangar_interface::element::id::ElementId;
 use korangar_networking::InventoryItem;
 
@@ -9,20 +9,21 @@ use crate::graphics::Texture;
 use crate::interface::resource::{ItemSource, SkillSource};
 use crate::inventory::Skill;
 use crate::loaders::Sprite;
+use crate::state::ClientState;
 use crate::world::{Actions, ResourceMetadata, SpriteAnimationState};
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub enum MouseInputMode {
     MoveItem(ItemSource, InventoryItem<ResourceMetadata>),
     MoveSkill(SkillSource, Skill),
-    MoveInterface(usize),
-    ResizeInterface(usize),
-    DragElement((ElementId, usize)),
-    ClickInterface,
     RotateCamera,
     Walk(Vector2<usize>),
-    #[default]
-    None,
+}
+
+impl From<MouseInputMode> for MouseMode<ClientState> {
+    fn from(mode: MouseInputMode) -> Self {
+        MouseMode::Custom { mode }
+    }
 }
 
 pub enum Grabbed {
@@ -30,19 +31,38 @@ pub enum Grabbed {
     Action(Arc<Sprite>, Arc<Actions>, SpriteAnimationState),
 }
 
-impl MouseInputMode {
-    pub fn is_none(&self) -> bool {
-        matches!(self, MouseInputMode::None)
+pub trait GrabbedExt {
+    fn is_rotating_camera(&self) -> bool;
+
+    fn walk_position(&self) -> Option<Vector2<usize>>;
+
+    fn grabbed(&self) -> Option<Grabbed>;
+}
+
+impl GrabbedExt for MouseMode<ClientState> {
+    fn is_rotating_camera(&self) -> bool {
+        matches!(self, MouseMode::Custom {
+            mode: MouseInputMode::RotateCamera
+        })
     }
 
-    pub fn is_walk(&self) -> bool {
-        matches!(self, MouseInputMode::Walk(..))
-    }
-
-    pub fn grabbed(&self) -> Option<Grabbed> {
+    fn walk_position(&self) -> Option<Vector2<usize>> {
         match self {
-            MouseInputMode::MoveItem(_, item) => item.metadata.texture.as_ref().map(|texture| Grabbed::Texture(texture.clone())),
-            MouseInputMode::MoveSkill(_, skill) => Some(Grabbed::Action(
+            MouseMode::Custom {
+                mode: MouseInputMode::Walk(position),
+            } => Some(*position),
+            _ => None,
+        }
+    }
+
+    fn grabbed(&self) -> Option<Grabbed> {
+        match self {
+            MouseMode::Custom {
+                mode: MouseInputMode::MoveItem(_, item),
+            } => item.metadata.texture.as_ref().map(|texture| Grabbed::Texture(texture.clone())),
+            MouseMode::Custom {
+                mode: MouseInputMode::MoveSkill(_, skill),
+            } => Some(Grabbed::Action(
                 skill.sprite.clone(),
                 skill.actions.clone(),
                 skill.animation_state.clone(),
@@ -51,18 +71,3 @@ impl MouseInputMode {
         }
     }
 }
-//
-// impl MouseInputModeTrait<InterfaceSettings> for MouseInputMode {
-//     fn is_none(&self) -> bool {
-//         matches!(self, MouseInputMode::None)
-//     }
-//
-//     fn is_self_dragged(&self, element: &dyn Element<InterfaceSettings>) ->
-// bool {         matches!(self, Self::DragElement(dragged_element) if
-// std::ptr::eq((&*dragged_element.0.borrow()) as *const _ as *const (), element
-// as *const _ as *const ()))     }
-//
-//     fn is_moving_window(&self, window_index: usize) -> bool {
-//         matches!(self, Self::MoveInterface(index) if *index == window_index)
-//     }
-// }

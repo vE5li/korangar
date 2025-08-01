@@ -1,11 +1,10 @@
 use korangar_components::skill_box;
-use korangar_interface::window::{CustomWindow, StateWindow, Window, WindowTrait};
+use korangar_interface::window::{CustomWindow, WindowTrait};
 use ragnarok_packets::HotbarSlot;
-use rust_state::{ArrayLookupExt, Context, OptionExt, Path};
+use rust_state::{ArrayLookupExt, OptionExt, Path};
 
-use crate::interface::layout::ScreenSize;
 use crate::interface::resource::SkillSource;
-use crate::interface::windows::{WindowCache, WindowClass};
+use crate::interface::windows::WindowClass;
 use crate::inventory::Skill;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
@@ -37,6 +36,7 @@ where
             theme: InterfaceThemeType::Game,
             elements: (
                 split! {
+                    gaps: theme().window().gaps(),
                     children: std::array::from_fn::<_, N, _>(|slot| {
                         let path = self.skills_path.array_index(slot).unwrapped();
 

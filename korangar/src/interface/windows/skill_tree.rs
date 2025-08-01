@@ -1,10 +1,9 @@
 use korangar_components::skill_box;
-use korangar_interface::window::{CustomWindow, StateWindow, Window, WindowTrait};
+use korangar_interface::window::{CustomWindow, WindowTrait};
 use rust_state::{Path, VecIndexExt};
 
 use crate::SkillSource;
-use crate::interface::layout::ScreenSize;
-use crate::interface::windows::{WindowCache, WindowClass};
+use crate::interface::windows::WindowClass;
 use crate::inventory::Skill;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
@@ -41,6 +40,7 @@ where
             closable: true,
             elements: std::array::from_fn::<_, SKILL_TREE_ROWS, _>(|row| {
                 split! {
+                    gaps: theme().window().gaps(),
                     children: std::array::from_fn::<_, SKILL_TREE_COLUMNS, _>(|column| {
                         let path = self.skills_path.index(row * SKILL_TREE_COLUMNS + column);
 

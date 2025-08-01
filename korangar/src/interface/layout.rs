@@ -1,5 +1,4 @@
 use cgmath::Vector2;
-use derive_new::new;
 use korangar_interface::application::{ClipTrait, CornerRadiusTrait, PositionTrait, SizeTrait};
 use korangar_interface::element::ElementDisplay;
 use rust_state::RustState;
@@ -395,6 +394,15 @@ impl CornerRadiusTrait for CornerRadius {
             top_right,
             bottom_left,
             bottom_right,
+        }
+    }
+
+    fn scaled(&self, scaling: f32) -> Self {
+        Self {
+            top_left: self.top_left * scaling,
+            top_right: self.top_right * scaling,
+            bottom_left: self.bottom_left * scaling,
+            bottom_right: self.bottom_right * scaling,
         }
     }
 

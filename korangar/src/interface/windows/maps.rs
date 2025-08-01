@@ -1,10 +1,8 @@
-use korangar_interface::window::{CustomWindow, StateWindow, Window, WindowTrait};
+use korangar_interface::window::{CustomWindow, WindowTrait};
 use ragnarok_packets::TilePosition;
-use rust_state::Context;
 
 use crate::input::UserEvent;
-use crate::interface::layout::ScreenSize;
-use crate::interface::windows::{WindowCache, WindowClass};
+use crate::interface::windows::WindowClass;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
 

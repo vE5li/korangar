@@ -24,15 +24,13 @@ extern crate self as korangar_interface;
 use std::any::Any;
 use std::collections::BTreeMap;
 
-use application::{Application, ClipTrait, PositionTrait, RenderLayer, SizeTrait, WindowCache};
+use application::{Application, ClipTrait, CornerRadiusTrait, FontSizeTrait, PositionTrait, RenderLayer, SizeTrait, WindowCache};
 use element::ElementBox;
 use element::id::{ElementId, ElementIdGenerator};
 use element::store::ElementStore;
 use event::{Event, EventQueue};
-#[cfg(feature = "debug")]
-use korangar_debug::profile_block;
 use layout::area::Area;
-use layout::{Layout, MouseButton, Resolver};
+use layout::{Layout, MouseButton, ResizeMode, Resolver};
 use option_ext::OptionExt;
 use prelude::TooltipThemePathExt;
 use rust_state::Context;
@@ -53,16 +51,15 @@ pub mod prelude {
     pub use crate::components::button::ButtonThemePathExt;
     pub use crate::components::collapsable::CollapsableThemePathExt;
     pub use crate::components::drop_down::DropDownThemePathExt;
+    pub use crate::components::field::FieldThemePathExt;
     pub use crate::components::state_button::StateButtonThemePathExt;
     pub use crate::components::text::TextThemePathExt;
     pub use crate::components::text_box::TextBoxThemePathExt;
     pub use crate::event::Toggle;
-    // TODO: Should this really be here?
-    pub use crate::layout::HeightBound;
     pub use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
     pub use crate::layout::tooltip::TooltipThemePathExt;
     pub use crate::selector_helpers::*;
-    pub use crate::theme::ThemePathGetter;
+    pub use crate::theme::{ThemePathGetter, theme};
     pub use crate::window::WindowThemePathExt;
 }
 
@@ -158,10 +155,14 @@ pub mod selector_helpers {
 }
 
 // TODO: This will likely be renamed + Moved
-pub enum MouseMode {
+pub enum MouseMode<App>
+where
+    App: Application,
+{
     Default,
     MovingWindow { window_id: u64 },
-    ResizingWindow { window_id: u64 },
+    ResizingWindow { resize_mode: ResizeMode, window_id: u64 },
+    Custom { mode: App::CustomMouseMode },
 }
 
 struct WindowWrapper<App>
@@ -170,7 +171,7 @@ where
 {
     window: Box<dyn WindowTrait<App>>,
     data: WindowData<App>,
-    display_information: DisplayInformation<App>,
+    display_information: DisplayInformation,
 }
 
 pub struct Interface<'a, App>
@@ -184,7 +185,7 @@ where
     generator: ElementIdGenerator,
     window_store: WindowStore,
     focused_element: Option<ElementId>,
-    mouse_mode: MouseMode,
+    mouse_mode: MouseMode<App>,
     event_queue: EventQueue<App>,
     overlay_element: Option<(ElementBox<App>, ElementStore, App::Position, App::Size)>,
 
@@ -241,33 +242,39 @@ where
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn handle_drag(&mut self, delta: App::Size) {
+    pub fn handle_drag(&mut self, delta: App::Size, interface_scaling: f32) {
         match self.mouse_mode {
             MouseMode::Default => {}
             MouseMode::MovingWindow { window_id } => {
                 if let Some(wrapper) = self.windows.iter_mut().find(|window| window.data.id == window_id) {
                     let new_position = App::Position::new(
-                        wrapper.display_information.real_position.left() + delta.width(),
-                        wrapper.display_information.real_position.top() + delta.height(),
+                        wrapper.display_information.real_area.left + delta.width(),
+                        wrapper.display_information.real_area.top + delta.height(),
                     );
 
-                    wrapper.data.anchor.update(
-                        self.window_size,
-                        new_position,
-                        wrapper.display_information.real_size,
-                        wrapper.display_information.display_height,
+                    let scaled_size = App::Size::new(
+                        wrapper.display_information.real_area.width * interface_scaling,
+                        wrapper.display_information.display_height * interface_scaling,
                     );
+
+                    wrapper.data.anchor.update(self.window_size, new_position, scaled_size);
 
                     if let Some(window_class) = wrapper.window.get_window_class() {
                         self.window_cache.update_anchor(window_class, wrapper.data.anchor);
                     }
                 }
             }
-            MouseMode::ResizingWindow { window_id } => {
+            MouseMode::ResizingWindow { window_id, resize_mode } => {
                 if let Some(wrapper) = self.windows.iter_mut().find(|window| window.data.id == window_id) {
+                    let (delta_width, delta_height) = match resize_mode {
+                        ResizeMode::Horizontal => (delta.width(), 0.0),
+                        ResizeMode::Vertical => (0.0, delta.height()),
+                        ResizeMode::Both => (delta.width(), delta.height()),
+                    };
+
                     wrapper.data.size = App::Size::new(
-                        wrapper.display_information.real_size.width() + delta.width(),
-                        wrapper.display_information.real_size.height() + delta.height(),
+                        wrapper.display_information.real_area.width + delta_width / interface_scaling,
+                        wrapper.display_information.real_area.height + delta_height / interface_scaling,
                     );
 
                     if let Some(window_class) = wrapper.window.get_window_class() {
@@ -275,6 +282,7 @@ where
                     }
                 }
             }
+            MouseMode::Custom { .. } => {}
         }
     }
 
@@ -309,11 +317,23 @@ where
             window: Box::new(window),
             data: WindowData { id, anchor, size },
             display_information: DisplayInformation {
-                real_position: App::Position::new(0.0, 0.0),
-                real_size: size,
+                real_area: Area {
+                    left: 0.0,
+                    top: 0.0,
+                    width: size.width(),
+                    height: size.height(),
+                },
                 display_height: 0.0,
             },
         });
+    }
+
+    pub fn get_mouse_mode(&self) -> &MouseMode<App> {
+        &self.mouse_mode
+    }
+
+    pub fn has_focus(&self) -> bool {
+        self.focused_element.is_some()
     }
 
     pub fn reset_mouse_mode(&mut self) {
@@ -395,8 +415,13 @@ where
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn do_layouts<'a>(&'a mut self, state: &'a Context<App>, mouse_position: App::Position) -> BuiltUi<'a, App> {
-        let mut is_ui_hovered = false;
+    pub fn do_layouts<'a>(
+        &'a mut self,
+        state: &'a Context<App>,
+        interface_scaling: f32,
+        mouse_position: App::Position,
+    ) -> BuiltUi<'a, App> {
+        let mut is_interface_hovered = false;
 
         if let Some((element, store, position, size)) = &mut self.overlay_element {
             let available_area = Area {
@@ -430,21 +455,46 @@ where
         });
 
         if let Some((element, store, ..)) = &this.overlay_element {
+            // TODO: Choose the most recent window instead.
+            let wrapper = &this.windows[0];
+
+            let position = App::Position::new(
+                wrapper.display_information.real_area.left,
+                wrapper.display_information.real_area.top,
+            );
+
             let layout = this.overlay_layout.get_or_insert_default();
-            layout.update(mouse_position, this.focused_element, !is_ui_hovered);
+            layout.update(
+                interface_scaling,
+                position,
+                mouse_position,
+                this.focused_element,
+                !is_interface_hovered,
+            );
 
             element.layout_element(state, store, &(), layout);
 
-            is_ui_hovered |= layout.is_hovered();
+            is_interface_hovered |= layout.is_hovered();
         }
 
         this.windows.iter().for_each(|wrapper| {
+            let position = App::Position::new(
+                wrapper.display_information.real_area.left,
+                wrapper.display_information.real_area.top,
+            );
+
             let layout = this.window_layouts.entry(wrapper.data.id).or_default();
-            layout.update(mouse_position, this.focused_element, !is_ui_hovered);
+            layout.update(
+                interface_scaling,
+                position,
+                mouse_position,
+                this.focused_element,
+                !is_interface_hovered,
+            );
 
             wrapper.window.do_layout(state, &this.window_store, &wrapper.data, layout);
 
-            is_ui_hovered |= layout.is_hovered();
+            is_interface_hovered |= layout.is_hovered();
         });
 
         BuiltUi {
@@ -454,10 +504,18 @@ where
             mouse_mode: &mut this.mouse_mode,
             event_queue: &mut this.event_queue,
             window_size: this.window_size,
+            is_interface_hovered,
+            interface_scaling,
         }
     }
 
-    pub fn render_overlay(&self, renderer: &App::Renderer, anchor_color: App::Color, closest_anchor_color: App::Color) {
+    pub fn render_overlay(
+        &self,
+        renderer: &App::Renderer,
+        anchor_color: App::Color,
+        closest_anchor_color: App::Color,
+        interface_scaling: f32,
+    ) {
         if let MouseMode::MovingWindow { window_id } = self.mouse_mode {
             if let Some(wrapper) = self.windows.iter().find(|wrapper| wrapper.data.id == window_id) {
                 wrapper
@@ -466,25 +524,25 @@ where
                     .render_screen_anchors(renderer, anchor_color, closest_anchor_color, self.window_size);
 
                 let window_display_size = App::Size::new(
-                    wrapper.display_information.real_size.width(),
-                    wrapper.display_information.display_height,
+                    wrapper.display_information.real_area.width * interface_scaling,
+                    wrapper.display_information.display_height * interface_scaling,
                 );
 
-                wrapper.data.anchor.render_window_anchors(
-                    renderer,
-                    anchor_color,
-                    closest_anchor_color,
-                    wrapper.display_information.real_position,
-                    window_display_size,
+                let position = App::Position::new(
+                    wrapper.display_information.real_area.left,
+                    wrapper.display_information.real_area.top,
                 );
+
+                wrapper
+                    .data
+                    .anchor
+                    .render_window_anchors(renderer, anchor_color, closest_anchor_color, position, window_display_size);
             }
         }
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn process_events(&mut self) -> Vec<App::CustomEvent> {
-        let mut custom_events = Vec::new();
-
+    pub fn process_events(&mut self, custom_events: &mut Vec<App::CustomEvent>) {
         for event in self.event_queue.drain() {
             match event {
                 // This case should never be hit. FocusElement needs to be converted to
@@ -507,8 +565,6 @@ where
                 }
             }
         }
-
-        custom_events
     }
 }
 
@@ -516,9 +572,11 @@ pub struct BuiltUi<'a, App: Application> {
     window_layouts: &'a mut BTreeMap<u64, Layout<'a, App>>,
     overlay_layout: &'a mut Option<Layout<'a, App>>,
     focused_element: &'a mut Option<ElementId>,
-    mouse_mode: &'a mut MouseMode,
+    mouse_mode: &'a mut MouseMode<App>,
     event_queue: &'a mut EventQueue<App>,
     window_size: App::Size,
+    is_interface_hovered: bool,
+    interface_scaling: f32,
 }
 
 impl<App: Application> BuiltUi<'_, App> {
@@ -549,11 +607,11 @@ impl<App: Application> BuiltUi<'_, App> {
     fn render_tooltips(&self, state: &Context<App>, renderer: &App::Renderer, tooltips: &[&str], mouse_position: App::Position) {
         let background_color = *state.get(&theme::theme().tooltip().background_color());
         let foreground_color = *state.get(&theme::theme().tooltip().foreground_color());
-        let font_size = *state.get(&theme::theme().tooltip().font_size());
-        let corner_radius = *state.get(&theme::theme().tooltip().corner_radius());
-        let border = *state.get(&theme::theme().tooltip().border());
-        let gap = *state.get(&theme::theme().tooltip().gap());
-        let mouse_offset = *state.get(&theme::theme().tooltip().mouse_offset());
+        let font_size = state.get(&theme::theme().tooltip().font_size()).scaled(self.interface_scaling);
+        let corner_radius = state.get(&theme::theme().tooltip().corner_radius()).scaled(self.interface_scaling);
+        let border = *state.get(&theme::theme().tooltip().border()) * self.interface_scaling;
+        let gap = *state.get(&theme::theme().tooltip().gap()) * self.interface_scaling;
+        let mouse_offset = *state.get(&theme::theme().tooltip().mouse_offset()) * self.interface_scaling;
 
         let total_offset = border * 2.0 + mouse_offset;
         let half_window_size = App::Size::new(self.window_size.width() / 2.0, self.window_size.height() / 2.0);
@@ -668,6 +726,14 @@ impl<App: Application> BuiltUi<'_, App> {
         }
 
         input_handled
+    }
+
+    pub fn is_interface_hovered(&self) -> bool {
+        self.is_interface_hovered
+    }
+
+    pub fn set_mouse_mode(&mut self, mouse_mode: impl Into<MouseMode<App>>) {
+        *self.mouse_mode = mouse_mode.into();
     }
 
     pub fn focus_element(&mut self, focus_id: impl Any) {

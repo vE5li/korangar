@@ -1,11 +1,5 @@
 use super::area::{Area, PartialArea};
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum HeightBound {
-    Unbound,
-    WithMax,
-}
-
 #[derive(Clone)]
 pub struct Resolver {
     available_area: PartialArea,
@@ -14,7 +8,7 @@ pub struct Resolver {
 }
 
 impl Resolver {
-    pub fn new(available_area: Area, gaps: f32) -> Self {
+    pub fn new(available_area: impl Into<PartialArea>, gaps: f32) -> Self {
         Self {
             available_area: available_area.into(),
             used_height: 0.0,
@@ -138,12 +132,7 @@ impl Resolver {
         (returned, layout_info)
     }
 
-    pub fn with_derived_scrolled<L>(
-        &mut self,
-        scroll: f32,
-        height_bound: HeightBound,
-        f: impl FnOnce(&mut Resolver) -> L,
-    ) -> (Area, f32, L) {
+    pub fn with_derived_scrolled<L>(&mut self, scroll: f32, f: impl FnOnce(&mut Resolver) -> L) -> (Area, f32, L) {
         self.push_gaps();
 
         let mut inner = Resolver {
@@ -160,14 +149,10 @@ impl Resolver {
         let layout_info = f(&mut inner);
 
         let children_height = inner.used_height;
-        let height = match height_bound {
-            HeightBound::Unbound => children_height,
-            HeightBound::WithMax => children_height.min(
-                self.available_area
-                    .height
-                    .expect("attempted to get height from an unbound resolver"),
-            ),
-        };
+        let height = self
+            .available_area
+            .height
+            .expect("attempted to get height from an unbound resolver");
 
         let returned = Area {
             left: self.available_area.left,
@@ -186,28 +171,16 @@ impl Resolver {
         (returned, children_height, layout_info)
     }
 
-    pub fn with_derived_custom<L>(&mut self, available_area: PartialArea, f: impl FnOnce(&mut Resolver) -> L) -> L {
-        let mut inner = Resolver {
-            available_area,
-            used_height: 0.0,
-            gaps: self.gaps,
-        };
+    pub fn get_used_height(&self) -> f32 {
+        self.used_height
+    }
 
-        let layout_info = f(&mut inner);
+    pub fn commit_used_height(&mut self, used_height: f32) {
+        self.available_area.top += used_height;
+        self.used_height += used_height;
 
-        let delta = inner.available_area.top - self.available_area.top;
-        if delta > 0.0 {
-            self.available_area.top = inner.available_area.top;
-            self.used_height += delta;
+        if let Some(available_height) = &mut self.available_area.height {
+            *available_height -= used_height;
         }
-
-        // TODO: Really bad. Shouldn't unwrap probably
-        // self.available_area.height = self
-        //     .available_area
-        //     .height
-        //     .map(|height| height.min(other.available_area.height.unwrap()))
-        //     .or(other.available_area.height);
-
-        layout_info
     }
 }

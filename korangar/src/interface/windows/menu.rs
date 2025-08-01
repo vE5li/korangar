@@ -1,9 +1,7 @@
-use korangar_interface::window::{CustomWindow, StateWindow, Window, WindowTrait};
-use rust_state::Context;
+use korangar_interface::window::{CustomWindow, WindowTrait};
 
 use crate::input::UserEvent;
-use crate::interface::layout::ScreenSize;
-use crate::interface::windows::{WindowCache, WindowClass};
+use crate::interface::windows::WindowClass;
 use crate::state::theme::{DebugButtonThemePathExt, InterfaceThemePathExt, InterfaceThemeType};
 use crate::state::{ClientState, client_theme};
 

@@ -181,7 +181,7 @@ where
                 text! {
                     text: name,
                 },
-                text! {
+                field! {
                     text: ElementDisplaySelector::new(self_path),
                 },
             ),
@@ -238,7 +238,7 @@ where
                 text! {
                     text: name,
                 },
-                text! {
+                field! {
                     text: BoolSelector(self_path),
                 },
             ),
@@ -285,7 +285,7 @@ where
                 text! {
                     text: name,
                 },
-                text! {
+                field! {
                     text: self_path,
                 },
             ),
@@ -458,7 +458,7 @@ where
                     text! {
                         text: name,
                     },
-                    text! {
+                    field! {
                         text: "None",
                     }
                 ),
@@ -548,7 +548,7 @@ where
                     text! {
                         text: name,
                     },
-                    text! {
+                    field! {
                         text: "None",
                     }
                 ),

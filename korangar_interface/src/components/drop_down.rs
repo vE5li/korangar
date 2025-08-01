@@ -237,7 +237,6 @@ where
                     _marker: PhantomData,
                 },
             ),
-            height_bound: HeightBound::WithMax,
         });
 
         queue.queue(Event::OpenOverlay {

@@ -10,6 +10,7 @@ use crate::version::{InternalVersion, MajorFirst, Version};
 /// A string that can either have a fixed length or be length prefixed, based on
 /// the file format version.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState))]
 pub struct ModelString<const LENGTH: usize> {
     pub inner: String,
 }
@@ -63,32 +64,14 @@ where
     where
         P: Path<App, Self>,
     {
-        use korangar_interface::prelude::*;
-
-        button! {
-            text: name,
-            event: |state: &rust_state::Context<App>, _: &mut korangar_interface::event::EventQueue<App>| {
-                println!("Just a dummy for now");
-            },
-        }
-
-        // self.inner.to_element(display)
+        String::to_element(self_path.inner(), name)
     }
 
     fn to_element_mut<P>(self_path: P, name: String) -> Self::ReturnMut<P>
     where
         P: Path<App, Self>,
     {
-        use korangar_interface::prelude::*;
-
-        button! {
-            text: name,
-            event: |state: &rust_state::Context<App>, _: &mut korangar_interface::event::EventQueue<App>| {
-                println!("Just a dummy for now");
-            },
-        }
-
-        // self.inner.to_element(display)
+        String::to_element_mut(self_path.inner(), name)
     }
 }
 

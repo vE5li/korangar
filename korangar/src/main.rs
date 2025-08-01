@@ -49,11 +49,8 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock};
 
 use cgmath::{Point3, Vector2, Vector3};
-use character_slots::CharacterSlots;
-#[cfg(feature = "debug")]
-use graphics::RenderOptions;
 use image::{EncodableLayout, ImageFormat, ImageReader};
-use interface::layout::CornerRadius;
+use input::{GrabbedExt, MouseInputMode};
 use inventory::{HotbarPathExt, InventoryPathExt, SkillTreePathExt};
 use korangar_audio::{AudioEngine, SoundEffectKey};
 #[cfg(feature = "debug")]
@@ -62,12 +59,10 @@ use korangar_debug::logging::{Colorize, print_debug};
 use korangar_debug::profile_block;
 #[cfg(feature = "debug")]
 use korangar_debug::profiling::Profiler;
-use korangar_interface::Interface;
-use korangar_interface::application::{Application, PositionTrait, ScalingTrait};
-use korangar_interface::element::StateElement;
-use korangar_interface::element::id::ElementId;
-use korangar_interface::event::EventQueue;
+use korangar_interface::application::Application;
+use korangar_interface::layout::MouseButton;
 use korangar_interface::window::WindowThemePathExt;
+use korangar_interface::{Interface, MouseMode};
 use korangar_networking::{
     DisconnectReason, HotkeyState, LoginServerLoginData, MessageColor, NetworkEvent, NetworkEventBuffer, NetworkingSystem, SellItem,
     ShopItem,
@@ -75,20 +70,17 @@ use korangar_networking::{
 use korangar_util::pathing::PathFinder;
 #[cfg(feature = "debug")]
 use networking::{PacketHistory, PacketHistoryCallback};
-// #[cfg(not(feature = "debug"))]
+#[cfg(not(feature = "debug"))]
 use ragnarok_packets::handler::NoPacketCallback;
 use ragnarok_packets::{
-    BuyShopItemsResult, CharacterId, CharacterInformation, CharacterServerInformation, Direction, DisappearanceReason, Friend, HotbarSlot,
-    SellItemsResult, SkillId, SkillType, TilePosition, UnitId, WorldPosition,
+    BuyShopItemsResult, CharacterServerInformation, Direction, DisappearanceReason, HotbarSlot, SellItemsResult, SkillId, SkillType,
+    TilePosition, UnitId, WorldPosition,
 };
 use renderer::InterfaceRenderer;
-use rust_state::{BoxedExt, Context, ManuallyAssertExt, OptionExt, Path, RustState};
+use rust_state::{AsRefExt, Context, ManuallyAssertExt, OptionExt, Path};
 use settings::{AudioSettings, AudioSettingsPathExt, GraphicsSettingsCapabilities, GraphicsSettingsPathExt};
-use state::theme::{
-    CursorThemePathExt, GameTheme, GameThemePathExt, IndicatorThemePathExt, InterfaceTheme, InterfaceThemePathExt, InterfaceThemeType,
-    ThemeDefault,
-};
-use state::{ChatMessage, ClientState, ClientStatePathExt, ClientStateRootExt, LoginWindowState, client_state, this_entity, this_player};
+use state::theme::{CursorThemePathExt, GameThemePathExt, IndicatorThemePathExt, InterfaceThemePathExt, InterfaceThemeType};
+use state::{ChatMessage, ClientState, ClientStatePathExt, ClientStateRootExt, client_state, this_entity, this_player};
 #[cfg(feature = "debug")]
 use wgpu::Device;
 use wgpu::util::initialize_adapter_from_env_or_default;
@@ -110,10 +102,7 @@ use crate::interface::cursor::{MouseCursor, MouseCursorState};
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 use crate::interface::resource::{ItemSource, Move, SkillSource};
 use crate::interface::windows::*;
-use crate::inventory::{Hotbar, Inventory, SkillTree};
 use crate::loaders::*;
-#[cfg(feature = "debug")]
-use crate::networking::PacketHistoryPathExt;
 #[cfg(feature = "debug")]
 use crate::renderer::DebugMarkerRenderer;
 use crate::renderer::{AlignHorizontal, EffectRenderer, GameInterfaceRenderer};
@@ -372,6 +361,7 @@ struct Client {
     directional_shadow_camera: DirectionalShadowCamera,
     point_shadow_camera: PointShadowCamera,
 
+    user_event_buffer: Vec<UserEvent>,
     network_event_buffer: NetworkEventBuffer,
     // TODO: Move or remove this.
     saved_login_data: Option<LoginServerLoginData>,
@@ -658,6 +648,8 @@ impl Client {
         });
 
         time_phase!("create resources", {
+            let user_event_buffer = Vec::new();
+
             let particle_holder = ParticleHolder::default();
             let point_light_manager = PointLightManager::new();
             let effect_holder = EffectHolder::default();
@@ -770,6 +762,7 @@ impl Client {
             player_camera,
             directional_shadow_camera,
             point_shadow_camera,
+            user_event_buffer,
             network_event_buffer,
             saved_login_data,
             saved_character_server,
@@ -850,7 +843,9 @@ impl Client {
         // function results in surface configuration errors under DX12.
         self.update_graphic_settings();
 
-        let scaling = *self.client_state.follow(client_state().interface_scale());
+        // TODO: Shouldn't this happen later? After the scaling has been potentially
+        // changed by the UI.
+        let scaling = *self.client_state.follow(client_state().graphics_settings().interface_scaling());
         self.bottom_interface_renderer.update_scaling(scaling);
         self.middle_interface_renderer.update_scaling(scaling);
         self.top_interface_renderer.update_scaling(scaling);
@@ -860,24 +855,23 @@ impl Client {
         #[cfg(feature = "debug")]
         let timer_measurement = Profiler::start_measurement("update timers");
 
-        self.input_system.update_delta();
-
         let delta_time = self.game_timer.update();
         let day_timer = self.game_timer.get_day_timer();
         let animation_timer = self.game_timer.get_animation_timer();
         let client_tick = self.game_timer.get_client_tick();
+
+        // TODO: Rename
+        let input_report = self.input_system.update_delta(client_tick);
 
         #[cfg(feature = "debug")]
         timer_measurement.stop();
 
         self.networking_system.get_events(&mut self.network_event_buffer);
 
-        let (mouse_target, mouse_position) = self.input_system.get_mouse();
-
         #[cfg(feature = "debug")]
         let picker_measurement = Profiler::start_measurement("update picker target");
 
-        if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
+        if let PickerTarget::Entity(entity_id) = input_report.mouse_target {
             if let Some(entity) = self
                 .client_state
                 .follow_mut(client_state().entities())
@@ -886,13 +880,6 @@ impl Client {
             {
                 if entity.are_details_unavailable() && self.networking_system.entity_details(entity_id).is_ok() {
                     entity.set_details_requested();
-                }
-
-                match entity.get_entity_type() {
-                    EntityType::Npc => self.mouse_cursor.set_state(MouseCursorState::Dialog, client_tick),
-                    EntityType::Warp => self.mouse_cursor.set_state(MouseCursorState::Warp, client_tick),
-                    EntityType::Monster => self.mouse_cursor.set_state(MouseCursorState::Attack, client_tick),
-                    _ => {}
                 }
             }
         }
@@ -922,7 +909,7 @@ impl Client {
                     self.interface.close_all_windows_except(DEBUG_WINDOWS);
 
                     self.interface
-                        .open_window(SelectServerWindow::new(client_state().character_servers()));
+                        .open_window(ServerSelectionWindow::new(client_state().character_servers()));
                 }
                 NetworkEvent::LoginServerConnectionFailed { message, .. } => {
                     self.networking_system.disconnect_from_login_server();
@@ -1612,9 +1599,25 @@ impl Client {
         #[cfg(feature = "debug")]
         let user_event_measurement = Profiler::start_measurement("process user events");
 
-        let user_events = self.interface.process_events();
+        self.interface.process_events(&mut self.user_event_buffer);
+        let interface_has_focus = self.interface.has_focus();
 
-        for event in user_events {
+        if self.interface.get_mouse_mode().is_rotating_camera() {
+            // TODO: Does this really need to be a UserEvent?
+            self.user_event_buffer.push(UserEvent::RotateCamera(input_report.mouse_delta.width));
+        }
+
+        if !interface_has_focus {
+            self.input_system.handle_keyboard_input(
+                &mut self.user_event_buffer,
+                #[cfg(feature = "debug")]
+                matches!(self.interface.get_mouse_mode(), MouseMode::Default),
+                #[cfg(feature = "debug")]
+                *self.client_state.follow(client_state().render_options().use_debug_camera()),
+            );
+        }
+
+        for event in self.user_event_buffer.drain(..) {
             match event {
                 UserEvent::LogIn {
                     service_id,
@@ -1662,9 +1665,9 @@ impl Client {
                     let _ = self.networking_system.log_out();
                 }
                 UserEvent::Exit => event_loop.exit(),
-                UserEvent::CameraZoom(factor) => self.player_camera.soft_zoom(factor),
-                UserEvent::CameraRotate(factor) => self.player_camera.soft_rotate(factor),
-                UserEvent::CameraResetRotation => self.player_camera.reset_rotation(),
+                UserEvent::ZoomCamera(factor) => self.player_camera.soft_zoom(factor),
+                UserEvent::RotateCamera(factor) => self.player_camera.soft_rotate(factor),
+                UserEvent::ResetCameraRotation => self.player_camera.reset_rotation(),
                 UserEvent::OpenMenuWindow => {
                     if self.client_state.try_follow(this_entity()).is_some() {
                         self.interface.open_window(MenuWindow)
@@ -1694,7 +1697,10 @@ impl Client {
                     .interface
                     .open_window(AudioSettingsWindow::new(client_state().audio_settings())),
                 UserEvent::OpenFriendListWindow => {
-                    self.interface.open_window(FriendListWindow::new(client_state().friend_list()));
+                    self.interface.open_window(FriendListWindow::new(
+                        client_state().friend_list_window(),
+                        client_state().friend_list(),
+                    ));
                 }
                 UserEvent::ToggleShowInterface => self.show_interface = !self.show_interface,
                 // UserEvent::SetThemeFile { theme_file, theme_kind } => {} //self.client_state.set_theme_file(theme_file, theme_kind),
@@ -1743,7 +1749,7 @@ impl Client {
 
                     if let Some(entity) = entity {
                         let _ = match entity.get_entity_type() {
-                            EntityType::Npc => Ok(()), // self.networking_system.start_dialog(entity_id),
+                            EntityType::Npc => self.networking_system.start_dialog(entity_id),
                             EntityType::Monster => self.networking_system.player_attack(entity_id),
                             EntityType::Warp => self.networking_system.player_move({
                                 let position = entity.get_grid_position();
@@ -1820,12 +1826,12 @@ impl Client {
                         match skill.skill_type {
                             SkillType::Passive => {}
                             SkillType::Attack => {
-                                if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
+                                if let PickerTarget::Entity(entity_id) = input_report.mouse_target {
                                     let _ = self.networking_system.cast_skill(skill.skill_id, skill.skill_level, entity_id);
                                 }
                             }
                             SkillType::Ground | SkillType::Trap => {
-                                if let Some(PickerTarget::Tile { x, y }) = mouse_target {
+                                if let PickerTarget::Tile { x, y } = input_report.mouse_target {
                                     let _ = self
                                         .networking_system
                                         .cast_ground_skill(skill.skill_id, skill.skill_level, TilePosition { x, y });
@@ -1848,7 +1854,7 @@ impl Client {
                                 }
                             },
                             SkillType::Support => {
-                                if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
+                                if let PickerTarget::Entity(entity_id) = input_report.mouse_target {
                                     let _ = self.networking_system.cast_skill(skill.skill_id, skill.skill_level, entity_id);
                                 } else {
                                     let _ = self.networking_system.cast_skill(
@@ -1868,12 +1874,12 @@ impl Client {
                         }
                     }
                 }
-                UserEvent::AddFriend(name) => {
-                    if name.len() > 24 {
+                UserEvent::AddFriend { character_name } => {
+                    if character_name.len() > 24 {
                         #[cfg(feature = "debug")]
-                        print_debug!("[{}] friend name {} is too long", "error".red(), name.magenta());
+                        print_debug!("[{}] friend name {} is too long", "error".red(), character_name.magenta());
                     } else {
-                        let _ = self.networking_system.add_friend(name);
+                        let _ = self.networking_system.add_friend(character_name);
                     }
                 }
                 UserEvent::RemoveFriend { account_id, character_id } => {
@@ -1930,9 +1936,9 @@ impl Client {
                     .open_window(RenderOptionsWindow::new(client_state().render_options())),
                 #[cfg(feature = "debug")]
                 UserEvent::OpenMapDataWindow => {
-                    if let Some(map) = self.client_state.follow(client_state().map()) {
+                    if self.client_state.follow(client_state().map()).is_some() {
                         self.interface
-                            .open_state_window(client_state().map().unwrapped().manually_asserted().unboxed().map_data());
+                            .open_state_window(client_state().map().unwrapped().manually_asserted().path_as_ref().map_data());
                     }
                 }
                 #[cfg(feature = "debug")]
@@ -1957,9 +1963,7 @@ impl Client {
                     self.interface.open_state_window(client_state().menu_theme())
                 }
                 #[cfg(feature = "debug")]
-                UserEvent::OpenProfilerWindow => self
-                    .interface
-                    .open_window(ProfilerWindow::new(client_state().profiler_visible_thread())),
+                UserEvent::OpenProfilerWindow => self.interface.open_window(ProfilerWindow::new(client_state().profiler_window())),
                 #[cfg(feature = "debug")]
                 UserEvent::OpenPacketInspectorWindow => self.interface.open_window(PacketInspector::new(client_state().packet_history())),
                 #[cfg(feature = "debug")]
@@ -2071,9 +2075,7 @@ impl Client {
         {
             profile_block!("update packet history");
 
-            let apply_updates = *self.client_state.follow(client_state().packet_history().update());
-
-            self.client_state.follow_mut(client_state().packet_history()).update(apply_updates);
+            self.client_state.follow_mut(client_state().packet_history()).update();
         }
 
         // Main map update and render loop
@@ -2106,12 +2108,14 @@ impl Client {
             #[cfg(feature = "debug")]
             let update_entities_measurement = Profiler::start_measurement("update entities");
 
+            let currently_playing = self.client_state.try_follow(this_player()).is_some();
+
             {
-                let current_camera: &(dyn Camera + Send + Sync) = match self.client_state.try_follow(this_player()).is_none() {
+                let current_camera: &(dyn Camera + Send + Sync) = match currently_playing {
                     #[cfg(feature = "debug")]
                     _ if render_options.use_debug_camera => &self.debug_camera,
-                    true => &self.start_camera,
-                    false => &self.player_camera,
+                    true => &self.player_camera,
+                    false => &self.start_camera,
                 };
 
                 // FIX: Hacky for now because of the client_state borrowing rules.
@@ -2216,8 +2220,8 @@ impl Client {
             let walk_indicator_color = *self.client_state.follow(client_state().game_theme().indicator().walking());
 
             #[cfg(feature = "debug")]
-            let hovered_marker_identifier = match mouse_target {
-                Some(PickerTarget::Marker(marker_identifier)) => Some(marker_identifier),
+            let hovered_marker_identifier = match input_report.mouse_target {
+                PickerTarget::Marker(marker_identifier) => Some(marker_identifier),
                 _ => None,
             };
 
@@ -2248,8 +2252,8 @@ impl Client {
             let collect_instructions_measurement = Profiler::start_measurement("collect instructions");
 
             let picker_position = ScreenPosition {
-                left: mouse_position.left.clamp(0.0, window_size.x as f32),
-                top: mouse_position.top.clamp(0.0, window_size.y as f32),
+                left: input_report.mouse_position.left.clamp(0.0, window_size.x as f32),
+                top: input_report.mouse_position.top.clamp(0.0, window_size.y as f32),
             };
             let mut indicator_instruction = None;
             let mut water_instruction = None;
@@ -2453,8 +2457,8 @@ impl Client {
 
                 self.effect_holder.render(&mut self.effect_renderer, current_camera);
 
-                if let Some(PickerTarget::Tile { x, y }) = mouse_target
-                    && !self.client_state.try_follow(this_entity()).is_some()
+                if let PickerTarget::Tile { x, y } = input_report.mouse_target
+                    && currently_playing
                 {
                     #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_indicators))]
                     map.render_walk_indicator(
@@ -2462,7 +2466,7 @@ impl Client {
                         walk_indicator_color,
                         Vector2::new(x as usize, y as usize),
                     );
-                } else if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
+                } else if let PickerTarget::Entity(entity_id) = input_report.mouse_target {
                     let entity = self
                         .client_state
                         .follow(client_state().entities())
@@ -2487,7 +2491,7 @@ impl Client {
 
                             self.middle_interface_renderer.render_text(
                                 name,
-                                mouse_position + offset,
+                                input_report.mouse_position + offset,
                                 Color::WHITE,
                                 FontSize(16.0),
                                 AlignHorizontal::Mid,
@@ -2508,31 +2512,103 @@ impl Client {
                     );
                 }
 
-                if self.input_system.get_mouse_released() {
+                // TODO: Move this down to the other input handling and move reset_mouse_mode
+                // onto build_ui. This needs to be handled more delicately, e.g.
+                // dropping resources.
+                if input_report.mouse_button_released {
                     self.interface.reset_mouse_mode();
+                    self.mouse_cursor.set_state(MouseCursorState::Default, client_tick);
                 }
 
                 let mut built_ui = {
                     #[cfg(feature = "debug")]
                     profile_block!("user interface");
 
+                    let mouse_mode = self.interface.get_mouse_mode();
+                    let last_walking_position = mouse_mode.walk_position();
+                    let is_rotating_camera = mouse_mode.is_rotating_camera();
                     let is_chat_open = self.interface.is_window_with_class_open(WindowClass::Chat);
 
-                    let mut built_ui = self.interface.do_layouts(&self.client_state, mouse_position);
+                    let mut built_ui = self
+                        .interface
+                        .do_layouts(&self.client_state, scaling.get_factor(), input_report.mouse_position);
 
-                    if let Some((click_position, mouse_button)) = self.input_system.get_click_position() {
-                        built_ui.click(&self.client_state, click_position, mouse_button);
+                    // We can only decide what to do with the user input once we know if the mouse
+                    // is hovering a window, so we buffer any actions for the next frame.
+
+                    let is_interface_hovered = built_ui.is_interface_hovered();
+
+                    let cursor_state = match input_report.mouse_target {
+                        _ if is_rotating_camera => MouseCursorState::RotateCamera,
+                        PickerTarget::Entity(entity_id) if !is_interface_hovered => self
+                            .client_state
+                            .follow(client_state().entities())
+                            .iter()
+                            .find(|entity| entity.get_entity_id() == entity_id)
+                            .map(|entity| match entity.get_entity_type() {
+                                EntityType::Npc => MouseCursorState::Dialog,
+                                EntityType::Warp => MouseCursorState::Warp,
+                                EntityType::Monster => MouseCursorState::Attack,
+                                _ => MouseCursorState::Default,
+                            })
+                            .unwrap_or(MouseCursorState::Default),
+                        _ => MouseCursorState::Default,
+                    };
+                    self.mouse_cursor.set_state(cursor_state, client_tick);
+
+                    if let Some(mouse_button) = input_report.mouse_click {
+                        if is_interface_hovered {
+                            built_ui.click(&self.client_state, input_report.mouse_position, mouse_button);
+                        } else {
+                            if mouse_button == MouseButton::Left {
+                                match input_report.mouse_target {
+                                    PickerTarget::Nothing => {}
+                                    PickerTarget::Entity(entity_id) => {
+                                        self.user_event_buffer.push(UserEvent::RequestPlayerInteract(entity_id))
+                                    }
+                                    PickerTarget::Tile { x, y } => {
+                                        let position = Vector2::new(x as usize, y as usize);
+
+                                        built_ui.set_mouse_mode(MouseInputMode::Walk(position));
+
+                                        self.user_event_buffer.push(UserEvent::RequestPlayerMove(position));
+                                    }
+                                    #[cfg(feature = "debug")]
+                                    PickerTarget::Marker(marker_identifier) => {
+                                        self.user_event_buffer.push(UserEvent::OpenMarkerDetails(marker_identifier))
+                                    }
+                                }
+                            } else if mouse_button == MouseButton::Right && currently_playing {
+                                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(!render_options.use_debug_camera))]
+                                built_ui.set_mouse_mode(MouseInputMode::RotateCamera);
+                            } else if mouse_button == MouseButton::DoubleRight {
+                                self.user_event_buffer.push(UserEvent::ResetCameraRotation);
+                            }
+                        }
+                    } else if let Some(last_position) = last_walking_position
+                        && let PickerTarget::Tile { x, y } = input_report.mouse_target
+                        && input_report.left_mouse_button_down
+                    {
+                        let new_position = Vector2::new(x as usize, y as usize);
+
+                        if last_position != new_position {
+                            built_ui.set_mouse_mode(MouseInputMode::Walk(new_position));
+                            self.user_event_buffer.push(UserEvent::RequestPlayerMove(new_position));
+                        }
                     }
 
-                    if let Some(delta) = self.input_system.get_scroll_delta() {
-                        built_ui.scroll(mouse_position, delta);
+                    if let Some(delta) = input_report.scroll {
+                        if is_interface_hovered {
+                            built_ui.scroll(input_report.mouse_position, delta);
+                        } else {
+                            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(!render_options.use_debug_camera))]
+                            self.user_event_buffer.push(UserEvent::ZoomCamera(delta));
+                        }
                     }
 
-                    if let Some(characters) = self.input_system.get_input_characters() {
-                        // Focus the chat window when pressing enter. This might be reworked to be
-                        // more customizable.
-                        if !built_ui.input_characters(&self.client_state, &characters)
-                            && characters.iter().any(|character| *character == '\x0d')
+                    if interface_has_focus {
+                        if !built_ui.input_characters(&self.client_state, &input_report.characters)
+                            && input_report.characters.iter().any(|character| *character == '\x0d')
                             && is_chat_open
                         {
                             built_ui.focus_element(ChatTextBox);
@@ -2549,7 +2625,7 @@ impl Client {
 
                 // This is only needed for rendering the tooltips.
                 ClientState::set_current_theme_type(tooltip_theme);
-                built_ui.render(&self.client_state, &self.interface_renderer, mouse_position);
+                built_ui.render(&self.client_state, &self.interface_renderer, input_report.mouse_position);
 
                 std::mem::drop(built_ui);
 
@@ -2559,10 +2635,12 @@ impl Client {
                     *self.client_state.get(&client_state().menu_theme().window().anchor_color()),
                     // TODO: Get the right theme (and maybe pass this better).
                     *self.client_state.get(&client_state().menu_theme().window().closest_anchor_color()),
+                    scaling.get_factor(),
                 );
 
-                if let Some(delta) = self.input_system.get_drag() {
-                    self.interface.handle_drag(delta);
+                if let Some(delta) = input_report.drag {
+                    // TODO: The scaling should be removed here.
+                    self.interface.handle_drag(delta, scaling.get_factor());
                 }
 
                 #[cfg(feature = "debug")]
@@ -2581,10 +2659,12 @@ impl Client {
                 if self.show_interface {
                     self.mouse_cursor.render(
                         &self.top_interface_renderer,
-                        mouse_position,
-                        self.input_system.get_mouse_mode().grabbed(),
+                        input_report.mouse_position,
+                        self.interface.get_mouse_mode().grabbed(),
                         *self.client_state.follow(client_state().game_theme().cursor().color()),
-                        self.client_state.follow(client_state().interface_scale()).get_factor(),
+                        self.client_state
+                            .follow(client_state().graphics_settings().interface_scaling())
+                            .get_factor(),
                     );
                 }
             }
@@ -2807,7 +2887,6 @@ impl ApplicationHandler for Client {
             WindowEvent::Focused(focused) => {
                 if !focused {
                     self.input_system.reset();
-                    // self.focus_state.remove_focus();
                 }
 
                 if *self.client_state.follow(client_state().audio_settings().mute_on_focus_loss()) {

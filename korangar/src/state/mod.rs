@@ -1,41 +1,39 @@
 pub mod theme;
 
-use std::sync::Arc;
-
-use korangar_interface::application::{Application, RenderLayer};
+use korangar_interface::application::Application;
 use korangar_interface::components::button::ButtonTheme;
 use korangar_interface::components::collapsable::CollapsableTheme;
 use korangar_interface::components::drop_down::DropDownTheme;
+use korangar_interface::components::field::FieldTheme;
 use korangar_interface::components::state_button::StateButtonTheme;
 use korangar_interface::components::text::TextTheme;
 use korangar_interface::components::text_box::TextBoxTheme;
 use korangar_interface::element::StateElement;
-use korangar_interface::layout::alignment::{HorizontalAlignment, VerticalAlignment};
-use korangar_interface::layout::area::Area;
 use korangar_interface::layout::tooltip::TooltipTheme;
-use korangar_interface::layout::{ClipLayer, ClipLayerId, Icon, Layout};
 use korangar_interface::theme::ThemePathGetter;
 use korangar_interface::window::{StateWindow, WindowTheme};
 use korangar_networking::{MessageColor, SellItem, ShopItem};
-use ragnarok_packets::{CharacterId, CharacterInformation, CharacterServerInformation, Friend};
+use ragnarok_packets::{CharacterId, CharacterServerInformation, Friend};
 use rust_state::{Path, RustState, Selector};
 use theme::{InterfaceTheme, InterfaceThemePathExt, InterfaceThemeType};
 
 #[cfg(feature = "debug")]
 use crate::PacketHistory;
 use crate::character_slots::CharacterSlots;
+use crate::graphics::Color;
 #[cfg(feature = "debug")]
 use crate::graphics::RenderOptions;
-use crate::graphics::{Color, Texture};
-use crate::input::UserEvent;
+use crate::input::{MouseInputMode, UserEvent};
 use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
-use crate::interface::windows::{WindowCache, WindowClass};
+#[cfg(feature = "debug")]
+use crate::interface::windows::ProfilerWindowState;
+use crate::interface::windows::{ChatWindowState, FriendListWindowState, LoginWindowState, WindowCache, WindowClass};
 use crate::inventory::{Hotbar, Inventory, SkillTree};
-use crate::loaders::{ClientInfo, FontSize, GameFileLoader, Scaling, ServiceId, Sprite, load_client_info};
-use crate::renderer::{InterfaceRenderer, SpriteRenderer};
+use crate::loaders::{ClientInfo, FontSize, GameFileLoader, load_client_info};
+use crate::renderer::InterfaceRenderer;
 use crate::settings::{GraphicsSettingsCapabilities, LoginSettings};
 use crate::state::theme::{GameTheme, ThemeDefault};
-use crate::world::{Actions, AnimationState, Entity, Map, Player, ResourceMetadata, SpriteAnimationState};
+use crate::world::{Entity, Map, Player, ResourceMetadata};
 use crate::{AudioSettings, GraphicsSettings};
 
 /// A message in the in-game chat.
@@ -48,18 +46,6 @@ pub struct ChatMessage {
     pub text: String,
     /// Color of the message.
     pub color: MessageColor,
-}
-
-/// Internal state of the login window.
-#[derive(RustState, StateElement)]
-pub struct LoginWindowState {
-    pub selected_service: ServiceId,
-}
-
-/// Internal state of the chat window.
-#[derive(RustState, StateElement)]
-pub struct ChatWindowState {
-    pub current_message: String,
 }
 
 /// Internal state of the client. Everything that can be viewed or modified via
@@ -93,6 +79,8 @@ pub struct ClientState {
     login_window: LoginWindowState,
     /// Internal state of the chat window.
     chat_window: ChatWindowState,
+    /// Internal state of the friend list window.
+    friend_list_window: FriendListWindowState,
 
     /// The current map.
     // TODO: These are currently pub due to some code in the main render update loop. Ideally these
@@ -144,15 +132,13 @@ pub struct ClientState {
 
     /// Size of the Korangar window.
     window_size: ScreenSize,
-    /// The scale of the ueser interface.
-    interface_scale: Scaling,
 
     /// Special render options for debugging the client.
     #[cfg(feature = "debug")]
     render_options: RenderOptions,
-    /// Currently selected thread in the profiler.
+    /// Internal state of the profiler window.
     #[cfg(feature = "debug")]
-    profiler_visible_thread: crate::threads::Enum,
+    profiler_window: ProfilerWindowState,
     /// List of packets sent and received for the packet inspector. Also
     /// contains information about which packets to display in the
     /// inspector.
@@ -203,7 +189,7 @@ impl ClientState {
                 login_settings.service_settings.entry(service.service_id()).or_default();
             }
 
-            let login_window = LoginWindowState { selected_service };
+            let login_window = LoginWindowState::new(selected_service);
         });
 
         time_phase!("create window state", {
@@ -216,9 +202,7 @@ impl ClientState {
                 color: MessageColor::Server,
             }];
 
-            let chat_window = ChatWindowState {
-                current_message: String::new(),
-            };
+            let chat_window = ChatWindowState::default();
         });
 
         time_phase!("create character server resources", {
@@ -233,8 +217,12 @@ impl ClientState {
             let create_character_name = String::new();
         });
 
-        time_phase!("create player resources", {
+        time_phase!("create friend list state", {
             let friend_list = Vec::default();
+            let friend_list_window = FriendListWindowState::default();
+        });
+
+        time_phase!("create player resources", {
             let shop_items = Vec::default();
             let sell_items = Vec::default();
             let player_name = String::new();
@@ -245,7 +233,6 @@ impl ClientState {
 
         time_phase!("create window resources", {
             let window_size = ScreenSize::default();
-            let interface_scale = Scaling::new(1.0);
         });
 
         #[cfg(feature = "debug")]
@@ -255,7 +242,7 @@ impl ClientState {
         let render_options = RenderOptions::new();
 
         #[cfg(feature = "debug")]
-        let profiler_visible_thread = crate::threads::Enum::Main;
+        let profiler_window = ProfilerWindowState::default();
 
         #[cfg(feature = "debug")]
         debug_timer.stop();
@@ -271,6 +258,7 @@ impl ClientState {
             client_info,
             login_window,
             chat_window,
+            friend_list_window,
             map: Some(map),
             entities: Vec::new(),
             chat_messages,
@@ -287,11 +275,10 @@ impl ClientState {
             switch_request,
             create_character_name,
             window_size,
-            interface_scale,
             #[cfg(feature = "debug")]
             render_options,
             #[cfg(feature = "debug")]
-            profiler_visible_thread,
+            profiler_window,
             #[cfg(feature = "debug")]
             packet_history,
         }
@@ -365,6 +352,10 @@ impl ThemePathGetter<ClientState> for ClientThemeGetter {
         ThemePath.drop_down()
     }
 
+    fn field(self) -> impl Path<ClientState, FieldTheme<ClientState>> {
+        ThemePath.field()
+    }
+
     fn tooltip(self) -> impl Path<ClientState, TooltipTheme<ClientState>> {
         ThemePath.tooltip()
     }
@@ -376,6 +367,7 @@ impl Application for ClientState {
     type Color = Color;
     type CornerRadius = CornerRadius;
     type CustomEvent = UserEvent;
+    type CustomMouseMode = MouseInputMode;
     type FontSize = FontSize;
     type Position = ScreenPosition;
     type Renderer = InterfaceRenderer;
@@ -383,10 +375,6 @@ impl Application for ClientState {
     type ThemeGetter = ClientThemeGetter;
     type ThemeType = InterfaceThemeType;
     type WindowClass = WindowClass;
-
-    // fn get_scaling_path() -> impl Path<Self, Scaling> {
-    //     client_state().interface_scale()
-    // }
 
     fn set_current_theme_type(theme: InterfaceThemeType) {
         unsafe {

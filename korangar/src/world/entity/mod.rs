@@ -6,7 +6,7 @@ use cgmath::{EuclideanSpace, Point3, Vector2, VectorSpace, Zero};
 use derive_new::new;
 use korangar_audio::{AudioEngine, SoundEffectKey};
 use korangar_interface::element::StateElement;
-use korangar_interface::window::{StateWindow, Window};
+use korangar_interface::window::StateWindow;
 use korangar_networking::EntityData;
 use korangar_util::pathing::{MAX_WALK_PATH_SIZE, PathFinder};
 use ragnarok_packets::{AccountId, CharacterInformation, ClientTick, Direction, EntityId, Sex, StatusType, WorldPosition};
@@ -20,7 +20,6 @@ use crate::graphics::EntityInstruction;
 #[cfg(feature = "debug")]
 use crate::graphics::{BindlessSupport, DebugRectangleInstruction};
 use crate::interface::layout::{ScreenPosition, ScreenSize};
-use crate::interface::windows::WindowCache;
 use crate::loaders::GameFileLoader;
 #[cfg(feature = "debug")]
 use crate::loaders::split_mesh_by_texture;

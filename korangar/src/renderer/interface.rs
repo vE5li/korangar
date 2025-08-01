@@ -127,6 +127,16 @@ impl InterfaceRenderer {
         mut corner_radius: CornerRadius,
         color: Color,
     ) {
+        // If the rectangle is not even within the bounds of the clip, discard it early
+        // saving GPU resources.
+        if position.left > screen_clip.right
+            || position.top > screen_clip.bottom
+            || position.left + size.width < screen_clip.left
+            || position.top + size.height < screen_clip.top
+        {
+            return;
+        }
+
         if self.high_quality_interface {
             screen_clip = screen_clip * 2.0;
             corner_radius = corner_radius * 2.0;
@@ -179,6 +189,20 @@ impl InterfaceRenderer {
                  texture_coordinate,
                  color,
              }| {
+                // If the character is not even within the bounds of the clip, discard it early
+                // saving GPU resources.
+                //
+                // TODO: For some reason the min.y is actually max.y and vice versa. Not sure
+                // how this rendering code works but that's why the check is
+                // using max.y and min.y inverted.
+                if text_position.left + position.min.x > screen_clip.right
+                    || text_position.top + position.max.y > screen_clip.bottom
+                    || text_position.left + position.max.x < screen_clip.left
+                    || text_position.top + position.min.y < screen_clip.top
+                {
+                    return;
+                }
+
                 let screen_position = ScreenPosition {
                     left: text_position.left + position.min.x,
                     top: text_position.top + position.min.y,
@@ -256,6 +280,16 @@ impl SpriteRenderer for InterfaceRenderer {
         color: Color,
         smooth: bool,
     ) {
+        // If the sprite is not even within the bounds of the clip, discard it early
+        // saving GPU resources.
+        if position.left > screen_clip.right
+            || position.top > screen_clip.bottom
+            || position.left + size.width < screen_clip.left
+            || position.top + size.height < screen_clip.top
+        {
+            return;
+        }
+
         if self.high_quality_interface {
             screen_clip = screen_clip * 2.0;
         }
@@ -277,6 +311,16 @@ impl SpriteRenderer for InterfaceRenderer {
     }
 
     fn render_sdf(&self, texture: Arc<Texture>, position: ScreenPosition, size: ScreenSize, mut screen_clip: ScreenClip, color: Color) {
+        // If the SDF is not even within the bounds of the clip, discard it early
+        // saving GPU resources.
+        if position.left > screen_clip.right
+            || position.top > screen_clip.bottom
+            || position.left + size.width < screen_clip.left
+            || position.top + size.height < screen_clip.top
+        {
+            return;
+        }
+
         if self.high_quality_interface {
             screen_clip = screen_clip * 2.0;
         }
@@ -322,12 +366,12 @@ struct SpriteInstruction<'a> {
     clip_layer: ClipLayerId,
     area: Area,
     color: Color,
-    smooth: bool,
 }
 
 /// A custom layout instruction.
 ///
 /// Only pub to make the compiler happy, its not used outside of this module.
+#[allow(private_interfaces)]
 pub enum CustomInstruction<'a> {
     /// An instruction to render a texture.
     Texture(TextureInstruction),
@@ -370,7 +414,6 @@ impl RenderLayer<ClientState> for InterfaceRenderer {
                 clip_layer,
                 area,
                 color,
-                smooth,
             }) => {
                 let position = ScreenPosition {
                     left: area.left + area.width / 2.0,
@@ -410,20 +453,13 @@ pub trait LayoutExt<'a> {
     fn add_texture(&mut self, texture: Arc<Texture>, area: Area, color: Color, smooth: bool);
 
     /// Add an instruction to render a sprite.
-    fn add_sprite(
-        &mut self,
-        actions: &'a Actions,
-        sprite: &'a Sprite,
-        animation_state: &'a SpriteAnimationState,
-        area: Area,
-        color: Color,
-        smooth: bool,
-    );
+    fn add_sprite(&mut self, actions: &'a Actions, sprite: &'a Sprite, animation_state: &'a SpriteAnimationState, area: Area, color: Color);
 }
 
 impl<'a> LayoutExt<'a> for Layout<'a, ClientState> {
     fn add_texture(&mut self, texture: Arc<Texture>, area: Area, color: Color, smooth: bool) {
         let clip_layer = self.get_active_clip_layer();
+        let area = self.scale_area(area);
 
         self.add_custom_instruction(CustomInstruction::Texture(TextureInstruction {
             texture,
@@ -441,9 +477,9 @@ impl<'a> LayoutExt<'a> for Layout<'a, ClientState> {
         animation_state: &'a SpriteAnimationState,
         area: Area,
         color: Color,
-        smooth: bool,
     ) {
         let clip_layer = self.get_active_clip_layer();
+        let area = self.scale_area(area);
 
         self.add_custom_instruction(CustomInstruction::Sprite(SpriteInstruction {
             actions,
@@ -452,7 +488,6 @@ impl<'a> LayoutExt<'a> for Layout<'a, ClientState> {
             clip_layer,
             area,
             color,
-            smooth,
         }));
     }
 }

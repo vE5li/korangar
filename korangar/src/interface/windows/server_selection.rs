@@ -1,36 +1,30 @@
-use std::any::Any;
-use std::cell::UnsafeCell;
 use std::cmp::Ordering;
-use std::collections::HashMap;
 
-use derive_new::new;
 use korangar_interface::element::id::ElementIdGenerator;
 use korangar_interface::element::store::ElementStore;
-use korangar_interface::element::{DefaultLayoutInfo, Element, ElementSet, ResolverSet};
+use korangar_interface::element::{DefaultLayoutInfo, Element};
 use korangar_interface::event::EventQueue;
 use korangar_interface::layout::{Layout, Resolver};
-use korangar_interface::window::{CustomWindow, StateWindow, Window, WindowTrait};
+use korangar_interface::window::{CustomWindow, WindowTrait};
 use ragnarok_packets::{CharacterServerInformation, CharacterServerInformationPathExt};
 use rust_state::{Context, Path};
 
 use crate::input::UserEvent;
-use crate::interface::layout::ScreenSize;
-use crate::interface::windows::{WindowCache, WindowClass};
-use crate::loaders::ServiceId;
+use crate::interface::windows::WindowClass;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
 
-pub struct SelectServerWindow<P> {
+pub struct ServerSelectionWindow<P> {
     path: P,
 }
 
-impl<P> SelectServerWindow<P> {
+impl<P> ServerSelectionWindow<P> {
     pub fn new(path: P) -> Self {
         Self { path }
     }
 }
 
-impl<P> CustomWindow<ClientState> for SelectServerWindow<P>
+impl<P> CustomWindow<ClientState> for ServerSelectionWindow<P>
 where
     P: Path<ClientState, Vec<CharacterServerInformation>>,
 {
@@ -84,44 +78,37 @@ where
             }
         }
 
-        impl<P> ElementSet<ClientState> for ServerWrapper<P>
+        impl<P> Element<ClientState> for ServerWrapper<P>
         where
             P: Path<ClientState, Vec<CharacterServerInformation>>,
         {
             type LayoutInfo = Vec<DefaultLayoutInfo>;
-
-            fn get_element_count(&self) -> usize {
-                unimplemented!()
-            }
 
             fn create_layout_info(
                 &mut self,
                 state: &Context<ClientState>,
                 store: &mut ElementStore,
                 generator: &mut ElementIdGenerator,
-                mut resolver_set: impl ResolverSet,
+                resolver: &mut Resolver,
             ) -> Self::LayoutInfo {
                 self.correct_element_size(state);
 
-                // FIX: Make this right. Maybe with_derived should expect a resolver set as well
-                resolver_set.with_index(0, |resolver| {
-                    let (area, layout_info) = resolver.with_derived(2.0, 4.0, |resolver| {
-                        self.item_boxes
-                            .iter_mut()
-                            .enumerate()
-                            .map(|(index, item_box)| {
-                                item_box.create_layout_info(
-                                    state,
-                                    store.get_or_create_child_store(index as u64, generator),
-                                    generator,
-                                    resolver,
-                                )
-                            })
-                            .collect()
-                    });
+                let (_area, layout_info) = resolver.with_derived(2.0, 4.0, |resolver| {
+                    self.item_boxes
+                        .iter_mut()
+                        .enumerate()
+                        .map(|(index, item_box)| {
+                            item_box.create_layout_info(
+                                state,
+                                store.get_or_create_child_store(index as u64, generator),
+                                generator,
+                                resolver,
+                            )
+                        })
+                        .collect()
+                });
 
-                    layout_info
-                })
+                layout_info
             }
 
             fn layout_element<'a>(
@@ -145,7 +132,9 @@ where
             theme: InterfaceThemeType::Menu,
             minimum_width: 450.0,
             maximum_width: 450.0,
-            elements: ServerWrapper::new(self.path),
+            elements: (
+                ServerWrapper::new(self.path),
+            ),
         }
     }
 }

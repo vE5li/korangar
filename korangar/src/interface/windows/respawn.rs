@@ -1,10 +1,7 @@
-use korangar_interface::prelude::window;
-use korangar_interface::window::{CustomWindow, StateWindow, Window, WindowTrait};
-use rust_state::Context;
+use korangar_interface::window::{CustomWindow, WindowTrait};
 
 use crate::input::UserEvent;
-use crate::interface::layout::ScreenSize;
-use crate::interface::windows::{WindowCache, WindowClass};
+use crate::interface::windows::WindowClass;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
 
@@ -17,6 +14,8 @@ impl CustomWindow<ClientState> for RespawnWindow {
     }
 
     fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
+        use korangar_interface::prelude::*;
+
         window! {
             title: "Respawn Menu",
             class: Self::window_class(),

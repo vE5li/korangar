@@ -26,7 +26,7 @@ mod profiler;
 #[cfg(feature = "debug")]
 mod render_options;
 mod respawn;
-mod select_server;
+mod server_selection;
 mod skill_tree;
 #[cfg(feature = "debug")]
 mod time;
@@ -38,31 +38,31 @@ pub use self::cache::WindowCache;
 pub use self::character_creation::CharacterCreationWindow;
 pub use self::character_overview::CharacterOverviewWindow;
 pub use self::character_selection::CharacterSelectionWindow;
-pub use self::chat::{ChatTextBox, ChatWindow};
+pub use self::chat::{ChatTextBox, ChatWindow, ChatWindowState};
 #[cfg(feature = "debug")]
 pub use self::commands::CommandsWindow;
 pub use self::equipment::EquipmentWindow;
 pub use self::error::ErrorWindow;
 #[cfg(feature = "debug")]
 pub use self::frame_inspector::FrameInspectorWindow;
-pub use self::friend_list::FriendListWindow;
+pub use self::friend_list::{FriendListWindow, FriendListWindowState};
 pub use self::friend_request::FriendRequestWindow;
 pub use self::graphics_settings::GraphicsSettingsWindow;
 pub use self::hotbar::HotbarWindow;
 pub use self::inventory::InventoryWindow;
 // pub use self::shop::*;
-pub use self::login::LoginWindow;
+pub use self::login::{LoginWindow, LoginWindowState};
 #[cfg(feature = "debug")]
 pub use self::maps::MapsWindow;
 pub use self::menu::MenuWindow;
 #[cfg(feature = "debug")]
 pub use self::packet_inspector::PacketInspector;
 #[cfg(feature = "debug")]
-pub use self::profiler::ProfilerWindow;
+pub use self::profiler::{ProfilerWindow, ProfilerWindowState};
 #[cfg(feature = "debug")]
 pub use self::render_options::RenderOptionsWindow;
 pub use self::respawn::RespawnWindow;
-pub use self::select_server::SelectServerWindow;
+pub use self::server_selection::ServerSelectionWindow;
 pub use self::skill_tree::SkillTreeWindow;
 #[cfg(feature = "debug")]
 pub use self::time::TimeWindow;

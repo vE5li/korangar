@@ -13,7 +13,9 @@ use image::{ImageBuffer, Rgba, RgbaImage, imageops};
 use korangar_debug::logging::Colorize;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::print_debug;
-use korangar_interface::element::{ElementDisplay, StateElement};
+use korangar_interface::application::FontSizeTrait;
+use korangar_interface::components::drop_down::DropDownItem;
+use korangar_interface::element::ElementDisplay;
 use korangar_util::Rectangle;
 use serde::{Deserialize, Serialize};
 
@@ -26,6 +28,12 @@ use crate::loaders::font::font_file::FontFile;
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct FontSize(pub f32);
+
+impl FontSizeTrait for FontSize {
+    fn scaled(&self, scaling: f32) -> Self {
+        Self(self.0 * scaling)
+    }
+}
 
 impl ArrayType for FontSize {
     type Element = f32;
@@ -59,6 +67,41 @@ impl std::ops::Mul<f32> for FontSize {
 #[serde(transparent)]
 pub struct Scaling(f32);
 
+impl Scaling {
+    // TODO: Likely remove this function
+    pub fn get_factor(&self) -> f32 {
+        self.0
+    }
+}
+
+impl DropDownItem<Scaling> for Scaling {
+    fn text(&self) -> &str {
+        match self.0 {
+            0.5 => "50%",
+            0.6 => "60%",
+            0.7 => "70%",
+            0.8 => "80%",
+            0.9 => "90%",
+            1.0 => "100%",
+            1.1 => "110%",
+            1.2 => "120%",
+            1.3 => "130%",
+            1.4 => "140%",
+            1.5 => "150%",
+            1.6 => "160%",
+            1.7 => "170%",
+            1.8 => "180%",
+            1.9 => "190%",
+            2.0 => "200%",
+            _ => unimplemented!(),
+        }
+    }
+
+    fn value(&self) -> Scaling {
+        *self
+    }
+}
+
 impl ArrayType for Scaling {
     type Element = f32;
 
@@ -82,12 +125,6 @@ impl ElementDisplay for Scaling {
 impl Scaling {
     pub const fn new(value: f32) -> Self {
         Self(value)
-    }
-}
-
-impl korangar_interface::application::ScalingTrait for Scaling {
-    fn get_factor(&self) -> f32 {
-        self.0
     }
 }
 

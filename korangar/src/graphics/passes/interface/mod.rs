@@ -31,7 +31,7 @@ impl RenderPassContext<{ BindGroupCount::One }, { ColorAttachmentCount::One }, {
         &mut self,
         encoder: &'encoder mut CommandEncoder,
         global_context: &GlobalContext,
-        pass_data: (),
+        _: (),
     ) -> RenderPass<'encoder> {
         let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
             label: Some(PASS_NAME),

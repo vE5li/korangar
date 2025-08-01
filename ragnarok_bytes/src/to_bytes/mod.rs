@@ -1,3 +1,5 @@
+use std::any::Any;
+
 use crate::{ByteWriter, ConversionError, ConversionErrorType, ConversionResult};
 
 mod implement;
@@ -23,7 +25,7 @@ pub trait ToBytesExt: ToBytes {
 
 impl<T> ToBytesExt for T
 where
-    T: ToBytes,
+    T: ToBytes + 'static,
 {
     fn to_n_bytes(&self, byte_writer: &mut ByteWriter, size: usize) -> ConversionResult<usize>
     where
@@ -33,6 +35,15 @@ where
 
         match size.checked_sub(written) {
             None => {
+                // HACK: Strings are a special case in that they are also valid without their
+                // trailing zero character. Since we can't check in `to_bytes` weather or not we
+                // have space for a zero byte and this will fail if the string has is exactly N
+                // long, we perform this manual check.
+                if self.type_id() == String::new().type_id() && written - size == 1 {
+                    byte_writer.pop();
+                    return Ok(size);
+                }
+
                 return Err(ConversionError::from_error_type(ConversionErrorType::DataTooBig {
                     type_name: std::any::type_name::<T>(),
                 }));

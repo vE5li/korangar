@@ -1,25 +1,21 @@
-use std::sync::Arc;
-
 use korangar_interface::components::text_box::DefaultHandler;
 use korangar_interface::element::id::ElementIdGenerator;
 use korangar_interface::element::store::ElementStore;
 use korangar_interface::element::{DefaultLayoutInfo, Element, StateElement};
-use korangar_interface::event::{ClickAction, Event, EventQueue};
+use korangar_interface::event::{Event, EventQueue};
 use korangar_interface::layout::area::Area;
 use korangar_interface::layout::{Layout, Resolver};
 use korangar_interface::prelude::{HorizontalAlignment, VerticalAlignment};
-use korangar_interface::window::{CustomWindow, StateWindow, Window, WindowTrait};
+use korangar_interface::window::{CustomWindow, WindowTrait};
 use korangar_networking::MessageColor;
-use rust_state::{Context, Path};
+use rust_state::{Context, Path, RustState};
 
 use super::WindowClass;
 use crate::graphics::Color;
 use crate::input::UserEvent;
-use crate::interface::layout::ScreenSize;
-use crate::interface::windows::WindowCache;
-use crate::loaders::{FontLoader, FontSize};
+use crate::loaders::FontSize;
 use crate::state::theme::{ChatThemePathExt, InterfaceThemePathExt, InterfaceThemeType};
-use crate::state::{ChatMessage, ChatWindowState, ChatWindowStatePathExt, ClientState, client_theme};
+use crate::state::{ChatMessage, ClientState, client_theme};
 
 const MAXIMUM_CHAT_MESSAGE_LENGTH: usize = 80;
 
@@ -44,8 +40,8 @@ where
     fn create_layout_info(
         &mut self,
         state: &Context<ClientState>,
-        store: &mut ElementStore,
-        generator: &mut ElementIdGenerator,
+        _: &mut ElementStore,
+        _: &mut ElementIdGenerator,
         resolver: &mut Resolver,
     ) -> Self::LayoutInfo {
         let chat_messages = state.get(&self.chat_messages_path);
@@ -72,7 +68,7 @@ where
     fn layout_element<'a>(
         &'a self,
         state: &'a Context<ClientState>,
-        store: &'a ElementStore,
+        _: &'a ElementStore,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, ClientState>,
     ) {
@@ -111,6 +107,12 @@ where
             );
         });
     }
+}
+
+/// Internal state of the chat window.
+#[derive(Default, RustState, StateElement)]
+pub struct ChatWindowState {
+    current_message: String,
 }
 
 pub struct ChatWindow<A, B> {
@@ -156,6 +158,10 @@ where
             class: Self::window_class(),
             theme: InterfaceThemeType::Game,
             background_color: client_theme().chat().window_color(),
+            resizable: true,
+            border: 3.0,
+            gaps: 2.0,
+            title_gap: 0.0,
             minimum_height: 150.0,
             maximum_height: 800.0,
             elements: (
@@ -164,6 +170,7 @@ where
                     state: current_message_path,
                     input_handler: DefaultHandler::<_, _, MAXIMUM_CHAT_MESSAGE_LENGTH>::new(current_message_path, send_action),
                     background_color: client_theme().chat().text_box_background_color(),
+                    focused_background_color: Color::rgba(0.0, 0.0, 0.0, 0.8),
                     focus_id: ChatTextBox,
                     // TODO:
                     // follow: true,
@@ -172,7 +179,6 @@ where
                     children: (
                         ChatElement::new(self.chat_messages_path),
                     ),
-                    height_bound: HeightBound::WithMax,
                 },
             ),
         }

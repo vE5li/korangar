@@ -1095,7 +1095,7 @@ pub struct DisplayEmotionPacket {
 /// [UpdateStatusPacket1], [UpdateStatusPacket2], and [UpdateStatusPacket3].
 /// All UpdateStatusPackets do the same, they just have different sizes
 /// correlating to the space the updated value requires.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StatusType {
     Weight(u32),
     MaximumWeight(u32),
@@ -1246,49 +1246,74 @@ impl ToBytes for StatusType {
     }
 }
 
-// TODO: make StatusType derivable
-#[cfg(feature = "interface")]
-impl<App: korangar_interface::application::Application> korangar_interface::element::StateElement<App> for StatusType {
-    type LayoutInfo = impl std::any::Any;
-    type LayoutInfoMut = impl std::any::Any;
-    type Return<P>
-        = impl korangar_interface::element::Element<App, LayoutInfo = Self::LayoutInfo>
-    where
-        P: rust_state::Path<App, Self>;
-    type ReturnMut<P>
-        = impl korangar_interface::element::Element<App, LayoutInfo = Self::LayoutInfoMut>
-    where
-        P: rust_state::Path<App, Self>;
-
-    fn to_element<P>(self_path: P, name: String) -> Self::Return<P>
-    where
-        P: rust_state::Path<App, Self>,
-    {
-        // format!("{self:?}").to_element(display)
-
-        use korangar_interface::prelude::*;
-
-        button! {
-            text: name,
-            event: |state: &rust_state::Context<App>, _: &mut korangar_interface::event::EventQueue<App>| {
-                println!("Just a dummy for now");
-            },
-        }
-    }
-
-    fn to_element_mut<P>(self_path: P, name: String) -> Self::ReturnMut<P>
-    where
-        P: rust_state::Path<App, Self>,
-    {
-        // format!("{self:?}").to_element(display)
-
-        use korangar_interface::prelude::*;
-
-        button! {
-            text: name,
-            event: |state: &rust_state::Context<App>, _: &mut korangar_interface::event::EventQueue<App>| {
-                println!("Just a dummy for now");
-            },
+impl std::fmt::Display for StatusType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Weight(value) => write!(f, "Weight: {}", value),
+            Self::MaximumWeight(value) => write!(f, "Maximum Weight: {}", value),
+            Self::MovementSpeed(value) => write!(f, "Movement Speed: {}", value),
+            Self::BaseLevel(value) => write!(f, "Base Level: {}", value),
+            Self::JobLevel(value) => write!(f, "Job Level: {}", value),
+            Self::Karma(value) => write!(f, "Karma: {}", value),
+            Self::Manner(value) => write!(f, "Manner: {}", value),
+            Self::StatusPoint(value) => write!(f, "Status Point: {}", value),
+            Self::SkillPoint(value) => write!(f, "Skill Point: {}", value),
+            Self::Hit(value) => write!(f, "Hit: {}", value),
+            Self::Flee1(value) => write!(f, "Flee1: {}", value),
+            Self::Flee2(value) => write!(f, "Flee2: {}", value),
+            Self::MaximumHealthPoints(value) => write!(f, "Maximum Health Points: {}", value),
+            Self::MaximumSpellPoints(value) => write!(f, "Maximum Spell Points: {}", value),
+            Self::HealthPoints(value) => write!(f, "Health Points: {}", value),
+            Self::SpellPoints(value) => write!(f, "Spell Points: {}", value),
+            Self::AttackSpeed(value) => write!(f, "Attack Speed: {}", value),
+            Self::Attack1(value) => write!(f, "Attack1: {}", value),
+            Self::Defense1(value) => write!(f, "Defense1: {}", value),
+            Self::MagicDefense1(value) => write!(f, "Magic Defense1: {}", value),
+            Self::Attack2(value) => write!(f, "Attack2: {}", value),
+            Self::Defense2(value) => write!(f, "Defense2: {}", value),
+            Self::MagicDefense2(value) => write!(f, "Magic Defense2: {}", value),
+            Self::Critical(value) => write!(f, "Critical: {}", value),
+            Self::MagicAttack1(value) => write!(f, "Magic Attack1: {}", value),
+            Self::MagicAttack2(value) => write!(f, "Magic Attack2: {}", value),
+            Self::Zeny(value) => write!(f, "Zeny: {}", value),
+            Self::BaseExperience(value) => write!(f, "Base Experience: {}", value),
+            Self::JobExperience(value) => write!(f, "Job Experience: {}", value),
+            Self::NextBaseExperience(value) => write!(f, "Next Base Experience: {}", value),
+            Self::NextJobExperience(value) => write!(f, "Next Job Experience: {}", value),
+            Self::SpUstr(value) => write!(f, "SpUstr: {}", value),
+            Self::SpUagi(value) => write!(f, "SpUagi: {}", value),
+            Self::SpUvit(value) => write!(f, "SpUvit: {}", value),
+            Self::SpUint(value) => write!(f, "SpUint: {}", value),
+            Self::SpUdex(value) => write!(f, "SpUdex: {}", value),
+            Self::SpUluk(value) => write!(f, "SpUluk: {}", value),
+            Self::Strength(base, bonus) => write!(f, "Strength: {} (+{})", base, bonus),
+            Self::Agility(base, bonus) => write!(f, "Agility: {} (+{})", base, bonus),
+            Self::Vitality(base, bonus) => write!(f, "Vitality: {} (+{})", base, bonus),
+            Self::Intelligence(base, bonus) => write!(f, "Intelligence: {} (+{})", base, bonus),
+            Self::Dexterity(base, bonus) => write!(f, "Dexterity: {} (+{})", base, bonus),
+            Self::Luck(base, bonus) => write!(f, "Luck: {} (+{})", base, bonus),
+            Self::CartInfo(items, weight, max_weight) => write!(f, "Cart Info: {} items, {}/{} weight", items, weight, max_weight),
+            Self::ActivityPoints(value) => write!(f, "Activity Points: {}", value),
+            Self::TraitPoint(value) => write!(f, "Trait Point: {}", value),
+            Self::MaximumActivityPoints(value) => write!(f, "Maximum Activity Points: {}", value),
+            Self::Power(base, bonus) => write!(f, "Power: {} (+{})", base, bonus),
+            Self::Stamina(base, bonus) => write!(f, "Stamina: {} (+{})", base, bonus),
+            Self::Wisdom(base, bonus) => write!(f, "Wisdom: {} (+{})", base, bonus),
+            Self::Spell(base, bonus) => write!(f, "Spell: {} (+{})", base, bonus),
+            Self::Concentration(base, bonus) => write!(f, "Concentration: {} (+{})", base, bonus),
+            Self::Creativity(base, bonus) => write!(f, "Creativity: {} (+{})", base, bonus),
+            Self::SpUpow(value) => write!(f, "SpUpow: {}", value),
+            Self::SpUsta(value) => write!(f, "SpUsta: {}", value),
+            Self::SpUwis(value) => write!(f, "SpUwis: {}", value),
+            Self::SpUspl(value) => write!(f, "SpUspl: {}", value),
+            Self::SpUcon(value) => write!(f, "SpUcon: {}", value),
+            Self::SpUcrt(value) => write!(f, "SpUcrt: {}", value),
+            Self::PhysicalAttack(value) => write!(f, "Physical Attack: {}", value),
+            Self::SpellMagicAttack(value) => write!(f, "Spell Magic Attack: {}", value),
+            Self::Resistance(value) => write!(f, "Resistance: {}", value),
+            Self::MagicResistance(value) => write!(f, "Magic Resistance: {}", value),
+            Self::HealingPlus(value) => write!(f, "Healing Plus: {}", value),
+            Self::CriticalDamageRate(value) => write!(f, "Critical Damage Rate: {}", value),
         }
     }
 }

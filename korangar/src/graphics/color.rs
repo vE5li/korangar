@@ -1,13 +1,16 @@
 use std::ops::{Add, Mul, Sub};
 
-use korangar_interface::element::{DefaultLayoutInfo, Element, StateElement};
+use korangar_interface::element::id::ElementIdGenerator;
+use korangar_interface::element::store::ElementStore;
+use korangar_interface::element::{Element, StateElement};
+use korangar_interface::layout::{Layout, Resolver};
 use mlua::{Lua, Value};
 use ragnarok_formats::color::{ColorBGRA, ColorRGB};
-use rust_state::Path;
+use rust_state::{Context, Path};
 use serde::{Deserialize, Serialize};
 
 use crate::interface::layout::CornerRadius;
-use crate::state::{ClientState, ClientStateRootExt};
+use crate::state::ClientState;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 pub struct Color {
@@ -247,13 +250,13 @@ impl StateElement<ClientState> for Color {
     type LayoutInfo = impl std::any::Any;
     type LayoutInfoMut = impl std::any::Any;
     type Return<P>
+        = impl Element<ClientState, LayoutInfo = Self::LayoutInfo>
     where
-        P: rust_state::Path<ClientState, Self>,
-    = impl Element<ClientState, LayoutInfo = Self::LayoutInfo>;
+        P: rust_state::Path<ClientState, Self>;
     type ReturnMut<P>
+        = impl Element<ClientState, LayoutInfo = Self::LayoutInfoMut>
     where
-        P: rust_state::Path<ClientState, Self>,
-    = impl Element<ClientState, LayoutInfo = Self::LayoutInfoMut>;
+        P: rust_state::Path<ClientState, Self>;
 
     fn to_element<P>(self_path: P, name: String) -> Self::Return<P>
     where
@@ -271,22 +274,22 @@ impl StateElement<ClientState> for Color {
         {
             fn create_layout_info(
                 &mut self,
-                state: &rust_state::Context<ClientState>,
-                store: &mut korangar_interface::element::store::ElementStore,
-                generator: &mut korangar_interface::element::id::ElementIdGenerator,
-                resolver: &mut korangar_interface::layout::Resolver,
+                _: &Context<ClientState>,
+                _: &mut ElementStore,
+                _: &mut ElementIdGenerator,
+                resolver: &mut Resolver,
             ) -> Self::LayoutInfo {
                 let area = resolver.with_height(18.0);
 
-                DefaultLayoutInfo { area }
+                Self::LayoutInfo { area }
             }
 
             fn layout_element<'a>(
                 &'a self,
-                state: &'a rust_state::Context<ClientState>,
-                store: &'a korangar_interface::element::store::ElementStore,
+                state: &'a Context<ClientState>,
+                _: &'a ElementStore,
                 layout_info: &'a Self::LayoutInfo,
-                layout: &mut korangar_interface::layout::Layout<'a, ClientState>,
+                layout: &mut Layout<'a, ClientState>,
             ) {
                 layout.add_rectangle(layout_info.area, CornerRadius::uniform(5.0), *state.get(&self.path));
             }
@@ -318,22 +321,22 @@ impl StateElement<ClientState> for Color {
         {
             fn create_layout_info(
                 &mut self,
-                state: &rust_state::Context<ClientState>,
-                store: &mut korangar_interface::element::store::ElementStore,
-                generator: &mut korangar_interface::element::id::ElementIdGenerator,
-                resolver: &mut korangar_interface::layout::Resolver,
+                _: &Context<ClientState>,
+                _: &mut ElementStore,
+                _: &mut ElementIdGenerator,
+                resolver: &mut Resolver,
             ) -> Self::LayoutInfo {
                 let area = resolver.with_height(18.0);
 
-                DefaultLayoutInfo { area }
+                Self::LayoutInfo { area }
             }
 
             fn layout_element<'a>(
                 &'a self,
-                state: &'a rust_state::Context<ClientState>,
-                store: &'a korangar_interface::element::store::ElementStore,
+                state: &'a Context<ClientState>,
+                _: &'a ElementStore,
                 layout_info: &'a Self::LayoutInfo,
-                layout: &mut korangar_interface::layout::Layout<'a, ClientState>,
+                layout: &mut Layout<'a, ClientState>,
             ) {
                 layout.add_rectangle(layout_info.area, CornerRadius::uniform(5.0), *state.get(&self.path));
             }

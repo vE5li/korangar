@@ -29,9 +29,9 @@ pub enum UserEvent {
     Respawn,
     LogOut,
     Exit,
-    CameraZoom(f32),
-    CameraRotate(f32),
-    CameraResetRotation,
+    ZoomCamera(f32),
+    RotateCamera(f32),
+    ResetCameraRotation,
     OpenMenuWindow,
     OpenInventoryWindow,
     OpenEquipmentWindow,
@@ -77,7 +77,9 @@ pub enum UserEvent {
     MoveResource(Move),
     CastSkill(HotbarSlot),
     StopSkill(HotbarSlot),
-    AddFriend(String),
+    AddFriend {
+        character_name: String,
+    },
     RemoveFriend {
         account_id: AccountId,
         character_id: CharacterId,

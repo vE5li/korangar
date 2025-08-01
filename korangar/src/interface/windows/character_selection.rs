@@ -1,18 +1,14 @@
-use std::any::Any;
-use std::cell::UnsafeCell;
-
 use korangar_components::character_slot_preview;
 use korangar_interface::element::id::ElementIdGenerator;
 use korangar_interface::element::store::ElementStore;
-use korangar_interface::element::{DefaultLayoutInfo, DefaultLayoutInfoSet, Element, ElementSet, ResolverSet};
+use korangar_interface::element::{DefaultLayoutInfo, Element};
 use korangar_interface::layout::{Layout, Resolver};
 use korangar_interface::window::{CustomWindow, WindowTrait};
 use rust_state::{Context, Path};
 
 use crate::character_slots::{CharacterSlots, CharacterSlotsExt};
 use crate::interface::components::character_slot_preview::CharacterSlotPreviewHandler;
-use crate::interface::layout::ScreenSize;
-use crate::interface::windows::{WindowCache, WindowClass};
+use crate::interface::windows::WindowClass;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
 
@@ -82,7 +78,7 @@ where
                         let path = self.character_slots;
 
                         self.item_boxes.push(Box::new(split! {
-                            gaps: 12.0,
+                            gaps: 10.0,
                             children: (
                                 character_slot_preview! {
                                     character_information: path.in_slot(slot),
@@ -141,7 +137,7 @@ where
                 resolver: &mut Resolver,
             ) -> Self::LayoutInfo {
                 self.correct_element_size(state);
-                let (area, layout_info) = resolver.with_derived(10.0, 0.0, |resolver| {
+                let (_area, layout_info) = resolver.with_derived(10.0, 0.0, |resolver| {
                     self.item_boxes
                         .iter_mut()
                         .enumerate()

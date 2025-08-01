@@ -4,7 +4,6 @@ use std::sync::Arc;
 #[cfg(feature = "debug")]
 use cgmath::Point3;
 use cgmath::{EuclideanSpace, Vector2};
-use korangar_interface::application::ScalingTrait;
 
 use crate::graphics::{Color, RectangleInstruction, Texture};
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};

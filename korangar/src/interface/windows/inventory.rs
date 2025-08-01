@@ -1,11 +1,10 @@
 use korangar_components::item_box;
-use korangar_interface::window::{CustomWindow, StateWindow, Window, WindowTrait};
+use korangar_interface::window::{CustomWindow, WindowTrait};
 use korangar_networking::InventoryItem;
 use rust_state::{Path, VecIndexExt};
 
 use crate::ItemSource;
-use crate::interface::layout::ScreenSize;
-use crate::interface::windows::{WindowCache, WindowClass};
+use crate::interface::windows::WindowClass;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
 use crate::world::ResourceMetadata;
@@ -42,6 +41,7 @@ where
             closable: true,
             elements: std::array::from_fn::<_, INVENTORY_ROWS, _>(|row| {
                 split! {
+                    gaps: theme().window().gaps(),
                     children: std::array::from_fn::<_, INVENTORY_COLUMNS, _>(|column| {
                         let path = self.items_path.index(row * INVENTORY_COLUMNS + column);
 

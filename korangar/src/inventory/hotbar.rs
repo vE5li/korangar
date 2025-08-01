@@ -1,5 +1,3 @@
-use std::cell::Ref;
-
 use korangar_interface::element::StateElement;
 use korangar_networking::NetworkingSystem;
 use ragnarok_packets::handler::PacketCallback;

@@ -1,15 +1,9 @@
 use korangar_interface::components::drop_down::DefaultClickHandler;
-use korangar_interface::element::StateElement;
-use korangar_interface::event::Toggle;
-use korangar_interface::window::{CustomWindow, StateWindow, Window, WindowTrait};
-use rust_state::{Context, Path};
+use korangar_interface::window::{CustomWindow, WindowTrait};
+use rust_state::Path;
 
-use crate::graphics::{
-    LimitFramerate, Msaa, PresentModeInfo, ScreenSpaceAntiAliasing, ShadowDetail, ShadowQuality, Ssaa, TextureSamplerType,
-};
-use crate::interface::layout::ScreenSize;
-use crate::interface::windows::{WindowCache, WindowClass};
-use crate::settings::{GraphicsSettingsCapabilitiesPathExt, GraphicsSettingsPathExt, LightingMode};
+use crate::interface::windows::WindowClass;
+use crate::settings::{GraphicsSettingsCapabilitiesPathExt, GraphicsSettingsPathExt};
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
 use crate::{GraphicsSettings, GraphicsSettingsCapabilities};
@@ -41,6 +35,18 @@ where
         use korangar_interface::prelude::*;
 
         let elements = (
+            split! {
+                children: (
+                    text! {
+                        text: "Interface scale",
+                    },
+                    drop_down! {
+                        selected: self.settings_path.interface_scaling(),
+                        options: self.capabilities_path.interface_scalings(),
+                        click_handler: DefaultClickHandler::new(self.settings_path.interface_scaling(), self.capabilities_path.interface_scalings()),
+                    }
+                )
+            },
             state_button! {
                 text: "Triple buffering",
                 state: self.settings_path.triple_buffering(),

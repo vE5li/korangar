@@ -1,13 +1,12 @@
 use korangar_components::item_box;
 use korangar_interface::element::Element;
-use korangar_interface::window::{CustomWindow, StateWindow, Window, WindowTrait};
+use korangar_interface::window::{CustomWindow, WindowTrait};
 use korangar_networking::{InventoryItem, InventoryItemDetails};
 use ragnarok_packets::EquipPosition;
 use rust_state::{Path, Selector};
 
 use crate::ItemSource;
-use crate::interface::layout::ScreenSize;
-use crate::interface::windows::{WindowCache, WindowClass};
+use crate::interface::windows::WindowClass;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
 use crate::world::ResourceMetadata;
@@ -24,6 +23,15 @@ impl<P: Copy> Clone for EquipmentPath<P> {
 }
 
 impl<P: Copy> Copy for EquipmentPath<P> {}
+
+impl<P> Selector<ClientState, InventoryItem<ResourceMetadata>, false> for EquipmentPath<P>
+where
+    P: Path<ClientState, Vec<InventoryItem<ResourceMetadata>>>,
+{
+    fn select<'a>(&'a self, state: &'a ClientState) -> Option<&'a InventoryItem<ResourceMetadata>> {
+        self.follow(state)
+    }
+}
 
 impl<P> Path<ClientState, InventoryItem<ResourceMetadata>, false> for EquipmentPath<P>
 where
@@ -53,15 +61,6 @@ where
 
             false
         })
-    }
-}
-
-impl<P> Selector<ClientState, InventoryItem<ResourceMetadata>, false> for EquipmentPath<P>
-where
-    P: Path<ClientState, Vec<InventoryItem<ResourceMetadata>>>,
-{
-    fn select<'a>(&'a self, state: &'a ClientState) -> Option<&'a InventoryItem<ResourceMetadata>> {
-        self.follow(state)
     }
 }
 

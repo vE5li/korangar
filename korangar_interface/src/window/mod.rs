@@ -13,7 +13,7 @@ use crate::element::ElementSet;
 use crate::element::id::ElementIdGenerator;
 use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
 use crate::layout::area::Area;
-use crate::layout::{Layout, Resolver};
+use crate::layout::{Layout, ResizeMode, Resolver};
 use crate::theme::{ThemePathGetter, theme};
 
 // TODO: Rename
@@ -27,12 +27,11 @@ pub trait WindowTrait<App: Application> {
         data: &mut WindowData<App>,
         generator: &mut ElementIdGenerator,
         window_size: App::Size,
-    ) -> DisplayInformation<App>;
+    ) -> DisplayInformation;
 
     fn do_layout<'a>(&'a self, state: &'a Context<App>, store: &'a WindowStore, data: &'a WindowData<App>, layout: &mut Layout<'a, App>);
 }
 
-// TODO: Rename this to StateWindow
 pub trait StateWindow<App>
 where
     App: Application,
@@ -92,12 +91,8 @@ where
     pub size: App::Size,
 }
 
-pub struct DisplayInformation<App>
-where
-    App: Application,
-{
-    pub real_position: App::Position,
-    pub real_size: App::Size,
+pub struct DisplayInformation {
+    pub real_area: Area,
     pub display_height: f32,
 }
 
@@ -107,7 +102,7 @@ pub struct WindowLayoutInfoSet<T> {
     children: T,
 }
 
-pub struct Window<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, Elements>
+pub struct Window<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Elements>
 where
     App: Application,
     Elements: ElementSet<App>,
@@ -124,20 +119,21 @@ where
     pub border: I,
     pub corner_radius: J,
     pub closable: K,
-    pub close_button_size: L,
-    pub close_button_corner_radius: M,
-    pub minimum_width: N,
-    pub maximum_width: O,
-    pub minimum_height: P,
-    pub maximum_height: Q,
+    pub resizable: L,
+    pub close_button_size: M,
+    pub close_button_corner_radius: N,
+    pub minimum_width: O,
+    pub maximum_width: P,
+    pub minimum_height: Q,
+    pub maximum_height: R,
     pub theme: App::ThemeType,
     pub class: Option<App::WindowClass>,
     pub elements: Elements,
     pub layout_info: Option<WindowLayoutInfoSet<<Elements as ElementSet<App>>::LayoutInfo>>,
 }
 
-impl<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, Elements> WindowTrait<App>
-    for Window<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, Elements>
+impl<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Elements> WindowTrait<App>
+    for Window<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Elements>
 where
     App: Application,
     Title: AsRef<str>,
@@ -152,12 +148,13 @@ where
     I: Selector<App, f32>,
     J: Selector<App, App::CornerRadius>,
     K: Selector<App, bool>,
-    L: Selector<App, App::Size>,
-    M: Selector<App, App::CornerRadius>,
-    N: Selector<App, f32>,
+    L: Selector<App, bool>,
+    M: Selector<App, App::Size>,
+    N: Selector<App, App::CornerRadius>,
     O: Selector<App, f32>,
     P: Selector<App, f32>,
     Q: Selector<App, f32>,
+    R: Selector<App, f32>,
     Elements: ElementSet<App>,
     <Elements as ElementSet<App>>::LayoutInfo: 'static,
 {
@@ -172,7 +169,7 @@ where
         data: &mut WindowData<App>,
         generator: &mut ElementIdGenerator,
         window_size: App::Size,
-    ) -> DisplayInformation<App> {
+    ) -> DisplayInformation {
         let store = store.get_or_create_from_window_id(data.id, generator);
 
         App::set_current_theme_type(self.theme);
@@ -236,8 +233,7 @@ where
         let display_height = area.height;
 
         DisplayInformation {
-            real_position,
-            real_size: App::Size::new(area.width, area.height),
+            real_area: area,
             display_height,
         }
     }
@@ -276,13 +272,61 @@ where
             None
         };
 
+        let is_title_hovered = layout.is_area_hovered_and_active(layout_info.title_area);
+
+        if is_title_hovered {
+            layout.add_window_move_area(layout_info.title_area, data.id);
+            layout.mark_hovered();
+        }
+
+        let corner_radius = *state.get(&self.corner_radius);
+
+        let horizontal_resize_area = Area {
+            left: layout_info.area.left + layout_info.area.width - 3.0,
+            top: layout_info.area.top + 20.0,
+            width: 6.0,
+            height: layout_info.area.height - 40.0,
+        };
+        let vertical_resize_area = Area {
+            left: layout_info.area.left + 20.0,
+            top: layout_info.area.top + layout_info.area.height - 3.0,
+            width: layout_info.area.width - 40.0,
+            height: 6.0,
+        };
+
+        let radius = corner_radius.bottom_right() / 2.0;
+        let corner_offset = radius - (radius.powi(2) / 2.0).sqrt();
+        let resize_area = Area {
+            left: layout_info.area.left + layout_info.area.width - corner_offset - 6.0,
+            top: layout_info.area.top + layout_info.area.height - corner_offset - 6.0,
+            width: 12.0,
+            height: 12.0,
+        };
+        let horizontal_resize_hovered = layout.is_area_hovered_and_active(horizontal_resize_area);
+        let vertical_resize_hovered = layout.is_area_hovered_and_active(vertical_resize_area);
+        let resize_hovered = layout.is_area_hovered_and_active(resize_area);
+
+        let horizontal_resize_available = *state.get(&self.minimum_width) != *state.get(&self.maximum_width);
+        let vertical_resize_availabe = *state.get(&self.resizable);
+
+        if horizontal_resize_hovered && horizontal_resize_available {
+            layout.add_window_resize_area(horizontal_resize_area, ResizeMode::Horizontal, data.id);
+            layout.mark_hovered();
+        } else if vertical_resize_hovered && vertical_resize_availabe {
+            layout.add_window_resize_area(vertical_resize_area, ResizeMode::Vertical, data.id);
+            layout.mark_hovered();
+        } else if resize_hovered && horizontal_resize_available && vertical_resize_availabe {
+            layout.add_window_resize_area(resize_area, ResizeMode::Both, data.id);
+            layout.mark_hovered();
+        }
+
         layout.with_clip_layer(layout_info.area, |layout| {
             layout.with_layer(|layout| {
                 self.elements.layout_element(state, store, &layout_info.children, layout);
             });
         });
 
-        let title_color = match layout.is_area_hovered_and_active(layout_info.title_area) {
+        let title_color = match is_title_hovered {
             true => *state.get(&self.hovered_title_color),
             false => *state.get(&self.title_color),
         };
@@ -296,58 +340,48 @@ where
             *state.get(&theme().window().vertical_alignment()),
         );
 
-        if layout.is_area_hovered_and_active(layout_info.title_area) {
-            layout.add_window_move_area(layout_info.title_area, data.id);
-            layout.mark_hovered();
-        }
-
         layout.add_rectangle(
             layout_info.area,
             *state.get(&self.corner_radius),
             *state.get(&self.background_color),
         );
 
-        // FIX: Add height to the check as well. Currently there is no concept of an
-        // window with a fixed height and a flexible one, so after that is
-        // implemented this can be corrected.
-        if *state.get(&self.minimum_width) != *state.get(&self.maximum_width) {
-            // TODO: Compute this better.
-            let resize_area = Area {
-                left: layout_info.area.left + layout_info.area.width - 14.0,
-                top: layout_info.area.top + layout_info.area.height - 14.0,
-                width: 14.0,
-                height: 14.0,
-            };
-
-            // TEMP
+        if horizontal_resize_hovered && horizontal_resize_available {
+            layout.add_rectangle(
+                horizontal_resize_area,
+                App::CornerRadius::new(6.0, 6.0, 6.0, 6.0),
+                *state.get(&theme().window().closest_anchor_color()),
+            );
+        } else if vertical_resize_hovered && vertical_resize_availabe {
+            layout.add_rectangle(
+                vertical_resize_area,
+                App::CornerRadius::new(6.0, 6.0, 6.0, 6.0),
+                *state.get(&theme().window().closest_anchor_color()),
+            );
+        } else if resize_hovered && horizontal_resize_available && vertical_resize_availabe {
             layout.add_rectangle(
                 resize_area,
-                App::CornerRadius::new(0.0, 0.0, state.get(&self.corner_radius).bottom_right(), 0.0),
-                *state.get(&self.title_color),
+                App::CornerRadius::new(12.0, 12.0, 12.0, 12.0),
+                *state.get(&theme().window().closest_anchor_color()),
+            );
+        }
+
+        if let Some((close_button_area, close_button_color)) = close_button {
+            layout.add_rectangle(
+                close_button_area,
+                *state.get(&self.close_button_corner_radius),
+                close_button_color,
             );
 
-            if let Some((close_button_area, close_button_color)) = close_button {
-                layout.add_rectangle(
-                    close_button_area,
-                    *state.get(&self.close_button_corner_radius),
-                    close_button_color,
-                );
-
-                // TODO: Use own values
-                layout.add_text(
-                    close_button_area,
-                    "X",
-                    *state.get(&self.font_size),
-                    *state.get(&self.background_color),
-                    HorizontalAlignment::Center { offset: 0.0 },
-                    VerticalAlignment::Center { offset: 0.0 },
-                );
-            }
-
-            if layout.is_area_hovered_and_active(resize_area) {
-                layout.add_window_resize_area(resize_area, data.id);
-                layout.mark_hovered();
-            }
+            // TODO: Use own values
+            layout.add_text(
+                close_button_area,
+                "X",
+                *state.get(&self.font_size),
+                *state.get(&self.background_color),
+                HorizontalAlignment::Center { offset: 0.0 },
+                VerticalAlignment::Center { offset: 0.0 },
+            );
         }
 
         if layout.is_area_hovered_and_active(layout_info.area) {

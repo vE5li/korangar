@@ -1,12 +1,12 @@
-use std::any::Any;
 use std::cell::UnsafeCell;
-use std::fmt::Display;
 use std::sync::mpsc::TryRecvError;
-use std::sync::{LazyLock, Mutex};
 
 use korangar_debug::logging::{Colorize, print_debug};
 use korangar_interface::application::Application;
-use korangar_interface::element::{DefaultLayoutInfo, Element, ErasedElement, StateElement};
+use korangar_interface::element::id::ElementIdGenerator;
+use korangar_interface::element::store::ElementStore;
+use korangar_interface::element::{Element, ErasedElement, StateElement};
+use korangar_interface::layout::{Layout, Resolver};
 use korangar_interface::prelude::*;
 use korangar_interface::theme::theme;
 use ragnarok_bytes::{ByteReader, ByteWriter, ConversionError, ConversionResult};
@@ -41,9 +41,9 @@ where
     fn create_layout_info(
         &mut self,
         state: &rust_state::Context<App>,
-        store: &mut korangar_interface::element::store::ElementStore,
-        generator: &mut korangar_interface::element::id::ElementIdGenerator,
-        resolver: &mut korangar_interface::layout::Resolver,
+        _: &mut ElementStore,
+        _: &mut ElementIdGenerator,
+        resolver: &mut Resolver,
     ) -> Self::LayoutInfo {
         let height = *state.get(&theme().text().height());
         let area = resolver.with_height(height);
@@ -61,15 +61,15 @@ where
             }
         }
 
-        DefaultLayoutInfo { area }
+        Self::LayoutInfo { area }
     }
 
     fn layout_element<'a>(
         &'a self,
         state: &'a rust_state::Context<App>,
-        store: &'a korangar_interface::element::store::ElementStore,
+        _: &'a ElementStore,
         layout_info: &'a Self::LayoutInfo,
-        layout: &mut korangar_interface::layout::Layout<'a, App>,
+        layout: &mut Layout<'a, App>,
     ) {
         layout.add_text(
             layout_info.area,
@@ -108,9 +108,9 @@ where
     fn create_layout_info(
         &mut self,
         state: &rust_state::Context<App>,
-        store: &mut korangar_interface::element::store::ElementStore,
-        generator: &mut korangar_interface::element::id::ElementIdGenerator,
-        resolver: &mut korangar_interface::layout::Resolver,
+        _: &mut ElementStore,
+        _: &mut ElementIdGenerator,
+        resolver: &mut Resolver,
     ) -> Self::LayoutInfo {
         let error = state.get(&self.path);
         if !self.cached.as_ref().is_some_and(|cached| cached == error) {
@@ -121,15 +121,15 @@ where
         let height = *state.get(&theme().text().height());
         let area = resolver.with_height(height);
 
-        DefaultLayoutInfo { area }
+        Self::LayoutInfo { area }
     }
 
     fn layout_element<'a>(
         &'a self,
         state: &'a rust_state::Context<App>,
-        store: &'a korangar_interface::element::store::ElementStore,
+        _: &'a ElementStore,
         layout_info: &'a Self::LayoutInfo,
-        layout: &mut korangar_interface::layout::Layout<'a, App>,
+        layout: &mut Layout<'a, App>,
     ) {
         layout.add_text(
             layout_info.area,
@@ -311,7 +311,6 @@ pub struct PacketHistory {
     #[hidden_element]
     receiver: std::sync::mpsc::Receiver<PacketApplicator>,
     pub entries: Vec<PacketEntry>,
-    pub update: bool,
     pub show_incoming: bool,
     pub show_outgoing: bool,
     pub show_pings: bool,
@@ -324,7 +323,6 @@ impl PacketHistory {
         let packet_history = PacketHistory {
             receiver,
             entries: Vec::default(),
-            update: true,
             show_incoming: true,
             show_outgoing: true,
             show_pings: false,
@@ -334,13 +332,11 @@ impl PacketHistory {
         (packet_history, packet_history_callback)
     }
 
-    pub fn update(&mut self, apply_updates: bool) {
+    pub fn update(&mut self) {
         loop {
             match self.receiver.try_recv() {
                 Ok(applicator) => {
-                    if apply_updates {
-                        applicator(self);
-                    }
+                    applicator(self);
                 }
                 Err(TryRecvError::Empty) => break,
                 Err(TryRecvError::Disconnected) => {

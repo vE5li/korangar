@@ -14,7 +14,6 @@ pub mod components {
         use korangar_interface::element::{Element, ErasedElement};
         use korangar_interface::event::{ClickAction, Event, EventQueue};
         use korangar_interface::layout::alignment::{HorizontalAlignment, VerticalAlignment};
-        use korangar_interface::layout::area::Area;
         use korangar_interface::layout::tooltip::TooltipExt;
         use korangar_interface::layout::{Layout, MouseButton, Resolver};
         use ragnarok_packets::{CharacterInformation, CharacterInformationPathExt};
@@ -56,7 +55,7 @@ pub mod components {
             A: Path<ClientState, Option<usize>>,
             B: Path<ClientState, CharacterInformation, false>,
         {
-            fn execute(&self, state: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
+            fn execute(&self, _: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
                 use korangar_interface::prelude::*;
 
                 let slot = self.slot;
@@ -87,7 +86,7 @@ pub mod components {
                         },
                         button! {
                             text: "Cancel",
-                            event: move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
+                            event: move |_: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
                                 queue.queue(Event::CloseOverlay);
                             },
                         },
@@ -125,9 +124,9 @@ pub mod components {
         {
             fn create_layout_info(
                 &mut self,
-                state: &Context<ClientState>,
-                store: &mut ElementStore,
-                generator: &mut ElementIdGenerator,
+                _: &Context<ClientState>,
+                _: &mut ElementStore,
+                _: &mut ElementIdGenerator,
                 resolver: &mut Resolver,
             ) -> Self::LayoutInfo {
                 let area = resolver.with_height(180.0);
@@ -157,8 +156,8 @@ pub mod components {
                     let is_hoverered = layout.is_area_hovered_and_active(layout_info.area);
 
                     let background_color = match is_hoverered {
-                        true => Color::monochrome_u8(95),
-                        false => *state.get(&self.background_color),
+                        true => Color::monochrome_u8(80),
+                        false => Color::monochrome_u8(60),
                     };
                     layout.add_rectangle(layout_info.area, CornerRadius::uniform(25.0), background_color);
 
@@ -197,8 +196,8 @@ pub mod components {
                     let is_hoverered = layout.is_area_hovered_and_active(layout_info.area);
 
                     let background_color = match is_hoverered {
-                        true => Color::monochrome_u8(95),
-                        false => *state.get(&self.background_color),
+                        true => Color::monochrome_u8(110),
+                        false => Color::monochrome_u8(90),
                     };
                     layout.add_rectangle(layout_info.area, CornerRadius::uniform(25.0), background_color);
 
@@ -283,8 +282,8 @@ pub mod components {
                     let is_hoverered = layout.is_area_hovered_and_active(layout_info.area);
 
                     let background_color = match is_hoverered {
-                        true => Color::monochrome_u8(95),
-                        false => *state.get(&self.background_color),
+                        true => Color::monochrome_u8(55),
+                        false => Color::monochrome_u8(40),
                     };
                     layout.add_rectangle(layout_info.area, CornerRadius::uniform(25.0), background_color);
 
@@ -292,7 +291,7 @@ pub mod components {
                         layout_info.area,
                         "Create Character",
                         FontSize(14.0),
-                        Color::WHITE,
+                        Color::monochrome_u8(85),
                         HorizontalAlignment::Center { offset: 0.0 },
                         VerticalAlignment::Center { offset: 0.0 },
                     );
@@ -429,18 +428,16 @@ pub mod components {
         use korangar_interface::element::Element;
         use korangar_interface::element::id::ElementIdGenerator;
         use korangar_interface::element::store::ElementStore;
-        use korangar_interface::event::ClickAction;
         use korangar_interface::layout::{Layout, Resolver};
         use korangar_interface::prelude::{HorizontalAlignment, VerticalAlignment};
         use korangar_networking::{InventoryItem, InventoryItemDetails};
         use rust_state::{Context, Path};
 
         use crate::graphics::Color;
-        use crate::input::MouseInputMode;
-        use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
-        use crate::interface::resource::{ItemSource, Move, PartialMove};
-        use crate::loaders::{FontSize, Scaling};
-        use crate::renderer::{InterfaceRenderer, LayoutExt, SpriteRenderer};
+        use crate::interface::layout::CornerRadius;
+        use crate::interface::resource::ItemSource;
+        use crate::loaders::FontSize;
+        use crate::renderer::LayoutExt;
         use crate::state::ClientState;
         use crate::world::ResourceMetadata;
 
@@ -472,14 +469,14 @@ pub mod components {
             fn create_layout_info(
                 &mut self,
                 state: &Context<ClientState>,
-                store: &mut ElementStore,
-                generator: &mut ElementIdGenerator,
+                _: &mut ElementStore,
+                _: &mut ElementIdGenerator,
                 resolver: &mut Resolver,
             ) -> Self::LayoutInfo {
                 let area = resolver.with_height(40.0);
 
                 if let Some(item) = state.try_get(&self.item_path)
-                    && let Some(texture) = item.metadata.texture.as_ref()
+                    && item.metadata.texture.as_ref().is_some()
                 {
                     if let InventoryItemDetails::Regular { amount, .. } = &item.details {
                         self.amount_display.update(*amount);
@@ -492,18 +489,18 @@ pub mod components {
             fn layout_element<'a>(
                 &'a self,
                 state: &'a Context<ClientState>,
-                store: &'a ElementStore,
+                _: &'a ElementStore,
                 layout_info: &'a Self::LayoutInfo,
                 layout: &mut Layout<'a, ClientState>,
             ) {
-                layout.add_rectangle(layout_info.area, CornerRadius::uniform(20.0), Color::rgb_u8(200, 120, 120));
+                layout.add_rectangle(layout_info.area, CornerRadius::uniform(20.0), Color::rgb_u8(40, 40, 40));
 
                 if let Some(item) = state.try_get(&self.item_path)
                     && let Some(texture) = item.metadata.texture.as_ref()
                 {
                     layout.add_texture(texture.clone(), layout_info.area, Color::WHITE, false);
 
-                    if let InventoryItemDetails::Regular { amount, .. } = &item.details {
+                    if matches!(item.details, InventoryItemDetails::Regular { .. }) {
                         layout.add_text(
                             layout_info.area,
                             self.amount_display.string.as_ref().unwrap(),
@@ -526,22 +523,18 @@ pub mod components {
         use korangar_interface::element::Element;
         use korangar_interface::element::id::ElementIdGenerator;
         use korangar_interface::element::store::ElementStore;
-        use korangar_interface::event::ClickAction;
         use korangar_interface::layout::{Layout, Resolver};
         use korangar_interface::prelude::{HorizontalAlignment, VerticalAlignment};
-        use korangar_networking::{InventoryItem, InventoryItemDetails};
         use ragnarok_packets::SkillLevel;
         use rust_state::{Context, Path};
 
         use crate::graphics::Color;
-        use crate::input::MouseInputMode;
-        use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
-        use crate::interface::resource::{ItemSource, Move, PartialMove, SkillSource};
+        use crate::interface::layout::CornerRadius;
+        use crate::interface::resource::SkillSource;
         use crate::inventory::Skill;
-        use crate::loaders::{FontSize, Scaling};
-        use crate::renderer::{InterfaceRenderer, LayoutExt, SpriteRenderer};
+        use crate::loaders::FontSize;
+        use crate::renderer::LayoutExt;
         use crate::state::ClientState;
-        use crate::world::ResourceMetadata;
 
         pub struct LevelDisplay {
             level: SkillLevel,
@@ -579,11 +572,11 @@ pub mod components {
             fn create_layout_info(
                 &mut self,
                 state: &Context<ClientState>,
-                store: &mut ElementStore,
-                generator: &mut ElementIdGenerator,
+                _: &mut ElementStore,
+                _: &mut ElementIdGenerator,
                 resolver: &mut Resolver,
             ) -> Self::LayoutInfo {
-                let area = resolver.with_height(30.0);
+                let area = resolver.with_height(40.0);
 
                 if let Some(skill) = state.try_get(&self.skill_path) {
                     self.level_display.update(skill.skill_level);
@@ -595,11 +588,11 @@ pub mod components {
             fn layout_element<'a>(
                 &'a self,
                 state: &'a Context<ClientState>,
-                store: &'a ElementStore,
+                _: &'a ElementStore,
                 layout_info: &'a Self::LayoutInfo,
                 layout: &mut Layout<'a, ClientState>,
             ) {
-                layout.add_rectangle(layout_info.area, CornerRadius::uniform(20.0), Color::rgb_u8(200, 120, 120));
+                layout.add_rectangle(layout_info.area, CornerRadius::uniform(20.0), Color::rgb_u8(40, 40, 40));
 
                 if let Some(skill) = state.try_get(&self.skill_path) {
                     layout.add_sprite(
@@ -608,7 +601,6 @@ pub mod components {
                         &skill.animation_state,
                         layout_info.area,
                         Color::WHITE,
-                        false,
                     );
 
                     layout.add_text(

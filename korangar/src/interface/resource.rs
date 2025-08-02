@@ -15,18 +15,3 @@ pub enum SkillSource {
     SkillTree,
     Hotbar { slot: HotbarSlot },
 }
-
-// TODO: Rename this
-#[derive(Clone, Debug)]
-pub enum Move {
-    Item {
-        source: ItemSource,
-        destination: ItemSource,
-        item: InventoryItem<ResourceMetadata>,
-    },
-    Skill {
-        source: SkillSource,
-        destination: SkillSource,
-        skill: Skill,
-    },
-}

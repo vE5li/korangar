@@ -19,7 +19,7 @@ pub mod components {
         use rust_state::{Context, ManuallyAssertExt, Path, RustState, Selector};
 
         use crate::graphics::Color;
-        use crate::input::UserEvent;
+        use crate::input::InputEvent;
         use crate::interface::layout::{CornerRadius, ScreenPosition, ScreenSize};
         use crate::loaders::FontSize;
         use crate::state::ClientState;
@@ -72,7 +72,7 @@ pub mod components {
                                 let character_information = state.try_get(&character_information_path).unwrap();
                                 let character_id = character_information.character_id;
 
-                                queue.queue(UserEvent::DeleteCharacter { character_id });
+                                queue.queue(InputEvent::DeleteCharacter { character_id });
                                 queue.queue(Event::CloseOverlay);
                             },
                         },
@@ -348,7 +348,7 @@ pub mod components {
 
         impl ClickAction<ClientState> for SelectCharacter {
             fn execute(&self, _: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
-                queue.queue(UserEvent::SelectCharacter { slot: self.slot });
+                queue.queue(InputEvent::SelectCharacter { slot: self.slot });
             }
         }
 
@@ -358,7 +358,7 @@ pub mod components {
 
         impl ClickAction<ClientState> for CreateCharacter {
             fn execute(&self, _: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
-                queue.queue(UserEvent::OpenCharacterCreationWindow { slot: self.slot });
+                queue.queue(InputEvent::OpenCharacterCreationWindow { slot: self.slot });
             }
         }
 
@@ -390,7 +390,7 @@ pub mod components {
                 // fine to unwrap.
                 let origin_slot = state.get(&self.switch_request).unwrap();
 
-                queue.queue(UserEvent::SwitchCharacterSlot {
+                queue.queue(InputEvent::SwitchCharacterSlot {
                     origin_slot,
                     destination_slot: self.slot,
                 });
@@ -435,9 +435,9 @@ pub mod components {
         use rust_state::{Context, Path};
 
         use crate::graphics::Color;
-        use crate::input::{MouseInputMode, UserEvent};
+        use crate::input::{InputEvent, MouseInputMode};
         use crate::interface::layout::CornerRadius;
-        use crate::interface::resource::{ItemSource, Move};
+        use crate::interface::resource::ItemSource;
         use crate::loaders::FontSize;
         use crate::renderer::LayoutExt;
         use crate::state::ClientState;
@@ -497,12 +497,10 @@ pub mod components {
                     mode: MouseInputMode::MoveItem { source, item },
                 } = mouse_mode
                 {
-                    queue.queue(UserEvent::MoveResource {
-                        resource: Move::Item {
-                            source: *source,
-                            destination: self.source,
-                            item: item.clone(),
-                        },
+                    queue.queue(InputEvent::MoveItem {
+                        source: *source,
+                        destination: self.source,
+                        item: item.clone(),
                     });
                 }
             }
@@ -605,9 +603,9 @@ pub mod components {
         use rust_state::{Context, Path};
 
         use crate::graphics::Color;
-        use crate::input::{MouseInputMode, UserEvent};
+        use crate::input::{InputEvent, MouseInputMode};
         use crate::interface::layout::CornerRadius;
-        use crate::interface::resource::{Move, SkillSource};
+        use crate::interface::resource::SkillSource;
         use crate::inventory::Skill;
         use crate::loaders::FontSize;
         use crate::renderer::LayoutExt;
@@ -678,12 +676,10 @@ pub mod components {
                     mode: MouseInputMode::MoveSkill { source, skill },
                 } = mouse_mode
                 {
-                    queue.queue(UserEvent::MoveResource {
-                        resource: Move::Skill {
-                            source: *source,
-                            destination: self.source,
-                            skill: skill.clone(),
-                        },
+                    queue.queue(InputEvent::MoveSkill {
+                        source: *source,
+                        destination: self.source,
+                        skill: skill.clone(),
                     });
                 }
             }

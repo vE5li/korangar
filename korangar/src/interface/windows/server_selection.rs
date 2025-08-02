@@ -9,7 +9,7 @@ use korangar_interface::window::{CustomWindow, WindowTrait};
 use ragnarok_packets::{CharacterServerInformation, CharacterServerInformationPathExt};
 use rust_state::{Context, Path};
 
-use crate::input::UserEvent;
+use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
@@ -68,7 +68,7 @@ where
                                 text: self.path.index(index).manually_asserted().server_name(),
                                 event: move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
                                     let character_server_information = state.get(&path).clone();
-                                    queue.queue(UserEvent::SelectServer { character_server_information });
+                                    queue.queue(InputEvent::SelectServer { character_server_information });
                                 },
                             }));
                         }

@@ -12,7 +12,7 @@ use rust_state::{Context, Path, RustState};
 
 use super::WindowClass;
 use crate::graphics::Color;
-use crate::input::UserEvent;
+use crate::input::InputEvent;
 use crate::loaders::FontSize;
 use crate::state::theme::{ChatThemePathExt, InterfaceThemePathExt, InterfaceThemeType};
 use crate::state::{ChatMessage, ClientState, client_theme};
@@ -148,7 +148,7 @@ where
             if !text.is_empty() {
                 // Clear the text box.
                 state.update_value_with(current_text_path, |current_text| current_text.clear());
-                queue.queue(UserEvent::SendMessage { text: text.clone() });
+                queue.queue(InputEvent::SendMessage { text: text.clone() });
                 queue.queue(Event::Unfocus);
             }
         };

@@ -8,6 +8,7 @@ pub use interface_macros::StateWindow;
 use rust_state::{Context, Path, RustState, Selector};
 use store::WindowStore;
 
+use crate::MouseMode;
 use crate::application::{Application, CornerRadiusTrait, PositionTrait, SizeTrait};
 use crate::element::ElementSet;
 use crate::element::id::ElementIdGenerator;
@@ -346,19 +347,34 @@ where
             *state.get(&self.background_color),
         );
 
-        if horizontal_resize_hovered && horizontal_resize_available {
+        if horizontal_resize_hovered && horizontal_resize_available
+            || matches!(layout.get_mouse_mode(), MouseMode::ResizingWindow {
+                resize_mode: ResizeMode::Horizontal,
+                window_id,
+            } if *window_id == data.id)
+        {
             layout.add_rectangle(
                 horizontal_resize_area,
                 App::CornerRadius::new(6.0, 6.0, 6.0, 6.0),
                 *state.get(&theme().window().closest_anchor_color()),
             );
-        } else if vertical_resize_hovered && vertical_resize_availabe {
+        } else if vertical_resize_hovered && vertical_resize_availabe
+            || matches!(layout.get_mouse_mode(), MouseMode::ResizingWindow {
+                resize_mode: ResizeMode::Vertical,
+                window_id,
+            } if *window_id == data.id)
+        {
             layout.add_rectangle(
                 vertical_resize_area,
                 App::CornerRadius::new(6.0, 6.0, 6.0, 6.0),
                 *state.get(&theme().window().closest_anchor_color()),
             );
-        } else if resize_hovered && horizontal_resize_available && vertical_resize_availabe {
+        } else if resize_hovered && horizontal_resize_available && vertical_resize_availabe
+            || matches!(layout.get_mouse_mode(), MouseMode::ResizingWindow {
+                resize_mode: ResizeMode::Both,
+                window_id,
+            } if *window_id == data.id)
+        {
             layout.add_rectangle(
                 resize_area,
                 App::CornerRadius::new(12.0, 12.0, 12.0, 12.0),

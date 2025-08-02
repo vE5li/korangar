@@ -4,7 +4,7 @@ use korangar_interface::window::{StateWindow, Window, WindowBuilder};
 use korangar_interface::{dimension_bound, size_bound};
 use ragnarok_packets::{BuyOrSellOption, ShopId};
 
-use crate::input::UserEvent;
+use crate::input::InputEvent;
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
@@ -29,7 +29,7 @@ impl StateWindow<InterfaceSettings> for BuyOrSellWindow {
         let elements = vec![
             ButtonBuilder::new()
                 .with_text("Buy")
-                .with_event(UserEvent::BuyOrSell {
+                .with_event(InputEvent::BuyOrSell {
                     shop_id: self.shop_id,
                     buy_or_sell: BuyOrSellOption::Buy,
                 })
@@ -38,7 +38,7 @@ impl StateWindow<InterfaceSettings> for BuyOrSellWindow {
                 .wrap(),
             ButtonBuilder::new()
                 .with_text("Sell")
-                .with_event(UserEvent::BuyOrSell {
+                .with_event(InputEvent::BuyOrSell {
                     shop_id: self.shop_id,
                     buy_or_sell: BuyOrSellOption::Sell,
                 })

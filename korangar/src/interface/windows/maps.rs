@@ -1,7 +1,7 @@
 use korangar_interface::window::{CustomWindow, WindowTrait};
 use ragnarok_packets::TilePosition;
 
-use crate::input::UserEvent;
+use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
@@ -54,7 +54,7 @@ impl CustomWindow<ClientState> for MapsWindow {
                 button! {
                     text: warp.0,
                     tooltip: format!("Map: {}\nCoordinates: {}, {}", warp.0, warp.1.x, warp.1.y),
-                    event: UserEvent::RequestWarpToMap {
+                    event: InputEvent::WarpToMap {
                         map_name: format!("{}.gat", warp.0),
                         position: warp.1,
                     },

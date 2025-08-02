@@ -23,7 +23,7 @@ use crate::character_slots::CharacterSlots;
 use crate::graphics::Color;
 #[cfg(feature = "debug")]
 use crate::graphics::RenderOptions;
-use crate::input::{MouseInputMode, UserEvent};
+use crate::input::{InputEvent, MouseInputMode};
 use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
 #[cfg(feature = "debug")]
 use crate::interface::windows::ProfilerWindowState;
@@ -371,7 +371,7 @@ impl Application for ClientState {
     type Clip = ScreenClip;
     type Color = Color;
     type CornerRadius = CornerRadius;
-    type CustomEvent = UserEvent;
+    type CustomEvent = InputEvent;
     type CustomMouseMode = MouseInputMode;
     type FontSize = FontSize;
     type Position = ScreenPosition;

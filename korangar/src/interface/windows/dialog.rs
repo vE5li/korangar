@@ -7,7 +7,7 @@ use ragnarok_packets::EntityId;
 use rust_state::{Context, Path, RustState};
 
 use super::WindowClass;
-use crate::input::UserEvent;
+use crate::input::InputEvent;
 use crate::interface::windows::WindowCache;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
@@ -88,7 +88,7 @@ impl DialogWindowState {
             button! {
                 text: "Next",
                 event: move |_: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
-                    queue.queue(UserEvent::NextDialog { npc_id });
+                    queue.queue(InputEvent::NextDialog { npc_id });
                 },
             },
             true,
@@ -98,7 +98,7 @@ impl DialogWindowState {
 
     /// Add a close button to the dialog.
     ///
-    /// This also removes any existing "next"-buttons.
+    /// This also removes any existing "Next"-buttons.
     ///
     /// I am unsure why that's the behavior of the official client.
     pub fn add_close_button(&mut self) {
@@ -112,7 +112,7 @@ impl DialogWindowState {
             button! {
                 text: "Close",
                 event: move |_: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
-                    queue.queue(UserEvent::CloseDialog { npc_id });
+                    queue.queue(InputEvent::CloseDialog { npc_id });
                 },
             },
             false,
@@ -121,7 +121,7 @@ impl DialogWindowState {
 
     /// Add multiple buttons, one for each choice.
     ///
-    /// This also removes any existing "next"-buttons.
+    /// This also removes any existing "Next"-buttons.
     ///
     /// I am unsure why that's the behavior of the official client.
     pub fn add_choice_buttons(&mut self, choices: Vec<String>) {
@@ -136,7 +136,7 @@ impl DialogWindowState {
                 button! {
                     text: text,
                     event: move |_: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
-                        queue.queue(UserEvent::ChooseDialogOption { npc_id, option: index as i8 + 1 });
+                        queue.queue(InputEvent::ChooseDialogOption { npc_id, option: index as i8 + 1 });
                     },
                 },
                 false,

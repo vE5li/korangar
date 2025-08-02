@@ -1,6 +1,6 @@
 use korangar_interface::window::{CustomWindow, WindowTrait};
 
-use crate::input::UserEvent;
+use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
@@ -30,22 +30,22 @@ impl CustomWindow<ClientState> for CommandsWindow {
                         button! {
                             text: "+1",
                             tooltip: "Increase base level by 1 [^50C3FF@blvl 1^000000]",
-                            event: UserEvent::SendMessage { text: "@blvl 1".to_string() },
+                            event: InputEvent::SendMessage { text: "@blvl 1".to_string() },
                         },
                         button! {
                             text: "+5",
                             tooltip: "Increase base level by 5 [^50C3FF@blvl 5^000000]",
-                            event: UserEvent::SendMessage { text: "@blvl 5".to_string() },
+                            event: InputEvent::SendMessage { text: "@blvl 5".to_string() },
                         },
                         button! {
                             text: "+10",
                             tooltip: "Increase base level by 10 [^50C3FF@blvl 10^000000]",
-                            event: UserEvent::SendMessage { text: "@blvl 10".to_string() },
+                            event: InputEvent::SendMessage { text: "@blvl 10".to_string() },
                         },
                         button! {
                             text: "MAX",
                             tooltip: "Set base level to the maximum [^50C3FF@blvl 9999^000000]",
-                            event: UserEvent::SendMessage { text: "@blvl 9999".to_string() },
+                            event: InputEvent::SendMessage { text: "@blvl 9999".to_string() },
                         },
                     ),
                 },
@@ -58,22 +58,22 @@ impl CustomWindow<ClientState> for CommandsWindow {
                         button! {
                             text: "+1",
                             tooltip: "Increase job level by 1 [^50C3FF@blvl 1^000000]",
-                            event: UserEvent::SendMessage { text: "@jlvl 1".to_string() },
+                            event: InputEvent::SendMessage { text: "@jlvl 1".to_string() },
                         },
                         button! {
                             text: "+5",
                             tooltip: "Increase job level by 5 [^50C3FF@blvl 5^000000]",
-                            event: UserEvent::SendMessage { text: "@jlvl 5".to_string() },
+                            event: InputEvent::SendMessage { text: "@jlvl 5".to_string() },
                         },
                         button! {
                             text: "+10",
                             tooltip: "Increase job level by 10 [^50C3FF@blvl 10^000000]",
-                            event: UserEvent::SendMessage { text: "@jlvl 10".to_string() },
+                            event: InputEvent::SendMessage { text: "@jlvl 10".to_string() },
                         },
                         button! {
                             text: "MAX",
                             tooltip: "Set base job to the maximum [^50C3FF@blvl 9999^000000]",
-                            event: UserEvent::SendMessage { text: "@jlvl 9999".to_string() },
+                            event: InputEvent::SendMessage { text: "@jlvl 9999".to_string() },
                         },
                     ),
                 },
@@ -83,7 +83,7 @@ impl CustomWindow<ClientState> for CommandsWindow {
                 button! {
                     text: "Set all to max",
                     tooltip: "Set all stats to the maximum [^50C3FF@allstats^000000]",
-                    event: UserEvent::SendMessage { text: "@allstats".to_string() },
+                    event: InputEvent::SendMessage { text: "@allstats".to_string() },
                 },
                 text! {
                     text: "Skills",
@@ -91,7 +91,7 @@ impl CustomWindow<ClientState> for CommandsWindow {
                 button! {
                     text: "Unlock all",
                     tooltip: "Unlock all learnable skills [^50C3FF@allskill^000000]",
-                    event: UserEvent::SendMessage { text: "@allskill".to_string() },
+                    event: InputEvent::SendMessage { text: "@allskill".to_string() },
                 },
                 text! {
                     text: "Resources",
@@ -99,7 +99,7 @@ impl CustomWindow<ClientState> for CommandsWindow {
                 button! {
                     text: "Give 10,000 Zeny",
                     tooltip: "Give the player 10,000 Zeny [^50C3FF@zeny 10000^000000]",
-                    event: UserEvent::SendMessage { text: "@zeny 10000".to_string() },
+                    event: InputEvent::SendMessage { text: "@zeny 10000".to_string() },
                 },
                 text! {
                     text: "Player state",
@@ -107,22 +107,22 @@ impl CustomWindow<ClientState> for CommandsWindow {
                 button! {
                     text: "Mount",
                     tooltip: "Mount if possible [^50C3FF@mount^000000]",
-                    event: UserEvent::SendMessage { text: "@mount".to_string() },
+                    event: InputEvent::SendMessage { text: "@mount".to_string() },
                 },
                 button! {
                     text: "Heal",
                     tooltip: "Heal the player [^50C3FF@heal^000000]",
-                    event: UserEvent::SendMessage { text: "@heal".to_string() },
+                    event: InputEvent::SendMessage { text: "@heal".to_string() },
                 },
                 button! {
                     text: "Fill AP",
                     tooltip: "Fill the player AP [^50C3FF@healap^000000]",
-                    event: UserEvent::SendMessage { text: "@healap".to_string() },
+                    event: InputEvent::SendMessage { text: "@healap".to_string() },
                 },
                 button! {
                     text: "Resurrect",
                     tooltip: "Resurrect the player [^50C3FF@alive^000000]",
-                    event: UserEvent::SendMessage { text: "@alive".to_string() },
+                    event: InputEvent::SendMessage { text: "@alive".to_string() },
                 },
             ),
         }

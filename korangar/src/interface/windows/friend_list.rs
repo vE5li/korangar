@@ -5,7 +5,7 @@ use korangar_interface::window::{CustomWindow, WindowTrait};
 use ragnarok_packets::Friend;
 use rust_state::{Context, Path, RustState};
 
-use crate::input::UserEvent;
+use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
@@ -55,7 +55,7 @@ where
             // TODO: Give some sort of error if the name is too short.
             if character_name.len() >= MINIMUM_NAME_LENGTH {
                 state.update_value_with(self.window_state_path.currently_adding(), |input| input.clear());
-                queue.queue(UserEvent::AddFriend { character_name });
+                queue.queue(InputEvent::AddFriend { character_name });
                 queue.queue(Event::Unfocus);
             }
         };

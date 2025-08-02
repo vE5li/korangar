@@ -1,6 +1,6 @@
 use korangar_interface::window::{CustomWindow, WindowTrait};
 
-use crate::input::UserEvent;
+use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
@@ -23,11 +23,11 @@ impl CustomWindow<ClientState> for RespawnWindow {
             elements: (
                 button! {
                     text: "Respawn",
-                    event: UserEvent::Respawn,
+                    event: InputEvent::Respawn,
                 },
                 button! {
                     text: "Disconnect",
-                    event: UserEvent::LogOut,
+                    event: InputEvent::LogOut,
                 },
             ),
         }

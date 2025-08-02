@@ -2,7 +2,7 @@ use korangar_interface::window::{CustomWindow, WindowTrait};
 use rust_state::Path;
 
 use crate::graphics::Color;
-use crate::input::UserEvent;
+use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
@@ -80,23 +80,23 @@ where
             },
             button! {
                 text: "Inventory",
-                event: UserEvent::OpenInventoryWindow,
+                event: InputEvent::OpenInventoryWindow,
             },
             button! {
                 text: "Equipment",
-                event: UserEvent::OpenEquipmentWindow,
+                event: InputEvent::OpenEquipmentWindow,
             },
             button! {
                 text: "Skill tree",
-                event: UserEvent::OpenSkillTreeWindow,
+                event: InputEvent::OpenSkillTreeWindow,
             },
             button! {
                 text: "Friend list",
-                event: UserEvent::OpenFriendListWindow,
+                event: InputEvent::OpenFriendListWindow,
             },
             button! {
                 text: "Menu",
-                event: UserEvent::OpenMenuWindow,
+                event: InputEvent::OpenMenuWindow,
             },
         );
 

@@ -96,10 +96,10 @@ use winit::keyboard::PhysicalKey;
 use winit::window::{Icon, Window, WindowId};
 
 use crate::graphics::*;
-use crate::input::{InputSystem, UserEvent};
+use crate::input::{InputEvent, InputSystem};
 use crate::interface::cursor::{MouseCursor, MouseCursorState};
 use crate::interface::layout::{ScreenPosition, ScreenSize};
-use crate::interface::resource::{ItemSource, Move, SkillSource};
+use crate::interface::resource::{ItemSource, SkillSource};
 use crate::interface::windows::*;
 use crate::loaders::*;
 #[cfg(feature = "debug")]
@@ -360,7 +360,7 @@ struct Client {
     directional_shadow_camera: DirectionalShadowCamera,
     point_shadow_camera: PointShadowCamera,
 
-    user_event_buffer: Vec<UserEvent>,
+    input_event_buffer: Vec<InputEvent>,
     network_event_buffer: NetworkEventBuffer,
     // TODO: Move or remove this.
     saved_login_data: Option<LoginServerLoginData>,
@@ -646,7 +646,7 @@ impl Client {
         });
 
         time_phase!("create resources", {
-            let user_event_buffer = Vec::new();
+            let input_event_buffer = Vec::new();
 
             let particle_holder = ParticleHolder::default();
             let point_light_manager = PointLightManager::new();
@@ -760,7 +760,7 @@ impl Client {
             player_camera,
             directional_shadow_camera,
             point_shadow_camera,
-            user_event_buffer,
+            input_event_buffer,
             network_event_buffer,
             saved_login_data,
             saved_character_server,
@@ -1612,20 +1612,20 @@ impl Client {
         network_event_measurement.stop();
 
         #[cfg(feature = "debug")]
-        let user_event_measurement = Profiler::start_measurement("process user events");
+        let input_event_measurement = Profiler::start_measurement("process user events");
 
-        self.interface.process_events(&mut self.user_event_buffer);
+        self.interface.process_events(&mut self.input_event_buffer);
         let interface_has_focus = self.interface.has_focus();
 
         if self.interface.get_mouse_mode().is_rotating_camera() {
-            // TODO: Does this really need to be a UserEvent?
+            // TODO: Does this really need to be a InputEvent?
             let rotation = input_report.mouse_delta.width;
-            self.user_event_buffer.push(UserEvent::RotateCamera { rotation });
+            self.input_event_buffer.push(InputEvent::RotateCamera { rotation });
         }
 
         if !interface_has_focus {
             self.input_system.handle_keyboard_input(
-                &mut self.user_event_buffer,
+                &mut self.input_event_buffer,
                 #[cfg(feature = "debug")]
                 self.interface.get_mouse_mode().is_default(),
                 #[cfg(feature = "debug")]
@@ -1633,9 +1633,9 @@ impl Client {
             );
         }
 
-        for event in self.user_event_buffer.drain(..) {
+        for event in self.input_event_buffer.drain(..) {
             match event {
-                UserEvent::LogIn {
+                InputEvent::LogIn {
                     service_id,
                     username,
                     password,
@@ -1659,7 +1659,7 @@ impl Client {
 
                     self.networking_system.connect_to_login_server(socket_address, username, password);
                 }
-                UserEvent::SelectServer {
+                InputEvent::SelectServer {
                     character_server_information,
                 } => {
                     self.saved_character_server = Some(character_server_information.clone());
@@ -1673,80 +1673,82 @@ impl Client {
                     self.networking_system
                         .connect_to_character_server(login_data, character_server_information);
                 }
-                UserEvent::Respawn => {
+                InputEvent::Respawn => {
                     let _ = self.networking_system.respawn();
                     self.interface.close_window_with_class(WindowClass::Respawn);
                 }
-                UserEvent::LogOut => {
+                InputEvent::LogOut => {
                     let _ = self.networking_system.log_out();
                 }
-                UserEvent::Exit => event_loop.exit(),
-                UserEvent::ZoomCamera { zoom_factor } => self.player_camera.soft_zoom(zoom_factor),
-                UserEvent::RotateCamera { rotation } => self.player_camera.soft_rotate(rotation),
-                UserEvent::ResetCameraRotation => self.player_camera.reset_rotation(),
-                UserEvent::OpenMenuWindow => {
+                InputEvent::Exit => event_loop.exit(),
+                InputEvent::ZoomCamera { zoom_factor } => self.player_camera.soft_zoom(zoom_factor),
+                InputEvent::RotateCamera { rotation } => self.player_camera.soft_rotate(rotation),
+                InputEvent::ResetCameraRotation => self.player_camera.reset_rotation(),
+                InputEvent::OpenMenuWindow => {
                     if self.client_state.try_follow(this_entity()).is_some() {
                         self.interface.open_window(MenuWindow)
                     }
                 }
-                UserEvent::OpenInventoryWindow => {
+                InputEvent::OpenInventoryWindow => {
                     if self.client_state.try_follow(this_entity()).is_some() {
                         self.interface.open_window(InventoryWindow::new(client_state().inventory().items()));
                     }
                 }
-                UserEvent::OpenEquipmentWindow => {
+                InputEvent::OpenEquipmentWindow => {
                     if self.client_state.try_follow(this_entity()).is_some() {
                         self.interface.open_window(EquipmentWindow::new(client_state().inventory().items()));
                     }
                 }
-                UserEvent::OpenSkillTreeWindow => {
+                InputEvent::OpenSkillTreeWindow => {
                     if self.client_state.try_follow(this_entity()).is_some() {
                         self.interface
                             .open_window(SkillTreeWindow::new(client_state().skill_tree().skills()))
                     }
                 }
-                UserEvent::OpenGraphicsSettingsWindow => self.interface.open_window(GraphicsSettingsWindow::new(
+                InputEvent::OpenGraphicsSettingsWindow => self.interface.open_window(GraphicsSettingsWindow::new(
                     client_state().graphics_settings(),
                     client_state().graphics_settings_capabilities(),
                 )),
-                UserEvent::OpenAudioSettingsWindow => self
+                InputEvent::OpenAudioSettingsWindow => self
                     .interface
                     .open_window(AudioSettingsWindow::new(client_state().audio_settings())),
-                UserEvent::OpenFriendListWindow => {
-                    self.interface.open_window(FriendListWindow::new(
-                        client_state().friend_list_window(),
-                        client_state().friend_list(),
-                    ));
+                InputEvent::OpenFriendListWindow => {
+                    if self.client_state.try_follow(this_entity()).is_some() {
+                        self.interface.open_window(FriendListWindow::new(
+                            client_state().friend_list_window(),
+                            client_state().friend_list(),
+                        ));
+                    }
                 }
-                UserEvent::ToggleShowInterface => self.show_interface = !self.show_interface,
-                // UserEvent::SaveTheme { theme_kind } => {}                //self.client_state.save_theme(theme_kind),
-                // UserEvent::ReloadTheme { theme_kind } => {}              //self.client_state.reload_theme(theme_kind),
-                UserEvent::SelectCharacter { slot } => {
+                InputEvent::ToggleShowInterface => self.show_interface = !self.show_interface,
+                // InputEvent::SaveTheme { theme_kind } => {}                //self.client_state.save_theme(theme_kind),
+                // InputEvent::ReloadTheme { theme_kind } => {}              //self.client_state.reload_theme(theme_kind),
+                InputEvent::SelectCharacter { slot } => {
                     let _ = self.networking_system.select_character(slot);
                 }
-                UserEvent::OpenCharacterCreationWindow { slot } => {
+                InputEvent::OpenCharacterCreationWindow { slot } => {
                     // Clear the name before opening the window.
                     self.client_state.follow_mut(client_state().create_character_name()).clear();
 
                     self.interface
                         .open_window(CharacterCreationWindow::new(client_state().create_character_name(), slot))
                 }
-                UserEvent::CreateCharacter { slot, name } => {
+                InputEvent::CreateCharacter { slot, name } => {
                     let _ = self.networking_system.create_character(slot, name);
                 }
-                UserEvent::DeleteCharacter { character_id } => {
+                InputEvent::DeleteCharacter { character_id } => {
                     if self.client_state.follow(client_state().currently_deleting()).is_none() {
                         let _ = self.networking_system.delete_character(character_id);
                         *self.client_state.follow_mut(client_state().currently_deleting()) = Some(character_id);
                     }
                 }
-                UserEvent::SwitchCharacterSlot {
+                InputEvent::SwitchCharacterSlot {
                     origin_slot,
                     destination_slot,
                 } => {
                     let _ = self.networking_system.switch_character_slot(origin_slot, destination_slot);
                 }
-                UserEvent::RequestPlayerMove { destination } => {
+                InputEvent::PlayerMove { destination } => {
                     if self.client_state.try_follow(this_entity()).is_some() {
                         let _ = self.networking_system.player_move(WorldPosition {
                             x: destination.x,
@@ -1755,7 +1757,7 @@ impl Client {
                         });
                     }
                 }
-                UserEvent::RequestPlayerInteract { entity_id } => {
+                InputEvent::PlayerInteract { entity_id } => {
                     let entity = self
                         .client_state
                         .follow_mut(client_state().entities())
@@ -1779,60 +1781,58 @@ impl Client {
                     }
                 }
                 #[cfg(feature = "debug")]
-                UserEvent::RequestWarpToMap { map_name, position } => {
+                InputEvent::WarpToMap { map_name, position } => {
                     let _ = self.networking_system.warp_to_map(map_name, position);
                 }
-                UserEvent::SendMessage { text } => {
+                InputEvent::SendMessage { text } => {
                     let _ = self
                         .networking_system
                         .send_chat_message(&self.client_state.follow(client_state().player_name()), &text);
                 }
-                UserEvent::NextDialog { npc_id } => {
+                InputEvent::NextDialog { npc_id } => {
                     let _ = self.networking_system.next_dialog(npc_id);
                 }
-                UserEvent::CloseDialog { npc_id } => {
+                InputEvent::CloseDialog { npc_id } => {
                     let _ = self.networking_system.close_dialog(npc_id);
                     self.client_state.follow_mut(client_state().dialog_window()).end();
                     self.interface.close_window_with_class(WindowClass::Dialog);
                 }
-                UserEvent::ChooseDialogOption { npc_id, option } => {
+                InputEvent::ChooseDialogOption { npc_id, option } => {
                     let _ = self.networking_system.choose_dialog_option(npc_id, option);
 
                     if option == -1 {
                         self.interface.close_window_with_class(WindowClass::Dialog);
                     }
                 }
-                UserEvent::MoveResource { resource } => match resource {
-                    Move::Item { source, destination, item } => match (source, destination) {
-                        (ItemSource::Inventory, ItemSource::Equipment { position }) => {
-                            let _ = self.networking_system.request_item_equip(item.index, position);
-                        }
-                        (ItemSource::Equipment { .. }, ItemSource::Inventory) => {
-                            let _ = self.networking_system.request_item_unequip(item.index);
-                        }
-                        _ => {}
-                    },
-                    Move::Skill {
-                        source,
-                        destination,
-                        skill,
-                    } => match (source, destination) {
-                        (SkillSource::SkillTree, SkillSource::Hotbar { slot }) => {
-                            self.client_state
-                                .follow_mut(client_state().hotbar())
-                                .update_slot(&mut self.networking_system, slot, skill);
-                        }
-                        (SkillSource::Hotbar { slot: source_slot }, SkillSource::Hotbar { slot: destination_slot }) => {
-                            self.client_state.follow_mut(client_state().hotbar()).swap_slot(
-                                &mut self.networking_system,
-                                source_slot,
-                                destination_slot,
-                            );
-                        }
-                        _ => {}
-                    },
+                InputEvent::MoveItem { source, destination, item } => match (source, destination) {
+                    (ItemSource::Inventory, ItemSource::Equipment { position }) => {
+                        let _ = self.networking_system.request_item_equip(item.index, position);
+                    }
+                    (ItemSource::Equipment { .. }, ItemSource::Inventory) => {
+                        let _ = self.networking_system.request_item_unequip(item.index);
+                    }
+                    _ => {}
                 },
-                UserEvent::CastSkill { slot } => {
+                InputEvent::MoveSkill {
+                    source,
+                    destination,
+                    skill,
+                } => match (source, destination) {
+                    (SkillSource::SkillTree, SkillSource::Hotbar { slot }) => {
+                        self.client_state
+                            .follow_mut(client_state().hotbar())
+                            .update_slot(&mut self.networking_system, slot, skill);
+                    }
+                    (SkillSource::Hotbar { slot: source_slot }, SkillSource::Hotbar { slot: destination_slot }) => {
+                        self.client_state.follow_mut(client_state().hotbar()).swap_slot(
+                            &mut self.networking_system,
+                            source_slot,
+                            destination_slot,
+                        );
+                    }
+                    _ => {}
+                },
+                InputEvent::CastSkill { slot } => {
                     if let Some(skill) = self.client_state.follow(client_state().hotbar()).get_skill_in_slot(slot).as_ref() {
                         match skill.skill_type {
                             SkillType::Passive => {}
@@ -1878,14 +1878,14 @@ impl Client {
                         }
                     }
                 }
-                UserEvent::StopSkill { slot } => {
+                InputEvent::StopSkill { slot } => {
                     if let Some(skill) = self.client_state.follow(client_state().hotbar()).get_skill_in_slot(slot).as_ref() {
                         if skill.skill_id == ROLLING_CUTTER_ID {
                             let _ = self.networking_system.stop_channeling_skill(skill.skill_id);
                         }
                     }
                 }
-                UserEvent::AddFriend { character_name } => {
+                InputEvent::AddFriend { character_name } => {
                     if character_name.len() > 24 {
                         #[cfg(feature = "debug")]
                         print_debug!("[{}] friend name {} is too long", "error".red(), character_name.magenta());
@@ -1893,21 +1893,21 @@ impl Client {
                         let _ = self.networking_system.add_friend(character_name);
                     }
                 }
-                UserEvent::RemoveFriend { account_id, character_id } => {
+                InputEvent::RemoveFriend { account_id, character_id } => {
                     let _ = self.networking_system.remove_friend(account_id, character_id);
                 }
-                UserEvent::RejectFriendRequest { account_id, character_id } => {
+                InputEvent::RejectFriendRequest { account_id, character_id } => {
                     let _ = self.networking_system.reject_friend_request(account_id, character_id);
                     self.interface.close_window_with_class(WindowClass::FriendRequest);
                 }
-                UserEvent::AcceptFriendRequest { account_id, character_id } => {
+                InputEvent::AcceptFriendRequest { account_id, character_id } => {
                     let _ = self.networking_system.accept_friend_request(account_id, character_id);
                     self.interface.close_window_with_class(WindowClass::FriendRequest);
                 }
-                UserEvent::BuyItems { items } => {
+                InputEvent::BuyItems { items } => {
                     let _ = self.networking_system.purchase_items(items);
                 }
-                UserEvent::CloseShop => {
+                InputEvent::CloseShop => {
                     let _ = self.networking_system.close_shop();
 
                     // self.interface
@@ -1922,17 +1922,17 @@ impl Client {
                     // self.interface.close_window_with_class(&mut
                     // self.focus_state, "sell_cart");
                 }
-                UserEvent::BuyOrSell { shop_id, buy_or_sell } => {
+                InputEvent::BuyOrSell { shop_id, buy_or_sell } => {
                     let _ = self.networking_system.select_buy_or_sell(shop_id, buy_or_sell);
                     // self.interface
                     //     .close_window_with_class(&mut self.focus_state,
                     // BuyOrSellWindow::WINDOW_CLASS);
                 }
-                UserEvent::SellItems { items } => {
+                InputEvent::SellItems { items } => {
                     let _ = self.networking_system.sell_items(items);
                 }
                 #[cfg(feature = "debug")]
-                UserEvent::OpenMarkerDetails { marker_identifier } => {
+                InputEvent::OpenMarkerDetails { marker_identifier } => {
                     if let Some(map) = self.client_state.follow(client_state().map()) {
                         // self.interface.open_window(
                         //     &self.client_state,
@@ -1942,62 +1942,56 @@ impl Client {
                     }
                 }
                 #[cfg(feature = "debug")]
-                UserEvent::OpenRenderOptionsWindow => self
+                InputEvent::OpenRenderOptionsWindow => self
                     .interface
                     .open_window(RenderOptionsWindow::new(client_state().render_options())),
                 #[cfg(feature = "debug")]
-                UserEvent::OpenMapDataWindow => {
+                InputEvent::OpenMapDataWindow => {
                     if self.client_state.follow(client_state().map()).is_some() {
                         self.interface
                             .open_state_window(client_state().map().unwrapped().manually_asserted().path_as_ref().map_data());
                     }
                 }
                 #[cfg(feature = "debug")]
-                UserEvent::OpenClientStateInspectorWindow => self.interface.open_state_window_mut(client_state()),
+                InputEvent::OpenClientStateInspectorWindow => self.interface.open_state_window_mut(client_state()),
                 #[cfg(feature = "debug")]
-                UserEvent::OpenMapsWindow => self.interface.open_window(MapsWindow),
+                InputEvent::OpenMapsWindow => self.interface.open_window(MapsWindow),
                 #[cfg(feature = "debug")]
-                UserEvent::OpenCommandsWindow => self.interface.open_window(CommandsWindow),
+                InputEvent::OpenCommandsWindow => self.interface.open_window(CommandsWindow),
                 #[cfg(feature = "debug")]
-                UserEvent::OpenTimeWindow => self.interface.open_window(TimeWindow),
+                InputEvent::OpenTimeWindow => self.interface.open_window(TimeWindow),
                 #[cfg(feature = "debug")]
-                UserEvent::SetDawn => self.game_timer.set_day_timer(5.0 * 3600.0),
+                InputEvent::SetTime { day_seconds } => self.game_timer.set_day_timer(day_seconds),
                 #[cfg(feature = "debug")]
-                UserEvent::SetNoon => self.game_timer.set_day_timer(12.0 * 3600.0),
-                #[cfg(feature = "debug")]
-                UserEvent::SetDusk => self.game_timer.set_day_timer(17.0 * 3600.0),
-                #[cfg(feature = "debug")]
-                UserEvent::SetMidnight => self.game_timer.set_day_timer(24.0 * 3600.0),
-                #[cfg(feature = "debug")]
-                UserEvent::OpenThemeInspectorWindow => {
+                InputEvent::OpenThemeInspectorWindow => {
                     // TODO: Themporary value
                     self.interface.open_state_window(client_state().menu_theme())
                 }
                 #[cfg(feature = "debug")]
-                UserEvent::OpenProfilerWindow => self.interface.open_window(ProfilerWindow::new(client_state().profiler_window())),
+                InputEvent::OpenProfilerWindow => self.interface.open_window(ProfilerWindow::new(client_state().profiler_window())),
                 #[cfg(feature = "debug")]
-                UserEvent::OpenPacketInspectorWindow => self.interface.open_window(PacketInspector::new(client_state().packet_history())),
+                InputEvent::OpenPacketInspectorWindow => self.interface.open_window(PacketInspector::new(client_state().packet_history())),
                 #[cfg(feature = "debug")]
-                UserEvent::CameraLookAround { offset } => self.debug_camera.look_around(offset),
+                InputEvent::CameraLookAround { offset } => self.debug_camera.look_around(offset),
                 #[cfg(feature = "debug")]
-                UserEvent::CameraMoveForward => self.debug_camera.move_forward(delta_time as f32),
+                InputEvent::CameraMoveForward => self.debug_camera.move_forward(delta_time as f32),
                 #[cfg(feature = "debug")]
-                UserEvent::CameraMoveBackward => self.debug_camera.move_backward(delta_time as f32),
+                InputEvent::CameraMoveBackward => self.debug_camera.move_backward(delta_time as f32),
                 #[cfg(feature = "debug")]
-                UserEvent::CameraMoveLeft => self.debug_camera.move_left(delta_time as f32),
+                InputEvent::CameraMoveLeft => self.debug_camera.move_left(delta_time as f32),
                 #[cfg(feature = "debug")]
-                UserEvent::CameraMoveRight => self.debug_camera.move_right(delta_time as f32),
+                InputEvent::CameraMoveRight => self.debug_camera.move_right(delta_time as f32),
                 #[cfg(feature = "debug")]
-                UserEvent::CameraMoveUp => self.debug_camera.move_up(delta_time as f32),
+                InputEvent::CameraMoveUp => self.debug_camera.move_up(delta_time as f32),
                 #[cfg(feature = "debug")]
-                UserEvent::CameraAccelerate => self.debug_camera.accelerate(),
+                InputEvent::CameraAccelerate => self.debug_camera.accelerate(),
                 #[cfg(feature = "debug")]
-                UserEvent::CameraDecelerate => self.debug_camera.decelerate(),
+                InputEvent::CameraDecelerate => self.debug_camera.decelerate(),
             }
         }
 
         #[cfg(feature = "debug")]
-        user_event_measurement.stop();
+        input_event_measurement.stop();
 
         #[cfg(feature = "debug")]
         let loads_measurement = Profiler::start_measurement("complete async loads");
@@ -2526,25 +2520,26 @@ impl Client {
                                 match input_report.mouse_target {
                                     PickerTarget::Nothing => {}
                                     PickerTarget::Entity(entity_id) => {
-                                        self.user_event_buffer.push(UserEvent::RequestPlayerInteract { entity_id })
+                                        self.input_event_buffer.push(InputEvent::PlayerInteract { entity_id })
                                     }
                                     PickerTarget::Tile { x, y } => {
                                         let destination = Vector2::new(x as usize, y as usize);
 
                                         built_ui.set_mouse_mode(MouseInputMode::Walk { destination });
 
-                                        self.user_event_buffer.push(UserEvent::RequestPlayerMove { destination });
+                                        self.input_event_buffer.push(InputEvent::PlayerMove { destination });
                                     }
                                     #[cfg(feature = "debug")]
                                     PickerTarget::Marker(marker_identifier) => {
-                                        self.user_event_buffer.push(UserEvent::OpenMarkerDetails { marker_identifier })
+                                        self.input_event_buffer.push(InputEvent::OpenMarkerDetails { marker_identifier })
                                     }
                                 }
                             } else if mouse_button == MouseButton::Right && currently_playing {
                                 #[cfg_attr(feature = "debug", korangar_debug::debug_condition(!render_options.use_debug_camera))]
                                 built_ui.set_mouse_mode(MouseInputMode::RotateCamera);
-                            } else if mouse_button == MouseButton::DoubleRight {
-                                self.user_event_buffer.push(UserEvent::ResetCameraRotation);
+                            } else if mouse_button == MouseButton::DoubleRight && currently_playing {
+                                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(!render_options.use_debug_camera))]
+                                self.input_event_buffer.push(InputEvent::ResetCameraRotation);
                             }
                         }
                     } else if let Some(last_destination) = last_walking_destination
@@ -2555,7 +2550,7 @@ impl Client {
 
                         if last_destination != destination {
                             built_ui.set_mouse_mode(MouseInputMode::Walk { destination });
-                            self.user_event_buffer.push(UserEvent::RequestPlayerMove { destination });
+                            self.input_event_buffer.push(InputEvent::PlayerMove { destination });
                         }
                     }
 
@@ -2568,7 +2563,7 @@ impl Client {
                             built_ui.scroll(input_report.mouse_position, delta);
                         } else {
                             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(!render_options.use_debug_camera))]
-                            self.user_event_buffer.push(UserEvent::ZoomCamera { zoom_factor: delta });
+                            self.input_event_buffer.push(InputEvent::ZoomCamera { zoom_factor: delta });
                         }
                     }
 

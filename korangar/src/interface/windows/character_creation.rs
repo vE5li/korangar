@@ -3,7 +3,7 @@ use korangar_interface::event::EventQueue;
 use korangar_interface::window::{CustomWindow, WindowTrait};
 use rust_state::{Context, Path};
 
-use crate::input::UserEvent;
+use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
@@ -40,7 +40,7 @@ where
 
             // TODO: Give some sort of error if the name is too short.
             if name.len() >= MINIMUM_NAME_LENGTH {
-                queue.queue(UserEvent::CreateCharacter { slot: self.slot, name });
+                queue.queue(InputEvent::CreateCharacter { slot: self.slot, name });
             }
         };
 

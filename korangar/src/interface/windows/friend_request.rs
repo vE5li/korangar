@@ -1,7 +1,7 @@
 use korangar_interface::window::{CustomWindow, WindowTrait};
 use ragnarok_packets::Friend;
 
-use crate::input::UserEvent;
+use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
@@ -33,14 +33,14 @@ impl CustomWindow<ClientState> for FriendRequestWindow {
                     children: (
                         button! {
                             text: "Reject",
-                            event: UserEvent::RejectFriendRequest {
+                            event: InputEvent::RejectFriendRequest {
                                 account_id: self.friend.account_id,
                                 character_id: self.friend.character_id,
                             },
                         },
                         button! {
                             text: "Accept",
-                            event: UserEvent::AcceptFriendRequest {
+                            event: InputEvent::AcceptFriendRequest {
                                 account_id: self.friend.account_id,
                                 character_id: self.friend.character_id,
                             },

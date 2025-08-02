@@ -1,6 +1,6 @@
 use korangar_interface::window::{CustomWindow, WindowTrait};
 
-use crate::input::UserEvent;
+use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
 use crate::state::theme::{DebugButtonThemePathExt, InterfaceThemePathExt, InterfaceThemeType};
 use crate::state::{ClientState, client_theme};
@@ -24,17 +24,17 @@ impl CustomWindow<ClientState> for MenuWindow {
             elements: (
                 button! {
                     text: "Graphics settings",
-                    event: UserEvent::OpenGraphicsSettingsWindow,
+                    event: InputEvent::OpenGraphicsSettingsWindow,
                 },
                 button! {
                     text: "Audio settings",
-                    event: UserEvent::OpenAudioSettingsWindow,
+                    event: InputEvent::OpenAudioSettingsWindow,
                 },
                 #[cfg(feature = "debug")]
                 button! {
                     text: "Render options",
                     tooltip: "Special render options (only available in debug mode)",
-                    event: UserEvent::OpenRenderOptionsWindow,
+                    event: InputEvent::OpenRenderOptionsWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
                     hovered_background_color: client_theme().debug_button().hovered_background_color(),
                 },
@@ -42,7 +42,7 @@ impl CustomWindow<ClientState> for MenuWindow {
                 button! {
                     text: "Map inspector",
                     tooltip: "Inspect the raw map data (only available in debug mode)",
-                    event: UserEvent::OpenMapDataWindow,
+                    event: InputEvent::OpenMapDataWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
                     hovered_background_color: client_theme().debug_button().hovered_background_color(),
                 },
@@ -50,7 +50,7 @@ impl CustomWindow<ClientState> for MenuWindow {
                 button! {
                     text: "Client state inspector",
                     tooltip: "Inspect and modify the internal client state (only available in debug mode)",
-                    event: UserEvent::OpenClientStateInspectorWindow,
+                    event: InputEvent::OpenClientStateInspectorWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
                     hovered_background_color: client_theme().debug_button().hovered_background_color(),
                 },
@@ -58,7 +58,7 @@ impl CustomWindow<ClientState> for MenuWindow {
                 button! {
                     text: "Maps",
                     tooltip: "List of maps used for testing (only available in debug mode)",
-                    event: UserEvent::OpenMapsWindow,
+                    event: InputEvent::OpenMapsWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
                     hovered_background_color: client_theme().debug_button().hovered_background_color(),
                 },
@@ -66,7 +66,7 @@ impl CustomWindow<ClientState> for MenuWindow {
                 button! {
                     text: "Commands",
                     tooltip: "List of commands used for testing (only available in debug mode)",
-                    event: UserEvent::OpenCommandsWindow,
+                    event: InputEvent::OpenCommandsWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
                     hovered_background_color: client_theme().debug_button().hovered_background_color(),
                 },
@@ -74,7 +74,7 @@ impl CustomWindow<ClientState> for MenuWindow {
                 button! {
                     text: "Time",
                     tooltip: "Time control (only available in debug mode)",
-                    event: UserEvent::OpenTimeWindow,
+                    event: InputEvent::OpenTimeWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
                     hovered_background_color: client_theme().debug_button().hovered_background_color(),
                 },
@@ -82,7 +82,7 @@ impl CustomWindow<ClientState> for MenuWindow {
                 button! {
                     text: "Theme inspector",
                     tooltip: "Inspect and edit the theme (only available in debug mode)",
-                    event: UserEvent::OpenThemeInspectorWindow,
+                    event: InputEvent::OpenThemeInspectorWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
                     hovered_background_color: client_theme().debug_button().hovered_background_color(),
                 },
@@ -90,7 +90,7 @@ impl CustomWindow<ClientState> for MenuWindow {
                 button! {
                     text: "Profiler",
                     tooltip: "Profile the client (only available in debug mode)",
-                    event: UserEvent::OpenProfilerWindow,
+                    event: InputEvent::OpenProfilerWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
                     hovered_background_color: client_theme().debug_button().hovered_background_color(),
                 },
@@ -98,17 +98,17 @@ impl CustomWindow<ClientState> for MenuWindow {
                 button! {
                     text: "Packet inspector",
                     tooltip: "Inspect all incoming and outgoing packets (only available in debug mode)",
-                    event: UserEvent::OpenPacketInspectorWindow,
+                    event: InputEvent::OpenPacketInspectorWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
                     hovered_background_color: client_theme().debug_button().hovered_background_color(),
                 },
                 button! {
                     text: "Log out",
-                    event: UserEvent::LogOut,
+                    event: InputEvent::LogOut,
                 },
                 button! {
                     text: "Exit",
-                    event: UserEvent::Exit,
+                    event: InputEvent::Exit,
                 },
             ),
         }

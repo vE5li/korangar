@@ -7,7 +7,7 @@ use korangar_interface::window::{CustomWindow, WindowTrait};
 use rust_state::{Context, Path, RustState, Selector};
 
 use crate::graphics::Color;
-use crate::input::UserEvent;
+use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
 use crate::loaders::{ClientInfo, ClientInfoPathExt, ServiceId};
 use crate::settings::{LoginSettings, LoginSettingsPathExt, ServiceSettings, ServiceSettingsPathExt};
@@ -165,7 +165,7 @@ where
             // starts.
             state.update_value(self.service_settings_path.recent_service_id(), Some(*selected_service_id));
 
-            queue.queue(UserEvent::LogIn {
+            queue.queue(InputEvent::LogIn {
                 service_id: *selected_service_id,
                 username: username.clone(),
                 password: password.clone(),

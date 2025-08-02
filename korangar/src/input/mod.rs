@@ -14,7 +14,7 @@ use winit::dpi::PhysicalPosition;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta};
 use winit::keyboard::KeyCode;
 
-pub use self::event::UserEvent;
+pub use self::event::InputEvent;
 pub use self::key::Key;
 pub use self::mode::{Grabbed, MouseInputMode, MouseModeExt};
 use crate::graphics::PickerTarget;
@@ -206,7 +206,7 @@ impl InputSystem {
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn handle_keyboard_input(
         &mut self,
-        events: &mut Vec<UserEvent>,
+        events: &mut Vec<InputEvent>,
         #[cfg(feature = "debug")] process_mouse: bool,
         #[cfg(feature = "debug")] use_debug_camera: bool,
     ) {
@@ -214,106 +214,106 @@ impl InputSystem {
         let control_down = self.get_key(KeyCode::ControlLeft).down();
 
         if self.get_key(KeyCode::Escape).pressed() {
-            events.push(UserEvent::OpenMenuWindow);
+            events.push(InputEvent::OpenMenuWindow);
         }
 
         if alt_down && self.get_key(KeyCode::KeyE).pressed() {
-            events.push(UserEvent::OpenInventoryWindow);
+            events.push(InputEvent::OpenInventoryWindow);
         }
 
         if control_down && self.get_key(KeyCode::KeyH).pressed() {
-            events.push(UserEvent::ToggleShowInterface);
+            events.push(InputEvent::ToggleShowInterface);
         }
 
         if self.get_key(KeyCode::KeyJ).pressed() {
-            events.push(UserEvent::CastSkill { slot: HotbarSlot(0) });
+            events.push(InputEvent::CastSkill { slot: HotbarSlot(0) });
         }
 
         if self.get_key(KeyCode::KeyJ).released() {
-            events.push(UserEvent::StopSkill { slot: HotbarSlot(0) });
+            events.push(InputEvent::StopSkill { slot: HotbarSlot(0) });
         }
 
         if self.get_key(KeyCode::KeyL).pressed() {
-            events.push(UserEvent::CastSkill { slot: HotbarSlot(1) });
+            events.push(InputEvent::CastSkill { slot: HotbarSlot(1) });
         }
 
         if self.get_key(KeyCode::KeyL).released() {
-            events.push(UserEvent::StopSkill { slot: HotbarSlot(1) });
+            events.push(InputEvent::StopSkill { slot: HotbarSlot(1) });
         }
 
         if self.get_key(KeyCode::KeyU).pressed() {
-            events.push(UserEvent::CastSkill { slot: HotbarSlot(2) });
+            events.push(InputEvent::CastSkill { slot: HotbarSlot(2) });
         }
 
         if self.get_key(KeyCode::KeyU).released() {
-            events.push(UserEvent::StopSkill { slot: HotbarSlot(2) });
+            events.push(InputEvent::StopSkill { slot: HotbarSlot(2) });
         }
 
         #[cfg(feature = "debug")]
         if control_down && self.get_key(KeyCode::KeyM).pressed() {
-            events.push(UserEvent::OpenMapsWindow);
+            events.push(InputEvent::OpenMapsWindow);
         }
 
         #[cfg(feature = "debug")]
         if control_down && self.get_key(KeyCode::KeyC).pressed() {
-            events.push(UserEvent::OpenClientStateInspectorWindow);
+            events.push(InputEvent::OpenClientStateInspectorWindow);
         }
 
         #[cfg(feature = "debug")]
         if control_down && self.get_key(KeyCode::KeyR).pressed() {
-            events.push(UserEvent::OpenRenderOptionsWindow);
+            events.push(InputEvent::OpenRenderOptionsWindow);
         }
 
         #[cfg(feature = "debug")]
         if control_down && self.get_key(KeyCode::KeyT).pressed() {
-            events.push(UserEvent::OpenTimeWindow);
+            events.push(InputEvent::OpenTimeWindow);
         }
 
         #[cfg(feature = "debug")]
         if control_down && self.get_key(KeyCode::KeyP).pressed() {
-            events.push(UserEvent::OpenPacketInspectorWindow);
+            events.push(InputEvent::OpenPacketInspectorWindow);
         }
 
         #[cfg(feature = "debug")]
         if self.get_key(KeyCode::ShiftLeft).pressed() && use_debug_camera {
-            events.push(UserEvent::CameraAccelerate);
+            events.push(InputEvent::CameraAccelerate);
         }
 
         #[cfg(feature = "debug")]
         if self.get_key(KeyCode::ShiftLeft).released() && use_debug_camera {
-            events.push(UserEvent::CameraDecelerate);
+            events.push(InputEvent::CameraDecelerate);
         }
 
         // TODO: This should be moved.
         #[cfg(feature = "debug")]
         if self.right_mouse_button.down() && !self.right_mouse_button.pressed() && process_mouse && use_debug_camera {
             let offset = -Vector2::new(self.mouse_delta.width, self.mouse_delta.height);
-            events.push(UserEvent::CameraLookAround { offset });
+            events.push(InputEvent::CameraLookAround { offset });
         }
 
         #[cfg(feature = "debug")]
         if self.get_key(KeyCode::KeyW).down() && use_debug_camera {
-            events.push(UserEvent::CameraMoveForward);
+            events.push(InputEvent::CameraMoveForward);
         }
 
         #[cfg(feature = "debug")]
         if self.get_key(KeyCode::KeyS).down() && use_debug_camera {
-            events.push(UserEvent::CameraMoveBackward);
+            events.push(InputEvent::CameraMoveBackward);
         }
 
         #[cfg(feature = "debug")]
         if self.get_key(KeyCode::KeyA).down() && use_debug_camera {
-            events.push(UserEvent::CameraMoveLeft);
+            events.push(InputEvent::CameraMoveLeft);
         }
 
         #[cfg(feature = "debug")]
         if self.get_key(KeyCode::KeyD).down() && use_debug_camera {
-            events.push(UserEvent::CameraMoveRight);
+            events.push(InputEvent::CameraMoveRight);
         }
 
         #[cfg(feature = "debug")]
         if self.get_key(KeyCode::Space).down() && use_debug_camera {
-            events.push(UserEvent::CameraMoveUp);
+            events.push(InputEvent::CameraMoveUp);
         }
 
         self.input_buffer.clear();

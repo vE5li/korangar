@@ -1,9 +1,14 @@
 use korangar_interface::window::{CustomWindow, WindowTrait};
 
-use crate::input::UserEvent;
+use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
+
+const DAWN: f32 = 5.0 * 3600.0;
+const NOON: f32 = 12.0 * 3600.0;
+const DUSK: f32 = 17.0 * 3600.0;
+const MIDNIGHT: f32 = 24.0 * 3600.0;
 
 pub struct TimeWindow;
 
@@ -23,19 +28,19 @@ impl CustomWindow<ClientState> for TimeWindow {
             elements: (
                 button! {
                     text: "Set dawn",
-                    event: UserEvent::SetDawn,
+                    event: InputEvent::SetTime { day_seconds: DAWN },
                 },
                 button! {
                     text: "Set noon",
-                    event: UserEvent::SetNoon,
+                    event: InputEvent::SetTime { day_seconds: NOON },
                 },
                 button! {
                     text: "Set dusk",
-                    event: UserEvent::SetDusk,
+                    event: InputEvent::SetTime { day_seconds: DUSK },
                 },
                 button! {
                     text: "Set midnight",
-                    event: UserEvent::SetMidnight,
+                    event: InputEvent::SetTime { day_seconds: MIDNIGHT },
                 },
             ),
         }

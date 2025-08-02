@@ -1,48 +1,69 @@
 use cgmath::Vector2;
 use korangar_interface::event::{ClickAction, Event, EventQueue};
-use korangar_networking::ShopItem;
+use korangar_networking::{InventoryItem, ShopItem};
 use ragnarok_packets::{
     AccountId, BuyOrSellOption, CharacterId, CharacterServerInformation, EntityId, HotbarSlot, ShopId, SoldItemInformation, TilePosition,
 };
 use rust_state::Context;
 
-use crate::interface::resource::Move;
+use crate::interface::resource::{ItemSource, SkillSource};
+use crate::inventory::Skill;
 use crate::loaders::ServiceId;
 use crate::state::ClientState;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
+use crate::world::ResourceMetadata;
 
-// TODO: A lot of these are not user events, just a element events.
-//
-// TODO: Some of these don't need a special event anymore and can just modify
-// the state directly.
+/// An event triggered by the user through mouse or keyboard input.
 #[derive(Clone, Debug)]
-pub enum UserEvent {
+pub enum InputEvent {
+    /// Log in to the login server.
     LogIn {
+        /// Id of the selected service.
         service_id: ServiceId,
+        /// Account username.
         username: String,
+        /// Account password.
         password: String,
     },
+    /// Select a character server.
     SelectServer {
+        /// Selected character server.
         character_server_information: CharacterServerInformation,
     },
+    /// Respawn the player.
     Respawn,
+    /// Log out of the map server.
     LogOut,
+    /// Exit Korangar.
     Exit,
+    /// Zoom the player camera.
     ZoomCamera {
+        /// Amount to zoom.
         zoom_factor: f32,
     },
+    /// Rotate the player camera.
     RotateCamera {
+        /// Amount of rotation.
         rotation: f32,
     },
+    /// Reset the player camera rotation.
     ResetCameraRotation,
+    /// Open the menu window. Only works while playing.
     OpenMenuWindow,
+    /// Open the inventory window. Only works while playing.
     OpenInventoryWindow,
+    /// Open the equipment window. Only works while playing.
     OpenEquipmentWindow,
+    /// Open the skill tree window. Only works while playing.
     OpenSkillTreeWindow,
+    /// Open the graphics settings window.
     OpenGraphicsSettingsWindow,
+    /// Open the audio settings window.
     OpenAudioSettingsWindow,
+    /// Open the friend list window. Only works while playing.
     OpenFriendListWindow,
+    /// Toggle if the user interface should be rendered or not.
     ToggleShowInterface,
     // SaveTheme {
     //     theme_kind: InternalThemeKind,
@@ -50,140 +71,224 @@ pub enum UserEvent {
     // ReloadTheme {
     //     theme_kind: InternalThemeKind,
     // },
+    /// Select a character to start playing.
     SelectCharacter {
+        /// Slot that the selected character is in.
         slot: usize,
     },
+    /// Open a window to create a new character.
     OpenCharacterCreationWindow {
+        /// Slot in which to create the new character.
         slot: usize,
     },
+    /// Create a new character.
     CreateCharacter {
+        /// Slot in which to create the new character.
         slot: usize,
+        /// Name of the new character.
         name: String,
     },
+    /// Delete a character.
     DeleteCharacter {
+        /// Id of the character to be deleted.
         character_id: CharacterId,
     },
+    /// Switch the characters of two slots.
     SwitchCharacterSlot {
+        /// First slot.
         origin_slot: usize,
+        /// Second slot.
         destination_slot: usize,
     },
-    RequestPlayerMove {
+    /// Start moving the player.
+    PlayerMove {
+        /// Destination of the move.
         destination: Vector2<usize>,
     },
-    RequestPlayerInteract {
+    /// Interact with an entity. The type of interaction depends on the entity
+    /// type.
+    PlayerInteract {
+        /// Id of the entity to interact with.
         entity_id: EntityId,
     },
+    /// Send a chat message.
     SendMessage {
+        /// Text of the message.
         text: String,
     },
+    /// Action for the "Next"-button in a dialog.
     NextDialog {
+        /// Id of the NPC the player is in a dialog with.
         npc_id: EntityId,
     },
+    /// Action for the "Close"-button in a dialog.
     CloseDialog {
+        /// Id of the NPC the player is in a dialog with.
         npc_id: EntityId,
     },
+    /// Choose an option in a dialog.
     ChooseDialogOption {
+        /// Id of the NPC the player is in a dialog with.
         npc_id: EntityId,
+        /// Id of the option.
         option: i8,
     },
-    MoveResource {
-        resource: Move,
+    /// Move an item in the user interface.
+    MoveItem {
+        /// Source of the move.
+        source: ItemSource,
+        /// Destination of the move.
+        destination: ItemSource,
+        /// Item to move.
+        item: InventoryItem<ResourceMetadata>,
     },
+    /// Move a skill in the user interface.
+    MoveSkill {
+        /// Source of the move.
+        source: SkillSource,
+        /// Destination of the move.
+        destination: SkillSource,
+        /// Skill to move.
+        skill: Skill,
+    },
+    /// Cast a skill.
     CastSkill {
+        /// Slot of the hotbar that the skill is bound to.
         slot: HotbarSlot,
     },
+    /// Stop a skill.
     StopSkill {
+        /// Slot of the hotbar that the skill is bound to.
         slot: HotbarSlot,
     },
+    /// Add a new friend.
     AddFriend {
+        /// Name of the character to befriend.
         character_name: String,
     },
+    /// Remove a current friend.
     RemoveFriend {
+        /// Account id of the friend.
         account_id: AccountId,
+        /// Character id of the friend.
         character_id: CharacterId,
     },
+    /// Reject a pending friend request.
     RejectFriendRequest {
+        /// Account id of the requestor.
         account_id: AccountId,
+        /// Character id of the requestor.
         character_id: CharacterId,
     },
+    /// Accept a pending friend request.
     AcceptFriendRequest {
+        /// Account id of the requestor.
         account_id: AccountId,
+        /// Character id of the requestor.
         character_id: CharacterId,
     },
+    /// Buy items from a shop.
     BuyItems {
+        /// Items to buy.
         items: Vec<ShopItem<u32>>,
     },
+    /// Close the shop.
     CloseShop,
+    /// Choose whether to buy or sell items at a shop.
     BuyOrSell {
+        /// Id of the open shop.
         shop_id: ShopId,
+        /// Whether to sell or buy items.
         buy_or_sell: BuyOrSellOption,
     },
+    /// Sell items to a shop.
     SellItems {
+        /// Items to sell.
         items: Vec<SoldItemInformation>,
     },
+    /// Warp the player.
     #[cfg(feature = "debug")]
-    RequestWarpToMap {
+    WarpToMap {
+        /// Map name. Can be the same as the current map.
         map_name: String,
+        /// Position on the new map after the warp.
         position: TilePosition,
     },
+    /// Open a window with the details for a marker.
     #[cfg(feature = "debug")]
     OpenMarkerDetails {
+        /// Id of the marker to inspect.
         marker_identifier: MarkerIdentifier,
     },
+    /// Open the render options window.
     #[cfg(feature = "debug")]
     OpenRenderOptionsWindow,
+    /// Open the map data window.
     #[cfg(feature = "debug")]
     OpenMapDataWindow,
+    /// Open the client state inspector window.
     #[cfg(feature = "debug")]
     OpenClientStateInspectorWindow,
+    /// Open the maps window.
     #[cfg(feature = "debug")]
     OpenMapsWindow,
+    /// Open the commands window.
     #[cfg(feature = "debug")]
     OpenCommandsWindow,
+    /// Open the time window.
     #[cfg(feature = "debug")]
     OpenTimeWindow,
-    // TODO: Unify Set* events into one that takes a specific time
+    /// Set the current time.
     #[cfg(feature = "debug")]
-    SetDawn,
-    #[cfg(feature = "debug")]
-    SetNoon,
-    #[cfg(feature = "debug")]
-    SetDusk,
-    #[cfg(feature = "debug")]
-    SetMidnight,
+    SetTime {
+        /// New day timer in seconds.
+        day_seconds: f32,
+    },
+    /// Open the theme inspector window.
     #[cfg(feature = "debug")]
     OpenThemeInspectorWindow,
+    /// Open the profiler window.
     #[cfg(feature = "debug")]
     OpenProfilerWindow,
+    /// Open the packet inspector window.
     #[cfg(feature = "debug")]
     OpenPacketInspectorWindow,
+    /// Move the view direction of the debug camera.
     #[cfg(feature = "debug")]
     CameraLookAround {
+        /// Offset of the view direction.
         offset: Vector2<f32>,
     },
+    /// Move the debug camera forward.
     #[cfg(feature = "debug")]
     CameraMoveForward,
+    /// Move the debug camera backward.
     #[cfg(feature = "debug")]
     CameraMoveBackward,
+    /// Move the debug camera left.
     #[cfg(feature = "debug")]
     CameraMoveLeft,
+    /// Move the debug camera right.
     #[cfg(feature = "debug")]
     CameraMoveRight,
+    /// Move the debug camera up.
     #[cfg(feature = "debug")]
     CameraMoveUp,
+    /// Set the debug camera speed to its higher value.
     #[cfg(feature = "debug")]
     CameraAccelerate,
+    /// Set the debug camera speed to its lower value.
     #[cfg(feature = "debug")]
     CameraDecelerate,
 }
 
-impl From<UserEvent> for Event<ClientState> {
-    fn from(custom_event: UserEvent) -> Self {
+impl From<InputEvent> for Event<ClientState> {
+    fn from(custom_event: InputEvent) -> Self {
         Event::Application { custom_event }
     }
 }
 
-impl ClickAction<ClientState> for UserEvent {
+impl ClickAction<ClientState> for InputEvent {
     fn execute(&self, _: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
         queue.queue(self.clone());
     }

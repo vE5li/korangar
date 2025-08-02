@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use self::color_span_iterator::ColorSpanIterator;
 use super::{GameFileLoader, TextureLoader};
 use crate::graphics::{Color, MAX_TEXTURE_SIZE, Texture};
-use crate::interface::layout::{ArrayType, ScreenSize};
+use crate::interface::layout::ScreenSize;
 use crate::loaders::font::font_file::FontFile;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -32,20 +32,6 @@ pub struct FontSize(pub f32);
 impl FontSizeTrait for FontSize {
     fn scaled(&self, scaling: f32) -> Self {
         Self(self.0 * scaling)
-    }
-}
-
-impl ArrayType for FontSize {
-    type Element = f32;
-
-    const ELEMENT_COUNT: usize = 1;
-
-    fn get_array_fields(&'static self) -> [(String, &'static Self::Element); Self::ELEMENT_COUNT] {
-        [("size".to_owned(), &self.0)]
-    }
-
-    fn get_inner(&self) -> [Self::Element; Self::ELEMENT_COUNT] {
-        [self.0]
     }
 }
 
@@ -99,20 +85,6 @@ impl DropDownItem<Scaling> for Scaling {
 
     fn value(&self) -> Scaling {
         *self
-    }
-}
-
-impl ArrayType for Scaling {
-    type Element = f32;
-
-    const ELEMENT_COUNT: usize = 1;
-
-    fn get_array_fields(&'static self) -> [(String, &'static Self::Element); Self::ELEMENT_COUNT] {
-        [("scale".to_owned(), &self.0)]
-    }
-
-    fn get_inner(&self) -> [Self::Element; Self::ELEMENT_COUNT] {
-        [self.0]
     }
 }
 

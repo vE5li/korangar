@@ -6,7 +6,6 @@ pub fn character_slot_preview(token_stream: TokenStream) -> TokenStream {
     create_component_macro!(crate::interface::components::character_slot_preview::CharacterSlotPreview, {
         character_information: !,
         switch_request: !,
-        background_color: { crate::graphics::Color::monochrome_u8(80) },
         click_handler: !,
         overlay_handler: !,
         slot: !,

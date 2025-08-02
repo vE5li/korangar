@@ -1,3 +1,4 @@
+use korangar_interface::components::drop_down::{DefaultClickHandler, DropDownItem};
 use korangar_interface::element::id::ElementIdGenerator;
 use korangar_interface::element::store::ElementStore;
 use korangar_interface::element::{Element, StateElement};
@@ -180,6 +181,19 @@ where
     }
 }
 
+impl DropDownItem<crate::threads::Enum> for crate::threads::Enum {
+    fn text(&self) -> &str {
+        match self {
+            crate::threads::Enum::Main => "Main thread",
+            crate::threads::Enum::Loader => "Loader thread",
+        }
+    }
+
+    fn value(&self) -> crate::threads::Enum {
+        *self
+    }
+}
+
 /// Internal state of the chat window.
 #[derive(RustState, StateElement)]
 pub struct ProfilerWindowState {
@@ -217,6 +231,8 @@ where
     fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
         use korangar_interface::prelude::*;
 
+        let visible_thread_options = vec![crate::threads::Enum::Main, crate::threads::Enum::Loader];
+
         window! {
             title: "Profiler",
             class: Self::window_class(),
@@ -226,9 +242,10 @@ where
                 split! {
                     gaps: theme().window().gaps(),
                     children: (
-                        // TODO: Use a drop down.
-                        field! {
-                            text: "Main Thread",
+                        drop_down! {
+                            selected: self.window_state_path.visible_thread(),
+                            options: visible_thread_options.clone(),
+                            click_handler: DefaultClickHandler::new(self.window_state_path.visible_thread(), visible_thread_options.clone()),
                         },
                         state_button! {
                             text: "Halt",

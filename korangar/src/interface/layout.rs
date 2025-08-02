@@ -5,16 +5,6 @@ use rust_state::RustState;
 use serde::{Deserialize, Serialize};
 use winit::dpi::PhysicalSize;
 
-pub trait ArrayType {
-    type Element;
-
-    const ELEMENT_COUNT: usize;
-
-    fn get_array_fields(&'static self) -> [(String, &'static Self::Element); Self::ELEMENT_COUNT];
-
-    fn get_inner(&self) -> [Self::Element; Self::ELEMENT_COUNT];
-}
-
 macro_rules! implement_ops {
     ($name:ident, $x:ident, $y:ident) => {
         impl $name {
@@ -134,20 +124,6 @@ impl PositionTrait for ScreenPosition {
     }
 }
 
-impl ArrayType for ScreenPosition {
-    type Element = f32;
-
-    const ELEMENT_COUNT: usize = 2;
-
-    fn get_array_fields(&'static self) -> [(String, &'static Self::Element); Self::ELEMENT_COUNT] {
-        [("left".to_owned(), &self.left), ("top".to_owned(), &self.top)]
-    }
-
-    fn get_inner(&self) -> [Self::Element; Self::ELEMENT_COUNT] {
-        [self.left, self.top]
-    }
-}
-
 implement_ops!(ScreenPosition, left, top);
 
 impl std::ops::Sub<ScreenPosition> for ScreenPosition {
@@ -220,20 +196,6 @@ impl SizeTrait for ScreenSize {
 
     fn height(&self) -> f32 {
         self.height
-    }
-}
-
-impl ArrayType for ScreenSize {
-    type Element = f32;
-
-    const ELEMENT_COUNT: usize = 2;
-
-    fn get_array_fields(&'static self) -> [(String, &'static Self::Element); Self::ELEMENT_COUNT] {
-        [("width".to_owned(), &self.width), ("height".to_owned(), &self.height)]
-    }
-
-    fn get_inner(&self) -> [Self::Element; Self::ELEMENT_COUNT] {
-        [self.width, self.height]
     }
 }
 
@@ -420,25 +382,6 @@ impl CornerRadiusTrait for CornerRadius {
 
     fn bottom_left(&self) -> f32 {
         self.bottom_left
-    }
-}
-
-impl ArrayType for CornerRadius {
-    type Element = f32;
-
-    const ELEMENT_COUNT: usize = 4;
-
-    fn get_array_fields(&'static self) -> [(String, &'static Self::Element); Self::ELEMENT_COUNT] {
-        [
-            ("top left".to_owned(), &self.top_left),
-            ("top right".to_owned(), &self.top_right),
-            ("bottom right".to_owned(), &self.bottom_right),
-            ("bottom left".to_owned(), &self.bottom_left),
-        ]
-    }
-
-    fn get_inner(&self) -> [Self::Element; Self::ELEMENT_COUNT] {
-        [self.top_left, self.top_right, self.bottom_right, self.bottom_left]
     }
 }
 

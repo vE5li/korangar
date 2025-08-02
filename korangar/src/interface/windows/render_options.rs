@@ -1,3 +1,5 @@
+use std::num::NonZeroU32;
+
 use korangar_interface::components::drop_down::DefaultClickHandler;
 use korangar_interface::element::Element;
 use korangar_interface::window::{CustomWindow, WindowTrait};
@@ -39,6 +41,16 @@ where
 
     fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
         use korangar_interface::prelude::*;
+
+        let show_point_shadow_map_options = vec![
+            None,
+            NonZeroU32::new(1),
+            NonZeroU32::new(2),
+            NonZeroU32::new(3),
+            NonZeroU32::new(4),
+            NonZeroU32::new(5),
+            NonZeroU32::new(6),
+        ];
 
         let elements = (
             collapsable! {
@@ -102,15 +114,18 @@ where
                 children: (
                     render_state_button("Picker", self.path.show_picker_buffer()),
                     render_state_button("Directional shadow", self.path.show_directional_shadow_map()),
-                    // split! {
-                    //     children: (
-                    //         drop_down! {
-                    //             selected: path.show_point_shadow_map(),
-                    //             options: options,
-                    //             click_handler: DefaultClickHandler::<_, _, _, ()>::new(path.show_point_shadow_map(), options),
-                    //         }
-                    //     ),
-                    // },
+                    split! {
+                        children: (
+                            text! {
+                                text: "Point shadow"
+                            },
+                            drop_down! {
+                                selected: self.path.show_point_shadow_map(),
+                                options: show_point_shadow_map_options.clone(),
+                                click_handler: DefaultClickHandler::new(self.path.show_point_shadow_map(), show_point_shadow_map_options.clone()),
+                            },
+                        ),
+                    },
                     render_state_button("Light cull count", self.path.show_light_culling_count_buffer()),
                     render_state_button("Font map", self.path.show_font_map()),
                 )

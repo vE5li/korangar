@@ -16,7 +16,7 @@ pub mod components {
         use korangar_interface::layout::tooltip::TooltipExt;
         use korangar_interface::layout::{Layout, MouseButton, Resolver};
         use ragnarok_packets::{CharacterInformation, CharacterInformationPathExt};
-        use rust_state::{Context, ManuallyAssertExt, Path, RustState, Selector};
+        use rust_state::{Context, ManuallyAssertExt, Path, RustState};
 
         use crate::graphics::Color;
         use crate::input::InputEvent;
@@ -105,20 +105,18 @@ pub mod components {
             pub background_color: ClientState,
         }
 
-        pub struct CharacterSlotPreview<P, M, A, B> {
+        pub struct CharacterSlotPreview<P, M, B> {
             pub character_information: P,
             pub switch_request: M,
-            pub background_color: A,
             pub click_handler: CharacterSlotPreviewHandler<B>,
             pub overlay_handler: OverlayHandler<M, P>,
             pub slot: usize,
         }
 
-        impl<P, M, A, B> Element<ClientState> for CharacterSlotPreview<P, M, A, B>
+        impl<P, M, B> Element<ClientState> for CharacterSlotPreview<P, M, B>
         where
             P: Path<ClientState, CharacterInformation, false>,
             M: Path<ClientState, Option<usize>>,
-            A: Selector<ClientState, Color>,
             B: Path<ClientState, Option<usize>>,
         {
             fn create_layout_info(

@@ -62,7 +62,7 @@ use korangar_debug::profiling::Profiler;
 use korangar_interface::application::Application;
 use korangar_interface::layout::MouseButton;
 use korangar_interface::window::WindowThemePathExt;
-use korangar_interface::{Interface, MouseMode};
+use korangar_interface::Interface;
 use korangar_networking::{
     DisconnectReason, HotkeyState, LoginServerLoginData, MessageColor, NetworkEvent, NetworkEventBuffer, NetworkingSystem, SellItem,
     ShopItem,
@@ -77,7 +77,7 @@ use ragnarok_packets::{
     TilePosition, UnitId, WorldPosition,
 };
 use renderer::InterfaceRenderer;
-use rust_state::{AsRefExt, Context, ManuallyAssertExt, OptionExt, Path};
+use rust_state::{AsRefExt, Context, ManuallyAssertExt, OptionExt};
 use settings::{AudioSettings, AudioSettingsPathExt, GraphicsSettingsCapabilities, GraphicsSettingsPathExt};
 use state::theme::{CursorThemePathExt, GameThemePathExt, IndicatorThemePathExt, InterfaceThemePathExt, InterfaceThemeType};
 use state::{ChatMessage, ClientState, ClientStatePathExt, ClientStateRootExt, client_state, this_entity, this_player};

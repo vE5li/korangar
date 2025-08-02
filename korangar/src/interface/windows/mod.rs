@@ -45,8 +45,6 @@ pub use self::commands::CommandsWindow;
 pub use self::dialog::{DialogWindow, DialogWindowState};
 pub use self::equipment::EquipmentWindow;
 pub use self::error::ErrorWindow;
-#[cfg(feature = "debug")]
-pub use self::frame_inspector::FrameInspectorWindow;
 pub use self::friend_list::{FriendListWindow, FriendListWindowState};
 pub use self::friend_request::FriendRequestWindow;
 pub use self::graphics_settings::GraphicsSettingsWindow;

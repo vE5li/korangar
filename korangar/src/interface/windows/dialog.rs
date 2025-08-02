@@ -8,7 +8,6 @@ use rust_state::{Context, Path, RustState};
 
 use super::WindowClass;
 use crate::input::InputEvent;
-use crate::interface::windows::WindowCache;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
 

@@ -7,8 +7,6 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use cgmath::Vector2;
-use korangar_interface::Interface;
-use korangar_interface::event::ClickAction;
 use ragnarok_packets::{ClientTick, HotbarSlot};
 use winit::dpi::PhysicalPosition;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta};
@@ -18,9 +16,6 @@ pub use self::event::InputEvent;
 pub use self::key::Key;
 pub use self::mode::{Grabbed, MouseInputMode, MouseModeExt};
 use crate::graphics::PickerTarget;
-#[cfg(feature = "debug")]
-use crate::graphics::RenderOptions;
-use crate::interface::cursor::{MouseCursor, MouseCursorState};
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 
 const MOUSE_SCOLL_MULTIPLIER: f32 = 30.0;

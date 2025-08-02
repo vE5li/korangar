@@ -1,8 +1,9 @@
 use std::cmp::Ordering;
 use std::marker::PhantomData;
+use std::num::NonZeroU32;
 
 use interface_components::scroll_view;
-use rust_state::{Context, ManuallyAssertExt, Path, RustState, Selector, VecIndexExt};
+use rust_state::{Context, Path, RustState, Selector};
 
 use crate::application::{Application, PositionTrait, SizeTrait};
 use crate::element::id::ElementIdGenerator;
@@ -20,25 +21,50 @@ pub trait DropDownItem<T> {
     fn value(&self) -> T;
 }
 
+// TODO: Having this here is not very clean. We should instead have
+// show_point_shadow_map wrapped in a new type and implement for that. Ideally,
+// that would be an enum only covering the possible cases.
+impl DropDownItem<Option<NonZeroU32>> for Option<NonZeroU32> {
+    fn text(&self) -> &str {
+        match self {
+            Some(count) => match count.get() {
+                1 => "1",
+                2 => "2",
+                3 => "3",
+                4 => "4",
+                5 => "5",
+                6 => "6",
+                _ => unimplemented!(),
+            },
+            None => "Off",
+        }
+    }
+
+    fn value(&self) -> Option<NonZeroU32> {
+        *self
+    }
+}
+
 struct InnerButton<Value, Item, A, B, C, D, E, F, G, H, I, J> {
-    pub text_marker: PhantomData<(Value, Item)>,
-    pub option: A,
-    pub event: B,
-    pub foreground_color: C,
-    pub background_color: D,
-    pub hovered_foreground_color: E,
-    pub hovered_background_color: F,
-    pub height: G,
-    pub corner_radius: H,
-    pub font_size: I,
-    pub text_alignment: J,
+    text_marker: PhantomData<(Value, Item)>,
+    options: A,
+    option_index: usize,
+    event: B,
+    foreground_color: C,
+    background_color: D,
+    hovered_foreground_color: E,
+    hovered_background_color: F,
+    height: G,
+    corner_radius: H,
+    font_size: I,
+    text_alignment: J,
 }
 
 impl<App, Value, Item, A, B, C, D, E, F, G, H, I, J> Element<App> for InnerButton<Value, Item, A, B, C, D, E, F, G, H, I, J>
 where
     App: Application,
     Item: DropDownItem<Value>,
-    A: Selector<App, Item>,
+    A: Selector<App, Vec<Item>>,
     B: ClickAction<App> + 'static,
     C: Selector<App, App::Color>,
     D: Selector<App, App::Color>,
@@ -87,7 +113,7 @@ where
             false => *state.get(&self.foreground_color),
         };
 
-        let option = state.get(&self.option);
+        let option = &state.get(&self.options)[self.option_index];
 
         layout.add_text(
             layout_info.area,
@@ -105,7 +131,7 @@ where
     App: Application,
 {
     value_path: A,
-    options_path: B,
+    options: B,
     item_boxes: Vec<Box<dyn Element<App, LayoutInfo = DefaultLayoutInfo>>>,
     _marker: PhantomData<(App, Value, Item)>,
 }
@@ -116,7 +142,7 @@ where
     Value: 'static,
     Item: DropDownItem<Value> + 'static,
     A: Path<App, Value>,
-    B: Path<App, Vec<Item>>,
+    B: Selector<App, Vec<Item>> + Clone,
 {
     // TODO: Refactor to not have to re-allocate this every frame.
     type LayoutInfo = (Area, Vec<DefaultLayoutInfo>);
@@ -128,7 +154,7 @@ where
         generator: &mut ElementIdGenerator,
         resolver: &mut Resolver,
     ) -> Self::LayoutInfo {
-        let vector = state.get(&self.options_path);
+        let vector = state.get(&self.options);
 
         match self.item_boxes.len().cmp(&vector.len()) {
             Ordering::Greater => {
@@ -140,13 +166,15 @@ where
                 for index in self.item_boxes.len()..vector.len() {
                     self.item_boxes.push({
                         let value_path = self.value_path;
-                        let option_path = self.options_path.index(index).manually_asserted();
+                        let options = self.options.clone();
 
                         let item_box: Box<dyn Element<App, LayoutInfo = DefaultLayoutInfo>> = Box::new(InnerButton {
                             text_marker: PhantomData,
-                            option: option_path,
+                            options: options.clone(),
+                            option_index: index,
                             event: move |state: &Context<App>, queue: &mut EventQueue<App>| {
-                                let value = state.get(&option_path).value();
+                                let options = state.get(&options);
+                                let value = options[index].value();
                                 state.update_value(value_path, value);
                                 queue.queue(Event::CloseOverlay);
                             },
@@ -213,7 +241,7 @@ where
     App: Application,
 {
     value_path: A,
-    options_path: B,
+    options: B,
     position: App::Position,
     size: App::Size,
     _marker: PhantomData<(Value, Item)>,
@@ -225,14 +253,14 @@ where
     Value: 'static,
     Item: DropDownItem<Value> + 'static,
     A: Path<App, Value>,
-    B: Path<App, Vec<Item>>,
+    B: Selector<App, Vec<Item>> + Clone,
 {
     fn execute(&self, _: &Context<App>, queue: &mut EventQueue<App>) {
         let erased_element = ErasedElement::new(scroll_view! {
             children: (
                 InnerElement {
                     value_path: self.value_path,
-                    options_path: self.options_path,
+                    options: self.options.clone(),
                     item_boxes: Vec::new(),
                     _marker: PhantomData,
                 },
@@ -262,13 +290,13 @@ where
     Value: 'static,
     Item: DropDownItem<Value> + 'static,
     A: Path<App, Value>,
-    B: Path<App, Vec<Item>>,
+    B: Selector<App, Vec<Item>>,
 {
     pub fn new(value_path: A, options_path: B) -> DefaultClickHandler<App, Value, Item, A, B> {
         DefaultClickHandler {
             overlay_element: InnerClickAction {
                 value_path,
-                options_path,
+                options: options_path,
                 position: App::Position::new(0.0, 0.0),
                 size: App::Size::new(0.0, 0.0),
                 _marker: PhantomData,
@@ -335,9 +363,7 @@ where
     App: Application,
     Value: PartialEq + 'static,
     Item: DropDownItem<Value> + 'static,
-    // TODO: Is it nicer to take a selector here?
-    A: Path<App, Vec<Item>>,
-    // TODO: Is it nicer to take a selector here?
+    A: Selector<App, Vec<Item>> + Clone,
     B: Path<App, Value>,
     C: Selector<App, App::Color>,
     D: Selector<App, App::Color>,

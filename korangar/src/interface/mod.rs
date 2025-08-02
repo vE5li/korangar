@@ -562,7 +562,6 @@ pub mod components {
 
                 if is_hovered {
                     layout.mark_hovered();
-                    layout.add_click_area(layout_info.area, MouseButton::Left, &self.handler);
                     layout.add_drop_area(layout_info.area, &self.handler);
                 }
 
@@ -570,6 +569,10 @@ pub mod components {
                     && let Some(texture) = item.metadata.texture.as_ref()
                 {
                     layout.add_texture(texture.clone(), layout_info.area, Color::WHITE, false);
+
+                    if is_hovered {
+                        layout.add_click_area(layout_info.area, MouseButton::Left, &self.handler);
+                    }
 
                     if matches!(item.details, InventoryItemDetails::Regular { .. }) {
                         layout.add_text(
@@ -736,7 +739,6 @@ pub mod components {
 
                 if is_hovered {
                     layout.mark_hovered();
-                    layout.add_click_area(layout_info.area, MouseButton::Left, &self.handler);
                     layout.add_drop_area(layout_info.area, &self.handler);
                 }
 
@@ -748,6 +750,10 @@ pub mod components {
                         layout_info.area,
                         Color::WHITE,
                     );
+
+                    if is_hovered {
+                        layout.add_click_area(layout_info.area, MouseButton::Left, &self.handler);
+                    }
 
                     layout.add_text(
                         layout_info.area,

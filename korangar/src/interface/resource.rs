@@ -16,18 +16,7 @@ pub enum SkillSource {
     Hotbar { slot: HotbarSlot },
 }
 
-#[derive(Clone, Debug)]
-pub enum PartialMove {
-    Item {
-        source: ItemSource,
-        item: InventoryItem<ResourceMetadata>,
-    },
-    Skill {
-        source: SkillSource,
-        skill: Skill,
-    },
-}
-
+// TODO: Rename this
 #[derive(Clone, Debug)]
 pub enum Move {
     Item {

@@ -749,7 +749,13 @@ where
             let (origin, destination) = packet.from_to.to_origin_destination();
             NetworkEvent::PlayerMove(origin, destination, packet.timestamp)
         })?;
-        packet_handler.register(|packet: ChangeMapPacket| NetworkEvent::ChangeMap(packet.map_name.replace(".gat", ""), packet.position))?;
+        packet_handler.register(|packet: ChangeMapPacket| {
+            let ChangeMapPacket { map_name, player_position } = packet;
+
+            let map_name = map_name.replace(".gat", "");
+
+            NetworkEvent::ChangeMap { map_name, player_position }
+        })?;
         packet_handler.register(|packet: ResurrectionPacket| NetworkEvent::ResurrectPlayer {
             entity_id: packet.entity_id,
         })?;
@@ -1057,7 +1063,11 @@ where
             }),
             _ => None,
         })?;
-        packet_handler.register(|packet: NpcDialogPacket| NetworkEvent::OpenDialog(packet.text, packet.npc_id))?;
+        packet_handler.register(|packet: NpcDialogPacket| {
+            let NpcDialogPacket { npc_id, text } = packet;
+
+            NetworkEvent::OpenDialog { text, npc_id }
+        })?;
         packet_handler.register(|packet: RequestEquipItemStatusPacket| match packet.result {
             RequestEquipItemStatus::Success => Some(NetworkEvent::UpdateEquippedPosition {
                 index: packet.inventory_index,

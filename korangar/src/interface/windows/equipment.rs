@@ -6,6 +6,7 @@ use ragnarok_packets::EquipPosition;
 use rust_state::{Path, Selector};
 
 use crate::ItemSource;
+use crate::interface::components::item_box::ItemBoxHandler;
 use crate::interface::windows::WindowClass;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
@@ -78,12 +79,14 @@ fn equip_box(
     items_path: impl Path<ClientState, Vec<InventoryItem<ResourceMetadata>>>,
     equip_position: EquipPosition,
 ) -> impl Element<ClientState> {
+    let equipment_path = EquipmentPath {
+        equip_position,
+        path: items_path,
+    };
+
     item_box! {
-        item_path: EquipmentPath {
-            equip_position,
-            path: items_path,
-        },
-        source: ItemSource::Equipment { position: equip_position },
+        item_path: equipment_path,
+        handler: ItemBoxHandler::new(equipment_path, ItemSource::Equipment { position: equip_position }),
     }
 }
 

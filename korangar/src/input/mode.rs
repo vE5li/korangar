@@ -12,12 +12,20 @@ use crate::loaders::Sprite;
 use crate::state::ClientState;
 use crate::world::{Actions, ResourceMetadata, SpriteAnimationState};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum MouseInputMode {
-    MoveItem(ItemSource, InventoryItem<ResourceMetadata>),
-    MoveSkill(SkillSource, Skill),
     RotateCamera,
-    Walk(Vector2<usize>),
+    Walk {
+        destination: Vector2<usize>,
+    },
+    MoveItem {
+        source: ItemSource,
+        item: InventoryItem<ResourceMetadata>,
+    },
+    MoveSkill {
+        source: SkillSource,
+        skill: Skill,
+    },
 }
 
 impl From<MouseInputMode> for MouseMode<ClientState> {
@@ -31,26 +39,26 @@ pub enum Grabbed {
     Action(Arc<Sprite>, Arc<Actions>, SpriteAnimationState),
 }
 
-pub trait GrabbedExt {
+pub trait MouseModeExt {
     fn is_rotating_camera(&self) -> bool;
 
-    fn walk_position(&self) -> Option<Vector2<usize>>;
+    fn walk_destination(&self) -> Option<Vector2<usize>>;
 
     fn grabbed(&self) -> Option<Grabbed>;
 }
 
-impl GrabbedExt for MouseMode<ClientState> {
+impl MouseModeExt for MouseMode<ClientState> {
     fn is_rotating_camera(&self) -> bool {
         matches!(self, MouseMode::Custom {
             mode: MouseInputMode::RotateCamera
         })
     }
 
-    fn walk_position(&self) -> Option<Vector2<usize>> {
+    fn walk_destination(&self) -> Option<Vector2<usize>> {
         match self {
             MouseMode::Custom {
-                mode: MouseInputMode::Walk(position),
-            } => Some(*position),
+                mode: MouseInputMode::Walk { destination },
+            } => Some(*destination),
             _ => None,
         }
     }
@@ -58,10 +66,10 @@ impl GrabbedExt for MouseMode<ClientState> {
     fn grabbed(&self) -> Option<Grabbed> {
         match self {
             MouseMode::Custom {
-                mode: MouseInputMode::MoveItem(_, item),
+                mode: MouseInputMode::MoveItem { item, .. },
             } => item.metadata.texture.as_ref().map(|texture| Grabbed::Texture(texture.clone())),
             MouseMode::Custom {
-                mode: MouseInputMode::MoveSkill(_, skill),
+                mode: MouseInputMode::MoveSkill { skill, .. },
             } => Some(Grabbed::Action(
                 skill.sprite.clone(),
                 skill.actions.clone(),

@@ -19,7 +19,7 @@ pub fn character_slot_preview(token_stream: TokenStream) -> TokenStream {
 pub fn item_box(token_stream: TokenStream) -> TokenStream {
     create_component_macro!(crate::interface::components::item_box::ItemBox, {
         item_path: !,
-        source: !,
+        handler: !,
         amount_display: { const crate::interface::components::item_box::AmountDisplay::default() },
     });
 
@@ -30,7 +30,7 @@ pub fn item_box(token_stream: TokenStream) -> TokenStream {
 pub fn skill_box(token_stream: TokenStream) -> TokenStream {
     create_component_macro!(crate::interface::components::skill_box::SkillBox, {
         skill_path: !,
-        source: !,
+        handler: !,
         level_display: { const crate::interface::components::skill_box::LevelDisplay::default() },
     });
 

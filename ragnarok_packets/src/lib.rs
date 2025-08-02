@@ -1560,7 +1560,7 @@ pub struct SwitchCharacterSlotResponsePacket {
 pub struct ChangeMapPacket {
     #[length(16)]
     pub map_name: String,
-    pub position: TilePosition,
+    pub player_position: TilePosition,
 }
 
 #[derive(Debug, Clone, ByteConvertable, PartialEq)]

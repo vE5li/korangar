@@ -6,6 +6,7 @@ mod character_selection;
 mod chat;
 #[cfg(feature = "debug")]
 mod commands;
+mod dialog;
 mod equipment;
 mod error;
 #[cfg(feature = "debug")]
@@ -41,6 +42,7 @@ pub use self::character_selection::CharacterSelectionWindow;
 pub use self::chat::{ChatTextBox, ChatWindow, ChatWindowState};
 #[cfg(feature = "debug")]
 pub use self::commands::CommandsWindow;
+pub use self::dialog::{DialogWindow, DialogWindowState};
 pub use self::equipment::EquipmentWindow;
 pub use self::error::ErrorWindow;
 #[cfg(feature = "debug")]
@@ -74,6 +76,7 @@ pub enum WindowClass {
     CharacterCreation,
     CharacterOverview,
     CharacterSelection,
+    Dialog,
     GraphicsSettings,
     Hotbar,
     Inventory,

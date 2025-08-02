@@ -65,7 +65,6 @@ where
             class: Self::window_class(),
             theme: InterfaceThemeType::Game,
             closable: true,
-            minimum_height: 300.0,
             elements: (
                 text_box! {
                     ghost_text: "Add friend by name",

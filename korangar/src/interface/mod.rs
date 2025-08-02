@@ -1,6 +1,5 @@
 pub mod cursor;
 pub mod layout;
-// pub mod dialog;
 pub mod resource;
 pub mod windows;
 
@@ -425,17 +424,20 @@ pub mod components {
     }
 
     pub mod item_box {
+        use korangar_interface::MouseMode;
         use korangar_interface::element::Element;
         use korangar_interface::element::id::ElementIdGenerator;
         use korangar_interface::element::store::ElementStore;
-        use korangar_interface::layout::{Layout, Resolver};
+        use korangar_interface::event::{ClickAction, Event, EventQueue};
+        use korangar_interface::layout::{DropHandler, Layout, MouseButton, Resolver};
         use korangar_interface::prelude::{HorizontalAlignment, VerticalAlignment};
         use korangar_networking::{InventoryItem, InventoryItemDetails};
         use rust_state::{Context, Path};
 
         use crate::graphics::Color;
+        use crate::input::{MouseInputMode, UserEvent};
         use crate::interface::layout::CornerRadius;
-        use crate::interface::resource::ItemSource;
+        use crate::interface::resource::{ItemSource, Move};
         use crate::loaders::FontSize;
         use crate::renderer::LayoutExt;
         use crate::state::ClientState;
@@ -456,9 +458,59 @@ pub mod components {
             }
         }
 
+        pub struct ItemBoxHandler<P> {
+            item_path: P,
+            source: ItemSource,
+        }
+
+        impl<P> ItemBoxHandler<P> {
+            pub fn new(item_path: P, source: ItemSource) -> Self {
+                Self { item_path, source }
+            }
+        }
+
+        impl<P> ClickAction<ClientState> for ItemBoxHandler<P>
+        where
+            P: Path<ClientState, InventoryItem<ResourceMetadata>, false>,
+        {
+            fn execute(&self, state: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
+                // SAFETY:
+                //
+                // Unwrapping here is fine since we only register the handler if the slot has a
+                // item.
+                let item = state.try_get(&self.item_path).unwrap().clone();
+
+                queue.queue(Event::SetMouseMode {
+                    mouse_mode: MouseMode::Custom {
+                        mode: MouseInputMode::MoveItem { item, source: self.source },
+                    },
+                });
+            }
+        }
+
+        impl<P> DropHandler<ClientState> for ItemBoxHandler<P>
+        where
+            P: Path<ClientState, InventoryItem<ResourceMetadata>, false>,
+        {
+            fn handle_drop(&self, state: &Context<ClientState>, queue: &mut EventQueue<ClientState>, mouse_mode: &MouseMode<ClientState>) {
+                if let MouseMode::Custom {
+                    mode: MouseInputMode::MoveItem { source, item },
+                } = mouse_mode
+                {
+                    queue.queue(UserEvent::MoveResource {
+                        resource: Move::Item {
+                            source: *source,
+                            destination: self.source,
+                            item: item.clone(),
+                        },
+                    });
+                }
+            }
+        }
+
         pub struct ItemBox<P> {
             pub item_path: P,
-            pub source: ItemSource,
+            pub handler: ItemBoxHandler<P>,
             pub amount_display: AmountDisplay,
         }
 
@@ -493,7 +545,26 @@ pub mod components {
                 layout_info: &'a Self::LayoutInfo,
                 layout: &mut Layout<'a, ClientState>,
             ) {
-                layout.add_rectangle(layout_info.area, CornerRadius::uniform(20.0), Color::rgb_u8(40, 40, 40));
+                let (is_hovered, background_color) = match layout.get_mouse_mode() {
+                    MouseMode::Custom {
+                        mode: MouseInputMode::MoveItem { .. },
+                    } => match layout.is_area_hovered_and_active_any_mode(layout_info.area) {
+                        true => (true, Color::rgb_u8(80, 180, 180)),
+                        false => (false, Color::rgb_u8(180, 180, 80)),
+                    },
+                    _ => match layout.is_area_hovered_and_active(layout_info.area) {
+                        true => (true, Color::rgb_u8(60, 60, 60)),
+                        false => (false, Color::rgb_u8(40, 40, 40)),
+                    },
+                };
+
+                layout.add_rectangle(layout_info.area, CornerRadius::uniform(20.0), background_color);
+
+                if is_hovered {
+                    layout.mark_hovered();
+                    layout.add_click_area(layout_info.area, MouseButton::Left, &self.handler);
+                    layout.add_drop_area(layout_info.area, &self.handler);
+                }
 
                 if let Some(item) = state.try_get(&self.item_path)
                     && let Some(texture) = item.metadata.texture.as_ref()
@@ -520,17 +591,20 @@ pub mod components {
     }
 
     pub mod skill_box {
+        use korangar_interface::MouseMode;
         use korangar_interface::element::Element;
         use korangar_interface::element::id::ElementIdGenerator;
         use korangar_interface::element::store::ElementStore;
-        use korangar_interface::layout::{Layout, Resolver};
+        use korangar_interface::event::{ClickAction, Event, EventQueue};
+        use korangar_interface::layout::{DropHandler, Layout, MouseButton, Resolver};
         use korangar_interface::prelude::{HorizontalAlignment, VerticalAlignment};
         use ragnarok_packets::SkillLevel;
         use rust_state::{Context, Path};
 
         use crate::graphics::Color;
+        use crate::input::{MouseInputMode, UserEvent};
         use crate::interface::layout::CornerRadius;
-        use crate::interface::resource::SkillSource;
+        use crate::interface::resource::{Move, SkillSource};
         use crate::inventory::Skill;
         use crate::loaders::FontSize;
         use crate::renderer::LayoutExt;
@@ -559,9 +633,62 @@ pub mod components {
             }
         }
 
+        pub struct SkillBoxHandler<P> {
+            skill_path: P,
+            source: SkillSource,
+        }
+
+        impl<P> SkillBoxHandler<P> {
+            pub fn new(skill_path: P, source: SkillSource) -> Self {
+                Self { skill_path, source }
+            }
+        }
+
+        impl<P> ClickAction<ClientState> for SkillBoxHandler<P>
+        where
+            P: Path<ClientState, Skill, false>,
+        {
+            fn execute(&self, state: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
+                // SAFETY:
+                //
+                // Unwrapping here is fine since we only register the handler if the slot has a
+                // skill.
+                let skill = state.try_get(&self.skill_path).unwrap().clone();
+
+                queue.queue(Event::SetMouseMode {
+                    mouse_mode: MouseMode::Custom {
+                        mode: MouseInputMode::MoveSkill {
+                            skill,
+                            source: self.source,
+                        },
+                    },
+                });
+            }
+        }
+
+        impl<P> DropHandler<ClientState> for SkillBoxHandler<P>
+        where
+            P: Path<ClientState, Skill, false>,
+        {
+            fn handle_drop(&self, state: &Context<ClientState>, queue: &mut EventQueue<ClientState>, mouse_mode: &MouseMode<ClientState>) {
+                if let MouseMode::Custom {
+                    mode: MouseInputMode::MoveSkill { source, skill },
+                } = mouse_mode
+                {
+                    queue.queue(UserEvent::MoveResource {
+                        resource: Move::Skill {
+                            source: *source,
+                            destination: self.source,
+                            skill: skill.clone(),
+                        },
+                    });
+                }
+            }
+        }
+
         pub struct SkillBox<P> {
             pub skill_path: P,
-            pub source: SkillSource,
+            pub handler: SkillBoxHandler<P>,
             pub level_display: LevelDisplay,
         }
 
@@ -592,7 +719,26 @@ pub mod components {
                 layout_info: &'a Self::LayoutInfo,
                 layout: &mut Layout<'a, ClientState>,
             ) {
-                layout.add_rectangle(layout_info.area, CornerRadius::uniform(20.0), Color::rgb_u8(40, 40, 40));
+                let (is_hovered, background_color) = match layout.get_mouse_mode() {
+                    MouseMode::Custom {
+                        mode: MouseInputMode::MoveSkill { .. },
+                    } => match layout.is_area_hovered_and_active_any_mode(layout_info.area) {
+                        true => (true, Color::rgb_u8(80, 180, 180)),
+                        false => (false, Color::rgb_u8(180, 180, 80)),
+                    },
+                    _ => match layout.is_area_hovered_and_active(layout_info.area) {
+                        true => (true, Color::rgb_u8(60, 60, 60)),
+                        false => (false, Color::rgb_u8(40, 40, 40)),
+                    },
+                };
+
+                layout.add_rectangle(layout_info.area, CornerRadius::uniform(20.0), background_color);
+
+                if is_hovered {
+                    layout.mark_hovered();
+                    layout.add_click_area(layout_info.area, MouseButton::Left, &self.handler);
+                    layout.add_drop_area(layout_info.area, &self.handler);
+                }
 
                 if let Some(skill) = state.try_get(&self.skill_path) {
                     layout.add_sprite(

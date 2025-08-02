@@ -67,14 +67,25 @@ pub enum UserEvent {
         origin_slot: usize,
         destination_slot: usize,
     },
-    RequestPlayerMove(Vector2<usize>),
+    RequestPlayerMove {
+        destination: Vector2<usize>,
+    },
     RequestPlayerInteract(EntityId),
     RequestWarpToMap(String, TilePosition),
     SendMessage(String),
-    NextDialog(EntityId),
-    CloseDialog(EntityId),
-    ChooseDialogOption(EntityId, i8),
-    MoveResource(Move),
+    NextDialog {
+        npc_id: EntityId,
+    },
+    CloseDialog {
+        npc_id: EntityId,
+    },
+    ChooseDialogOption {
+        npc_id: EntityId,
+        option: i8,
+    },
+    MoveResource {
+        resource: Move,
+    },
     CastSkill(HotbarSlot),
     StopSkill(HotbarSlot),
     AddFriend {

@@ -27,7 +27,7 @@ use crate::input::{MouseInputMode, UserEvent};
 use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
 #[cfg(feature = "debug")]
 use crate::interface::windows::ProfilerWindowState;
-use crate::interface::windows::{ChatWindowState, FriendListWindowState, LoginWindowState, WindowCache, WindowClass};
+use crate::interface::windows::{ChatWindowState, DialogWindowState, FriendListWindowState, LoginWindowState, WindowCache, WindowClass};
 use crate::inventory::{Hotbar, Inventory, SkillTree};
 use crate::loaders::{ClientInfo, FontSize, GameFileLoader, load_client_info};
 use crate::renderer::InterfaceRenderer;
@@ -81,6 +81,8 @@ pub struct ClientState {
     chat_window: ChatWindowState,
     /// Internal state of the friend list window.
     friend_list_window: FriendListWindowState,
+    /// Internal state of the dialog window.
+    dialog_window: DialogWindowState,
 
     /// The current map.
     // TODO: These are currently pub due to some code in the main render update loop. Ideally these
@@ -223,6 +225,8 @@ impl ClientState {
         });
 
         time_phase!("create player resources", {
+            let dialog_window = DialogWindowState::default();
+
             let shop_items = Vec::default();
             let sell_items = Vec::default();
             let player_name = String::new();
@@ -259,6 +263,7 @@ impl ClientState {
             login_window,
             chat_window,
             friend_list_window,
+            dialog_window,
             map: Some(map),
             entities: Vec::new(),
             chat_messages,

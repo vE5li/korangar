@@ -165,6 +165,33 @@ where
     Custom { mode: App::CustomMouseMode },
 }
 
+impl<App> MouseMode<App>
+where
+    App: Application,
+{
+    pub fn is_default(&self) -> bool {
+        matches!(self, MouseMode::Default)
+    }
+}
+
+impl<App> Clone for MouseMode<App>
+where
+    App: Application,
+    App::CustomMouseMode: Clone,
+{
+    fn clone(&self) -> Self {
+        match self {
+            Self::Default => Self::Default,
+            Self::MovingWindow { window_id } => Self::MovingWindow { window_id: *window_id },
+            Self::ResizingWindow { resize_mode, window_id } => Self::ResizingWindow {
+                resize_mode: *resize_mode,
+                window_id: *window_id,
+            },
+            Self::Custom { mode } => Self::Custom { mode: mode.clone() },
+        }
+    }
+}
+
 struct WindowWrapper<App>
 where
     App: Application,
@@ -336,10 +363,6 @@ where
         self.focused_element.is_some()
     }
 
-    pub fn reset_mouse_mode(&mut self) {
-        self.mouse_mode = MouseMode::Default;
-    }
-
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn open_window<T>(&mut self, window: T)
     where
@@ -470,6 +493,8 @@ where
                 mouse_position,
                 this.focused_element,
                 !is_interface_hovered,
+                // TODO: Would be nicer if we didn't have to clone here.
+                &this.mouse_mode,
             );
 
             element.layout_element(state, store, &(), layout);
@@ -490,6 +515,8 @@ where
                 mouse_position,
                 this.focused_element,
                 !is_interface_hovered,
+                // TODO: Would be nicer if we didn't have to clone here.
+                &this.mouse_mode,
             );
 
             wrapper.window.do_layout(state, &this.window_store, &wrapper.data, layout);
@@ -500,10 +527,9 @@ where
         BuiltUi {
             window_layouts: &mut this.window_layouts,
             overlay_layout: &mut this.overlay_layout,
-            focused_element: &mut this.focused_element,
-            mouse_mode: &mut this.mouse_mode,
             event_queue: &mut this.event_queue,
             window_size: this.window_size,
+            mouse_mode: &this.mouse_mode,
             is_interface_hovered,
             interface_scaling,
         }
@@ -518,10 +544,13 @@ where
     ) {
         if let MouseMode::MovingWindow { window_id } = self.mouse_mode {
             if let Some(wrapper) = self.windows.iter().find(|wrapper| wrapper.data.id == window_id) {
-                wrapper
-                    .data
-                    .anchor
-                    .render_screen_anchors(renderer, anchor_color, closest_anchor_color, self.window_size);
+                wrapper.data.anchor.render_screen_anchors(
+                    renderer,
+                    anchor_color,
+                    closest_anchor_color,
+                    self.window_size,
+                    interface_scaling,
+                );
 
                 let window_display_size = App::Size::new(
                     wrapper.display_information.real_area.width * interface_scaling,
@@ -533,10 +562,14 @@ where
                     wrapper.display_information.real_area.top,
                 );
 
-                wrapper
-                    .data
-                    .anchor
-                    .render_window_anchors(renderer, anchor_color, closest_anchor_color, position, window_display_size);
+                wrapper.data.anchor.render_window_anchors(
+                    renderer,
+                    anchor_color,
+                    closest_anchor_color,
+                    position,
+                    window_display_size,
+                    interface_scaling,
+                );
             }
         }
     }
@@ -550,6 +583,7 @@ where
                 Event::FocusElement { .. } => {}
                 Event::FocusElementPost { element_id } => self.focused_element = Some(element_id),
                 Event::Unfocus => self.focused_element = None,
+                Event::SetMouseMode { mouse_mode } => self.mouse_mode = mouse_mode,
                 Event::Application { custom_event } => custom_events.push(custom_event),
                 Event::OpenOverlay { element, position, size } => {
                     self.overlay_element = Some((element, ElementStore::root(&mut self.generator), position, size))
@@ -571,15 +605,18 @@ where
 pub struct BuiltUi<'a, App: Application> {
     window_layouts: &'a mut BTreeMap<u64, Layout<'a, App>>,
     overlay_layout: &'a mut Option<Layout<'a, App>>,
-    focused_element: &'a mut Option<ElementId>,
-    mouse_mode: &'a mut MouseMode<App>,
     event_queue: &'a mut EventQueue<App>,
+    mouse_mode: &'a MouseMode<App>,
     window_size: App::Size,
     is_interface_hovered: bool,
     interface_scaling: f32,
 }
 
 impl<App: Application> BuiltUi<'_, App> {
+    pub fn is_interface_hovered(&self) -> bool {
+        self.is_interface_hovered
+    }
+
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn render(&mut self, state: &Context<App>, renderer: &App::Renderer, mouse_position: App::Position) {
         // FIX: Don't allocate every frame. Move this to the interface as well.
@@ -664,31 +701,36 @@ impl<App: Application> BuiltUi<'_, App> {
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn click(&mut self, state: &Context<App>, click_position: App::Position, mouse_button: MouseButton) {
-        *self.focused_element = None;
+        self.event_queue.queue(Event::Unfocus);
         self.event_queue.queue(Event::CloseOverlay);
 
         if let Some(layout) = &self.overlay_layout {
-            if layout.do_click(
-                state,
-                self.event_queue,
-                self.focused_element,
-                self.mouse_mode,
-                click_position,
-                mouse_button,
-            ) {
+            if layout.do_click(state, self.event_queue, click_position, mouse_button) {
                 return;
             }
         }
 
         for layout in self.window_layouts.values() {
-            if layout.do_click(
-                state,
-                self.event_queue,
-                self.focused_element,
-                self.mouse_mode,
-                click_position,
-                mouse_button,
-            ) {
+            if layout.do_click(state, self.event_queue, click_position, mouse_button) {
+                return;
+            }
+        }
+    }
+
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
+    pub fn drop(&mut self, state: &Context<App>, drop_position: App::Position) {
+        self.event_queue.queue(Event::SetMouseMode {
+            mouse_mode: MouseMode::Default,
+        });
+
+        if let Some(layout) = &self.overlay_layout {
+            if layout.do_drop(state, self.event_queue, drop_position, self.mouse_mode) {
+                return;
+            }
+        }
+
+        for layout in self.window_layouts.values() {
+            if layout.do_drop(state, self.event_queue, drop_position, self.mouse_mode) {
                 return;
             }
         }
@@ -728,12 +770,10 @@ impl<App: Application> BuiltUi<'_, App> {
         input_handled
     }
 
-    pub fn is_interface_hovered(&self) -> bool {
-        self.is_interface_hovered
-    }
-
     pub fn set_mouse_mode(&mut self, mouse_mode: impl Into<MouseMode<App>>) {
-        *self.mouse_mode = mouse_mode.into();
+        self.event_queue.queue(Event::SetMouseMode {
+            mouse_mode: mouse_mode.into(),
+        });
     }
 
     pub fn focus_element(&mut self, focus_id: impl Any) {

@@ -3,6 +3,7 @@ use std::vec::Drain;
 use rust_state::Context;
 
 use super::ClickAction;
+use crate::MouseMode;
 use crate::application::Application;
 use crate::element::ElementBox;
 use crate::element::id::{ElementId, FocusId};
@@ -20,6 +21,9 @@ pub enum Event<App: Application> {
         element_id: ElementId,
     },
     Unfocus,
+    SetMouseMode {
+        mouse_mode: MouseMode<App>,
+    },
     Application {
         custom_event: App::CustomEvent,
     },
@@ -40,9 +44,12 @@ impl<App: Application> Clone for Event<App> {
             Self::FocusElement { focus_id } => Self::FocusElement { focus_id: *focus_id },
             Self::FocusElementPost { element_id } => Self::FocusElementPost { element_id: *element_id },
             Self::Unfocus => Self::Unfocus,
+            // TODO: Find a better solution for this. Ideally Event wouldn't need to be clone.
+            Self::SetMouseMode { .. } => unimplemented!(),
             Self::Application { custom_event } => Self::Application {
                 custom_event: custom_event.clone(),
             },
+            // TODO: Find a better solution for this. Ideally Event wouldn't need to be clone.
             Self::OpenOverlay { .. } => unimplemented!(),
             Self::CloseWindow { window_id } => Self::CloseWindow { window_id: *window_id },
             Self::CloseOverlay => Self::CloseOverlay,

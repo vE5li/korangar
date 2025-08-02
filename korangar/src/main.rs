@@ -50,7 +50,7 @@ use std::sync::{Arc, LazyLock};
 
 use cgmath::{Point3, Vector2, Vector3};
 use image::{EncodableLayout, ImageFormat, ImageReader};
-use input::{GrabbedExt, MouseInputMode};
+use input::{MouseInputMode, MouseModeExt};
 use inventory::{HotbarPathExt, InventoryPathExt, SkillTreePathExt};
 use korangar_audio::{AudioEngine, SoundEffectKey};
 #[cfg(feature = "debug")]
@@ -98,7 +98,6 @@ use winit::window::{Icon, Window, WindowId};
 use crate::graphics::*;
 use crate::input::{InputSystem, UserEvent};
 use crate::interface::cursor::{MouseCursor, MouseCursorState};
-// use crate::interface::dialog::DialogSystem;
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 use crate::interface::resource::{ItemSource, Move, SkillSource};
 use crate::interface::windows::*;
@@ -610,7 +609,6 @@ impl Client {
         time_phase!("initialize interface", {
             let mut interface = Interface::new(INITIAL_SCREEN_SIZE);
             let mouse_cursor = MouseCursor::new(&sprite_loader, &action_loader);
-            // let dialog_system = DialogSystem::default();
             let show_interface = true;
         });
 
@@ -1085,7 +1083,7 @@ impl Client {
                     self.interface.open_window(HotbarWindow::new(client_state().hotbar().skills()));
 
                     // Put the dialog system in a well-defined state.
-                    // self.dialog_system.close_dialog();
+                    self.client_state.follow_mut(client_state().dialog_window()).end();
 
                     *self.client_state.follow_mut(client_state().map()) = None;
 
@@ -1204,7 +1202,7 @@ impl Client {
                         }
                     }
                 }
-                NetworkEvent::ChangeMap(map_name, player_position) => {
+                NetworkEvent::ChangeMap { map_name, player_position } => {
                     *self.client_state.follow_mut(client_state().map()) = None;
                     self.particle_holder.clear();
                     self.effect_holder.clear();
@@ -1213,6 +1211,9 @@ impl Client {
 
                     // Only the player must stay alive between map changes.
                     self.client_state.follow_mut(client_state().entities()).truncate(1);
+
+                    // Close any remaining dialogs.
+                    self.interface.close_window_with_class(WindowClass::Dialog);
 
                     self.async_loader.request_map_load(map_name, Some(player_position));
                 }
@@ -1275,15 +1276,16 @@ impl Client {
                         player.update_status(status_type);
                     }
                 }
-                NetworkEvent::OpenDialog(text, npc_id) => {
-                    // if let Some(dialog_window) =
-                    // self.dialog_system.open_dialog_window(text, npc_id) {
-                    //     self.interface.open_window(&self.client_state,
-                    // dialog_window); }
+                NetworkEvent::OpenDialog { text, npc_id } => {
+                    self.client_state.follow_mut(client_state().dialog_window()).start(text, npc_id);
+                    self.interface.open_window(DialogWindow::new(client_state().dialog_window()));
                 }
-                NetworkEvent::AddNextButton => {}             // self.dialog_system.add_next_button(),
-                NetworkEvent::AddCloseButton => {}            // self.dialog_system.add_close_button(),
-                NetworkEvent::AddChoiceButtons(choices) => {} //self.dialog_system.add_choice_buttons(choices),
+                NetworkEvent::AddNextButton => self.client_state.follow_mut(client_state().dialog_window()).add_next_button(),
+                NetworkEvent::AddCloseButton => self.client_state.follow_mut(client_state().dialog_window()).add_close_button(),
+                NetworkEvent::AddChoiceButtons(choices) => self
+                    .client_state
+                    .follow_mut(client_state().dialog_window())
+                    .add_choice_buttons(choices),
                 NetworkEvent::AddQuestEffect(quest_effect) => {
                     if let Some(map) = self.client_state.follow(client_state().map()) {
                         self.particle_holder.add_quest_icon(&self.texture_loader, map, quest_effect)
@@ -1611,7 +1613,7 @@ impl Client {
             self.input_system.handle_keyboard_input(
                 &mut self.user_event_buffer,
                 #[cfg(feature = "debug")]
-                matches!(self.interface.get_mouse_mode(), MouseMode::Default),
+                self.interface.get_mouse_mode().is_default(),
                 #[cfg(feature = "debug")]
                 *self.client_state.follow(client_state().render_options().use_debug_camera()),
             );
@@ -1731,7 +1733,7 @@ impl Client {
                 } => {
                     let _ = self.networking_system.switch_character_slot(origin_slot, destination_slot);
                 }
-                UserEvent::RequestPlayerMove(destination) => {
+                UserEvent::RequestPlayerMove { destination } => {
                     if self.client_state.try_follow(this_entity()).is_some() {
                         let _ = self.networking_system.player_move(WorldPosition {
                             x: destination.x,
@@ -1771,27 +1773,22 @@ impl Client {
                         .networking_system
                         .send_chat_message(&self.client_state.follow(client_state().player_name()), &message);
                 }
-                UserEvent::NextDialog(npc_id) => {
+                UserEvent::NextDialog { npc_id } => {
                     let _ = self.networking_system.next_dialog(npc_id);
                 }
-                UserEvent::CloseDialog(npc_id) => {
+                UserEvent::CloseDialog { npc_id } => {
                     let _ = self.networking_system.close_dialog(npc_id);
-                    // self.dialog_system.close_dialog();
-                    // self.interface
-                    //     .close_window_with_class(&mut self.focus_state,
-                    // DialogWindow::WINDOW_CLASS);
+                    self.client_state.follow_mut(client_state().dialog_window()).end();
+                    self.interface.close_window_with_class(WindowClass::Dialog);
                 }
-                UserEvent::ChooseDialogOption(npc_id, option) => {
+                UserEvent::ChooseDialogOption { npc_id, option } => {
                     let _ = self.networking_system.choose_dialog_option(npc_id, option);
 
                     if option == -1 {
-                        // self.dialog_system.close_dialog();
-                        // self.interface
-                        //     .close_window_with_class(&mut self.focus_state,
-                        // DialogWindow::WINDOW_CLASS);
+                        self.interface.close_window_with_class(WindowClass::Dialog);
                     }
                 }
-                UserEvent::MoveResource(r#move) => match r#move {
+                UserEvent::MoveResource { resource } => match resource {
                     Move::Item { source, destination, item } => match (source, destination) {
                         (ItemSource::Inventory, ItemSource::Equipment { position }) => {
                             let _ = self.networking_system.request_item_equip(item.index, position);
@@ -2457,49 +2454,6 @@ impl Client {
 
                 self.effect_holder.render(&mut self.effect_renderer, current_camera);
 
-                if let PickerTarget::Tile { x, y } = input_report.mouse_target
-                    && currently_playing
-                {
-                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_indicators))]
-                    map.render_walk_indicator(
-                        &mut indicator_instruction,
-                        walk_indicator_color,
-                        Vector2::new(x as usize, y as usize),
-                    );
-                } else if let PickerTarget::Entity(entity_id) = input_report.mouse_target {
-                    let entity = self
-                        .client_state
-                        .follow(client_state().entities())
-                        .iter()
-                        .find(|entity| entity.get_entity_id() == entity_id);
-
-                    if let Some(entity) = entity {
-                        entity.render_status(
-                            &self.middle_interface_renderer,
-                            current_camera,
-                            self.client_state.follow(client_state().game_theme()),
-                            screen_size,
-                        );
-
-                        if let Some(name) = &entity.get_details() {
-                            let name = name.split('#').next().unwrap();
-
-                            let offset = ScreenPosition {
-                                left: 15.0 * scaling.get_factor(),
-                                top: 15.0 * scaling.get_factor(),
-                            };
-
-                            self.middle_interface_renderer.render_text(
-                                name,
-                                input_report.mouse_position + offset,
-                                Color::WHITE,
-                                FontSize(16.0),
-                                AlignHorizontal::Mid,
-                            );
-                        }
-                    }
-                }
-
                 if let Some(player) = self.client_state.try_follow(this_entity()) {
                     #[cfg(feature = "debug")]
                     profile_block!("render player status");
@@ -2512,20 +2466,14 @@ impl Client {
                     );
                 }
 
-                // TODO: Move this down to the other input handling and move reset_mouse_mode
-                // onto build_ui. This needs to be handled more delicately, e.g.
-                // dropping resources.
-                if input_report.mouse_button_released {
-                    self.interface.reset_mouse_mode();
-                    self.mouse_cursor.set_state(MouseCursorState::Default, client_tick);
-                }
+                let mouse_mode = self.interface.get_mouse_mode();
+                let is_mouse_mode_default = mouse_mode.is_default();
+                let last_walking_destination = mouse_mode.walk_destination();
 
                 let mut built_ui = {
                     #[cfg(feature = "debug")]
                     profile_block!("user interface");
 
-                    let mouse_mode = self.interface.get_mouse_mode();
-                    let last_walking_position = mouse_mode.walk_position();
                     let is_rotating_camera = mouse_mode.is_rotating_camera();
                     let is_chat_open = self.interface.is_window_with_class_open(WindowClass::Chat);
 
@@ -2569,9 +2517,9 @@ impl Client {
                                     PickerTarget::Tile { x, y } => {
                                         let position = Vector2::new(x as usize, y as usize);
 
-                                        built_ui.set_mouse_mode(MouseInputMode::Walk(position));
+                                        built_ui.set_mouse_mode(MouseInputMode::Walk { destination: position });
 
-                                        self.user_event_buffer.push(UserEvent::RequestPlayerMove(position));
+                                        self.user_event_buffer.push(UserEvent::RequestPlayerMove { destination: position });
                                     }
                                     #[cfg(feature = "debug")]
                                     PickerTarget::Marker(marker_identifier) => {
@@ -2585,16 +2533,24 @@ impl Client {
                                 self.user_event_buffer.push(UserEvent::ResetCameraRotation);
                             }
                         }
-                    } else if let Some(last_position) = last_walking_position
+                    } else if let Some(last_destination) = last_walking_destination
                         && let PickerTarget::Tile { x, y } = input_report.mouse_target
                         && input_report.left_mouse_button_down
                     {
-                        let new_position = Vector2::new(x as usize, y as usize);
+                        let new_destination = Vector2::new(x as usize, y as usize);
 
-                        if last_position != new_position {
-                            built_ui.set_mouse_mode(MouseInputMode::Walk(new_position));
-                            self.user_event_buffer.push(UserEvent::RequestPlayerMove(new_position));
+                        if last_destination != new_destination {
+                            built_ui.set_mouse_mode(MouseInputMode::Walk {
+                                destination: new_destination,
+                            });
+                            self.user_event_buffer.push(UserEvent::RequestPlayerMove {
+                                destination: new_destination,
+                            });
                         }
+                    }
+
+                    if input_report.mouse_button_released {
+                        built_ui.drop(&self.client_state, input_report.mouse_position);
                     }
 
                     if let Some(delta) = input_report.scroll {
@@ -2617,6 +2573,59 @@ impl Client {
 
                     built_ui
                 };
+
+                match input_report.mouse_target {
+                    PickerTarget::Tile { x, y } => {
+                        // Only show if the mouse mode is default or walking.
+                        if currently_playing
+                            && !built_ui.is_interface_hovered()
+                            && (is_mouse_mode_default || last_walking_destination.is_some())
+                        {
+                            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_indicators))]
+                            map.render_walk_indicator(
+                                &mut indicator_instruction,
+                                walk_indicator_color,
+                                Vector2::new(x as usize, y as usize),
+                            );
+                        }
+                    }
+                    PickerTarget::Entity(entity_id) => {
+                        if !built_ui.is_interface_hovered() && is_mouse_mode_default {
+                            let entity = self
+                                .client_state
+                                .follow(client_state().entities())
+                                .iter()
+                                .find(|entity| entity.get_entity_id() == entity_id);
+
+                            if let Some(entity) = entity {
+                                entity.render_status(
+                                    &self.middle_interface_renderer,
+                                    current_camera,
+                                    self.client_state.follow(client_state().game_theme()),
+                                    screen_size,
+                                );
+
+                                if let Some(name) = &entity.get_details() {
+                                    let name = name.split('#').next().unwrap();
+
+                                    let offset = ScreenPosition {
+                                        left: 15.0 * scaling.get_factor(),
+                                        top: 15.0 * scaling.get_factor(),
+                                    };
+
+                                    self.middle_interface_renderer.render_text(
+                                        name,
+                                        input_report.mouse_position + offset,
+                                        Color::WHITE,
+                                        FontSize(16.0),
+                                        AlignHorizontal::Mid,
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
+                }
 
                 let tooltip_theme = match self.client_state.try_follow(this_player()).is_none() {
                     true => InterfaceThemeType::Menu,

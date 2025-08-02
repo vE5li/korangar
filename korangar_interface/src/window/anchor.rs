@@ -220,9 +220,10 @@ where
         closest_anchor_color: App::Color,
         window_position: App::Position,
         window_size: App::Size,
+        interface_scaling: f32,
     ) {
-        let dot_width = 10.0;
-        let wide_dot_width = 40.0;
+        let dot_width = 10.0 * interface_scaling;
+        let wide_dot_width = 40.0 * interface_scaling;
         let dot_size = App::Size::new(dot_width, dot_width);
         let screen_clip = App::Clip::unbound();
 
@@ -315,9 +316,10 @@ where
         anchor_color: App::Color,
         closest_anchor_color: App::Color,
         available_space: App::Size,
+        interface_scaling: f32,
     ) {
-        let dot_width = 10.0;
-        let wide_dot_width = 60.0;
+        let dot_width = 10.0 * interface_scaling;
+        let wide_dot_width = 60.0 * interface_scaling;
         let dot_size = App::Size::new(dot_width, dot_width);
         let screen_clip = App::Clip::unbound();
 

@@ -80,7 +80,10 @@ pub enum NetworkEvent {
     /// An Entity nearby is pathing to a new position.
     EntityMove(EntityId, WorldPosition, WorldPosition, ClientTick),
     /// Player was moved to a new position on a different map or the current map
-    ChangeMap(String, TilePosition),
+    ChangeMap {
+        map_name: String,
+        player_position: TilePosition,
+    },
     /// Update the client side [`tick
     /// counter`](crate::system::GameTimer::base_client_tick) to keep server and
     /// client synchronized.
@@ -105,7 +108,10 @@ pub enum NetworkEvent {
     },
     HealEffect(EntityId, usize),
     UpdateStatus(StatusType),
-    OpenDialog(String, EntityId),
+    OpenDialog {
+        text: String,
+        npc_id: EntityId,
+    },
     AddNextButton,
     AddCloseButton,
     AddChoiceButtons(Vec<String>),

@@ -16,13 +16,12 @@ use winit::keyboard::KeyCode;
 
 pub use self::event::UserEvent;
 pub use self::key::Key;
-pub use self::mode::{Grabbed, GrabbedExt, MouseInputMode};
+pub use self::mode::{Grabbed, MouseInputMode, MouseModeExt};
 use crate::graphics::PickerTarget;
 #[cfg(feature = "debug")]
 use crate::graphics::RenderOptions;
 use crate::interface::cursor::{MouseCursor, MouseCursorState};
 use crate::interface::layout::{ScreenPosition, ScreenSize};
-use crate::interface::resource::PartialMove;
 
 const MOUSE_SCOLL_MULTIPLIER: f32 = 30.0;
 const KEY_COUNT: usize = variant_count::<KeyCode>();

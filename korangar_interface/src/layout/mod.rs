@@ -76,6 +76,12 @@ struct ClickArea<'a, App> {
     action: &'a dyn ClickAction<App>,
 }
 
+struct DropArea<'a, App> {
+    clip_layer: ClipLayerId,
+    area: Area,
+    handler: &'a dyn DropHandler<App>,
+}
+
 struct WindowArea {
     clip_layer: ClipLayerId,
     area: Area,
@@ -113,6 +119,11 @@ pub trait InputHandler<App: Application> {
     fn handle_character(&self, state: &Context<App>, queue: &mut EventQueue<App>, character: char);
 }
 
+/// Handler for handling dropping a resource.
+pub trait DropHandler<App: Application> {
+    fn handle_drop(&self, state: &Context<App>, queue: &mut EventQueue<App>, mouse_mode: &MouseMode<App>);
+}
+
 // TODO: Rename most of these fields to include "_instructions".
 struct LayoutLayer<'a, App: Application> {
     rectangles: Vec<RectangleInsturction<App>>,
@@ -120,6 +131,7 @@ struct LayoutLayer<'a, App: Application> {
     icons: Vec<IconInstruction<App>>,
     custom_instructions: Vec<<App::Renderer as RenderLayer<App>>::CustomInstruction<'a>>,
     click_areas: Vec<ClickArea<'a, App>>,
+    drop_areas: Vec<DropArea<'a, App>>,
     window_move_areas: Vec<WindowArea>,
     window_resize_areas: Vec<WindowResizeArea>,
     window_close_areas: Vec<WindowArea>,
@@ -136,6 +148,7 @@ impl<App: Application> LayoutLayer<'_, App> {
         self.icons.clear();
         self.custom_instructions.clear();
         self.click_areas.clear();
+        self.drop_areas.clear();
         self.window_move_areas.clear();
         self.window_resize_areas.clear();
         self.window_close_areas.clear();
@@ -154,6 +167,7 @@ impl<App: Application> Default for LayoutLayer<'_, App> {
             icons: Default::default(),
             custom_instructions: Default::default(),
             click_areas: Default::default(),
+            drop_areas: Default::default(),
             window_move_areas: Default::default(),
             window_resize_areas: Default::default(),
             window_close_areas: Default::default(),
@@ -219,6 +233,8 @@ pub struct Layout<'a, App: Application> {
 
     window_position: App::Position,
     interface_scaling: f32,
+
+    mouse_mode: Option<&'a MouseMode<App>>,
 }
 
 impl<App: Application> Default for Layout<'_, App> {
@@ -246,6 +262,8 @@ impl<App: Application> Default for Layout<'_, App> {
 
             window_position: App::Position::new(0.0, 0.0),
             interface_scaling: 1.0,
+
+            mouse_mode: None,
         }
     }
 }
@@ -269,6 +287,7 @@ impl<'a, App: Application> Layout<'a, App> {
 
         self.tooltips.clear();
         self.focus_id_lookup.clear();
+        self.mouse_mode = None;
     }
 
     pub fn update(
@@ -278,6 +297,7 @@ impl<'a, App: Application> Layout<'a, App> {
         mouse_position: App::Position,
         focused_element: Option<ElementId>,
         can_hover: bool,
+        mouse_mode: &'a MouseMode<App>,
     ) {
         self.interface_scaling = interface_scaling;
         self.window_position = window_position;
@@ -287,6 +307,7 @@ impl<'a, App: Application> Layout<'a, App> {
         );
         self.focused_element = focused_element;
         self.can_hover = can_hover;
+        self.mouse_mode = Some(mouse_mode);
     }
 
     pub fn scale_area(&self, area: Area) -> Area {
@@ -298,6 +319,10 @@ impl<'a, App: Application> Layout<'a, App> {
         }
     }
 
+    pub fn get_mouse_mode(&self) -> &MouseMode<App> {
+        self.mouse_mode.as_ref().unwrap()
+    }
+
     pub fn is_hovered(&self) -> bool {
         !self.can_hover
     }
@@ -306,21 +331,32 @@ impl<'a, App: Application> Layout<'a, App> {
         self.can_hover = false;
     }
 
-    // TODO: Just expose `can_hover` as `mouse_free` or something hand have the
-    // caller combine these themselves.
-    /// This currently doesn't respect the clip since we don't have the clip
-    /// when performing this check. Maybe this will be changed in the
-    /// future.
-    pub fn is_area_hovered_and_active(&self, area: Area) -> bool {
-        self.can_hover
+    // TODO: Combine all of theses
+    pub fn is_area_hovered(&self, area: Area) -> bool {
+        self.mouse_mode.as_ref().unwrap().is_default()
             && self.mouse_position.left() >= area.left
             && self.mouse_position.top() >= area.top
             && self.mouse_position.left() <= area.left + area.width
             && self.mouse_position.top() <= area.top + area.height
     }
 
-    pub fn is_area_hovered(&self, area: Area) -> bool {
-        self.mouse_position.left() >= area.left
+    /// This currently doesn't respect the clip since we don't have the clip
+    /// when performing this check. Maybe this will be changed in the
+    /// future.
+    // TODO: Combine all of theses
+    pub fn is_area_hovered_and_active(&self, area: Area) -> bool {
+        self.can_hover
+            && self.mouse_mode.as_ref().unwrap().is_default()
+            && self.mouse_position.left() >= area.left
+            && self.mouse_position.top() >= area.top
+            && self.mouse_position.left() <= area.left + area.width
+            && self.mouse_position.top() <= area.top + area.height
+    }
+
+    // TODO: Combine all of theses
+    pub fn is_area_hovered_and_active_any_mode(&self, area: Area) -> bool {
+        self.can_hover
+            && self.mouse_position.left() >= area.left
             && self.mouse_position.top() >= area.top
             && self.mouse_position.left() <= area.left + area.width
             && self.mouse_position.top() <= area.top + area.height
@@ -406,6 +442,15 @@ impl<'a, App: Application> Layout<'a, App> {
             mouse_button: button,
             action,
         });
+    }
+
+    pub fn add_drop_area(&mut self, area: Area, handler: &'a dyn DropHandler<App>) {
+        let clip_layer = self.get_active_clip_layer();
+        let area = self.scale_area(area);
+
+        self.layers[self.current_layer]
+            .drop_areas
+            .push(DropArea { clip_layer, area, handler });
     }
 
     pub fn add_window_move_area(&mut self, area: Area, window_id: u64) {
@@ -684,8 +729,6 @@ impl<'a, App: Application> Layout<'a, App> {
         &self,
         state: &Context<App>,
         queue: &mut EventQueue<App>,
-        focused_element: &mut Option<ElementId>,
-        mouse_mode: &mut MouseMode<App>,
         click_position: App::Position,
         mouse_button: MouseButton,
     ) -> bool {
@@ -742,9 +785,11 @@ impl<'a, App: Application> Layout<'a, App> {
                     && click_position.top() >= clip.top()
                     && click_position.top() <= clip.bottom()
                 {
-                    *mouse_mode = MouseMode::MovingWindow {
-                        window_id: window_move_area.window_id,
-                    };
+                    queue.queue(Event::SetMouseMode {
+                        mouse_mode: MouseMode::MovingWindow {
+                            window_id: window_move_area.window_id,
+                        },
+                    });
                     clicked = true;
                 }
             }
@@ -759,10 +804,12 @@ impl<'a, App: Application> Layout<'a, App> {
                     && click_position.top() >= clip.top()
                     && click_position.top() <= clip.bottom()
                 {
-                    *mouse_mode = MouseMode::ResizingWindow {
-                        window_id: window_resize_area.window_id,
-                        resize_mode: window_resize_area.resize_mode,
-                    };
+                    queue.queue(Event::SetMouseMode {
+                        mouse_mode: MouseMode::ResizingWindow {
+                            window_id: window_resize_area.window_id,
+                            resize_mode: window_resize_area.resize_mode,
+                        },
+                    });
                     clicked = true;
                 }
             }
@@ -793,13 +840,53 @@ impl<'a, App: Application> Layout<'a, App> {
                     && click_position.top() >= clip.top()
                     && click_position.top() <= clip.bottom()
                 {
-                    *focused_element = Some(focus_area.element_id);
+                    queue.queue(Event::FocusElementPost {
+                        element_id: focus_area.element_id,
+                    });
                     clicked = true;
                 }
             }
         }
 
         clicked
+    }
+
+    pub fn do_drop(
+        &self,
+        state: &Context<App>,
+        queue: &mut EventQueue<App>,
+        drop_position: App::Position,
+        mouse_mode: &'a MouseMode<App>,
+    ) -> bool {
+        let mut handled = false;
+
+        // TODO: Deduplicate this function.
+        fn apply_clip<T: ClipTrait>(clip: T, area: Area) -> T {
+            T::new(
+                area.left.max(clip.left()),
+                area.top.max(clip.top()),
+                (area.left + area.width).min(clip.right()),
+                (area.top + area.height).min(clip.bottom()),
+            )
+        }
+
+        for layer in self.layers.iter().rev() {
+            for drop_area in &layer.drop_areas {
+                let clip = self.clip_layers[drop_area.clip_layer.0].clip;
+                let clip = apply_clip(clip, drop_area.area);
+
+                if drop_position.left() >= clip.left()
+                    && drop_position.left() <= clip.right()
+                    && drop_position.top() >= clip.top()
+                    && drop_position.top() <= clip.bottom()
+                {
+                    drop_area.handler.handle_drop(state, queue, mouse_mode);
+                    handled = true;
+                }
+            }
+        }
+
+        handled
     }
 
     pub fn do_scroll(&self, mouse_position: App::Position, delta: f32) -> bool {

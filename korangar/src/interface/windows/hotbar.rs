@@ -3,6 +3,7 @@ use korangar_interface::window::{CustomWindow, WindowTrait};
 use ragnarok_packets::HotbarSlot;
 use rust_state::{ArrayLookupExt, OptionExt, Path};
 
+use crate::interface::components::skill_box::SkillBoxHandler;
 use crate::interface::resource::SkillSource;
 use crate::interface::windows::WindowClass;
 use crate::inventory::Skill;
@@ -42,7 +43,7 @@ where
 
                         skill_box! {
                             skill_path: path,
-                            source: SkillSource::Hotbar { slot: HotbarSlot(slot as u16) },
+                            handler: SkillBoxHandler::new(path, SkillSource::Hotbar { slot: HotbarSlot(slot as u16) }),
                         }
                     }),
                 },

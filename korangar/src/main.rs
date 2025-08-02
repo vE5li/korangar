@@ -2515,11 +2515,11 @@ impl Client {
                                         self.user_event_buffer.push(UserEvent::RequestPlayerInteract(entity_id))
                                     }
                                     PickerTarget::Tile { x, y } => {
-                                        let position = Vector2::new(x as usize, y as usize);
+                                        let destination = Vector2::new(x as usize, y as usize);
 
-                                        built_ui.set_mouse_mode(MouseInputMode::Walk { destination: position });
+                                        built_ui.set_mouse_mode(MouseInputMode::Walk { destination });
 
-                                        self.user_event_buffer.push(UserEvent::RequestPlayerMove { destination: position });
+                                        self.user_event_buffer.push(UserEvent::RequestPlayerMove { destination });
                                     }
                                     #[cfg(feature = "debug")]
                                     PickerTarget::Marker(marker_identifier) => {
@@ -2537,15 +2537,11 @@ impl Client {
                         && let PickerTarget::Tile { x, y } = input_report.mouse_target
                         && input_report.left_mouse_button_down
                     {
-                        let new_destination = Vector2::new(x as usize, y as usize);
+                        let destination = Vector2::new(x as usize, y as usize);
 
-                        if last_destination != new_destination {
-                            built_ui.set_mouse_mode(MouseInputMode::Walk {
-                                destination: new_destination,
-                            });
-                            self.user_event_buffer.push(UserEvent::RequestPlayerMove {
-                                destination: new_destination,
-                            });
+                        if last_destination != destination {
+                            built_ui.set_mouse_mode(MouseInputMode::Walk { destination });
+                            self.user_event_buffer.push(UserEvent::RequestPlayerMove { destination });
                         }
                     }
 

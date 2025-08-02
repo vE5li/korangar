@@ -29,8 +29,12 @@ pub enum UserEvent {
     Respawn,
     LogOut,
     Exit,
-    ZoomCamera(f32),
-    RotateCamera(f32),
+    ZoomCamera {
+        zoom_factor: f32,
+    },
+    RotateCamera {
+        rotation: f32,
+    },
     ResetCameraRotation,
     OpenMenuWindow,
     OpenInventoryWindow,
@@ -40,10 +44,6 @@ pub enum UserEvent {
     OpenAudioSettingsWindow,
     OpenFriendListWindow,
     ToggleShowInterface,
-    // SetThemeFile {
-    //     theme_file: String,
-    //     theme_kind: InternalThemeKind,
-    // },
     // SaveTheme {
     //     theme_kind: InternalThemeKind,
     // },
@@ -70,9 +70,12 @@ pub enum UserEvent {
     RequestPlayerMove {
         destination: Vector2<usize>,
     },
-    RequestPlayerInteract(EntityId),
-    RequestWarpToMap(String, TilePosition),
-    SendMessage(String),
+    RequestPlayerInteract {
+        entity_id: EntityId,
+    },
+    SendMessage {
+        text: String,
+    },
     NextDialog {
         npc_id: EntityId,
     },
@@ -86,8 +89,12 @@ pub enum UserEvent {
     MoveResource {
         resource: Move,
     },
-    CastSkill(HotbarSlot),
-    StopSkill(HotbarSlot),
+    CastSkill {
+        slot: HotbarSlot,
+    },
+    StopSkill {
+        slot: HotbarSlot,
+    },
     AddFriend {
         character_name: String,
     },
@@ -115,7 +122,14 @@ pub enum UserEvent {
         items: Vec<SoldItemInformation>,
     },
     #[cfg(feature = "debug")]
-    OpenMarkerDetails(MarkerIdentifier),
+    RequestWarpToMap {
+        map_name: String,
+        position: TilePosition,
+    },
+    #[cfg(feature = "debug")]
+    OpenMarkerDetails {
+        marker_identifier: MarkerIdentifier,
+    },
     #[cfg(feature = "debug")]
     OpenRenderOptionsWindow,
     #[cfg(feature = "debug")]
@@ -144,7 +158,9 @@ pub enum UserEvent {
     #[cfg(feature = "debug")]
     OpenPacketInspectorWindow,
     #[cfg(feature = "debug")]
-    CameraLookAround(Vector2<f32>),
+    CameraLookAround {
+        offset: Vector2<f32>,
+    },
     #[cfg(feature = "debug")]
     CameraMoveForward,
     #[cfg(feature = "debug")]

@@ -998,7 +998,7 @@ impl Client {
                         entity.set_idle(client_tick);
                     }
                 }
-                NetworkEvent::AccountId(..) => {}
+                NetworkEvent::AccountId { .. } => {}
                 NetworkEvent::CharacterList { characters } => {
                     self.audio_engine.play_sound_effect(self.main_menu_click_sound_effect);
 
@@ -1109,7 +1109,7 @@ impl Client {
                     self.interface
                         .open_window(ErrorWindow::new("Failed to switch character slots".to_owned()));
                 }
-                NetworkEvent::AddEntity(entity_data) => {
+                NetworkEvent::AddEntity { entity_data } => {
                     // FIX: A bit hacky because of borrowing rules.
                     let client_state = self.client_state.follow_mut(client_state());
 
@@ -1170,7 +1170,12 @@ impl Client {
                             .retain(|entity| entity.get_entity_id() != entity_id);
                     }
                 }
-                NetworkEvent::EntityMove(entity_id, position_from, position_to, starting_timestamp) => {
+                NetworkEvent::EntityMove {
+                    entity_id,
+                    origin,
+                    destination,
+                    starting_timestamp,
+                } => {
                     // FIX: A bit hacky because of borrowing rules.
                     let client_state = self.client_state.follow_mut(client_state());
 
@@ -1179,21 +1184,25 @@ impl Client {
                     if let Some(entity) = entity
                         && let Some(map) = &client_state.map
                     {
-                        let position_from = Vector2::new(position_from.x, position_from.y);
-                        let position_to = Vector2::new(position_to.x, position_to.y);
+                        let position_from = Vector2::new(origin.x, origin.y);
+                        let position_to = Vector2::new(destination.x, destination.y);
 
                         entity.move_from_to(map, &mut self.path_finder, position_from, position_to, starting_timestamp);
                         #[cfg(feature = "debug")]
                         entity.generate_pathing_mesh(&self.device, &self.queue, self.graphics_engine.bindless_support(), map);
                     }
                 }
-                NetworkEvent::PlayerMove(position_from, position_to, starting_timestamp) => {
+                NetworkEvent::PlayerMove {
+                    origin,
+                    destination,
+                    starting_timestamp,
+                } => {
                     // FIX: A bit hacky because of borrowing rules.
                     let client_state = self.client_state.follow_mut(client_state());
 
                     if let Some(map) = &client_state.map {
-                        let position_from = Vector2::new(position_from.x, position_from.y);
-                        let position_to = Vector2::new(position_to.x, position_to.y);
+                        let position_from = Vector2::new(origin.x, origin.y);
+                        let position_to = Vector2::new(destination.x, destination.y);
 
                         if let Some(player) = client_state.entities.get_mut(0) {
                             player.move_from_to(map, &mut self.path_finder, position_from, position_to, starting_timestamp);
@@ -1202,7 +1211,7 @@ impl Client {
                         }
                     }
                 }
-                NetworkEvent::ChangeMap { map_name, player_position } => {
+                NetworkEvent::ChangeMap { map_name, position } => {
                     *self.client_state.follow_mut(client_state().map()) = None;
                     self.particle_holder.clear();
                     self.effect_holder.clear();
@@ -1215,7 +1224,7 @@ impl Client {
                     // Close any remaining dialogs.
                     self.interface.close_window_with_class(WindowClass::Dialog);
 
-                    self.async_loader.request_map_load(map_name, Some(player_position));
+                    self.async_loader.request_map_load(map_name, Some(position));
                 }
                 NetworkEvent::UpdateClientTick { client_tick, received_at } => {
                     self.game_timer.set_client_tick(client_tick, received_at);
@@ -1225,7 +1234,7 @@ impl Client {
                         .follow_mut(client_state().chat_messages())
                         .push(ChatMessage { text, color });
                 }
-                NetworkEvent::UpdateEntityDetails(entity_id, name) => {
+                NetworkEvent::UpdateEntityDetails { entity_id, name } => {
                     let entity = self
                         .client_state
                         .follow_mut(client_state().entities())
@@ -1248,7 +1257,7 @@ impl Client {
                             .spawn_particle(Box::new(DamageNumber::new(entity.get_position(), damage_amount.to_string())));
                     }
                 }
-                NetworkEvent::HealEffect(entity_id, damage_amount) => {
+                NetworkEvent::HealEffect { entity_id, heal_amount } => {
                     if let Some(entity) = self
                         .client_state
                         .follow(client_state().entities())
@@ -1257,10 +1266,14 @@ impl Client {
                         .or_else(|| self.client_state.try_follow(this_entity()))
                     {
                         self.particle_holder
-                            .spawn_particle(Box::new(HealNumber::new(entity.get_position(), damage_amount.to_string())));
+                            .spawn_particle(Box::new(HealNumber::new(entity.get_position(), heal_amount.to_string())));
                     }
                 }
-                NetworkEvent::UpdateEntityHealth(entity_id, health_points, maximum_health_points) => {
+                NetworkEvent::UpdateEntityHealth {
+                    entity_id,
+                    health_points,
+                    maximum_health_points,
+                } => {
                     let entity = self
                         .client_state
                         .follow_mut(client_state().entities())
@@ -1271,7 +1284,7 @@ impl Client {
                         entity.update_health(health_points, maximum_health_points);
                     }
                 }
-                NetworkEvent::UpdateStatus(status_type) => {
+                NetworkEvent::UpdateStatus { status_type } => {
                     if let Some(player) = self.client_state.try_follow_mut(this_player()) {
                         player.update_status(status_type);
                     }
@@ -1282,16 +1295,16 @@ impl Client {
                 }
                 NetworkEvent::AddNextButton => self.client_state.follow_mut(client_state().dialog_window()).add_next_button(),
                 NetworkEvent::AddCloseButton => self.client_state.follow_mut(client_state().dialog_window()).add_close_button(),
-                NetworkEvent::AddChoiceButtons(choices) => self
+                NetworkEvent::AddChoiceButtons { choices } => self
                     .client_state
                     .follow_mut(client_state().dialog_window())
                     .add_choice_buttons(choices),
-                NetworkEvent::AddQuestEffect(quest_effect) => {
+                NetworkEvent::AddQuestEffect { quest_effect } => {
                     if let Some(map) = self.client_state.follow(client_state().map()) {
                         self.particle_holder.add_quest_icon(&self.texture_loader, map, quest_effect)
                     }
                 }
-                NetworkEvent::RemoveQuestEffect(entity_id) => self.particle_holder.remove_quest_icon(entity_id),
+                NetworkEvent::RemoveQuestEffect { entity_id } => self.particle_holder.remove_quest_icon(entity_id),
                 NetworkEvent::SetInventory { items } => {
                     self.client_state
                         .follow_mut(client_state().inventory())
@@ -1307,14 +1320,10 @@ impl Client {
                     // should allow you to sell the new
                     // amount of items.
                 }
-                NetworkEvent::InventoryItemRemoved {
-                    reason: _reason,
-                    index,
-                    amount,
-                } => {
+                NetworkEvent::InventoryItemRemoved { index, amount, .. } => {
                     self.client_state.follow_mut(client_state().inventory()).remove_item(index, amount);
                 }
-                NetworkEvent::SkillTree(skill_information) => {
+                NetworkEvent::SkillTree { skill_information } => {
                     self.client_state.follow_mut(client_state().skill_tree()).fill(
                         &self.sprite_loader,
                         &self.action_loader,
@@ -1381,8 +1390,8 @@ impl Client {
                 NetworkEvent::FriendAdded { friend } => {
                     self.client_state.follow_mut(client_state().friend_list()).push(friend);
                 }
-                NetworkEvent::VisualEffect(path, entity_id) => {
-                    let effect = self.effect_loader.get_or_load(path, &self.texture_loader).unwrap();
+                NetworkEvent::VisualEffect { effect_path, entity_id } => {
+                    let effect = self.effect_loader.get_or_load(effect_path, &self.texture_loader).unwrap();
                     let frame_timer = effect.new_frame_timer();
 
                     self.effect_holder.add_effect(Box::new(EffectWithLight::new(
@@ -1402,7 +1411,11 @@ impl Client {
                         false,
                     )));
                 }
-                NetworkEvent::AddSkillUnit(entity_id, unit_id, position) => {
+                NetworkEvent::AddSkillUnit {
+                    entity_id,
+                    unit_id,
+                    position,
+                } => {
                     let Some(map) = self.client_state.follow(client_state().map()) else {
                         continue;
                     };
@@ -1453,11 +1466,11 @@ impl Client {
                         _ => {}
                     }
                 }
-                NetworkEvent::RemoveSkillUnit(entity_id) => {
+                NetworkEvent::RemoveSkillUnit { entity_id } => {
                     self.effect_holder.remove_unit(entity_id);
                 }
-                NetworkEvent::SetFriendList { friend_list: friends } => {
-                    *self.client_state.follow_mut(client_state().friend_list()) = friends;
+                NetworkEvent::SetFriendList { friend_list } => {
+                    *self.client_state.follow_mut(client_state().friend_list()) = friend_list;
                 }
                 NetworkEvent::SetHotkeyData { tab, hotkeys } => {
                     // FIX: Since we only have one hotbar at the moment, we ignore
@@ -1606,7 +1619,8 @@ impl Client {
 
         if self.interface.get_mouse_mode().is_rotating_camera() {
             // TODO: Does this really need to be a UserEvent?
-            self.user_event_buffer.push(UserEvent::RotateCamera(input_report.mouse_delta.width));
+            let rotation = input_report.mouse_delta.width;
+            self.user_event_buffer.push(UserEvent::RotateCamera { rotation });
         }
 
         if !interface_has_focus {
@@ -1667,8 +1681,8 @@ impl Client {
                     let _ = self.networking_system.log_out();
                 }
                 UserEvent::Exit => event_loop.exit(),
-                UserEvent::ZoomCamera(factor) => self.player_camera.soft_zoom(factor),
-                UserEvent::RotateCamera(factor) => self.player_camera.soft_rotate(factor),
+                UserEvent::ZoomCamera { zoom_factor } => self.player_camera.soft_zoom(zoom_factor),
+                UserEvent::RotateCamera { rotation } => self.player_camera.soft_rotate(rotation),
                 UserEvent::ResetCameraRotation => self.player_camera.reset_rotation(),
                 UserEvent::OpenMenuWindow => {
                     if self.client_state.try_follow(this_entity()).is_some() {
@@ -1705,7 +1719,6 @@ impl Client {
                     ));
                 }
                 UserEvent::ToggleShowInterface => self.show_interface = !self.show_interface,
-                // UserEvent::SetThemeFile { theme_file, theme_kind } => {} //self.client_state.set_theme_file(theme_file, theme_kind),
                 // UserEvent::SaveTheme { theme_kind } => {}                //self.client_state.save_theme(theme_kind),
                 // UserEvent::ReloadTheme { theme_kind } => {}              //self.client_state.reload_theme(theme_kind),
                 UserEvent::SelectCharacter { slot } => {
@@ -1742,7 +1755,7 @@ impl Client {
                         });
                     }
                 }
-                UserEvent::RequestPlayerInteract(entity_id) => {
+                UserEvent::RequestPlayerInteract { entity_id } => {
                     let entity = self
                         .client_state
                         .follow_mut(client_state().entities())
@@ -1765,13 +1778,14 @@ impl Client {
                         };
                     }
                 }
-                UserEvent::RequestWarpToMap(map_name, position) => {
+                #[cfg(feature = "debug")]
+                UserEvent::RequestWarpToMap { map_name, position } => {
                     let _ = self.networking_system.warp_to_map(map_name, position);
                 }
-                UserEvent::SendMessage(message) => {
+                UserEvent::SendMessage { text } => {
                     let _ = self
                         .networking_system
-                        .send_chat_message(&self.client_state.follow(client_state().player_name()), &message);
+                        .send_chat_message(&self.client_state.follow(client_state().player_name()), &text);
                 }
                 UserEvent::NextDialog { npc_id } => {
                     let _ = self.networking_system.next_dialog(npc_id);
@@ -1818,7 +1832,7 @@ impl Client {
                         _ => {}
                     },
                 },
-                UserEvent::CastSkill(slot) => {
+                UserEvent::CastSkill { slot } => {
                     if let Some(skill) = self.client_state.follow(client_state().hotbar()).get_skill_in_slot(slot).as_ref() {
                         match skill.skill_type {
                             SkillType::Passive => {}
@@ -1864,7 +1878,7 @@ impl Client {
                         }
                     }
                 }
-                UserEvent::StopSkill(slot) => {
+                UserEvent::StopSkill { slot } => {
                     if let Some(skill) = self.client_state.follow(client_state().hotbar()).get_skill_in_slot(slot).as_ref() {
                         if skill.skill_id == ROLLING_CUTTER_ID {
                             let _ = self.networking_system.stop_channeling_skill(skill.skill_id);
@@ -1918,7 +1932,7 @@ impl Client {
                     let _ = self.networking_system.sell_items(items);
                 }
                 #[cfg(feature = "debug")]
-                UserEvent::OpenMarkerDetails(marker_identifier) => {
+                UserEvent::OpenMarkerDetails { marker_identifier } => {
                     if let Some(map) = self.client_state.follow(client_state().map()) {
                         // self.interface.open_window(
                         //     &self.client_state,
@@ -1964,7 +1978,7 @@ impl Client {
                 #[cfg(feature = "debug")]
                 UserEvent::OpenPacketInspectorWindow => self.interface.open_window(PacketInspector::new(client_state().packet_history())),
                 #[cfg(feature = "debug")]
-                UserEvent::CameraLookAround(offset) => self.debug_camera.look_around(offset),
+                UserEvent::CameraLookAround { offset } => self.debug_camera.look_around(offset),
                 #[cfg(feature = "debug")]
                 UserEvent::CameraMoveForward => self.debug_camera.move_forward(delta_time as f32),
                 #[cfg(feature = "debug")]
@@ -2014,7 +2028,7 @@ impl Client {
                             .for_each(|item| item.metadata.texture = Some(texture.clone()));
                     }
                 },
-                (LoaderId::Map(..), LoadableResource::Map { map, player_position }) => {
+                (LoaderId::Map(..), LoadableResource::Map { map, position }) => {
                     match self.client_state.try_follow(this_player()).is_none() {
                         true => {
                             // Load of main menu map
@@ -2041,8 +2055,8 @@ impl Client {
                             map.set_ambient_sound_sources(&self.audio_engine);
                             self.audio_engine.play_background_music_track(map.background_music_track_name());
 
-                            if let Some(player_position) = player_position {
-                                let player_position = Vector2::new(player_position.x as usize, player_position.y as usize);
+                            if let Some(position) = position {
+                                let position = Vector2::new(position.x as usize, position.y as usize);
 
                                 // SAFETY
                                 // `manually_asserted` is safe because we are in
@@ -2052,7 +2066,7 @@ impl Client {
 
                                 let player = &mut client_state.entities[0];
 
-                                player.set_position(map, player_position, client_tick);
+                                player.set_position(map, position, client_tick);
                                 self.player_camera.set_focus_point(player.get_position());
                             }
 
@@ -2144,8 +2158,8 @@ impl Client {
                     // SAFETY
                     // `manually_asserted` is safe because we are in the branch where `this_player`
                     // is not `None`.
-                    let player_position = self.client_state.follow(this_entity().manually_asserted()).get_position();
-                    self.player_camera.set_smoothed_focus_point(player_position);
+                    let position = self.client_state.follow(this_entity().manually_asserted()).get_position();
+                    self.player_camera.set_smoothed_focus_point(position);
                     self.directional_shadow_camera
                         .set_focus_point(self.player_camera.focus_point(), self.player_camera.view_direction());
                 }
@@ -2512,7 +2526,7 @@ impl Client {
                                 match input_report.mouse_target {
                                     PickerTarget::Nothing => {}
                                     PickerTarget::Entity(entity_id) => {
-                                        self.user_event_buffer.push(UserEvent::RequestPlayerInteract(entity_id))
+                                        self.user_event_buffer.push(UserEvent::RequestPlayerInteract { entity_id })
                                     }
                                     PickerTarget::Tile { x, y } => {
                                         let destination = Vector2::new(x as usize, y as usize);
@@ -2523,7 +2537,7 @@ impl Client {
                                     }
                                     #[cfg(feature = "debug")]
                                     PickerTarget::Marker(marker_identifier) => {
-                                        self.user_event_buffer.push(UserEvent::OpenMarkerDetails(marker_identifier))
+                                        self.user_event_buffer.push(UserEvent::OpenMarkerDetails { marker_identifier })
                                     }
                                 }
                             } else if mouse_button == MouseButton::Right && currently_playing {
@@ -2554,7 +2568,7 @@ impl Client {
                             built_ui.scroll(input_report.mouse_position, delta);
                         } else {
                             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(!render_options.use_debug_camera))]
-                            self.user_event_buffer.push(UserEvent::ZoomCamera(delta));
+                            self.user_event_buffer.push(UserEvent::ZoomCamera { zoom_factor: delta });
                         }
                     }
 

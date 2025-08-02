@@ -226,27 +226,27 @@ impl InputSystem {
         }
 
         if self.get_key(KeyCode::KeyJ).pressed() {
-            events.push(UserEvent::CastSkill(HotbarSlot(0)));
+            events.push(UserEvent::CastSkill { slot: HotbarSlot(0) });
         }
 
         if self.get_key(KeyCode::KeyJ).released() {
-            events.push(UserEvent::StopSkill(HotbarSlot(0)));
+            events.push(UserEvent::StopSkill { slot: HotbarSlot(0) });
         }
 
         if self.get_key(KeyCode::KeyL).pressed() {
-            events.push(UserEvent::CastSkill(HotbarSlot(1)));
+            events.push(UserEvent::CastSkill { slot: HotbarSlot(1) });
         }
 
         if self.get_key(KeyCode::KeyL).released() {
-            events.push(UserEvent::StopSkill(HotbarSlot(1)));
+            events.push(UserEvent::StopSkill { slot: HotbarSlot(1) });
         }
 
         if self.get_key(KeyCode::KeyU).pressed() {
-            events.push(UserEvent::CastSkill(HotbarSlot(2)));
+            events.push(UserEvent::CastSkill { slot: HotbarSlot(2) });
         }
 
         if self.get_key(KeyCode::KeyU).released() {
-            events.push(UserEvent::StopSkill(HotbarSlot(2)));
+            events.push(UserEvent::StopSkill { slot: HotbarSlot(2) });
         }
 
         #[cfg(feature = "debug")]
@@ -287,10 +287,8 @@ impl InputSystem {
         // TODO: This should be moved.
         #[cfg(feature = "debug")]
         if self.right_mouse_button.down() && !self.right_mouse_button.pressed() && process_mouse && use_debug_camera {
-            events.push(UserEvent::CameraLookAround(-Vector2::new(
-                self.mouse_delta.width,
-                self.mouse_delta.height,
-            )));
+            let offset = -Vector2::new(self.mouse_delta.width, self.mouse_delta.height);
+            events.push(UserEvent::CameraLookAround { offset });
         }
 
         #[cfg(feature = "debug")]

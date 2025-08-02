@@ -32,14 +32,8 @@ pub enum LoaderId {
 
 pub enum LoadableResource {
     AnimationData(Arc<AnimationData>),
-    ItemSprite {
-        texture: Arc<Texture>,
-        location: ItemLocation,
-    },
-    Map {
-        map: Box<Map>,
-        player_position: Option<TilePosition>,
-    },
+    ItemSprite { texture: Arc<Texture>, location: ItemLocation },
+    Map { map: Box<Map>, position: Option<TilePosition> },
 }
 
 enum LoadStatus {
@@ -162,7 +156,7 @@ impl AsyncLoader {
         }
     }
 
-    pub fn request_map_load(&self, map_name: String, player_position: Option<TilePosition>) {
+    pub fn request_map_load(&self, map_name: String, position: Option<TilePosition>) {
         let map_loader = self.map_loader.clone();
         let model_loader = self.model_loader.clone();
         let texture_loader = self.texture_loader.clone();
@@ -173,7 +167,7 @@ impl AsyncLoader {
             #[cfg(feature = "debug")]
             let _load_measurement = Profiler::start_measurement("map load");
             let map = map_loader.load(map_name, &model_loader, texture_loader, video_loader.clone(), &library)?;
-            Ok(LoadableResource::Map { map, player_position })
+            Ok(LoadableResource::Map { map, position })
         });
     }
 

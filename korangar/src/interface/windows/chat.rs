@@ -112,7 +112,7 @@ where
 /// Internal state of the chat window.
 #[derive(Default, RustState, StateElement)]
 pub struct ChatWindowState {
-    current_message: String,
+    current_text: String,
 }
 
 pub struct ChatWindow<A, B> {
@@ -141,14 +141,14 @@ where
     fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
         use korangar_interface::prelude::*;
 
-        let current_message_path = self.chat_window_state.current_message();
+        let current_text_path = self.chat_window_state.current_text();
         let send_action = move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
-            let message = state.get(&current_message_path);
+            let text = state.get(&current_text_path);
 
-            if !message.is_empty() {
+            if !text.is_empty() {
                 // Clear the text box.
-                state.update_value_with(current_message_path, |current_message| current_message.clear());
-                queue.queue(UserEvent::SendMessage(message.clone()));
+                state.update_value_with(current_text_path, |current_text| current_text.clear());
+                queue.queue(UserEvent::SendMessage { text: text.clone() });
                 queue.queue(Event::Unfocus);
             }
         };
@@ -167,8 +167,8 @@ where
             elements: (
                 text_box! {
                     ghost_text: "Enter chat message or command",
-                    state: current_message_path,
-                    input_handler: DefaultHandler::<_, _, MAXIMUM_CHAT_MESSAGE_LENGTH>::new(current_message_path, send_action),
+                    state: current_text_path,
+                    input_handler: DefaultHandler::<_, _, MAXIMUM_CHAT_MESSAGE_LENGTH>::new(current_text_path, send_action),
                     background_color: client_theme().chat().text_box_background_color(),
                     focused_background_color: Color::rgba(0.0, 0.0, 0.0, 0.8),
                     focus_id: ChatTextBox,

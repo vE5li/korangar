@@ -32,21 +32,21 @@ impl SkillTree {
         &mut self,
         sprite_loader: &SpriteLoader,
         action_loader: &ActionLoader,
-        skill_data: Vec<SkillInformation>,
+        skill_information: Vec<SkillInformation>,
         client_tick: ClientTick,
     ) {
-        self.skills = skill_data
+        self.skills = skill_information
             .into_iter()
-            .map(|skill_data| {
-                let file_path = format!("아이템\\{}", skill_data.skill_name);
+            .map(|skill_information| {
+                let file_path = format!("아이템\\{}", skill_information.skill_name);
                 let sprite = sprite_loader.get_or_load(&format!("{file_path}.spr")).unwrap();
                 let actions = action_loader.get_or_load(&format!("{file_path}.act")).unwrap();
 
                 Skill {
-                    skill_id: skill_data.skill_id,
-                    skill_level: skill_data.skill_level,
-                    skill_type: skill_data.skill_type,
-                    skill_name: skill_data.skill_name,
+                    skill_id: skill_information.skill_id,
+                    skill_level: skill_information.skill_level,
+                    skill_type: skill_information.skill_type,
+                    skill_name: skill_information.skill_name,
                     sprite,
                     actions,
                     animation_state: SpriteAnimationState::new(client_tick),

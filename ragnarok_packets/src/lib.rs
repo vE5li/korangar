@@ -665,7 +665,7 @@ pub struct RequestWarpToMapPacket {
 pub struct EntityMovePacket {
     pub entity_id: EntityId,
     pub from_to: WorldPosition2,
-    pub timestamp: ClientTick,
+    pub starting_timestamp: ClientTick,
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
@@ -684,7 +684,7 @@ pub struct EntityStopMovePacket {
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x0087)]
 pub struct PlayerMovePacket {
-    pub timestamp: ClientTick,
+    pub starting_timestamp: ClientTick,
     pub from_to: WorldPosition2,
 }
 
@@ -1560,7 +1560,7 @@ pub struct SwitchCharacterSlotResponsePacket {
 pub struct ChangeMapPacket {
     #[length(16)]
     pub map_name: String,
-    pub player_position: TilePosition,
+    pub position: TilePosition,
 }
 
 #[derive(Debug, Clone, ByteConvertable, PartialEq)]

@@ -3,8 +3,7 @@ use std::sync::mpsc::TryRecvError;
 
 use korangar_debug::logging::{Colorize, print_debug};
 use korangar_interface::application::Application;
-use korangar_interface::element::id::ElementIdGenerator;
-use korangar_interface::element::store::ElementStore;
+use korangar_interface::element::store::{ElementStore, ElementStoreMut};
 use korangar_interface::element::{Element, ErasedElement, StateElement};
 use korangar_interface::layout::{Layout, Resolver};
 use korangar_interface::prelude::*;
@@ -41,9 +40,8 @@ where
     fn create_layout_info(
         &mut self,
         state: &rust_state::Context<App>,
-        _: &mut ElementStore,
-        _: &mut ElementIdGenerator,
-        resolver: &mut Resolver,
+        _: ElementStoreMut<'_>,
+        resolver: &mut Resolver<'_, App>,
     ) -> Self::LayoutInfo {
         let height = *state.get(&theme().text().height());
         let area = resolver.with_height(height);
@@ -64,10 +62,10 @@ where
         Self::LayoutInfo { area }
     }
 
-    fn layout_element<'a>(
+    fn lay_out<'a>(
         &'a self,
         state: &'a rust_state::Context<App>,
-        _: &'a ElementStore,
+        _: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, App>,
     ) {
@@ -80,6 +78,8 @@ where
             *state.get(&theme().text().horizontal_alignment()),
             // TODO: Check if we really want it like this.
             *state.get(&theme().text().vertical_alignment()),
+            // TODO: Check if we really want it like this.
+            *state.get(&theme().text().overflow_behavior()),
         );
     }
 }
@@ -108,9 +108,8 @@ where
     fn create_layout_info(
         &mut self,
         state: &rust_state::Context<App>,
-        _: &mut ElementStore,
-        _: &mut ElementIdGenerator,
-        resolver: &mut Resolver,
+        _: ElementStoreMut<'_>,
+        resolver: &mut Resolver<'_, App>,
     ) -> Self::LayoutInfo {
         let error = state.get(&self.path);
         if !self.cached.as_ref().is_some_and(|cached| cached == error) {
@@ -124,10 +123,10 @@ where
         Self::LayoutInfo { area }
     }
 
-    fn layout_element<'a>(
+    fn lay_out<'a>(
         &'a self,
         state: &'a rust_state::Context<App>,
-        _: &'a ElementStore,
+        _: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, App>,
     ) {
@@ -140,6 +139,8 @@ where
             *state.get(&theme().text().horizontal_alignment()),
             // TODO: Check if we really want it like this.
             *state.get(&theme().text().vertical_alignment()),
+            // TODO: Check if we really want it like this.
+            *state.get(&theme().text().overflow_behavior()),
         );
     }
 }

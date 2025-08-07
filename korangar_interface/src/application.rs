@@ -1,3 +1,4 @@
+use crate::layout::alignment::OverflowBehavior;
 use crate::layout::{ClipLayer, Icon};
 use crate::theme::ThemePathGetter;
 use crate::window::Anchor;
@@ -102,6 +103,9 @@ pub trait Application: Sized + 'static {
     /// dragging a resource or rotating the camera.
     type CustomMouseMode;
 
+    /// Application text layouter.
+    type TextLayouter: TextLayouter<Self>;
+
     fn set_current_theme_type(theme: Self::ThemeType);
 }
 
@@ -116,12 +120,6 @@ pub trait RenderLayer<App: Application> {
     /// Application specific icons.
     type CustomIcon: Clone + Copy;
 
-    /// Get the bounds of a given text. The implementation should respect the
-    /// available_width and use the overflow behavior to adjust the font
-    /// size or insert line breaks if needed.
-    // TODO: Add overflow behavior parameter. E.g. shrink and break.
-    fn get_text_dimensions(&self, text: &str, font_size: App::FontSize, available_width: f32) -> App::Size;
-
     /// Render a rectangle.
     fn render_rectangle(
         &self,
@@ -133,13 +131,34 @@ pub trait RenderLayer<App: Application> {
     );
 
     /// Render a str as text.
-    fn render_text(&self, text: &str, position: App::Position, clip: App::Clip, color: App::Color, font_size: App::FontSize);
+    fn render_text(
+        &self,
+        text: &str,
+        position: App::Position,
+        available_width: f32,
+        clip: App::Clip,
+        color: App::Color,
+        font_size: App::FontSize,
+    );
 
     /// Render an icon.
     fn render_icon(&self, position: App::Position, size: App::Size, clip: App::Clip, icon: Icon<App>, color: App::Color);
 
     /// Render a [`CustomInstruction`](RenderLayer::CustomInstruction).
     fn render_custom(&self, instruction: Self::CustomInstruction<'_>, clip_layers: &[ClipLayer<App>]);
+}
+
+/// Glue between [`korangar_interface`] and the part of the application that
+/// handles layouting text. Many components change their size based on the
+/// displayed text to avoid clipping text.
+pub trait TextLayouter<App: Application>: Clone {
+    fn get_text_dimensions(
+        &self,
+        text: &str,
+        font_size: App::FontSize,
+        available_width: f32,
+        overflow_behavior: OverflowBehavior,
+    ) -> (App::Size, App::FontSize);
 }
 
 // TODO: Rename

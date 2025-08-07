@@ -1,4 +1,4 @@
-use korangar_interface::window::{CustomWindow, WindowTrait};
+use korangar_interface::window::{CustomWindow, Window};
 use ragnarok_packets::Friend;
 
 use crate::input::InputEvent;
@@ -17,7 +17,7 @@ impl FriendRequestWindow {
 }
 
 impl CustomWindow<ClientState> for FriendRequestWindow {
-    fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
+    fn to_window<'a>(self) -> impl Window<ClientState> + 'a {
         use korangar_interface::prelude::*;
 
         window! {

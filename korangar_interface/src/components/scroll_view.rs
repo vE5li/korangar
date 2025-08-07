@@ -3,8 +3,7 @@ use std::cell::RefCell;
 use rust_state::Context;
 
 use crate::application::Application;
-use crate::element::id::ElementIdGenerator;
-use crate::element::store::{ElementStore, Persistent, PersistentExt};
+use crate::element::store::{ElementStore, ElementStoreMut, Persistent, PersistentExt};
 use crate::element::{Element, ElementSet};
 use crate::layout::area::Area;
 use crate::layout::{Layout, Resolver};
@@ -39,12 +38,11 @@ where
     fn create_layout_info(
         &mut self,
         state: &Context<App>,
-        store: &mut ElementStore,
-        generator: &mut ElementIdGenerator,
-        resolver: &mut Resolver,
+        mut store: ElementStoreMut<'_>,
+        resolver: &mut Resolver<'_, App>,
     ) -> Self::LayoutInfo {
         loop {
-            let persistent = self.get_persistent_data(store, ());
+            let persistent = self.get_persistent_data(&store, ());
             let current_scroll = *persistent.scroll.borrow();
 
             // In case that we need to resolve twice we don't want to start with the same
@@ -53,11 +51,16 @@ where
             // ugly and might be improved in the future.
             let mut cloned_resolver = resolver.clone();
 
+            // HACK: Since this loop might run multiple times we need a new store every
+            // time. This is a bit wasteful and I would like to solve this more
+            // elegantly.
+            let child_store = store.child_store(0);
+
             let (area, children_height, layout_info) = cloned_resolver.with_derived_scrolled(current_scroll, |resolver| {
-                self.children.create_layout_info(state, store, generator, resolver)
+                self.children.create_layout_info(state, child_store, resolver)
             });
 
-            let persistent = self.get_persistent_data(store, ());
+            let persistent = self.get_persistent_data(&store, ());
             let mut current_scroll = persistent.scroll.borrow_mut();
 
             let max_scroll = (children_height - area.height).max(0.0);
@@ -83,18 +86,19 @@ where
         }
     }
 
-    fn layout_element<'a>(
+    fn lay_out<'a>(
         &'a self,
         state: &'a Context<App>,
-        store: &'a ElementStore,
+        store: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, App>,
     ) {
-        let persistent = self.get_persistent_data(store, ());
+        let persistent = self.get_persistent_data(&store, ());
 
         layout.with_clip_layer(layout_info.area, |layout| {
             layout.with_layer(|layout| {
-                self.children.layout_element(state, store, &layout_info.children, layout);
+                // HACK: We need to do the same as in `create_layout_info`.
+                self.children.lay_out(state, store.child_store(0), &layout_info.children, layout);
             });
         });
 

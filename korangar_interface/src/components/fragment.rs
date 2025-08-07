@@ -1,8 +1,7 @@
 use rust_state::{Context, Selector};
 
 use crate::application::Application;
-use crate::element::id::ElementIdGenerator;
-use crate::element::store::ElementStore;
+use crate::element::store::{ElementStore, ElementStoreMut};
 use crate::element::{Element, ElementSet};
 use crate::layout::{Layout, Resolver};
 
@@ -24,24 +23,23 @@ where
     fn create_layout_info(
         &mut self,
         state: &Context<App>,
-        store: &mut ElementStore,
-        generator: &mut ElementIdGenerator,
-        resolver: &mut Resolver,
+        store: ElementStoreMut<'_>,
+        resolver: &mut Resolver<'_, App>,
     ) -> Self::LayoutInfo {
         let (_, children) = resolver.with_derived(*state.get(&self.gaps), *state.get(&self.border), |resolver| {
-            self.children.create_layout_info(state, store, generator, resolver)
+            self.children.create_layout_info(state, store, resolver)
         });
 
         children
     }
 
-    fn layout_element<'a>(
+    fn lay_out<'a>(
         &'a self,
         state: &'a Context<App>,
-        store: &'a ElementStore,
+        store: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, App>,
     ) {
-        self.children.layout_element(state, store, layout_info, layout);
+        self.children.lay_out(state, store, layout_info, layout);
     }
 }

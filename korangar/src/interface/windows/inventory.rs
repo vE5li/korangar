@@ -1,5 +1,5 @@
 use korangar_components::item_box;
-use korangar_interface::window::{CustomWindow, WindowTrait};
+use korangar_interface::window::{CustomWindow, Window};
 use korangar_networking::InventoryItem;
 use rust_state::{Path, VecIndexExt};
 
@@ -28,7 +28,7 @@ where
         Some(WindowClass::Inventory)
     }
 
-    fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
+    fn to_window<'a>(self) -> impl Window<ClientState> + 'a {
         use korangar_interface::prelude::*;
 
         // TODO: Probably this should be more dynamic

@@ -4,12 +4,12 @@ use std::marker::PhantomData;
 
 use rust_state::{Context, Path, RustState, Selector};
 
-use crate::application::Application;
-use crate::element::Element;
-use crate::element::id::{ElementIdGenerator, FocusIdExt};
-use crate::element::store::{ElementStore, Persistent, PersistentData, PersistentExt};
+use crate::application::{Application, SizeTrait};
+use crate::element::id::FocusIdExt;
+use crate::element::store::{ElementStore, ElementStoreMut, Persistent, PersistentData, PersistentExt};
+use crate::element::{DefaultLayoutInfoWithText, Element};
 use crate::event::{ClickAction, Event, EventQueue};
-use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
+use crate::layout::alignment::{HorizontalAlignment, OverflowBehavior, VerticalAlignment};
 use crate::layout::area::Area;
 use crate::layout::{Icon, InputHandler, Layout, Resolver};
 use crate::theme::ThemePathGetter;
@@ -33,6 +33,7 @@ where
     pub font_size: App::FontSize,
     pub text_alignment: HorizontalAlignment,
     pub vertical_alignment: VerticalAlignment,
+    pub overflow_behavior: OverflowBehavior,
 }
 
 pub struct TextBoxData {
@@ -51,7 +52,7 @@ impl PersistentData for TextBoxData {
     }
 }
 
-pub struct TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, Id> {
+pub struct TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Id> {
     pub text_marker: PhantomData<Text>,
     pub ghost_text: A,
     pub state: B,
@@ -70,17 +71,18 @@ pub struct TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, Id> 
     pub corner_radius: O,
     pub font_size: P,
     pub text_alignment: Q,
+    pub overflow_behavior: R,
     pub focus_id: Id,
 }
 
-impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, Id> Persistent
-    for TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, Id>
+impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Id> Persistent
+    for TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Id>
 {
     type Data = TextBoxData;
 }
 
-impl<App, Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, Id> Element<App>
-    for TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, Id>
+impl<App, Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Id> Element<App>
+    for TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Id>
 where
     App: Application,
     Text: AsRef<str> + 'static,
@@ -101,26 +103,62 @@ where
     O: Selector<App, App::CornerRadius>,
     P: Selector<App, App::FontSize>,
     Q: Selector<App, HorizontalAlignment>,
+    R: Selector<App, OverflowBehavior>,
     Id: Any,
 {
+    type LayoutInfo = DefaultLayoutInfoWithText<App>;
+
     fn create_layout_info(
         &mut self,
         state: &Context<App>,
-        _: &mut ElementStore,
-        _: &mut ElementIdGenerator,
-        resolver: &mut Resolver,
+        store: ElementStoreMut<'_>,
+        resolver: &mut Resolver<'_, App>,
     ) -> Self::LayoutInfo {
-        let height = state.get(&self.height);
+        let height = *state.get(&self.height);
+
+        let mut display_text = state.get(&self.state).as_str();
+
+        if *state.get(&self.hidable) {
+            let persistent_data = self.get_persistent_data(&store, true);
+            let is_hidden = *persistent_data.is_hidden.borrow();
+
+            if is_hidden {
+                // SAFETY:
+                //
+                // This is only used here to create a string with all '*' characters, so this
+                // should be perfectly safe.
+                let hidden_text = unsafe { &mut *persistent_data.hidden_text.get() };
+
+                let display_text_length = display_text.len();
+                if hidden_text.len() != display_text_length {
+                    *hidden_text = "*".repeat(display_text_length);
+                }
+
+                display_text = hidden_text;
+            }
+        }
+
+        if display_text.is_empty() {
+            display_text = state.get(&self.ghost_text).as_ref();
+        }
+
+        let (size, font_size) = resolver.get_text_dimensions(
+            display_text,
+            *state.get(&self.font_size),
+            *state.get(&self.text_alignment),
+            *state.get(&self.overflow_behavior),
+        );
 
         Self::LayoutInfo {
-            area: resolver.with_height(*height),
+            area: resolver.with_height(height.max(size.height())),
+            font_size,
         }
     }
 
-    fn layout_element<'a>(
+    fn lay_out<'a>(
         &'a self,
         state: &'a Context<App>,
-        store: &'a ElementStore,
+        store: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, App>,
     ) {
@@ -136,7 +174,7 @@ where
             };
 
             let is_hoverered = layout.is_area_hovered_and_active(button_area);
-            let persistent_data = self.get_persistent_data(store, true);
+            let persistent_data = self.get_persistent_data(&store, true);
 
             if is_hoverered {
                 layout.add_toggle(button_area, &persistent_data.is_hidden);
@@ -224,10 +262,11 @@ where
         layout.add_text(
             layout_info.area,
             display_text,
-            *state.get(&self.font_size),
+            layout_info.font_size,
             foreground_color,
             *state.get(&self.text_alignment),
             *state.get(&crate::theme::theme().text_box().vertical_alignment()),
+            *state.get(&self.overflow_behavior),
         );
 
         layout.register_focus_id(self.focus_id.focus_id(), element_id);

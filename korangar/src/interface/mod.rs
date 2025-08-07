@@ -4,429 +4,12 @@ pub mod resource;
 pub mod windows;
 
 pub mod components {
-    pub mod character_slot_preview {
-        use std::cell::UnsafeCell;
-        use std::fmt::Display;
-
-        use korangar_interface::element::id::ElementIdGenerator;
-        use korangar_interface::element::store::ElementStore;
-        use korangar_interface::element::{Element, ErasedElement};
-        use korangar_interface::event::{ClickAction, Event, EventQueue};
-        use korangar_interface::layout::alignment::{HorizontalAlignment, VerticalAlignment};
-        use korangar_interface::layout::tooltip::TooltipExt;
-        use korangar_interface::layout::{Layout, MouseButton, Resolver};
-        use ragnarok_packets::{CharacterInformation, CharacterInformationPathExt};
-        use rust_state::{Context, ManuallyAssertExt, Path, RustState};
-
-        use crate::graphics::Color;
-        use crate::input::InputEvent;
-        use crate::interface::layout::{CornerRadius, ScreenPosition, ScreenSize};
-        use crate::loaders::FontSize;
-        use crate::state::ClientState;
-
-        pub struct OverlayHandler<A, B> {
-            position: ScreenPosition,
-            size: ScreenSize,
-            slot: usize,
-            switch_request_path: A,
-            character_information_path: B,
-        }
-
-        impl<A, B> OverlayHandler<A, B> {
-            pub fn new(slot: usize, switch_request_path: A, character_information_path: B) -> Self {
-                Self {
-                    position: ScreenPosition { left: 0.0, top: 0.0 },
-                    size: ScreenSize { width: 0.0, height: 0.0 },
-                    slot,
-                    switch_request_path,
-                    character_information_path,
-                }
-            }
-
-            fn set_position_size(&mut self, position: ScreenPosition, size: ScreenSize) {
-                self.position = position;
-                self.size = size;
-            }
-        }
-
-        impl<A, B> ClickAction<ClientState> for OverlayHandler<A, B>
-        where
-            A: Path<ClientState, Option<usize>>,
-            B: Path<ClientState, CharacterInformation, false>,
-        {
-            fn execute(&self, _: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
-                use korangar_interface::prelude::*;
-
-                let slot = self.slot;
-                let switch_request_path = self.switch_request_path;
-                let character_information_path = self.character_information_path;
-
-                let erased_element = ErasedElement::new(fragment! {
-                    children: (
-                        button! {
-                            text: "Delete",
-                            event: move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
-                                // SAFETY
-                                // We should not be able to get here if the character is not present, so it's
-                                // fine to unwrap.
-                                let character_information = state.try_get(&character_information_path).unwrap();
-                                let character_id = character_information.character_id;
-
-                                queue.queue(InputEvent::DeleteCharacter { character_id });
-                                queue.queue(Event::CloseOverlay);
-                            },
-                        },
-                        button! {
-                            text: "Switch",
-                            event: move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
-                                state.update_value(switch_request_path, Some(slot));
-                                queue.queue(Event::CloseOverlay);
-                            },
-                        },
-                        button! {
-                            text: "Cancel",
-                            event: move |_: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
-                                queue.queue(Event::CloseOverlay);
-                            },
-                        },
-                    ),
-                });
-
-                queue.queue(Event::OpenOverlay {
-                    element: Box::new(erased_element),
-                    position: self.position,
-                    size: self.size,
-                });
-            }
-        }
-
-        #[derive(RustState)]
-        pub struct CharacterSlotPreviewTheme {
-            pub background_color: ClientState,
-        }
-
-        pub struct CharacterSlotPreview<P, M, B> {
-            pub character_information: P,
-            pub switch_request: M,
-            pub click_handler: CharacterSlotPreviewHandler<B>,
-            pub overlay_handler: OverlayHandler<M, P>,
-            pub slot: usize,
-        }
-
-        impl<P, M, B> Element<ClientState> for CharacterSlotPreview<P, M, B>
-        where
-            P: Path<ClientState, CharacterInformation, false>,
-            M: Path<ClientState, Option<usize>>,
-            B: Path<ClientState, Option<usize>>,
-        {
-            fn create_layout_info(
-                &mut self,
-                _: &Context<ClientState>,
-                _: &mut ElementStore,
-                _: &mut ElementIdGenerator,
-                resolver: &mut Resolver,
-            ) -> Self::LayoutInfo {
-                let area = resolver.with_height(180.0);
-
-                self.overlay_handler.set_position_size(
-                    ScreenPosition {
-                        left: area.left,
-                        top: area.top,
-                    },
-                    ScreenSize {
-                        width: area.width,
-                        height: area.height,
-                    },
-                );
-
-                Self::LayoutInfo { area }
-            }
-
-            fn layout_element<'a>(
-                &'a self,
-                state: &'a Context<ClientState>,
-                _: &'a ElementStore,
-                layout_info: &'a Self::LayoutInfo,
-                layout: &mut Layout<'a, ClientState>,
-            ) {
-                if let Some(switch_request) = state.get(&self.switch_request) {
-                    let is_hoverered = layout.is_area_hovered_and_active(layout_info.area);
-
-                    let background_color = match is_hoverered {
-                        true => Color::monochrome_u8(80),
-                        false => Color::monochrome_u8(60),
-                    };
-                    layout.add_rectangle(layout_info.area, CornerRadius::uniform(25.0), background_color);
-
-                    if *switch_request == self.slot {
-                        layout.add_text(
-                            layout_info.area,
-                            "Cancel",
-                            FontSize(14.0),
-                            Color::WHITE,
-                            HorizontalAlignment::Center { offset: 0.0 },
-                            VerticalAlignment::Center { offset: 0.0 },
-                        );
-
-                        if is_hoverered {
-                            layout.add_click_area(layout_info.area, MouseButton::Left, &self.click_handler.cancel_switch);
-                        }
-                    } else {
-                        layout.add_text(
-                            layout_info.area,
-                            "Switch slots",
-                            FontSize(14.0),
-                            Color::WHITE,
-                            HorizontalAlignment::Center { offset: 0.0 },
-                            VerticalAlignment::Center { offset: 0.0 },
-                        );
-
-                        if is_hoverered {
-                            layout.add_click_area(layout_info.area, MouseButton::Left, &self.click_handler.request_switch);
-                        }
-                    }
-
-                    return;
-                }
-
-                if let Some(character_information) = state.try_get(&self.character_information) {
-                    let is_hoverered = layout.is_area_hovered_and_active(layout_info.area);
-
-                    let background_color = match is_hoverered {
-                        true => Color::monochrome_u8(110),
-                        false => Color::monochrome_u8(90),
-                    };
-                    layout.add_rectangle(layout_info.area, CornerRadius::uniform(25.0), background_color);
-
-                    layout.add_text(
-                        layout_info.area,
-                        &character_information.name,
-                        FontSize(18.0),
-                        Color::rgb_u8(255, 200, 150),
-                        HorizontalAlignment::Center { offset: 0.0 },
-                        VerticalAlignment::Top { offset: 0.0 },
-                    );
-
-                    layout.add_text(
-                        layout_info.area,
-                        "Base level",
-                        FontSize(14.0),
-                        Color::rgb_u8(200, 200, 150),
-                        HorizontalAlignment::Left { offset: 5.0 },
-                        VerticalAlignment::Top { offset: 30.0 },
-                    );
-
-                    layout.add_text(
-                        layout_info.area,
-                        self.click_handler
-                            .base_level_str
-                            .get_str(self.character_information.manually_asserted().base_level(), state),
-                        FontSize(14.0),
-                        Color::rgb_u8(200, 200, 150),
-                        HorizontalAlignment::Left { offset: 5.0 },
-                        VerticalAlignment::Top { offset: 44.0 },
-                    );
-
-                    layout.add_text(
-                        layout_info.area,
-                        "Job level",
-                        FontSize(14.0),
-                        Color::rgb_u8(200, 200, 150),
-                        HorizontalAlignment::Left { offset: 5.0 },
-                        VerticalAlignment::Top { offset: 66.0 },
-                    );
-
-                    layout.add_text(
-                        layout_info.area,
-                        self.click_handler
-                            .job_level_str
-                            .get_str(self.character_information.manually_asserted().job_level(), state),
-                        FontSize(14.0),
-                        Color::rgb_u8(200, 200, 150),
-                        HorizontalAlignment::Left { offset: 5.0 },
-                        VerticalAlignment::Top { offset: 80.0 },
-                    );
-
-                    layout.add_text(
-                        layout_info.area,
-                        "Map",
-                        FontSize(14.0),
-                        Color::rgb_u8(200, 200, 150),
-                        HorizontalAlignment::Left { offset: 5.0 },
-                        VerticalAlignment::Top { offset: 102.0 },
-                    );
-
-                    layout.add_text(
-                        layout_info.area,
-                        &character_information.map_name,
-                        FontSize(14.0),
-                        Color::rgb_u8(200, 200, 150),
-                        HorizontalAlignment::Left { offset: 5.0 },
-                        VerticalAlignment::Top { offset: 116.0 },
-                    );
-
-                    if is_hoverered {
-                        layout.add_click_area(layout_info.area, MouseButton::Left, &self.click_handler.select_character);
-                        layout.add_click_area(layout_info.area, MouseButton::Right, &self.overlay_handler);
-                        layout.mark_hovered();
-
-                        {
-                            struct PrivateTooltipId;
-                            layout.add_tooltip(&character_information.name, PrivateTooltipId.tooltip_id());
-                        }
-                    }
-                } else {
-                    let is_hoverered = layout.is_area_hovered_and_active(layout_info.area);
-
-                    let background_color = match is_hoverered {
-                        true => Color::monochrome_u8(55),
-                        false => Color::monochrome_u8(40),
-                    };
-                    layout.add_rectangle(layout_info.area, CornerRadius::uniform(25.0), background_color);
-
-                    layout.add_text(
-                        layout_info.area,
-                        "Create Character",
-                        FontSize(14.0),
-                        Color::monochrome_u8(85),
-                        HorizontalAlignment::Center { offset: 0.0 },
-                        VerticalAlignment::Center { offset: 0.0 },
-                    );
-
-                    if is_hoverered {
-                        layout.add_click_area(layout_info.area, MouseButton::Left, &self.click_handler.create_character);
-                        layout.mark_hovered();
-                    }
-                }
-            }
-        }
-
-        struct PartialEqDisplayStr<T> {
-            last_value: UnsafeCell<Option<T>>,
-            text: UnsafeCell<String>,
-        }
-
-        impl<T> PartialEqDisplayStr<T> {
-            pub fn new() -> Self {
-                Self {
-                    last_value: UnsafeCell::default(),
-                    text: UnsafeCell::default(),
-                }
-            }
-        }
-
-        impl<T> PartialEqDisplayStr<T>
-        where
-            T: Clone + PartialEq + Display + 'static,
-        {
-            fn get_str<'a, P>(&'a self, path: P, state: &'a Context<ClientState>) -> &'a str
-            where
-                P: Path<ClientState, T>,
-            {
-                // SAFETY
-                // `unnwrap` is safe here because the bound of `P` specifies a safe path.
-                let value = state.get(&path);
-
-                unsafe {
-                    let last_value = &mut *self.last_value.get();
-
-                    if last_value.is_none() || last_value.as_ref().is_some_and(|last| last != value) {
-                        *self.text.get() = value.to_string();
-                        *last_value = Some(value.clone());
-                    }
-                }
-
-                unsafe { self.text.as_ref_unchecked() }
-            }
-        }
-
-        struct SelectCharacter {
-            slot: usize,
-        }
-
-        impl ClickAction<ClientState> for SelectCharacter {
-            fn execute(&self, _: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
-                queue.queue(InputEvent::SelectCharacter { slot: self.slot });
-            }
-        }
-
-        struct CreateCharacter {
-            slot: usize,
-        }
-
-        impl ClickAction<ClientState> for CreateCharacter {
-            fn execute(&self, _: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
-                queue.queue(InputEvent::OpenCharacterCreationWindow { slot: self.slot });
-            }
-        }
-
-        struct CancelSwitch<P> {
-            switch_request: P,
-        }
-
-        impl<P> ClickAction<ClientState> for CancelSwitch<P>
-        where
-            P: Path<ClientState, Option<usize>>,
-        {
-            fn execute(&self, state: &Context<ClientState>, _: &mut EventQueue<ClientState>) {
-                state.update_value(self.switch_request, None);
-            }
-        }
-
-        struct RequestSwitch<P> {
-            switch_request: P,
-            slot: usize,
-        }
-
-        impl<P> ClickAction<ClientState> for RequestSwitch<P>
-        where
-            P: Path<ClientState, Option<usize>>,
-        {
-            fn execute(&self, state: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
-                // SAFETY
-                // We should not be able to get here if there is no switch request, so it's
-                // fine to unwrap.
-                let origin_slot = state.get(&self.switch_request).unwrap();
-
-                queue.queue(InputEvent::SwitchCharacterSlot {
-                    origin_slot,
-                    destination_slot: self.slot,
-                });
-            }
-        }
-
-        pub struct CharacterSlotPreviewHandler<P> {
-            select_character: SelectCharacter,
-            create_character: CreateCharacter,
-            cancel_switch: CancelSwitch<P>,
-            request_switch: RequestSwitch<P>,
-            base_level_str: PartialEqDisplayStr<i16>,
-            job_level_str: PartialEqDisplayStr<i32>,
-        }
-
-        impl<P> CharacterSlotPreviewHandler<P>
-        where
-            P: Path<ClientState, Option<usize>>,
-        {
-            pub fn new(switch_request: P, slot: usize) -> Self {
-                Self {
-                    select_character: SelectCharacter { slot },
-                    create_character: CreateCharacter { slot },
-                    cancel_switch: CancelSwitch { switch_request },
-                    request_switch: RequestSwitch { switch_request, slot },
-                    base_level_str: PartialEqDisplayStr::new(),
-                    job_level_str: PartialEqDisplayStr::new(),
-                }
-            }
-        }
-    }
-
     pub mod item_box {
         use korangar_interface::MouseMode;
         use korangar_interface::element::Element;
-        use korangar_interface::element::id::ElementIdGenerator;
-        use korangar_interface::element::store::ElementStore;
+        use korangar_interface::element::store::{ElementStore, ElementStoreMut};
         use korangar_interface::event::{ClickAction, Event, EventQueue};
+        use korangar_interface::layout::alignment::OverflowBehavior;
         use korangar_interface::layout::{DropHandler, Layout, MouseButton, Resolver};
         use korangar_interface::prelude::{HorizontalAlignment, VerticalAlignment};
         use korangar_networking::{InventoryItem, InventoryItemDetails};
@@ -517,9 +100,8 @@ pub mod components {
             fn create_layout_info(
                 &mut self,
                 state: &Context<ClientState>,
-                _: &mut ElementStore,
-                _: &mut ElementIdGenerator,
-                resolver: &mut Resolver,
+                _: ElementStoreMut<'_>,
+                resolver: &mut Resolver<'_, ClientState>,
             ) -> Self::LayoutInfo {
                 let area = resolver.with_height(40.0);
 
@@ -534,10 +116,10 @@ pub mod components {
                 Self::LayoutInfo { area }
             }
 
-            fn layout_element<'a>(
+            fn lay_out<'a>(
                 &'a self,
                 state: &'a Context<ClientState>,
-                _: &'a ElementStore,
+                _: ElementStore<'a>,
                 layout_info: &'a Self::LayoutInfo,
                 layout: &mut Layout<'a, ClientState>,
             ) {
@@ -579,9 +161,10 @@ pub mod components {
                             // TODO: Put this in the theme
                             Color::rgb_u8(255, 200, 255),
                             // TODO: Put this in the theme
-                            HorizontalAlignment::Right { offset: 3.0 },
+                            HorizontalAlignment::Right { offset: 3.0, border: 3.0 },
                             // TODO: Put this in the theme
                             VerticalAlignment::Bottom { offset: 3.0 },
+                            OverflowBehavior::Shrink,
                         );
                     }
                 }
@@ -592,9 +175,9 @@ pub mod components {
     pub mod skill_box {
         use korangar_interface::MouseMode;
         use korangar_interface::element::Element;
-        use korangar_interface::element::id::ElementIdGenerator;
-        use korangar_interface::element::store::ElementStore;
+        use korangar_interface::element::store::{ElementStore, ElementStoreMut};
         use korangar_interface::event::{ClickAction, Event, EventQueue};
+        use korangar_interface::layout::alignment::OverflowBehavior;
         use korangar_interface::layout::{DropHandler, Layout, MouseButton, Resolver};
         use korangar_interface::prelude::{HorizontalAlignment, VerticalAlignment};
         use ragnarok_packets::SkillLevel;
@@ -696,9 +279,8 @@ pub mod components {
             fn create_layout_info(
                 &mut self,
                 state: &Context<ClientState>,
-                _: &mut ElementStore,
-                _: &mut ElementIdGenerator,
-                resolver: &mut Resolver,
+                _: ElementStoreMut<'_>,
+                resolver: &mut Resolver<'_, ClientState>,
             ) -> Self::LayoutInfo {
                 let area = resolver.with_height(40.0);
 
@@ -709,10 +291,10 @@ pub mod components {
                 Self::LayoutInfo { area }
             }
 
-            fn layout_element<'a>(
+            fn lay_out<'a>(
                 &'a self,
                 state: &'a Context<ClientState>,
-                _: &'a ElementStore,
+                _: ElementStore<'a>,
                 layout_info: &'a Self::LayoutInfo,
                 layout: &mut Layout<'a, ClientState>,
             ) {
@@ -757,9 +339,10 @@ pub mod components {
                         // TODO: Put this in the theme
                         Color::rgb_u8(255, 200, 255),
                         // TODO: Put this in the theme
-                        HorizontalAlignment::Right { offset: 3.0 },
+                        HorizontalAlignment::Right { offset: 3.0, border: 3.0 },
                         // TODO: Put this in the theme
                         VerticalAlignment::Bottom { offset: 3.0 },
+                        OverflowBehavior::Shrink,
                     );
                 }
             }

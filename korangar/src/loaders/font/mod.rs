@@ -13,9 +13,10 @@ use image::{ImageBuffer, Rgba, RgbaImage, imageops};
 use korangar_debug::logging::Colorize;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::print_debug;
-use korangar_interface::application::FontSizeTrait;
+use korangar_interface::application::{FontSizeTrait, TextLayouter};
 use korangar_interface::components::drop_down::DropDownItem;
 use korangar_interface::element::ElementDisplay;
+use korangar_interface::layout::alignment::OverflowBehavior;
 use korangar_util::Rectangle;
 use serde::{Deserialize, Serialize};
 
@@ -24,6 +25,7 @@ use super::{GameFileLoader, TextureLoader};
 use crate::graphics::{Color, MAX_TEXTURE_SIZE, Texture};
 use crate::interface::layout::ScreenSize;
 use crate::loaders::font::font_file::FontFile;
+use crate::state::ClientState;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -238,13 +240,38 @@ impl FontLoader {
         }
     }
 
-    pub fn get_text_dimensions(&self, text: &str, font_size: FontSize, line_height_scale: f32, available_width: f32) -> ScreenSize {
-        let size = self.layout_text(text, Color::BLACK, font_size, line_height_scale, available_width, None);
+    pub fn get_text_dimensions(
+        &self,
+        text: &str,
+        mut font_size: FontSize,
+        line_height_scale: f32,
+        available_width: f32,
+        overflow_behavior: OverflowBehavior,
+    ) -> (ScreenSize, FontSize) {
+        // Avoid floating point inaccuracy leading to a line break when shrinking.
+        const THRESHOLD: f32 = 1.0;
 
-        ScreenSize {
-            width: size.x,
-            height: size.y,
+        let layout_width = match overflow_behavior {
+            OverflowBehavior::Shrink => None,
+            OverflowBehavior::LineBreak => Some(available_width),
+        };
+
+        let mut size = self.layout_text(text, Color::BLACK, font_size, line_height_scale, layout_width, None);
+
+        if let OverflowBehavior::Shrink = overflow_behavior {
+            let scaling_factor = (available_width / (size.x + THRESHOLD)).min(1.0);
+
+            font_size = FontSize(font_size.0 * scaling_factor);
+            size *= scaling_factor;
         }
+
+        (
+            ScreenSize {
+                width: size.x,
+                height: size.y,
+            },
+            font_size,
+        )
     }
 
     // TODO: NHA cosmic_text could help us to render text in boxes.
@@ -261,7 +288,7 @@ impl FontLoader {
         default_color: Color,
         font_size: FontSize,
         line_height_scale: f32,
-        available_width: f32,
+        available_width: Option<f32>,
         mut glyphs: Option<&mut Vec<GlyphInstruction>>,
     ) -> Vector2<f32> {
         let mut text_width = 0f32;
@@ -275,7 +302,7 @@ impl FontLoader {
             let mut font_system = self.font_system.lock().unwrap();
             let mut buffer = Buffer::new(&mut font_system, metrics);
 
-            buffer.set_size(&mut font_system, Some(available_width), None);
+            buffer.set_size(&mut font_system, available_width, None);
             buffer.set_rich_text(
                 &mut font_system,
                 ColorSpanIterator::new(text, default_color, attributes.clone()),
@@ -330,5 +357,21 @@ impl FontLoader {
     /// The texture of the static font map.
     pub fn get_font_map(&self) -> &Texture {
         &self.font_map
+    }
+}
+
+impl TextLayouter<ClientState> for Arc<FontLoader> {
+    fn get_text_dimensions(
+        &self,
+        text: &str,
+        font_size: FontSize,
+        available_width: f32,
+        overflow_behavior: OverflowBehavior,
+    ) -> (ScreenSize, FontSize) {
+        let (size, font_size) = self
+            .as_ref()
+            .get_text_dimensions(text, font_size, 1.0, available_width, overflow_behavior);
+
+        (size, font_size)
     }
 }

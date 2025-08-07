@@ -1,4 +1,4 @@
-use korangar_interface::window::{CustomWindow, WindowTrait};
+use korangar_interface::window::{CustomWindow, Window};
 use rust_state::Path;
 
 use crate::interface::windows::WindowClass;
@@ -7,25 +7,25 @@ use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
 
 #[derive(Default)]
-pub struct AudioSettingsWindow<P> {
-    path: P,
+pub struct AudioSettingsWindow<A> {
+    audio_settings_path: A,
 }
 
-impl<P> AudioSettingsWindow<P> {
-    pub fn new(path: P) -> Self {
-        Self { path }
+impl<A> AudioSettingsWindow<A> {
+    pub fn new(audio_settings_path: A) -> Self {
+        Self { audio_settings_path }
     }
 }
 
-impl<P> CustomWindow<ClientState> for AudioSettingsWindow<P>
+impl<A> CustomWindow<ClientState> for AudioSettingsWindow<A>
 where
-    P: Path<ClientState, AudioSettings>,
+    A: Path<ClientState, AudioSettings>,
 {
     fn window_class() -> Option<WindowClass> {
         Some(WindowClass::AudioSettings)
     }
 
-    fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
+    fn to_window<'a>(self) -> impl Window<ClientState> + 'a {
         use korangar_interface::prelude::*;
 
         window! {
@@ -36,8 +36,8 @@ where
             elements: (
                 state_button! {
                     text: "Mute audio on focus loss",
-                    state: self.path.mute_on_focus_loss(),
-                    event: Toggle(self.path.mute_on_focus_loss()),
+                    state: self.audio_settings_path.mute_on_focus_loss(),
+                    event: Toggle(self.audio_settings_path.mute_on_focus_loss()),
                 },
             ),
         }

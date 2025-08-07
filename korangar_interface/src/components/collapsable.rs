@@ -4,10 +4,9 @@ use std::marker::PhantomData;
 use rust_state::{Context, RustState, Selector};
 
 use crate::application::Application;
-use crate::element::id::ElementIdGenerator;
-use crate::element::store::{ElementStore, Persistent, PersistentData, PersistentExt};
+use crate::element::store::{ElementStore, ElementStoreMut, Persistent, PersistentData, PersistentExt};
 use crate::element::{Element, ElementSet};
-use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
+use crate::layout::alignment::{HorizontalAlignment, OverflowBehavior, VerticalAlignment};
 use crate::layout::area::Area;
 use crate::layout::{Icon, Layout, Resolver};
 use crate::theme::{ThemePathGetter, theme};
@@ -108,11 +107,10 @@ where
     fn create_layout_info(
         &mut self,
         state: &Context<App>,
-        store: &mut ElementStore,
-        generator: &mut ElementIdGenerator,
-        resolver: &mut Resolver,
+        mut store: ElementStoreMut<'_>,
+        resolver: &mut Resolver<'_, App>,
     ) -> Self::LayoutInfo {
-        let persistent = self.get_persistent_data(store, *state.get(&self.initially_expanded));
+        let persistent = self.get_persistent_data(&store, *state.get(&self.initially_expanded));
         let expanded = *persistent.expanded.borrow();
 
         let title_height = *state.get(&self.title_height);
@@ -125,9 +123,9 @@ where
                 // We need to create a separate store so that the children and the extra
                 // elements don't interfere. We need to make sure they both have
                 // different ids.
-                let children_store = store.get_or_create_child_store(CHILDREN_STORE_ID, generator);
+                let children_store = store.child_store(CHILDREN_STORE_ID);
 
-                Some(self.children.create_layout_info(state, children_store, generator, resolver))
+                Some(self.children.create_layout_info(state, children_store, resolver))
             }),
             false => (resolver.with_height(title_height), None),
         };
@@ -149,15 +147,13 @@ where
             width: extra_space,
             height: title_height,
         };
-        let mut extra_resolver = Resolver::new(extra_area, 0.0);
+        let mut extra_resolver = Resolver::new(extra_area, 0.0, resolver.get_text_layouter());
 
         // We need to create a separate store so that the children and the extra
         // elements don't interfere. We need to make sure they both have
         // different ids.
-        let extra_store = store.get_or_create_child_store(EXTRA_STORE_ID, generator);
-        let extra_elements = self
-            .extra_elements
-            .create_layout_info(state, extra_store, generator, &mut extra_resolver);
+        let extra_store = store.child_store(EXTRA_STORE_ID);
+        let extra_elements = self.extra_elements.create_layout_info(state, extra_store, &mut extra_resolver);
 
         MyLayoutInfo {
             area,
@@ -166,10 +162,10 @@ where
         }
     }
 
-    fn layout_element<'a>(
+    fn lay_out<'a>(
         &'a self,
         state: &'a Context<App>,
-        store: &'a ElementStore,
+        store: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, App>,
     ) {
@@ -177,7 +173,7 @@ where
             if let Some(layout_info) = &layout_info.children {
                 layout.with_layer(|layout| {
                     let children_store = store.child_store(CHILDREN_STORE_ID);
-                    self.children.layout_element(state, children_store, layout_info, layout);
+                    self.children.lay_out(state, children_store, layout_info, layout);
                 });
             }
         });
@@ -218,14 +214,13 @@ where
 
         layout.with_layer(|layout| {
             let extra_store = store.child_store(EXTRA_STORE_ID);
-            self.extra_elements
-                .layout_element(state, extra_store, &layout_info.extra_elements, layout);
+            self.extra_elements.lay_out(state, extra_store, &layout_info.extra_elements, layout);
         });
 
         let is_title_hovered = layout.is_area_hovered_and_active(title_area);
 
         if is_title_hovered {
-            let persistent = self.get_persistent_data(store, *state.get(&self.initially_expanded));
+            let persistent = self.get_persistent_data(&store, *state.get(&self.initially_expanded));
             layout.add_toggle(title_area, &persistent.expanded);
             layout.mark_hovered();
         }
@@ -250,6 +245,7 @@ where
             foreground_color,
             *state.get(&self.text_alignment),
             *state.get(&theme().collapsable().vertical_alignment()),
+            OverflowBehavior::Shrink,
         );
     }
 }

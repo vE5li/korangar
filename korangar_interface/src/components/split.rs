@@ -1,32 +1,39 @@
 use rust_state::{Context, Selector};
 
 use crate::application::Application;
-use crate::element::id::ElementIdGenerator;
-use crate::element::store::ElementStore;
+use crate::element::store::{ElementStore, ElementStoreMut};
 use crate::element::{Element, ElementSet, ResolverSet};
 use crate::layout::area::PartialArea;
 use crate::layout::{Layout, Resolver};
 
-struct CellResolverSet {
+struct CellResolverSet<'a, App: Application> {
     initial_available_area: PartialArea,
     cell_size: f32,
     gaps: f32,
     used_height: f32,
+    text_layouter: &'a App::TextLayouter,
 }
 
-impl CellResolverSet {
-    pub fn new(initial_available_area: PartialArea, cell_size: f32, gaps: f32) -> Self {
+impl<'a, App> CellResolverSet<'a, App>
+where
+    App: Application,
+{
+    pub fn new(initial_available_area: PartialArea, cell_size: f32, gaps: f32, text_layouter: &'a App::TextLayouter) -> Self {
         Self {
             initial_available_area,
             cell_size,
             gaps,
             used_height: 0.0,
+            text_layouter,
         }
     }
 }
 
-impl ResolverSet for &mut CellResolverSet {
-    fn with_index<C>(&mut self, index: usize, mut f: impl FnMut(&mut Resolver) -> C) -> C {
+impl<'a, App> ResolverSet<'a, App> for &mut CellResolverSet<'a, App>
+where
+    App: Application,
+{
+    fn with_index<C>(&mut self, index: usize, mut f: impl FnMut(&mut Resolver<'a, App>) -> C) -> C {
         let cell_area = PartialArea {
             left: self.initial_available_area.left + self.gaps * index as f32 + self.cell_size * index as f32,
             top: self.initial_available_area.top,
@@ -34,7 +41,7 @@ impl ResolverSet for &mut CellResolverSet {
             height: self.initial_available_area.height,
         };
 
-        let mut resolver = Resolver::new(cell_area, self.gaps);
+        let mut resolver = Resolver::new(cell_area, self.gaps, self.text_layouter);
 
         let layout_info = f(&mut resolver);
 
@@ -60,9 +67,8 @@ where
     fn create_layout_info(
         &mut self,
         state: &Context<App>,
-        store: &mut ElementStore,
-        generator: &mut ElementIdGenerator,
-        resolver: &mut Resolver,
+        store: ElementStoreMut<'_>,
+        resolver: &mut Resolver<'_, App>,
     ) -> Self::LayoutInfo {
         let gaps = *state.get(&self.gaps);
         let element_count = self.children.get_element_count();
@@ -72,9 +78,9 @@ where
         // TODO: This is obviously a divide by 0 if we don't have any child elements.
         // Should be protected somehow.
         let cell_size = available_width / element_count as f32;
-        let mut resolver_set = CellResolverSet::new(available_area, cell_size, gaps);
+        let mut resolver_set = CellResolverSet::new(available_area, cell_size, gaps, resolver.get_text_layouter());
 
-        let layout_info = self.children.create_layout_info(state, store, generator, &mut resolver_set);
+        let layout_info = self.children.create_layout_info(state, store, &mut resolver_set);
 
         let used_height = resolver_set.used_height;
         resolver.commit_used_height(used_height);
@@ -82,13 +88,13 @@ where
         layout_info
     }
 
-    fn layout_element<'a>(
+    fn lay_out<'a>(
         &'a self,
         state: &'a Context<App>,
-        store: &'a ElementStore,
+        store: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, App>,
     ) {
-        self.children.layout_element(state, store, layout_info, layout);
+        self.children.lay_out(state, store, layout_info, layout);
     }
 }

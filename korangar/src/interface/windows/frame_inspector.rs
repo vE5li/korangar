@@ -1,5 +1,5 @@
 use korangar_debug::profiling::FrameMeasurement;
-use korangar_interface::window::{CustomWindow, WindowTrait};
+use korangar_interface::window::{CustomWindow, Window};
 use rust_state::Path;
 
 use crate::state::ClientState;
@@ -19,7 +19,7 @@ impl<P> CustomWindow<ClientState> for FrameInspectorWindow<P>
 where
     P: Path<ClientState, FrameMeasurement>,
 {
-    fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
+    fn to_window<'a>(self) -> impl Window<ClientState> + 'a {
         use korangar_interface::prelude::*;
 
         window! {

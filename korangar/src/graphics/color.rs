@@ -1,7 +1,6 @@
 use std::ops::{Add, Mul, Sub};
 
-use korangar_interface::element::id::ElementIdGenerator;
-use korangar_interface::element::store::ElementStore;
+use korangar_interface::element::store::{ElementStore, ElementStoreMut};
 use korangar_interface::element::{Element, StateElement};
 use korangar_interface::layout::{Layout, Resolver};
 use mlua::{Lua, Value};
@@ -275,19 +274,18 @@ impl StateElement<ClientState> for Color {
             fn create_layout_info(
                 &mut self,
                 _: &Context<ClientState>,
-                _: &mut ElementStore,
-                _: &mut ElementIdGenerator,
-                resolver: &mut Resolver,
+                _: ElementStoreMut<'_>,
+                resolver: &mut Resolver<'_, ClientState>,
             ) -> Self::LayoutInfo {
                 let area = resolver.with_height(18.0);
 
                 Self::LayoutInfo { area }
             }
 
-            fn layout_element<'a>(
+            fn lay_out<'a>(
                 &'a self,
                 state: &'a Context<ClientState>,
-                _: &'a ElementStore,
+                _: ElementStore<'a>,
                 layout_info: &'a Self::LayoutInfo,
                 layout: &mut Layout<'a, ClientState>,
             ) {
@@ -322,19 +320,18 @@ impl StateElement<ClientState> for Color {
             fn create_layout_info(
                 &mut self,
                 _: &Context<ClientState>,
-                _: &mut ElementStore,
-                _: &mut ElementIdGenerator,
-                resolver: &mut Resolver,
+                _: ElementStoreMut<'_>,
+                resolver: &mut Resolver<'_, ClientState>,
             ) -> Self::LayoutInfo {
                 let area = resolver.with_height(18.0);
 
                 Self::LayoutInfo { area }
             }
 
-            fn layout_element<'a>(
+            fn lay_out<'a>(
                 &'a self,
                 state: &'a Context<ClientState>,
-                _: &'a ElementStore,
+                _: ElementStore<'a>,
                 layout_info: &'a Self::LayoutInfo,
                 layout: &mut Layout<'a, ClientState>,
             ) {

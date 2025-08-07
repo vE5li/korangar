@@ -1,7 +1,7 @@
 use korangar_interface::components::text_box::DefaultHandler;
 use korangar_interface::element::StateElement;
 use korangar_interface::event::{Event, EventQueue};
-use korangar_interface::window::{CustomWindow, WindowTrait};
+use korangar_interface::window::{CustomWindow, Window};
 use ragnarok_packets::Friend;
 use rust_state::{Context, Path, RustState};
 
@@ -44,7 +44,7 @@ where
         Some(WindowClass::FriendList)
     }
 
-    fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
+    fn to_window<'a>(self) -> impl Window<ClientState> + 'a {
         use korangar_interface::prelude::*;
 
         struct AddFriendTextBox;

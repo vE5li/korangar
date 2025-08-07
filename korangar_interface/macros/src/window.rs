@@ -30,7 +30,7 @@ pub fn derive_state_window_struct(
                 }
 
                 fn to_window<'a>(self_path: impl rust_state::Path<#impl_for, Self>,
-                ) -> impl korangar_interface::window::WindowTrait<#impl_for> + 'a {
+                ) -> impl korangar_interface::window::Window<#impl_for> + 'a {
                     use korangar_interface::prelude::*;
 
                     window! {
@@ -45,7 +45,7 @@ pub fn derive_state_window_struct(
                 }
 
                 fn to_window_mut<'a>(self_path: impl rust_state::Path<#impl_for, Self>,
-                ) -> impl korangar_interface::window::WindowTrait<#impl_for> + 'a {
+                ) -> impl korangar_interface::window::Window<#impl_for> + 'a {
                     use korangar_interface::prelude::*;
 
                     window! {
@@ -69,7 +69,7 @@ pub fn derive_state_window_struct(
                 #window_class_option
             }
 
-            fn to_window<'a>(self_path: impl rust_state::Path<App, Self>) -> impl korangar_interface::window::WindowTrait<App> + 'a {
+            fn to_window<'a>(self_path: impl rust_state::Path<App, Self>) -> impl korangar_interface::window::Window<App> + 'a {
                 use korangar_interface::prelude::*;
 
                 window! {
@@ -83,7 +83,7 @@ pub fn derive_state_window_struct(
                 }
             }
 
-            fn to_window_mut<'a>(self_path: impl rust_state::Path<App, Self>) -> impl korangar_interface::window::WindowTrait<App> + 'a {
+            fn to_window_mut<'a>(self_path: impl rust_state::Path<App, Self>) -> impl korangar_interface::window::Window<App> + 'a {
                 use korangar_interface::prelude::*;
 
                 window! {

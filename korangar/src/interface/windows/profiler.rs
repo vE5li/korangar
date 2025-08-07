@@ -1,11 +1,9 @@
 use korangar_interface::components::drop_down::{DefaultClickHandler, DropDownItem};
-use korangar_interface::element::id::ElementIdGenerator;
-use korangar_interface::element::store::ElementStore;
+use korangar_interface::element::store::{ElementStore, ElementStoreMut};
 use korangar_interface::element::{Element, StateElement};
 use korangar_interface::layout::area::Area;
-use korangar_interface::layout::tooltip::TooltipExt;
 use korangar_interface::layout::{Layout, Resolver};
-use korangar_interface::window::{CustomWindow, WindowTrait};
+use korangar_interface::window::{CustomWindow, Window};
 use rust_state::{Context, Path, RustState};
 
 use crate::graphics::Color;
@@ -102,18 +100,17 @@ where
     fn create_layout_info(
         &mut self,
         _: &Context<ClientState>,
-        _: &mut ElementStore,
-        _: &mut ElementIdGenerator,
-        resolver: &mut Resolver,
+        _: ElementStoreMut<'_>,
+        resolver: &mut Resolver<'_, ClientState>,
     ) -> Self::LayoutInfo {
         let area = resolver.with_height(200.0);
         Self::LayoutInfo { area }
     }
 
-    fn layout_element<'a>(
+    fn lay_out<'a>(
         &'a self,
         state: &'a Context<ClientState>,
-        _: &'a ElementStore,
+        _: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, ClientState>,
     ) {
@@ -167,11 +164,6 @@ where
                     width: bar_width,
                     height: bar_height,
                 };
-
-                if is_hovered {
-                    struct SharedTooltip;
-                    layout.add_tooltip(name, SharedTooltip.tooltip_id());
-                }
 
                 layout.add_rectangle(bar_area, CornerRadius::default(), color);
             }
@@ -228,7 +220,7 @@ where
         Some(WindowClass::Profiler)
     }
 
-    fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
+    fn to_window<'a>(self) -> impl Window<ClientState> + 'a {
         use korangar_interface::prelude::*;
 
         let visible_thread_options = vec![crate::threads::Enum::Main, crate::threads::Enum::Loader];

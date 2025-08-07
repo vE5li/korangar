@@ -1,4 +1,4 @@
-use korangar_interface::window::{CustomWindow, WindowTrait};
+use korangar_interface::window::{CustomWindow, Window};
 use ragnarok_packets::TilePosition;
 
 use crate::input::InputEvent;
@@ -13,7 +13,7 @@ impl CustomWindow<ClientState> for MapsWindow {
         Some(WindowClass::Maps)
     }
 
-    fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
+    fn to_window<'a>(self) -> impl Window<ClientState> + 'a {
         use korangar_interface::prelude::*;
 
         const MAP_COUNT: usize = 23;

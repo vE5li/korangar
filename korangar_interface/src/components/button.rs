@@ -4,10 +4,9 @@ use rust_state::{Context, RustState, Selector};
 
 use crate::application::Application;
 use crate::element::Element;
-use crate::element::id::ElementIdGenerator;
-use crate::element::store::ElementStore;
+use crate::element::store::{ElementStore, ElementStoreMut};
 use crate::event::ClickAction;
-use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
+use crate::layout::alignment::{HorizontalAlignment, OverflowBehavior, VerticalAlignment};
 use crate::layout::tooltip::TooltipExt;
 use crate::layout::{Layout, MouseButton, Resolver};
 use crate::theme::{ThemePathGetter, theme};
@@ -62,22 +61,16 @@ where
     K: Selector<App, App::FontSize>,
     L: Selector<App, HorizontalAlignment>,
 {
-    fn create_layout_info(
-        &mut self,
-        state: &Context<App>,
-        _: &mut ElementStore,
-        _: &mut ElementIdGenerator,
-        resolver: &mut Resolver,
-    ) -> Self::LayoutInfo {
+    fn create_layout_info(&mut self, state: &Context<App>, _: ElementStoreMut<'_>, resolver: &mut Resolver<'_, App>) -> Self::LayoutInfo {
         let height = state.get(&self.height);
         let area = resolver.with_height(*height);
         Self::LayoutInfo { area }
     }
 
-    fn layout_element<'a>(
+    fn lay_out<'a>(
         &'a self,
         state: &'a Context<App>,
-        _: &'a ElementStore,
+        _: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, App>,
     ) {
@@ -114,6 +107,7 @@ where
             foreground_color,
             *state.get(&self.text_alignment),
             *state.get(&theme().button().vertical_alignment()),
+            OverflowBehavior::Shrink,
         );
     }
 }

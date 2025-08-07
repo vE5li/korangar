@@ -1,8 +1,8 @@
 use std::cell::UnsafeCell;
 
-use korangar_interface::element::{Element, ErasedElement, StateElement};
+use korangar_interface::element::{Element, ElementBox, ErasedElement, StateElement};
 use korangar_interface::event::EventQueue;
-use korangar_interface::window::{CustomWindow, WindowTrait};
+use korangar_interface::window::{CustomWindow, Window};
 use ragnarok_packets::EntityId;
 use rust_state::{Context, Path, RustState};
 
@@ -22,7 +22,7 @@ struct DialogElement {
     // TODO: Unfortunately this has to be an unsafe cell as of now. Ideally this can be changed
     // later.
     #[hidden_element]
-    element: UnsafeCell<Box<dyn Element<ClientState, LayoutInfo = ()>>>,
+    element: UnsafeCell<ElementBox<ClientState>>,
     is_next_button: bool,
 }
 
@@ -180,45 +180,44 @@ where
     fn create_layout_info(
         &mut self,
         state: &Context<ClientState>,
-        store: &mut korangar_interface::element::store::ElementStore,
-        generator: &mut korangar_interface::element::id::ElementIdGenerator,
-        resolver: &mut korangar_interface::layout::Resolver,
+        mut store: korangar_interface::element::store::ElementStoreMut<'_>,
+        resolver: &mut korangar_interface::layout::Resolver<'_, ClientState>,
     ) {
-        state.get(&self.dialog_elements_path).iter().for_each(|dialog_element| {
-            // SAFETY:
-            //
-            // We only create this mutable reference for the lifetime of this scope, and
-            // since nothing is captured from the element this is safe.
-            let element = unsafe { &mut *dialog_element.element.get() };
+        state
+            .get(&self.dialog_elements_path)
+            .iter()
+            .enumerate()
+            .for_each(|(index, dialog_element)| {
+                // SAFETY:
+                //
+                // We only create this mutable reference for the lifetime of this scope, and
+                // since nothing is captured from the element this is safe.
+                let element = unsafe { &mut *dialog_element.element.get() };
 
-            // Technically we should create a new store entry for every child but
-            // given that the components used in the dialogs are "dumb" currently,
-            // we can optimize a bit. This might have to change if we add
-            // animations.
-            element.create_layout_info(state, store, generator, resolver)
-        });
+                element.create_layout_info(state, store.child_store(index as u64), resolver)
+            });
     }
 
-    fn layout_element<'a>(
+    fn lay_out<'a>(
         &'a self,
         state: &'a Context<ClientState>,
-        store: &'a korangar_interface::element::store::ElementStore,
+        store: korangar_interface::element::store::ElementStore<'a>,
         _: &'a Self::LayoutInfo,
         layout: &mut korangar_interface::layout::Layout<'a, ClientState>,
     ) {
-        state.get(&self.dialog_elements_path).iter().for_each(|dialog_element| {
-            // SAFETY:
-            //
-            // There are no mutable references at this point in time and the immutable
-            // reference will be dropped after the interface is rendered, making this safe.
-            let element = unsafe { &*dialog_element.element.get() };
+        state
+            .get(&self.dialog_elements_path)
+            .iter()
+            .enumerate()
+            .for_each(|(index, dialog_element)| {
+                // SAFETY:
+                //
+                // There are no mutable references at this point in time and the immutable
+                // reference will be dropped after the interface is rendered, making this safe.
+                let element = unsafe { &*dialog_element.element.get() };
 
-            // Technically we should create a new store entry for every child but
-            // given that the components used in the dialogs are "dumb" currently,
-            // we can optimize a bit. This might have to change if we add
-            // animations.
-            element.layout_element(state, store, &(), layout)
-        });
+                element.lay_out(state, store.child_store(index as u64), &(), layout)
+            });
     }
 }
 
@@ -245,7 +244,7 @@ where
         Some(WindowClass::Dialog)
     }
 
-    fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
+    fn to_window<'a>(self) -> impl Window<ClientState> + 'a {
         use korangar_interface::prelude::*;
 
         window! {

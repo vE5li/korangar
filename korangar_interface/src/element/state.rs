@@ -10,9 +10,9 @@ use interface_components::collapsable;
 use rust_state::{ArrayLookupExt, Context, ManuallyAssertExt, OptionExt, Path, Selector, VecIndexExt};
 
 use super::Element;
+use super::store::ElementStoreMut;
 use crate::application::Application;
 use crate::components::text_box::DefaultHandler;
-use crate::element::id::ElementIdGenerator;
 use crate::element::store::ElementStore;
 use crate::event::{ClickAction, Event, EventQueue};
 use crate::layout::area::Area;
@@ -435,31 +435,30 @@ where
     fn create_layout_info(
         &mut self,
         state: &Context<App>,
-        store: &mut ElementStore,
-        generator: &mut ElementIdGenerator,
-        resolver: &mut Resolver,
+        store: ElementStoreMut<'_>,
+        resolver: &mut Resolver<'_, App>,
     ) -> Self::LayoutInfo {
         if state.get(&self.option_path).is_some() {
             let element = self
                 .element
                 .get_or_insert_with(|| T::to_element_mut(self.inner_path, self.name.take().unwrap()));
 
-            OptionLayoutInfo::Some(element.create_layout_info(state, store, generator, resolver))
+            OptionLayoutInfo::Some(element.create_layout_info(state, store, resolver))
         } else {
-            OptionLayoutInfo::None(self.none_element.create_layout_info(state, store, generator, resolver))
+            OptionLayoutInfo::None(self.none_element.create_layout_info(state, store, resolver))
         }
     }
 
-    fn layout_element<'a>(
+    fn lay_out<'a>(
         &'a self,
         state: &'a Context<App>,
-        store: &'a ElementStore,
+        store: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, App>,
     ) {
         match layout_info {
-            OptionLayoutInfo::None(layout_info) => self.none_element.layout_element(state, store, layout_info, layout),
-            OptionLayoutInfo::Some(layout_info) => self.element.as_ref().unwrap().layout_element(state, store, layout_info, layout),
+            OptionLayoutInfo::None(layout_info) => self.none_element.lay_out(state, store, layout_info, layout),
+            OptionLayoutInfo::Some(layout_info) => self.element.as_ref().unwrap().lay_out(state, store, layout_info, layout),
         }
     }
 }
@@ -594,9 +593,8 @@ where
     fn create_layout_info(
         &mut self,
         state: &Context<App>,
-        store: &mut ElementStore,
-        generator: &mut ElementIdGenerator,
-        resolver: &mut Resolver,
+        mut store: ElementStoreMut<'_>,
+        resolver: &mut Resolver<'_, App>,
     ) -> Self::LayoutInfo {
         let vector = state.get(&self.self_path);
 
@@ -623,29 +621,22 @@ where
             self.item_boxes
                 .iter_mut()
                 .enumerate()
-                .map(|(index, item_box)| {
-                    item_box.create_layout_info(
-                        state,
-                        store.get_or_create_child_store(index as u64, generator),
-                        generator,
-                        resolver,
-                    )
-                })
+                .map(|(index, item_box)| item_box.create_layout_info(state, store.child_store(index as u64), resolver))
                 .collect()
         });
 
         layout_info
     }
 
-    fn layout_element<'a>(
+    fn lay_out<'a>(
         &'a self,
         state: &'a Context<App>,
-        store: &'a ElementStore,
+        store: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, App>,
     ) {
         for (index, item_box) in self.item_boxes.iter().enumerate() {
-            item_box.layout_element(state, store.child_store(index as u64), &layout_info[index], layout);
+            item_box.lay_out(state, store.child_store(index as u64), &layout_info[index], layout);
         }
     }
 }
@@ -706,9 +697,8 @@ where
             fn create_layout_info(
                 &mut self,
                 state: &Context<App>,
-                _: &mut ElementStore,
-                _: &mut ElementIdGenerator,
-                resolver: &mut Resolver,
+                _: ElementStoreMut<'_>,
+                resolver: &mut Resolver<'_, App>,
             ) -> Self::LayoutInfo {
                 let height = *state.get(&theme().collapsable().title_height());
                 let mut area = resolver.with_height(height);
@@ -721,10 +711,10 @@ where
                 Self::LayoutInfo { area }
             }
 
-            fn layout_element<'a>(
+            fn lay_out<'a>(
                 &'a self,
                 state: &'a Context<App>,
-                _: &'a ElementStore,
+                _: ElementStore<'a>,
                 layout_info: &'a Self::LayoutInfo,
                 layout: &mut Layout<'a, App>,
             ) {

@@ -1,4 +1,5 @@
-use korangar_interface::window::{CustomWindow, WindowTrait};
+use korangar_interface::layout::alignment::OverflowBehavior;
+use korangar_interface::window::{CustomWindow, Window};
 use rust_state::Path;
 
 use crate::graphics::Color;
@@ -7,98 +8,34 @@ use crate::interface::windows::WindowClass;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
 
-pub struct CharacterOverviewWindow<P, L, J> {
-    player_name: P,
-    base_level: L,
-    job_level: J,
+pub struct CharacterOverviewWindow<A, B, C> {
+    player_name_path: A,
+    base_level_path: B,
+    job_level_path: C,
 }
 
-impl<P, L, J> CharacterOverviewWindow<P, L, J> {
-    pub fn new(player_name: P, base_level: L, job_level: J) -> Self {
+impl<A, B, C> CharacterOverviewWindow<A, B, C> {
+    pub fn new(player_name_path: A, base_level_path: B, job_level_path: C) -> Self {
         Self {
-            player_name,
-            base_level,
-            job_level,
+            player_name_path,
+            base_level_path,
+            job_level_path,
         }
     }
 }
 
-impl<P, L, J> CustomWindow<ClientState> for CharacterOverviewWindow<P, L, J>
+impl<A, B, C> CustomWindow<ClientState> for CharacterOverviewWindow<A, B, C>
 where
-    P: Path<ClientState, String>,
-    L: Path<ClientState, usize>,
-    J: Path<ClientState, usize>,
+    A: Path<ClientState, String>,
+    B: Path<ClientState, usize>,
+    C: Path<ClientState, usize>,
 {
     fn window_class() -> Option<WindowClass> {
         Some(WindowClass::CharacterOverview)
     }
 
-    fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
+    fn to_window<'a>(self) -> impl Window<ClientState> + 'a {
         use korangar_interface::prelude::*;
-
-        let elements = (
-            fragment! {
-                gaps: 4.0,
-                children: (
-                    split! {
-                        children: (
-                            text! {
-                                text: "Name",
-                            },
-                            text! {
-                                text: self.player_name,
-                                color: Color::rgb_u8(255, 144, 13),
-                                horizontal_alignment: HorizontalAlignment::Right { offset: 0.0 },
-                            },
-                        ),
-                    },
-                    split! {
-                        children: (
-                            text! {
-                                text: "Base level",
-                            },
-                            text! {
-                                text: PartialEqDisplaySelector::new(self.base_level),
-                                color: Color::rgb_u8(13, 231, 255),
-                                horizontal_alignment: HorizontalAlignment::Right { offset: 0.0 },
-                            },
-                        ),
-                    },
-                    split! {
-                        children: (
-                            text! {
-                                text: "Job level",
-                            },
-                            text! {
-                                text: PartialEqDisplaySelector::new(self.job_level),
-                                color: Color::rgb_u8(13, 231, 255),
-                                horizontal_alignment: HorizontalAlignment::Right { offset: 0.0 },
-                            },
-                        ),
-                    },
-                ),
-            },
-            button! {
-                text: "Inventory",
-                event: InputEvent::OpenInventoryWindow,
-            },
-            button! {
-                text: "Equipment",
-                event: InputEvent::OpenEquipmentWindow,
-            },
-            button! {
-                text: "Skill tree",
-                event: InputEvent::OpenSkillTreeWindow,
-            },
-            button! {
-                text: "Friend list",
-                event: InputEvent::OpenFriendListWindow,
-            },
-            button! {
-                text: "Menu",
-                event: InputEvent::OpenMenuWindow,
-            },
-        );
 
         window! {
             title: "Character Overview",
@@ -106,7 +43,75 @@ where
             theme: InterfaceThemeType::Game,
             minimum_width: 300.0,
             maximum_width: 300.0,
-            elements: elements,
+            elements: (
+                fragment! {
+                    gaps: 4.0,
+                    children: (
+                        split! {
+                            children: (
+                                text! {
+                                    text: "Name",
+                                    overflow_behavior: OverflowBehavior::Shrink,
+                                },
+                                text! {
+                                    text: self.player_name_path,
+                                    color: Color::rgb_u8(255, 144, 13),
+                                    horizontal_alignment: HorizontalAlignment::Right { offset: 0.0, border: 3.0 },
+                                    overflow_behavior: OverflowBehavior::Shrink,
+                                },
+                            ),
+                        },
+                        split! {
+                            children: (
+                                text! {
+                                    text: "Base level",
+                                    overflow_behavior: OverflowBehavior::Shrink,
+                                },
+                                text! {
+                                    text: PartialEqDisplaySelector::new(self.base_level_path),
+                                    color: Color::rgb_u8(13, 231, 255),
+                                    horizontal_alignment: HorizontalAlignment::Right { offset: 0.0, border: 3.0 },
+                                    overflow_behavior: OverflowBehavior::Shrink,
+                                },
+                            ),
+                        },
+                        split! {
+                            children: (
+                                text! {
+                                    text: "Job level",
+                                    overflow_behavior: OverflowBehavior::Shrink,
+                                },
+                                text! {
+                                    text: PartialEqDisplaySelector::new(self.job_level_path),
+                                    color: Color::rgb_u8(13, 231, 255),
+                                    horizontal_alignment: HorizontalAlignment::Right { offset: 0.0, border: 3.0 },
+                                    overflow_behavior: OverflowBehavior::Shrink,
+                                },
+                            ),
+                        },
+                    ),
+                },
+                button! {
+                    text: "Inventory",
+                    event: InputEvent::OpenInventoryWindow,
+                },
+                button! {
+                    text: "Equipment",
+                    event: InputEvent::OpenEquipmentWindow,
+                },
+                button! {
+                    text: "Skill tree",
+                    event: InputEvent::OpenSkillTreeWindow,
+                },
+                button! {
+                    text: "Friend list",
+                    event: InputEvent::OpenFriendListWindow,
+                },
+                button! {
+                    text: "Menu",
+                    event: InputEvent::OpenMenuWindow,
+                },
+            ),
         }
     }
 }

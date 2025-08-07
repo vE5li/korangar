@@ -2,7 +2,7 @@ use std::num::NonZeroU32;
 
 use korangar_interface::components::drop_down::DefaultClickHandler;
 use korangar_interface::element::Element;
-use korangar_interface::window::{CustomWindow, WindowTrait};
+use korangar_interface::window::{CustomWindow, Window};
 use rust_state::Path;
 
 use crate::graphics::{RenderOptions, RenderOptionsPathExt};
@@ -39,7 +39,7 @@ where
         Some(WindowClass::RenderOptions)
     }
 
-    fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
+    fn to_window<'a>(self) -> impl Window<ClientState> + 'a {
         use korangar_interface::prelude::*;
 
         let show_point_shadow_map_options = vec![

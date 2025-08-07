@@ -1,18 +1,39 @@
+use super::alignment::OverflowBehavior;
 use super::area::{Area, PartialArea};
+use crate::application::{Application, TextLayouter};
+use crate::prelude::HorizontalAlignment;
 
-#[derive(Clone)]
-pub struct Resolver {
+pub struct Resolver<'a, App: Application> {
     available_area: PartialArea,
     used_height: f32,
     gaps: f32,
+    text_layouter: &'a App::TextLayouter,
 }
 
-impl Resolver {
-    pub fn new(available_area: impl Into<PartialArea>, gaps: f32) -> Self {
+impl<'a, App> Clone for Resolver<'a, App>
+where
+    App: Application,
+{
+    fn clone(&self) -> Self {
+        Self {
+            available_area: self.available_area,
+            used_height: self.used_height,
+            gaps: self.gaps,
+            text_layouter: self.text_layouter,
+        }
+    }
+}
+
+impl<'a, App> Resolver<'a, App>
+where
+    App: Application,
+{
+    pub fn new(available_area: impl Into<PartialArea>, gaps: f32, text_layouter: &'a App::TextLayouter) -> Self {
         Self {
             available_area: available_area.into(),
             used_height: 0.0,
             gaps,
+            text_layouter,
         }
     }
 
@@ -53,6 +74,27 @@ impl Resolver {
         returned
     }
 
+    pub fn get_text_dimensions(
+        &self,
+        text: &str,
+        font_size: App::FontSize,
+        horizontal_alignment: HorizontalAlignment,
+        overflow_behavior: OverflowBehavior,
+    ) -> (App::Size, App::FontSize) {
+        let offset = match horizontal_alignment {
+            HorizontalAlignment::Left { offset, border } => offset + border,
+            HorizontalAlignment::Center { offset, border } => offset + border,
+            HorizontalAlignment::Right { offset, border } => offset + border,
+        };
+
+        self.text_layouter
+            .get_text_dimensions(text, font_size, self.available_area.width - offset, overflow_behavior)
+    }
+
+    pub fn get_text_layouter(&self) -> &App::TextLayouter {
+        &self.text_layouter
+    }
+
     pub fn push_top(&mut self, height: f32) {
         self.push_gaps();
 
@@ -65,7 +107,7 @@ impl Resolver {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile("derived"))]
-    pub fn with_derived<L>(&mut self, gaps: f32, border: f32, f: impl FnOnce(&mut Resolver) -> L) -> (Area, L) {
+    pub fn with_derived<L>(&mut self, gaps: f32, border: f32, f: impl FnOnce(&mut Resolver<'a, App>) -> L) -> (Area, L) {
         self.push_gaps();
 
         let mut inner = Resolver {
@@ -77,6 +119,7 @@ impl Resolver {
             },
             used_height: 0.0,
             gaps,
+            text_layouter: self.text_layouter,
         };
 
         let layout_info = f(&mut inner);
@@ -99,7 +142,13 @@ impl Resolver {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile("derived"))]
-    pub fn with_derived_borderless<L>(&mut self, gaps: f32, border: f32, once_gap: f32, f: impl FnOnce(&mut Resolver) -> L) -> (Area, L) {
+    pub fn with_derived_borderless<L>(
+        &mut self,
+        gaps: f32,
+        border: f32,
+        once_gap: f32,
+        f: impl FnOnce(&mut Resolver<'a, App>) -> L,
+    ) -> (Area, L) {
         self.push_gaps();
 
         let mut inner = Resolver {
@@ -111,6 +160,7 @@ impl Resolver {
             },
             used_height: 0.0,
             gaps,
+            text_layouter: self.text_layouter,
         };
 
         let layout_info = f(&mut inner);
@@ -132,7 +182,7 @@ impl Resolver {
         (returned, layout_info)
     }
 
-    pub fn with_derived_scrolled<L>(&mut self, scroll: f32, f: impl FnOnce(&mut Resolver) -> L) -> (Area, f32, L) {
+    pub fn with_derived_scrolled<L>(&mut self, scroll: f32, f: impl FnOnce(&mut Resolver<'a, App>) -> L) -> (Area, f32, L) {
         self.push_gaps();
 
         let mut inner = Resolver {
@@ -144,6 +194,7 @@ impl Resolver {
             },
             used_height: 0.0,
             gaps: self.gaps,
+            text_layouter: self.text_layouter,
         };
 
         let layout_info = f(&mut inner);

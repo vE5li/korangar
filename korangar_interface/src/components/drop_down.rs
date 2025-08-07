@@ -6,11 +6,10 @@ use interface_components::scroll_view;
 use rust_state::{Context, Path, RustState, Selector};
 
 use crate::application::{Application, PositionTrait, SizeTrait};
-use crate::element::id::ElementIdGenerator;
-use crate::element::store::ElementStore;
+use crate::element::store::{ElementStore, ElementStoreMut};
 use crate::element::{DefaultLayoutInfo, Element, ErasedElement};
 use crate::event::{ClickAction, Event, EventQueue};
-use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
+use crate::layout::alignment::{HorizontalAlignment, OverflowBehavior, VerticalAlignment};
 use crate::layout::area::Area;
 use crate::layout::{Layout, MouseButton, Resolver};
 use crate::theme::{ThemePathGetter, theme};
@@ -75,22 +74,16 @@ where
     I: Selector<App, App::FontSize>,
     J: Selector<App, HorizontalAlignment>,
 {
-    fn create_layout_info(
-        &mut self,
-        state: &Context<App>,
-        _: &mut ElementStore,
-        _: &mut ElementIdGenerator,
-        resolver: &mut Resolver,
-    ) -> Self::LayoutInfo {
+    fn create_layout_info(&mut self, state: &Context<App>, _: ElementStoreMut<'_>, resolver: &mut Resolver<'_, App>) -> Self::LayoutInfo {
         let height = state.get(&self.height);
         let area = resolver.with_height(*height);
         Self::LayoutInfo { area }
     }
 
-    fn layout_element<'a>(
+    fn lay_out<'a>(
         &'a self,
         state: &'a Context<App>,
-        _: &'a ElementStore,
+        _: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, App>,
     ) {
@@ -122,6 +115,7 @@ where
             foreground_color,
             *state.get(&self.text_alignment),
             *state.get(&theme().drop_down().item_vertical_alignment()),
+            OverflowBehavior::Shrink,
         );
     }
 }
@@ -150,9 +144,8 @@ where
     fn create_layout_info(
         &mut self,
         state: &Context<App>,
-        store: &mut ElementStore,
-        generator: &mut ElementIdGenerator,
-        resolver: &mut Resolver,
+        mut store: ElementStoreMut<'_>,
+        resolver: &mut Resolver<'_, App>,
     ) -> Self::LayoutInfo {
         let vector = state.get(&self.options);
 
@@ -203,24 +196,17 @@ where
             self.item_boxes
                 .iter_mut()
                 .enumerate()
-                .map(|(index, item_box)| {
-                    item_box.create_layout_info(
-                        state,
-                        store.get_or_create_child_store(index as u64, generator),
-                        generator,
-                        resolver,
-                    )
-                })
+                .map(|(index, item_box)| item_box.create_layout_info(state, store.child_store(index as u64), resolver))
                 .collect()
         });
 
         (area, layout_info)
     }
 
-    fn layout_element<'a>(
+    fn lay_out<'a>(
         &'a self,
         state: &'a Context<App>,
-        store: &'a ElementStore,
+        store: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, App>,
     ) {
@@ -231,7 +217,7 @@ where
         );
 
         for (index, item_box) in self.item_boxes.iter().enumerate() {
-            item_box.layout_element(state, store.child_store(index as u64), &layout_info.1[index], layout);
+            item_box.lay_out(state, store.child_store(index as u64), &layout_info.1[index], layout);
         }
     }
 }
@@ -244,6 +230,7 @@ where
     options: B,
     position: App::Position,
     size: App::Size,
+    window_id: u64,
     _marker: PhantomData<(Value, Item)>,
 }
 
@@ -271,6 +258,7 @@ where
             element: Box::new(erased_element),
             position: self.position,
             size: self.size,
+            window_id: self.window_id,
         });
     }
 }
@@ -299,15 +287,17 @@ where
                 options: options_path,
                 position: App::Position::new(0.0, 0.0),
                 size: App::Size::new(0.0, 0.0),
+                window_id: 0,
                 _marker: PhantomData,
             },
             _marker: PhantomData,
         }
     }
 
-    fn set_position_size(&mut self, position: App::Position, size: App::Size) {
+    fn set_position_size(&mut self, position: App::Position, size: App::Size, window_id: u64) {
         self.overlay_element.position = position;
         self.overlay_element.size = size;
+        self.overlay_element.window_id = window_id;
     }
 }
 
@@ -377,9 +367,8 @@ where
     fn create_layout_info(
         &mut self,
         state: &Context<App>,
-        _: &mut ElementStore,
-        _: &mut ElementIdGenerator,
-        resolver: &mut Resolver,
+        store: ElementStoreMut<'_>,
+        resolver: &mut Resolver<'_, App>,
     ) -> Self::LayoutInfo {
         let height = state.get(&self.height);
         let area = resolver.with_height(*height);
@@ -390,15 +379,16 @@ where
         self.click_handler.set_position_size(
             App::Position::new(area.left - border, area.top - border),
             App::Size::new(area.width + border * 2.0, list_maximum_height + border * 2.0),
+            store.get_window_id(),
         );
 
         Self::LayoutInfo { area }
     }
 
-    fn layout_element<'a>(
+    fn lay_out<'a>(
         &'a self,
         state: &'a Context<App>,
-        _: &'a ElementStore,
+        _: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, App>,
     ) {
@@ -437,6 +427,7 @@ where
             foreground_color,
             *state.get(&self.text_alignment),
             *state.get(&theme().drop_down().button_vertical_alignment()),
+            OverflowBehavior::Shrink,
         );
     }
 }

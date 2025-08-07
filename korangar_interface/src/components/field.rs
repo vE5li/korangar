@@ -2,11 +2,10 @@ use std::marker::PhantomData;
 
 use rust_state::{Context, RustState, Selector};
 
-use crate::application::Application;
-use crate::element::Element;
-use crate::element::id::ElementIdGenerator;
-use crate::element::store::ElementStore;
-use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
+use crate::application::{Application, SizeTrait};
+use crate::element::store::{ElementStore, ElementStoreMut};
+use crate::element::{DefaultLayoutInfoWithText, Element};
+use crate::layout::alignment::{HorizontalAlignment, OverflowBehavior, VerticalAlignment};
 use crate::layout::tooltip::TooltipExt;
 use crate::layout::{Layout, Resolver};
 
@@ -52,22 +51,26 @@ where
     H: Selector<App, HorizontalAlignment>,
     I: Selector<App, VerticalAlignment>,
 {
-    fn create_layout_info(
-        &mut self,
-        state: &Context<App>,
-        _: &mut ElementStore,
-        _: &mut ElementIdGenerator,
-        resolver: &mut Resolver,
-    ) -> Self::LayoutInfo {
-        let height = state.get(&self.height);
-        let area = resolver.with_height(*height);
-        Self::LayoutInfo { area }
+    type LayoutInfo = DefaultLayoutInfoWithText<App>;
+
+    fn create_layout_info(&mut self, state: &Context<App>, _: ElementStoreMut<'_>, resolver: &mut Resolver<'_, App>) -> Self::LayoutInfo {
+        let height = *state.get(&self.height);
+
+        let text = state.get(&self.text).as_ref();
+        let font_size = *state.get(&self.font_size);
+        let horizontal_alignment = *state.get(&self.horizontal_alignment);
+        let overflow_behavior = OverflowBehavior::LineBreak;
+
+        let (size, font_size) = resolver.get_text_dimensions(text, font_size, horizontal_alignment, overflow_behavior);
+
+        let area = resolver.with_height(height.max(size.height()));
+        Self::LayoutInfo { area, font_size }
     }
 
-    fn layout_element<'a>(
+    fn lay_out<'a>(
         &'a self,
         state: &'a Context<App>,
-        _: &'a ElementStore,
+        _: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, App>,
     ) {
@@ -92,10 +95,11 @@ where
         layout.add_text(
             layout_info.area,
             state.get(&self.text).as_ref(),
-            *state.get(&self.font_size),
+            layout_info.font_size,
             *state.get(&self.foreground_color),
             *state.get(&self.horizontal_alignment),
             *state.get(&self.vertical_alignment),
+            OverflowBehavior::LineBreak,
         );
     }
 }

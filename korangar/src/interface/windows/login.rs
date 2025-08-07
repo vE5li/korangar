@@ -3,7 +3,8 @@ use korangar_interface::components::text_box::DefaultHandler;
 use korangar_interface::element::StateElement;
 use korangar_interface::element::id::FocusIdExt;
 use korangar_interface::event::{Event, EventQueue};
-use korangar_interface::window::{CustomWindow, WindowTrait};
+use korangar_interface::layout::alignment::OverflowBehavior;
+use korangar_interface::window::{CustomWindow, Window};
 use rust_state::{Context, Path, RustState, Selector};
 
 use crate::graphics::Color;
@@ -144,7 +145,7 @@ where
         Some(WindowClass::Login)
     }
 
-    fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
+    fn to_window<'a>(self) -> impl Window<ClientState> + 'a {
         use korangar_interface::prelude::*;
 
         let selected_service_path = SelectedServicePath::new(self.window_state_path, self.service_settings_path);
@@ -218,6 +219,7 @@ where
                             state: username_path,
                             input_handler: DefaultHandler::<_, _, MAXIMUM_USERNAME_LENGTH>::new(username_path, username_action),
                             focus_id: UsernameTextBox,
+                            overflow_behavior: OverflowBehavior::Shrink,
                         },
                         text_box! {
                             ghost_text: "Password",
@@ -225,6 +227,7 @@ where
                             input_handler: DefaultHandler::<_, _, MAXIMUM_PASSWORD_LENGTH>::new(password_path, password_action),
                             focus_id: PasswordTextBox,
                             hidable: true,
+                            overflow_behavior: OverflowBehavior::Shrink,
                         },
                     ),
                 },

@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use cgmath::EuclideanSpace;
 use korangar_interface::application::RenderLayer;
+use korangar_interface::layout::alignment::OverflowBehavior;
 use korangar_interface::layout::area::Area;
 use korangar_interface::layout::{ClipLayer, ClipLayerId, Icon, Layout};
 
@@ -101,7 +102,13 @@ impl InterfaceRenderer {
     }
 
     /// Get the bounds of a given text, respecting the loaded font.
-    pub fn get_text_dimensions(&self, text: &str, mut font_size: FontSize, mut available_width: f32) -> ScreenSize {
+    pub fn get_text_dimensions(
+        &self,
+        text: &str,
+        mut font_size: FontSize,
+        mut available_width: f32,
+        overflow_behavior: OverflowBehavior,
+    ) -> (ScreenSize, FontSize) {
         if self.high_quality_interface {
             // We need to adjust the font size, or else we would create glyphs for a font
             // size, that we don't use.
@@ -109,13 +116,16 @@ impl InterfaceRenderer {
             available_width *= 2.0;
         }
 
-        let mut size = self.font_loader.get_text_dimensions(text, font_size, 1.0, available_width);
+        let (mut size, mut font_size) = self
+            .font_loader
+            .get_text_dimensions(text, font_size, 1.0, available_width, overflow_behavior);
 
         if self.high_quality_interface {
             size = size / 2.0;
+            font_size = FontSize(font_size.0 / 2.0);
         }
 
-        size
+        (size, font_size)
     }
 
     /// Add instruction for rendering a rectangle.
@@ -160,26 +170,25 @@ impl InterfaceRenderer {
         &self,
         text: &str,
         mut text_position: ScreenPosition,
+        mut available_width: f32,
         mut screen_clip: ScreenClip,
         color: Color,
         mut font_size: FontSize,
     ) -> f32 {
+        // TODO: Can't we scale after laying out the text? Would cut down on
+        // multiplications.
         if self.high_quality_interface {
             text_position = text_position * 2.0;
+            available_width = available_width * 2.0;
             screen_clip = screen_clip * 2.0;
             font_size = font_size * 2.0;
         }
 
         let mut glyphs = self.glyphs.borrow_mut();
 
-        let mut size = self.font_loader.layout_text(
-            text,
-            color,
-            font_size,
-            1.0,
-            screen_clip.right - text_position.left,
-            Some(&mut glyphs),
-        );
+        let mut size = self
+            .font_loader
+            .layout_text(text, color, font_size, 1.0, Some(available_width), Some(&mut glyphs));
 
         let mut instructions = self.instructions.borrow_mut();
 
@@ -387,12 +396,8 @@ impl RenderLayer<ClientState> for InterfaceRenderer {
         self.render_rectangle(position, size, clip, corner_radius, color);
     }
 
-    fn get_text_dimensions(&self, text: &str, font_size: FontSize, available_width: f32) -> ScreenSize {
-        self.get_text_dimensions(text, font_size, available_width)
-    }
-
-    fn render_text(&self, text: &str, position: ScreenPosition, clip: ScreenClip, color: Color, font_size: FontSize) {
-        self.render_text(text, position, clip, color, font_size);
+    fn render_text(&self, text: &str, position: ScreenPosition, available_width: f32, clip: ScreenClip, color: Color, font_size: FontSize) {
+        self.render_text(text, position, available_width, clip, color, font_size);
     }
 
     fn render_icon(&self, position: ScreenPosition, size: ScreenSize, clip: ScreenClip, icon: Icon<ClientState>, color: Color) {

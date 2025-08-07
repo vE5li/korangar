@@ -1,5 +1,5 @@
 use derive_new::new;
-use korangar_interface::window::{CustomWindow, WindowTrait};
+use korangar_interface::window::{CustomWindow, Window};
 
 use crate::graphics::Color;
 use crate::state::ClientState;
@@ -11,7 +11,7 @@ pub struct ErrorWindow {
 }
 
 impl CustomWindow<ClientState> for ErrorWindow {
-    fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
+    fn to_window<'a>(self) -> impl Window<ClientState> + 'a {
         use korangar_interface::prelude::*;
 
         window! {

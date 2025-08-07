@@ -3,7 +3,7 @@ use proc_macro::TokenStream;
 
 #[proc_macro]
 pub fn window(token_stream: TokenStream) -> TokenStream {
-    create_component_macro!(korangar_interface::window::Window, {
+    create_component_macro!(korangar_interface::window::WindowInternal, {
         title_marker: { const std::marker::PhantomData },
         title: !,
         title_color: { korangar_interface::theme::theme().window().title_color() },
@@ -42,6 +42,7 @@ pub fn text(token_stream: TokenStream) -> TokenStream {
         font_size: { korangar_interface::theme::theme().text().font_size() },
         horizontal_alignment: { korangar_interface::theme::theme().text().horizontal_alignment() },
         vertical_alignment: { korangar_interface::theme::theme().text().vertical_alignment() },
+        overflow_behavior: { korangar_interface::theme::theme().text().overflow_behavior() },
     });
 
     macro_impl(token_stream.into()).into()
@@ -204,6 +205,7 @@ pub fn text_box(token_stream: TokenStream) -> TokenStream {
         corner_radius: { korangar_interface::theme::theme().text_box().corner_radius() },
         font_size: { korangar_interface::theme::theme().text_box().font_size() },
         text_alignment: { korangar_interface::theme::theme().text_box().text_alignment() },
+        overflow_behavior: { korangar_interface::theme::theme().text_box().overflow_behavior() },
     });
 
     macro_impl(token_stream.into()).into()

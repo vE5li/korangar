@@ -1,5 +1,5 @@
 use korangar_components::skill_box;
-use korangar_interface::window::{CustomWindow, WindowTrait};
+use korangar_interface::window::{CustomWindow, Window};
 use ragnarok_packets::HotbarSlot;
 use rust_state::{ArrayLookupExt, OptionExt, Path};
 
@@ -28,7 +28,7 @@ where
         Some(WindowClass::Hotbar)
     }
 
-    fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
+    fn to_window<'a>(self) -> impl Window<ClientState> + 'a {
         use korangar_interface::prelude::*;
 
         window! {

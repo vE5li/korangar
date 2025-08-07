@@ -1,5 +1,7 @@
 pub mod theme;
 
+use std::sync::Arc;
+
 use korangar_interface::application::Application;
 use korangar_interface::components::button::ButtonTheme;
 use korangar_interface::components::collapsable::CollapsableTheme;
@@ -29,7 +31,7 @@ use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenS
 use crate::interface::windows::ProfilerWindowState;
 use crate::interface::windows::{ChatWindowState, DialogWindowState, FriendListWindowState, LoginWindowState, WindowCache, WindowClass};
 use crate::inventory::{Hotbar, Inventory, SkillTree};
-use crate::loaders::{ClientInfo, FontSize, GameFileLoader, load_client_info};
+use crate::loaders::{ClientInfo, FontLoader, FontSize, GameFileLoader, load_client_info};
 use crate::renderer::InterfaceRenderer;
 use crate::settings::{GraphicsSettingsCapabilities, LoginSettings};
 use crate::state::theme::{GameTheme, ThemeDefault};
@@ -377,6 +379,7 @@ impl Application for ClientState {
     type Position = ScreenPosition;
     type Renderer = InterfaceRenderer;
     type Size = ScreenSize;
+    type TextLayouter = Arc<FontLoader>;
     type ThemeGetter = ClientThemeGetter;
     type ThemeType = InterfaceThemeType;
     type WindowClass = WindowClass;

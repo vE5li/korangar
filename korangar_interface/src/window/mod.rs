@@ -12,49 +12,80 @@ use crate::MouseMode;
 use crate::application::{Application, CornerRadiusTrait, PositionTrait, SizeTrait};
 use crate::element::ElementSet;
 use crate::element::id::ElementIdGenerator;
-use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
+use crate::element::store::ElementStore;
+use crate::layout::alignment::{HorizontalAlignment, OverflowBehavior, VerticalAlignment};
 use crate::layout::area::Area;
 use crate::layout::{Layout, ResizeMode, Resolver};
 use crate::theme::{ThemePathGetter, theme};
 
-// TODO: Rename
-pub trait WindowTrait<App: Application> {
-    fn get_window_class(&self) -> Option<App::WindowClass>;
+mod private {
+    /// Sealed trait to avoid outside implementations of
+    /// [`Window`](super::Window).
+    pub trait Sealed {}
+}
 
+/// This trait is only used to abstract over [`WindowInternal`] and it's
+/// generics and is not supposed to be implemented outised this crate.
+pub trait Window<App: Application>: private::Sealed {
+    /// Get the window class of the window (if any).
+    fn get_class(&self) -> Option<App::WindowClass>;
+
+    /// Get the window theme.
+    fn get_theme_type(&self) -> App::ThemeType;
+
+    /// Create the layout info for the window.
+    #[allow(private_interfaces)]
     fn create_layout_info(
         &mut self,
         state: &Context<App>,
         store: &mut WindowStore,
         data: &mut WindowData<App>,
         generator: &mut ElementIdGenerator,
+        text_layouter: &App::TextLayouter,
         window_size: App::Size,
     ) -> DisplayInformation;
 
-    fn do_layout<'a>(&'a self, state: &'a Context<App>, store: &'a WindowStore, data: &'a WindowData<App>, layout: &mut Layout<'a, App>);
+    /// Lay out the window.
+    #[allow(private_interfaces)]
+    fn lay_out<'a>(&'a self, state: &'a Context<App>, store: &'a WindowStore, data: &'a WindowData<App>, layout: &mut Layout<'a, App>);
 }
 
-pub trait StateWindow<App>
-where
-    App: Application,
-{
-    fn window_class() -> Option<App::WindowClass> {
-        None
-    }
-
-    fn to_window<'a>(self_path: impl Path<App, Self>) -> impl WindowTrait<App> + 'a;
-
-    fn to_window_mut<'a>(self_path: impl Path<App, Self>) -> impl WindowTrait<App> + 'a;
-}
-
+/// An application specific custom window.
+///
+/// Can be passed to [`open_window`](crate::Interface::open_window).
 pub trait CustomWindow<App>
 where
     App: Application,
 {
+    /// Return the window class of the window (if any).
     fn window_class() -> Option<App::WindowClass> {
         None
     }
 
-    fn to_window<'a>(self) -> impl WindowTrait<App> + 'a;
+    /// Convert to a real window.
+    fn to_window<'a>(self) -> impl Window<App> + 'a;
+}
+
+/// A window for inspecting a part of the application state.
+///
+/// Can be passed to [`open_state_window`](crate::Interface::open_state_window).
+///
+/// Implementing this trait is generally discouraged, see [`CustomWindow`] for
+/// custom windows.
+pub trait StateWindow<App>
+where
+    App: Application,
+{
+    /// Return the window class of the window (if any).
+    fn window_class() -> Option<App::WindowClass> {
+        None
+    }
+
+    /// Create a new immutable inspector window of the state.
+    fn to_window<'a>(self_path: impl Path<App, Self>) -> impl Window<App> + 'a;
+
+    /// Create a new mutable inspector window of the state.
+    fn to_window_mut<'a>(self_path: impl Path<App, Self>) -> impl Window<App> + 'a;
 }
 
 #[derive(RustState)]
@@ -92,7 +123,7 @@ where
     pub size: App::Size,
 }
 
-pub struct DisplayInformation {
+pub(crate) struct DisplayInformation {
     pub real_area: Area,
     pub display_height: f32,
 }
@@ -103,7 +134,7 @@ pub struct WindowLayoutInfoSet<T> {
     children: T,
 }
 
-pub struct Window<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Elements>
+pub struct WindowInternal<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Elements>
 where
     App: Application,
     Elements: ElementSet<App>,
@@ -133,8 +164,16 @@ where
     pub layout_info: Option<WindowLayoutInfoSet<<Elements as ElementSet<App>>::LayoutInfo>>,
 }
 
-impl<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Elements> WindowTrait<App>
-    for Window<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Elements>
+impl<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Elements> private::Sealed
+    for WindowInternal<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Elements>
+where
+    App: Application,
+    Elements: ElementSet<App>,
+{
+}
+
+impl<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Elements> Window<App>
+    for WindowInternal<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Elements>
 where
     App: Application,
     Title: AsRef<str>,
@@ -159,16 +198,22 @@ where
     Elements: ElementSet<App>,
     <Elements as ElementSet<App>>::LayoutInfo: 'static,
 {
-    fn get_window_class(&self) -> Option<App::WindowClass> {
+    fn get_class(&self) -> Option<App::WindowClass> {
         self.class
     }
 
+    fn get_theme_type(&self) -> <App as Application>::ThemeType {
+        self.theme
+    }
+
+    #[allow(private_interfaces)]
     fn create_layout_info(
         &mut self,
         state: &Context<App>,
         store: &mut WindowStore,
         data: &mut WindowData<App>,
         generator: &mut ElementIdGenerator,
+        text_layouter: &App::TextLayouter,
         window_size: App::Size,
     ) -> DisplayInformation {
         let store = store.get_or_create_from_window_id(data.id, generator);
@@ -210,12 +255,12 @@ where
             height: adjusted_size.height(),
         };
 
-        let mut resolver = Resolver::new(available_area, 0.0);
+        let mut resolver = Resolver::new(available_area, 0.0, text_layouter);
 
         let title_area = resolver.with_height(title_height);
 
         let (area, children) = resolver.with_derived_borderless(*state.get(&self.gaps), *state.get(&self.border), title_gap, |resolver| {
-            self.elements.create_layout_info(state, store, generator, resolver)
+            self.elements.create_layout_info(state, store, resolver)
         });
 
         let area = Area {
@@ -239,9 +284,9 @@ where
         }
     }
 
-    // TODO: Rename
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn do_layout<'a>(&'a self, state: &'a Context<App>, store: &'a WindowStore, data: &'a WindowData<App>, layout: &mut Layout<'a, App>) {
+    #[allow(private_interfaces)]
+    fn lay_out<'a>(&'a self, state: &'a Context<App>, store: &'a WindowStore, data: &'a WindowData<App>, layout: &mut Layout<'a, App>) {
         let store = store.get_from_window_id(data.id);
         let layout_info = self.layout_info.as_ref().expect("no layout present");
 
@@ -323,7 +368,8 @@ where
 
         layout.with_clip_layer(layout_info.area, |layout| {
             layout.with_layer(|layout| {
-                self.elements.layout_element(state, store, &layout_info.children, layout);
+                self.elements
+                    .lay_out(state, ElementStore::new(store, data.id), &layout_info.children, layout);
             });
         });
 
@@ -339,6 +385,7 @@ where
             title_color,
             *state.get(&theme().window().text_alignment()),
             *state.get(&theme().window().vertical_alignment()),
+            OverflowBehavior::Shrink,
         );
 
         layout.add_rectangle(
@@ -395,8 +442,9 @@ where
                 "X",
                 *state.get(&self.font_size),
                 *state.get(&self.background_color),
-                HorizontalAlignment::Center { offset: 0.0 },
+                HorizontalAlignment::Center { offset: 0.0, border: 8.0 },
                 VerticalAlignment::Center { offset: 0.0 },
+                OverflowBehavior::Shrink,
             );
         }
 

@@ -1,4 +1,4 @@
-use korangar_interface::window::{CustomWindow, WindowTrait};
+use korangar_interface::window::{CustomWindow, Window};
 
 use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
@@ -12,7 +12,7 @@ impl CustomWindow<ClientState> for CommandsWindow {
         Some(WindowClass::Commands)
     }
 
-    fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
+    fn to_window<'a>(self) -> impl Window<ClientState> + 'a {
         use korangar_interface::prelude::*;
 
         window! {

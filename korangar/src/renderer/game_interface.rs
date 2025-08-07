@@ -186,9 +186,7 @@ impl GameInterfaceRenderer {
 
         let mut glyphs = self.glyphs.borrow_mut();
 
-        let size = self
-            .font_loader
-            .layout_text(text, color, font_size, 1.0, f32::MAX, Some(&mut glyphs));
+        let size = self.font_loader.layout_text(text, color, font_size, 1.0, None, Some(&mut glyphs));
 
         let horizontal_offset = match align_horizontal {
             AlignHorizontal::Left => 0.0,

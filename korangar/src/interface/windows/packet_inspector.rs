@@ -1,9 +1,8 @@
 use korangar_interface::element::Element;
-use korangar_interface::element::id::ElementIdGenerator;
-use korangar_interface::element::store::ElementStore;
+use korangar_interface::element::store::{ElementStore, ElementStoreMut};
 use korangar_interface::event::EventQueue;
 use korangar_interface::layout::{Layout, Resolver};
-use korangar_interface::window::{CustomWindow, WindowTrait};
+use korangar_interface::window::{CustomWindow, Window};
 use rust_state::{Context, Path};
 
 use crate::interface::windows::WindowClass;
@@ -29,7 +28,7 @@ where
         Some(WindowClass::PacketInspector)
     }
 
-    fn to_window<'a>(self) -> impl WindowTrait<ClientState> + 'a {
+    fn to_window<'a>(self) -> impl Window<ClientState> + 'a {
         use korangar_interface::prelude::*;
 
         struct BufferWrapper<A> {
@@ -45,9 +44,8 @@ where
             fn create_layout_info(
                 &mut self,
                 state: &Context<ClientState>,
-                store: &mut ElementStore,
-                generator: &mut ElementIdGenerator,
-                resolver: &mut Resolver,
+                mut store: ElementStoreMut<'_>,
+                resolver: &mut Resolver<'_, ClientState>,
             ) {
                 let packet_history = state.get(&self.packet_history_path);
 
@@ -58,16 +56,16 @@ where
                         && (!entry.is_ping() || packet_history.show_pings)
                     {
                         let element = unsafe { &mut *entry.element.get() };
-                        let store = store.get_or_create_child_store(index as u64, generator);
-                        element.create_layout_info(state, store, generator, resolver);
+                        let store = store.child_store(index as u64);
+                        element.create_layout_info(state, store, resolver);
                     }
                 });
             }
 
-            fn layout_element<'a>(
+            fn lay_out<'a>(
                 &'a self,
                 state: &'a Context<ClientState>,
-                store: &'a ElementStore,
+                store: ElementStore<'a>,
                 _: &'a Self::LayoutInfo,
                 layout: &mut Layout<'a, ClientState>,
             ) {
@@ -81,7 +79,7 @@ where
                     {
                         let element = unsafe { &*entry.element.get() };
                         let store = store.child_store(index as u64);
-                        element.layout_element(state, store, &(), layout)
+                        element.lay_out(state, store, &(), layout)
                     }
                 });
             }

@@ -31,6 +31,10 @@ pub enum Event<App: Application> {
         element: ElementBox<App>,
         position: App::Position,
         size: App::Size,
+        window_id: u64,
+    },
+    MoveWindowToTop {
+        window_id: u64,
     },
     CloseWindow {
         window_id: u64,
@@ -51,6 +55,7 @@ impl<App: Application> Clone for Event<App> {
             },
             // TODO: Find a better solution for this. Ideally Event wouldn't need to be clone.
             Self::OpenOverlay { .. } => unimplemented!(),
+            Self::MoveWindowToTop { window_id } => Self::MoveWindowToTop { window_id: *window_id },
             Self::CloseWindow { window_id } => Self::CloseWindow { window_id: *window_id },
             Self::CloseOverlay => Self::CloseOverlay,
         }

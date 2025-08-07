@@ -9,6 +9,7 @@
 #![feature(unsafe_cell_access)]
 #![feature(associated_type_defaults)]
 #![feature(impl_trait_in_assoc_type)]
+#![feature(anonymous_lifetime_in_impl_trait)]
 
 pub mod application;
 pub mod components;
@@ -24,19 +25,22 @@ extern crate self as korangar_interface;
 use std::any::Any;
 use std::collections::BTreeMap;
 
-use application::{Application, ClipTrait, CornerRadiusTrait, FontSizeTrait, PositionTrait, RenderLayer, SizeTrait, WindowCache};
+use application::{
+    Application, ClipTrait, CornerRadiusTrait, FontSizeTrait, PositionTrait, RenderLayer, SizeTrait, TextLayouter, WindowCache,
+};
 use element::ElementBox;
 use element::id::{ElementId, ElementIdGenerator};
-use element::store::ElementStore;
+use element::store::{ElementStore, ElementStoreMut, InternalElementStore};
 use event::{Event, EventQueue};
+use layout::alignment::OverflowBehavior;
 use layout::area::Area;
+use layout::tooltip::TooltipTheme;
 use layout::{Layout, MouseButton, ResizeMode, Resolver};
 use option_ext::OptionExt;
-use prelude::TooltipThemePathExt;
 use rust_state::Context;
 use theme::ThemePathGetter;
 use window::store::WindowStore;
-use window::{Anchor, CustomWindow, DisplayInformation, StateWindow, WindowData, WindowTrait};
+use window::{Anchor, CustomWindow, DisplayInformation, StateWindow, Window, WindowData, WindowThemePathExt};
 
 use crate::element::id::FocusIdExt;
 
@@ -196,9 +200,20 @@ struct WindowWrapper<App>
 where
     App: Application,
 {
-    window: Box<dyn WindowTrait<App>>,
+    window: Box<dyn Window<App>>,
     data: WindowData<App>,
     display_information: DisplayInformation,
+}
+
+struct OverlayElement<App>
+where
+    App: Application,
+{
+    element: ElementBox<App>,
+    store: InternalElementStore,
+    position: App::Position,
+    size: App::Size,
+    window_id: u64,
 }
 
 pub struct Interface<'a, App>
@@ -214,7 +229,7 @@ where
     focused_element: Option<ElementId>,
     mouse_mode: MouseMode<App>,
     event_queue: EventQueue<App>,
-    overlay_element: Option<(ElementBox<App>, ElementStore, App::Position, App::Size)>,
+    overlay_element: Option<OverlayElement<App>>,
 
     /// Cached window layouts. This is mostly an optimization to avoid
     /// re-allocating the every frame but also serves to store some information
@@ -226,13 +241,15 @@ where
     overlay_layout: Option<Layout<'a, App>>,
 
     next_window_id: u64,
+
+    text_layouter: App::TextLayouter,
 }
 
 impl<App> Interface<'static, App>
 where
     App: Application,
 {
-    pub fn new(available_space: App::Size) -> Self {
+    pub fn new(text_layouter: App::TextLayouter, available_space: App::Size) -> Self {
         let window_cache = App::Cache::create();
 
         Self {
@@ -251,21 +268,12 @@ where
             overlay_layout: None,
 
             next_window_id: 0,
+            text_layouter,
         }
     }
 
     pub fn update_window_size(&mut self, screen_size: App::Size) {
         self.window_size = screen_size;
-    }
-
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn move_window_to_top(&mut self, window_index: usize) -> usize {
-        let window = self.windows.remove(window_index);
-        let new_window_index = self.windows.len();
-
-        self.windows.push(window);
-
-        new_window_index
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
@@ -286,7 +294,7 @@ where
 
                     wrapper.data.anchor.update(self.window_size, new_position, scaled_size);
 
-                    if let Some(window_class) = wrapper.window.get_window_class() {
+                    if let Some(window_class) = wrapper.window.get_class() {
                         self.window_cache.update_anchor(window_class, wrapper.data.anchor);
                     }
                 }
@@ -304,7 +312,7 @@ where
                         wrapper.display_information.real_area.height + delta_height / interface_scaling,
                     );
 
-                    if let Some(window_class) = wrapper.window.get_window_class() {
+                    if let Some(window_class) = wrapper.window.get_class() {
                         self.window_cache.update_size(window_class, wrapper.data.size);
                     }
                 }
@@ -316,15 +324,15 @@ where
     pub fn is_window_with_class_open(&self, window_class: App::WindowClass) -> bool {
         self.windows
             .iter()
-            .any(|wrapper| wrapper.window.get_window_class().is_some_and(|class| class == window_class))
+            .any(|wrapper| wrapper.window.get_class().is_some_and(|class| class == window_class))
     }
 
-    fn open_new_window(&mut self, window: impl WindowTrait<App> + 'static) {
+    fn open_new_window(&mut self, window: impl Window<App> + 'static) {
         let id = self.next_window_id;
         // TODO: Actual logic to wrap around and adjust all window IDs.
         self.next_window_id = self.next_window_id.wrapping_add(1);
 
-        let window_class = window.get_window_class();
+        let window_class = window.get_class();
 
         let (anchor, size) = match window_class.and_then(|window_class| self.window_cache.get_window_state(window_class)) {
             Some(saved_state) => saved_state,
@@ -408,7 +416,7 @@ where
             .windows
             .iter()
             .rev()
-            .map(|wrapper| wrapper.window.get_window_class())
+            .map(|wrapper| wrapper.window.get_class())
             .position(|class_option| class_option.contains(&window_class))
         {
             let index = self.windows.len() - 1 - index_from_back;
@@ -428,148 +436,11 @@ where
         for index in (0..self.windows.len()).rev() {
             if self.windows[index]
                 .window
-                .get_window_class()
+                .get_class()
                 .map(|class| !exceptions.contains(&class))
                 .unwrap_or(true)
             {
                 self.remove_window(index);
-            }
-        }
-    }
-
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn do_layouts<'a>(
-        &'a mut self,
-        state: &'a Context<App>,
-        interface_scaling: f32,
-        mouse_position: App::Position,
-    ) -> BuiltUi<'a, App> {
-        let mut is_interface_hovered = false;
-
-        if let Some((element, store, position, size)) = &mut self.overlay_element {
-            let available_area = Area {
-                left: position.left(),
-                top: position.top(),
-                width: size.width(),
-                height: size.height(),
-            };
-
-            let mut resolver = Resolver::new(available_area, 0.0);
-
-            element.create_layout_info(state, store, &mut self.generator, &mut resolver);
-        }
-
-        // SAFETY:
-        //
-        // This is safe as long as the `Drop` implementation of the `BuiltUi` clears the
-        // `Layout`s, removing any references with the lifetime 'a from the
-        // struct. If drop does not clear the layout or the clear implementation
-        // of drop is incorrect we will end up with dangling references.
-        let this = unsafe { std::mem::transmute::<&'a mut Interface<'static, App>, &'a mut Interface<'a, App>>(self) };
-
-        this.windows.iter_mut().for_each(|wrapper| {
-            wrapper.display_information = wrapper.window.create_layout_info(
-                state,
-                &mut this.window_store,
-                &mut wrapper.data,
-                &mut this.generator,
-                this.window_size,
-            );
-        });
-
-        if let Some((element, store, ..)) = &this.overlay_element {
-            // TODO: Choose the most recent window instead.
-            let wrapper = &this.windows[0];
-
-            let position = App::Position::new(
-                wrapper.display_information.real_area.left,
-                wrapper.display_information.real_area.top,
-            );
-
-            let layout = this.overlay_layout.get_or_insert_default();
-            layout.update(
-                interface_scaling,
-                position,
-                mouse_position,
-                this.focused_element,
-                !is_interface_hovered,
-                // TODO: Would be nicer if we didn't have to clone here.
-                &this.mouse_mode,
-            );
-
-            element.layout_element(state, store, &(), layout);
-
-            is_interface_hovered |= layout.is_hovered();
-        }
-
-        this.windows.iter().for_each(|wrapper| {
-            let position = App::Position::new(
-                wrapper.display_information.real_area.left,
-                wrapper.display_information.real_area.top,
-            );
-
-            let layout = this.window_layouts.entry(wrapper.data.id).or_default();
-            layout.update(
-                interface_scaling,
-                position,
-                mouse_position,
-                this.focused_element,
-                !is_interface_hovered,
-                // TODO: Would be nicer if we didn't have to clone here.
-                &this.mouse_mode,
-            );
-
-            wrapper.window.do_layout(state, &this.window_store, &wrapper.data, layout);
-
-            is_interface_hovered |= layout.is_hovered();
-        });
-
-        BuiltUi {
-            window_layouts: &mut this.window_layouts,
-            overlay_layout: &mut this.overlay_layout,
-            event_queue: &mut this.event_queue,
-            window_size: this.window_size,
-            mouse_mode: &this.mouse_mode,
-            is_interface_hovered,
-            interface_scaling,
-        }
-    }
-
-    pub fn render_overlay(
-        &self,
-        renderer: &App::Renderer,
-        anchor_color: App::Color,
-        closest_anchor_color: App::Color,
-        interface_scaling: f32,
-    ) {
-        if let MouseMode::MovingWindow { window_id } = self.mouse_mode {
-            if let Some(wrapper) = self.windows.iter().find(|wrapper| wrapper.data.id == window_id) {
-                wrapper.data.anchor.render_screen_anchors(
-                    renderer,
-                    anchor_color,
-                    closest_anchor_color,
-                    self.window_size,
-                    interface_scaling,
-                );
-
-                let window_display_size = App::Size::new(
-                    wrapper.display_information.real_area.width * interface_scaling,
-                    wrapper.display_information.display_height * interface_scaling,
-                );
-
-                let position = App::Position::new(
-                    wrapper.display_information.real_area.left,
-                    wrapper.display_information.real_area.top,
-                );
-
-                wrapper.data.anchor.render_window_anchors(
-                    renderer,
-                    anchor_color,
-                    closest_anchor_color,
-                    position,
-                    window_display_size,
-                    interface_scaling,
-                );
             }
         }
     }
@@ -585,8 +456,25 @@ where
                 Event::Unfocus => self.focused_element = None,
                 Event::SetMouseMode { mouse_mode } => self.mouse_mode = mouse_mode,
                 Event::Application { custom_event } => custom_events.push(custom_event),
-                Event::OpenOverlay { element, position, size } => {
-                    self.overlay_element = Some((element, ElementStore::root(&mut self.generator), position, size))
+                Event::OpenOverlay {
+                    element,
+                    position,
+                    size,
+                    window_id,
+                } => {
+                    self.overlay_element = Some(OverlayElement {
+                        element,
+                        store: InternalElementStore::root(&mut self.generator),
+                        position,
+                        size,
+                        window_id,
+                    });
+                }
+                Event::MoveWindowToTop { window_id } => {
+                    if let Some(window_index) = self.windows.iter().position(|wrapper| wrapper.data.id == window_id) {
+                        let window = self.windows.remove(window_index);
+                        self.windows.push(window);
+                    }
                 }
                 Event::CloseWindow { window_id } => {
                     if let Some(index) = self.windows.iter().position(|wrapper| wrapper.data.id == window_id) {
@@ -600,55 +488,228 @@ where
             }
         }
     }
+
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
+    pub fn lay_out_windows<'a>(
+        &'a mut self,
+        state: &'a Context<App>,
+        interface_scaling: f32,
+        mouse_position: App::Position,
+    ) -> InterfaceFrame<'a, App> {
+        if let Some(overlay_element) = &mut self.overlay_element {
+            match self.windows.iter().any(|wrapper| wrapper.data.id == overlay_element.window_id) {
+                true => {
+                    let available_area = Area {
+                        left: overlay_element.position.left(),
+                        top: overlay_element.position.top(),
+                        width: overlay_element.size.width(),
+                        height: overlay_element.size.height(),
+                    };
+
+                    let store = ElementStoreMut::new(&mut overlay_element.store, &mut self.generator, overlay_element.window_id);
+                    let mut resolver = Resolver::new(available_area, 0.0, &self.text_layouter);
+
+                    overlay_element.element.create_layout_info(state, store, &mut resolver);
+                }
+                // Window was closed while the overlay was open, so we just close it.
+                false => self.overlay_element = None,
+            }
+        }
+
+        // SAFETY:
+        //
+        // This is safe as long as the `Drop` implementation of the `InterfaceFrame`
+        // clears the `Layout`s, removing any references with the lifetime 'a
+        // from the struct. If drop does not clear the layout or the clear
+        // implementation of drop is incorrect we will end up with dangling
+        // references.
+        let this = unsafe { std::mem::transmute::<&'a mut Interface<'static, App>, &'a mut Interface<'a, App>>(self) };
+
+        this.windows.iter_mut().for_each(|wrapper| {
+            wrapper.display_information = wrapper.window.create_layout_info(
+                state,
+                &mut this.window_store,
+                &mut wrapper.data,
+                &mut this.generator,
+                &this.text_layouter,
+                this.window_size,
+            );
+        });
+
+        let mut hovered_window = None;
+
+        if let Some(overlay_element) = &this.overlay_element {
+            // SAFETY:
+            //
+            // Window is guaranteed to exist since we check for that when creating the
+            // layout info for the overlay.
+            let wrapper = this
+                .windows
+                .iter()
+                .find(|wrapper| wrapper.data.id == overlay_element.window_id)
+                .unwrap();
+
+            let position = App::Position::new(
+                wrapper.display_information.real_area.left,
+                wrapper.display_information.real_area.top,
+            );
+
+            let layout = this.overlay_layout.get_or_insert_default();
+            layout.update(
+                interface_scaling,
+                position,
+                mouse_position,
+                this.focused_element,
+                hovered_window.is_none(),
+                &this.mouse_mode,
+            );
+
+            let store = ElementStore::new(&overlay_element.store, overlay_element.window_id);
+
+            overlay_element.element.lay_out(state, store, &(), layout);
+
+            if hovered_window.is_none() && layout.is_hovered() {
+                hovered_window = Some(overlay_element.window_id);
+            }
+        }
+
+        this.windows.iter().rev().for_each(|wrapper| {
+            let position = App::Position::new(
+                wrapper.display_information.real_area.left,
+                wrapper.display_information.real_area.top,
+            );
+
+            let layout = this.window_layouts.entry(wrapper.data.id).or_default();
+            layout.update(
+                interface_scaling,
+                position,
+                mouse_position,
+                this.focused_element,
+                hovered_window.is_none(),
+                &this.mouse_mode,
+            );
+
+            wrapper.window.lay_out(state, &this.window_store, &wrapper.data, layout);
+
+            if hovered_window.is_none() && layout.is_hovered() {
+                hovered_window = Some(wrapper.data.id);
+            }
+        });
+
+        InterfaceFrame {
+            windows: &this.windows,
+            window_layouts: &mut this.window_layouts,
+            overlay_layout: &mut this.overlay_layout,
+            event_queue: &mut this.event_queue,
+            window_size: this.window_size,
+            mouse_mode: &this.mouse_mode,
+            hovered_window,
+            interface_scaling,
+            text_layouter: &this.text_layouter,
+        }
+    }
 }
 
-pub struct BuiltUi<'a, App: Application> {
+pub struct InterfaceFrame<'a, App: Application> {
+    windows: &'a [WindowWrapper<App>],
     window_layouts: &'a mut BTreeMap<u64, Layout<'a, App>>,
     overlay_layout: &'a mut Option<Layout<'a, App>>,
     event_queue: &'a mut EventQueue<App>,
     mouse_mode: &'a MouseMode<App>,
     window_size: App::Size,
-    is_interface_hovered: bool,
+    hovered_window: Option<u64>,
     interface_scaling: f32,
+    text_layouter: &'a App::TextLayouter,
 }
 
-impl<App: Application> BuiltUi<'_, App> {
+impl<App: Application> InterfaceFrame<'_, App> {
     pub fn is_interface_hovered(&self) -> bool {
-        self.is_interface_hovered
+        self.hovered_window.is_some()
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn render(&mut self, state: &Context<App>, renderer: &App::Renderer, mouse_position: App::Position) {
-        // FIX: Don't allocate every frame. Move this to the interface as well.
+    pub fn render(
+        &mut self,
+        state: &Context<App>,
+        renderer: &App::Renderer,
+        tooltip_theme: &TooltipTheme<App>,
+        mouse_position: App::Position,
+    ) {
+        // TODO: Don't allocate every frame. Move this to the interface as well.
         let mut tooltips = Vec::new();
 
-        // FIX: Window order.
-        // Most likely we want to include another vector that keeps the ids of the
-        // windows in order.
-        self.window_layouts.values_mut().for_each(|layout| {
-            layout.render(renderer);
+        self.windows.iter().for_each(|wrapper| {
+            let layout = self.window_layouts.get_mut(&wrapper.data.id).unwrap();
+            layout.render(renderer, self.text_layouter);
             layout.update_tooltips(&mut tooltips);
         });
 
         if let Some(layout) = &mut self.overlay_layout {
-            layout.render(renderer);
+            layout.render(renderer, self.text_layouter);
             layout.update_tooltips(&mut tooltips);
         }
 
+        if let MouseMode::MovingWindow { window_id } = self.mouse_mode {
+            self.render_window_anchors(state, renderer, *window_id);
+        }
+
         if !tooltips.is_empty() {
-            self.render_tooltips(state, renderer, &tooltips, mouse_position);
+            self.render_tooltips(renderer, tooltip_theme, &tooltips, mouse_position);
         }
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn render_tooltips(&self, state: &Context<App>, renderer: &App::Renderer, tooltips: &[&str], mouse_position: App::Position) {
-        let background_color = *state.get(&theme::theme().tooltip().background_color());
-        let foreground_color = *state.get(&theme::theme().tooltip().foreground_color());
-        let font_size = state.get(&theme::theme().tooltip().font_size()).scaled(self.interface_scaling);
-        let corner_radius = state.get(&theme::theme().tooltip().corner_radius()).scaled(self.interface_scaling);
-        let border = *state.get(&theme::theme().tooltip().border()) * self.interface_scaling;
-        let gap = *state.get(&theme::theme().tooltip().gap()) * self.interface_scaling;
-        let mouse_offset = *state.get(&theme::theme().tooltip().mouse_offset()) * self.interface_scaling;
+    fn render_window_anchors(&self, state: &Context<App>, renderer: &App::Renderer, window_id: u64) {
+        if let Some(wrapper) = self.windows.iter().find(|wrapper| wrapper.data.id == window_id) {
+            App::set_current_theme_type(wrapper.window.get_theme_type());
+
+            let anchor_color = *state.get(&theme::theme().window().anchor_color());
+            let closest_anchor_color = *state.get(&theme::theme().window().closest_anchor_color());
+
+            wrapper.data.anchor.render_screen_anchors(
+                renderer,
+                anchor_color,
+                closest_anchor_color,
+                self.window_size,
+                self.interface_scaling,
+            );
+
+            let window_display_size = App::Size::new(
+                wrapper.display_information.real_area.width * self.interface_scaling,
+                wrapper.display_information.display_height * self.interface_scaling,
+            );
+
+            let position = App::Position::new(
+                wrapper.display_information.real_area.left,
+                wrapper.display_information.real_area.top,
+            );
+
+            wrapper.data.anchor.render_window_anchors(
+                renderer,
+                anchor_color,
+                closest_anchor_color,
+                position,
+                window_display_size,
+                self.interface_scaling,
+            );
+        }
+    }
+
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
+    fn render_tooltips(
+        &self,
+        renderer: &App::Renderer,
+        tooltip_theme: &TooltipTheme<App>,
+        tooltips: &[&str],
+        mouse_position: App::Position,
+    ) {
+        let background_color = tooltip_theme.background_color;
+        let foreground_color = tooltip_theme.foreground_color;
+        let font_size = tooltip_theme.font_size.scaled(self.interface_scaling);
+        let corner_radius = tooltip_theme.corner_radius.scaled(self.interface_scaling);
+        let border = tooltip_theme.border * self.interface_scaling;
+        let gap = tooltip_theme.gap * self.interface_scaling;
+        let mouse_offset = tooltip_theme.mouse_offset * self.interface_scaling;
 
         let total_offset = border * 2.0 + mouse_offset;
         let half_window_size = App::Size::new(self.window_size.width() / 2.0, self.window_size.height() / 2.0);
@@ -667,7 +728,9 @@ impl<App: Application> BuiltUi<'_, App> {
         };
 
         for tooltip in iterator {
-            let text_dimensions = renderer.get_text_dimensions(tooltip, font_size, available_width);
+            let (text_dimensions, font_size) =
+                self.text_layouter
+                    .get_text_dimensions(tooltip, font_size, available_width, OverflowBehavior::LineBreak);
 
             let tooltip_left = match mouse_position.left() > half_window_size.width() {
                 true => mouse_position.left() - text_dimensions.width() - total_offset,
@@ -681,6 +744,8 @@ impl<App: Application> BuiltUi<'_, App> {
 
             vertical_offset += text_dimensions.height() + border * 2.0 + gap;
 
+            // TODO: Actually get the text dimensions and scale the tooltip size.
+
             renderer.render_rectangle(
                 App::Position::new(tooltip_left, tooltip_top),
                 App::Size::new(text_dimensions.width() + border * 2.0, text_dimensions.height() + border * 2.0),
@@ -692,6 +757,7 @@ impl<App: Application> BuiltUi<'_, App> {
             renderer.render_text(
                 tooltip,
                 App::Position::new(tooltip_left + border, tooltip_top + border),
+                available_width,
                 App::Clip::unbound(),
                 foreground_color,
                 font_size,
@@ -703,6 +769,10 @@ impl<App: Application> BuiltUi<'_, App> {
     pub fn click(&mut self, state: &Context<App>, click_position: App::Position, mouse_button: MouseButton) {
         self.event_queue.queue(Event::Unfocus);
         self.event_queue.queue(Event::CloseOverlay);
+
+        if let Some(hovered_window) = self.hovered_window {
+            self.event_queue.queue(Event::MoveWindowToTop { window_id: hovered_window });
+        }
 
         if let Some(layout) = &self.overlay_layout {
             if layout.do_click(state, self.event_queue, click_position, mouse_button) {
@@ -783,7 +853,7 @@ impl<App: Application> BuiltUi<'_, App> {
     }
 }
 
-impl<App: Application> Drop for BuiltUi<'_, App> {
+impl<App: Application> Drop for InterfaceFrame<'_, App> {
     fn drop(&mut self) {
         // Convert FocusElement to FocusElementPost. This needs to be done before the
         // layouts are cleared. If a focus id could not be resolved we leave the event

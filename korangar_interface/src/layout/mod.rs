@@ -8,7 +8,7 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
-use alignment::{HorizontalAlignment, VerticalAlignment};
+use alignment::{HorizontalAlignment, OverflowBehavior, VerticalAlignment};
 use area::Area;
 use num::Signed;
 use rust_state::Context;
@@ -16,7 +16,7 @@ use tooltip::{Tooltip, TooltipId};
 
 pub use self::resolver::Resolver;
 use crate::MouseMode;
-use crate::application::{Application, ClipTrait, CornerRadiusTrait, FontSizeTrait, PositionTrait, RenderLayer, SizeTrait};
+use crate::application::{Application, ClipTrait, CornerRadiusTrait, FontSizeTrait, PositionTrait, RenderLayer, SizeTrait, TextLayouter};
 use crate::element::id::{ElementId, FocusId};
 use crate::event::{ClickAction, Event, EventQueue};
 
@@ -67,6 +67,7 @@ struct TextInstruction<'a, App: Application> {
     color: App::Color,
     horizontal_alignment: HorizontalAlignment,
     vertical_alignment: VerticalAlignment,
+    overflow_behavior: OverflowBehavior,
 }
 
 struct ClickArea<'a, App> {
@@ -544,6 +545,7 @@ impl<'a, App: Application> Layout<'a, App> {
         color: App::Color,
         horizontal_alignment: HorizontalAlignment,
         vertical_alignment: VerticalAlignment,
+        overflow_behavior: OverflowBehavior,
     ) {
         let clip_layer = self.get_active_clip_layer();
         let area = self.scale_area(area);
@@ -559,6 +561,7 @@ impl<'a, App: Application> Layout<'a, App> {
             color,
             horizontal_alignment,
             vertical_alignment,
+            overflow_behavior,
         });
     }
 
@@ -612,7 +615,7 @@ impl<'a, App: Application> Layout<'a, App> {
         });
     }
 
-    pub fn render(&mut self, renderer: &App::Renderer) {
+    pub fn render(&mut self, renderer: &App::Renderer, text_layouter: &App::TextLayouter) {
         fn combine_clip<T: ClipTrait>(clip: T, other: T) -> T {
             T::new(
                 clip.left().max(other.left()),
@@ -685,9 +688,17 @@ impl<'a, App: Application> Layout<'a, App> {
                      color,
                      horizontal_alignment,
                      vertical_alignment,
+                     overflow_behavior,
                  }: TextInstruction<'_, App>| {
-                    let text_size = renderer.get_text_dimensions(text, font_size, area.width);
                     let clip = self.clip_layers[clip_layer.0].clip;
+
+                    let available_width = match horizontal_alignment {
+                        HorizontalAlignment::Left { offset, border } => area.width - offset - border,
+                        HorizontalAlignment::Center { border, .. } => area.width - border * 2.0,
+                        HorizontalAlignment::Right { offset, border } => area.width - offset - border,
+                    };
+
+                    let (text_size, font_size) = text_layouter.get_text_dimensions(text, font_size, available_width, overflow_behavior);
 
                     let top_offset = match vertical_alignment {
                         VerticalAlignment::Top { offset } => offset,
@@ -702,12 +713,12 @@ impl<'a, App: Application> Layout<'a, App> {
                     };
 
                     let left_offset = match horizontal_alignment {
-                        HorizontalAlignment::Left { offset } => offset,
-                        HorizontalAlignment::Center { offset } => {
+                        HorizontalAlignment::Left { offset, .. } => offset,
+                        HorizontalAlignment::Center { offset, .. } => {
                             let left_offset = (area.width - text_size.width()) / 2.0;
                             left_offset + offset
                         }
-                        HorizontalAlignment::Right { offset } => {
+                        HorizontalAlignment::Right { offset, .. } => {
                             let top_offset = area.width - text_size.width();
                             top_offset - offset
                         }
@@ -716,6 +727,7 @@ impl<'a, App: Application> Layout<'a, App> {
                     renderer.render_text(
                         text,
                         App::Position::new(area.left + left_offset, area.top + top_offset),
+                        available_width,
                         clip,
                         color,
                         font_size,

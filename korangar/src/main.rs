@@ -59,10 +59,10 @@ use korangar_debug::logging::{Colorize, print_debug};
 use korangar_debug::profile_block;
 #[cfg(feature = "debug")]
 use korangar_debug::profiling::Profiler;
+use korangar_interface::Interface;
 use korangar_interface::application::Application;
 use korangar_interface::layout::MouseButton;
 use korangar_interface::window::WindowThemePathExt;
-use korangar_interface::Interface;
 use korangar_networking::{
     DisconnectReason, HotkeyState, LoginServerLoginData, MessageColor, NetworkEvent, NetworkEventBuffer, NetworkingSystem, SellItem,
     ShopItem,
@@ -80,7 +80,7 @@ use renderer::InterfaceRenderer;
 use rust_state::{AsRefExt, Context, ManuallyAssertExt, OptionExt};
 use settings::{AudioSettings, AudioSettingsPathExt, GraphicsSettingsCapabilities, GraphicsSettingsPathExt};
 use state::theme::{CursorThemePathExt, GameThemePathExt, IndicatorThemePathExt, InterfaceThemePathExt, InterfaceThemeType};
-use state::{ChatMessage, ClientState, ClientStatePathExt, ClientStateRootExt, client_state, this_entity, this_player};
+use state::{ChatMessage, ClientState, ClientStatePathExt, ClientStateRootExt, client_state, client_theme, this_entity, this_player};
 #[cfg(feature = "debug")]
 use wgpu::Device;
 use wgpu::util::initialize_adapter_from_env_or_default;
@@ -607,7 +607,7 @@ impl Client {
         });
 
         time_phase!("initialize interface", {
-            let mut interface = Interface::new(INITIAL_SCREEN_SIZE);
+            let mut interface = Interface::new(font_loader.clone(), INITIAL_SCREEN_SIZE);
             let mouse_cursor = MouseCursor::new(&sprite_loader, &action_loader);
             let show_interface = true;
         });
@@ -2478,21 +2478,21 @@ impl Client {
                 let is_mouse_mode_default = mouse_mode.is_default();
                 let last_walking_destination = mouse_mode.walk_destination();
 
-                let mut built_ui = {
+                let mut interface_frame = {
                     #[cfg(feature = "debug")]
                     profile_block!("user interface");
 
                     let is_rotating_camera = mouse_mode.is_rotating_camera();
                     let is_chat_open = self.interface.is_window_with_class_open(WindowClass::Chat);
 
-                    let mut built_ui = self
-                        .interface
-                        .do_layouts(&self.client_state, scaling.get_factor(), input_report.mouse_position);
+                    let mut interface_frame =
+                        self.interface
+                            .lay_out_windows(&self.client_state, scaling.get_factor(), input_report.mouse_position);
 
                     // We can only decide what to do with the user input once we know if the mouse
                     // is hovering a window, so we buffer any actions for the next frame.
 
-                    let is_interface_hovered = built_ui.is_interface_hovered();
+                    let is_interface_hovered = interface_frame.is_interface_hovered();
 
                     let cursor_state = match input_report.mouse_target {
                         _ if is_rotating_camera => MouseCursorState::RotateCamera,
@@ -2514,7 +2514,7 @@ impl Client {
 
                     if let Some(mouse_button) = input_report.mouse_click {
                         if is_interface_hovered {
-                            built_ui.click(&self.client_state, input_report.mouse_position, mouse_button);
+                            interface_frame.click(&self.client_state, input_report.mouse_position, mouse_button);
                         } else {
                             if mouse_button == MouseButton::Left {
                                 match input_report.mouse_target {
@@ -2525,7 +2525,7 @@ impl Client {
                                     PickerTarget::Tile { x, y } => {
                                         let destination = Vector2::new(x as usize, y as usize);
 
-                                        built_ui.set_mouse_mode(MouseInputMode::Walk { destination });
+                                        interface_frame.set_mouse_mode(MouseInputMode::Walk { destination });
 
                                         self.input_event_buffer.push(InputEvent::PlayerMove { destination });
                                     }
@@ -2536,7 +2536,7 @@ impl Client {
                                 }
                             } else if mouse_button == MouseButton::Right && currently_playing {
                                 #[cfg_attr(feature = "debug", korangar_debug::debug_condition(!render_options.use_debug_camera))]
-                                built_ui.set_mouse_mode(MouseInputMode::RotateCamera);
+                                interface_frame.set_mouse_mode(MouseInputMode::RotateCamera);
                             } else if mouse_button == MouseButton::DoubleRight && currently_playing {
                                 #[cfg_attr(feature = "debug", korangar_debug::debug_condition(!render_options.use_debug_camera))]
                                 self.input_event_buffer.push(InputEvent::ResetCameraRotation);
@@ -2549,18 +2549,18 @@ impl Client {
                         let destination = Vector2::new(x as usize, y as usize);
 
                         if last_destination != destination {
-                            built_ui.set_mouse_mode(MouseInputMode::Walk { destination });
+                            interface_frame.set_mouse_mode(MouseInputMode::Walk { destination });
                             self.input_event_buffer.push(InputEvent::PlayerMove { destination });
                         }
                     }
 
                     if input_report.mouse_button_released {
-                        built_ui.drop(&self.client_state, input_report.mouse_position);
+                        interface_frame.drop(&self.client_state, input_report.mouse_position);
                     }
 
                     if let Some(delta) = input_report.scroll {
                         if is_interface_hovered {
-                            built_ui.scroll(input_report.mouse_position, delta);
+                            interface_frame.scroll(input_report.mouse_position, delta);
                         } else {
                             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(!render_options.use_debug_camera))]
                             self.input_event_buffer.push(InputEvent::ZoomCamera { zoom_factor: delta });
@@ -2568,22 +2568,22 @@ impl Client {
                     }
 
                     if interface_has_focus {
-                        if !built_ui.input_characters(&self.client_state, &input_report.characters)
+                        if !interface_frame.input_characters(&self.client_state, &input_report.characters)
                             && input_report.characters.iter().any(|character| *character == '\x0d')
                             && is_chat_open
                         {
-                            built_ui.focus_element(ChatTextBox);
+                            interface_frame.focus_element(ChatTextBox);
                         }
                     }
 
-                    built_ui
+                    interface_frame
                 };
 
                 match input_report.mouse_target {
                     PickerTarget::Tile { x, y } => {
                         // Only show if the mouse mode is default or walking.
                         if currently_playing
-                            && !built_ui.is_interface_hovered()
+                            && !interface_frame.is_interface_hovered()
                             && (is_mouse_mode_default || last_walking_destination.is_some())
                         {
                             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_indicators))]
@@ -2595,7 +2595,7 @@ impl Client {
                         }
                     }
                     PickerTarget::Entity(entity_id) => {
-                        if !built_ui.is_interface_hovered() && is_mouse_mode_default {
+                        if !interface_frame.is_interface_hovered() && is_mouse_mode_default {
                             let entity = self
                                 .client_state
                                 .follow(client_state().entities())
@@ -2632,25 +2632,21 @@ impl Client {
                     _ => {}
                 }
 
-                let tooltip_theme = match self.client_state.try_follow(this_player()).is_none() {
-                    true => InterfaceThemeType::Menu,
-                    false => InterfaceThemeType::Game,
+                let playing_theme_path = client_state().playing_theme().tooltip();
+                let menu_theme_path = client_state().menu_theme().tooltip();
+                let tooltip_theme = match currently_playing {
+                    true => self.client_state.get(&playing_theme_path),
+                    false => self.client_state.get(&menu_theme_path),
                 };
 
-                // This is only needed for rendering the tooltips.
-                ClientState::set_current_theme_type(tooltip_theme);
-                built_ui.render(&self.client_state, &self.interface_renderer, input_report.mouse_position);
-
-                std::mem::drop(built_ui);
-
-                self.interface.render_overlay(
+                interface_frame.render(
+                    &self.client_state,
                     &self.interface_renderer,
-                    // TODO: Get the right theme (and maybe pass this better).
-                    *self.client_state.get(&client_state().menu_theme().window().anchor_color()),
-                    // TODO: Get the right theme (and maybe pass this better).
-                    *self.client_state.get(&client_state().menu_theme().window().closest_anchor_color()),
-                    scaling.get_factor(),
+                    tooltip_theme,
+                    input_report.mouse_position,
                 );
+
+                std::mem::drop(interface_frame);
 
                 if let Some(delta) = input_report.drag {
                     // TODO: The scaling should be removed here.

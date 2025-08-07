@@ -2,10 +2,9 @@ mod state;
 
 use std::marker::PhantomData;
 
-use id::ElementIdGenerator;
 pub use interface_macros::StateElement;
 use rust_state::Context;
-use store::ElementStore;
+use store::{ElementStore, ElementStoreMut};
 
 pub use self::state::*;
 use crate::application::Application;
@@ -19,7 +18,7 @@ pub mod id {
     pub struct ElementId(usize);
 
     #[derive(Clone)]
-    pub struct ElementIdGenerator {
+    pub(crate) struct ElementIdGenerator {
         next_free_id: usize,
     }
 
@@ -61,17 +60,17 @@ pub mod store {
 
     use super::id::{ElementId, ElementIdGenerator};
 
-    pub struct ElementStore {
+    pub(crate) struct InternalElementStore {
         // TODO: Let the element choose between HashMap and Vec lookup.
         /// The inner element stores need to be in a `Box` so that we can safely
         /// pass out references to them without worrying about
         /// relocation of the hashmap when inserting new children.
-        children: HashMap<u64, Box<ElementStore>>,
+        children: HashMap<u64, Box<InternalElementStore>>,
         data: UnsafeCell<Option<Box<dyn Any>>>,
         element_id: ElementId,
     }
 
-    impl ElementStore {
+    impl InternalElementStore {
         pub fn root(generator: &mut ElementIdGenerator) -> Self {
             Self {
                 children: HashMap::new(),
@@ -79,33 +78,113 @@ pub mod store {
                 element_id: generator.generate(),
             }
         }
+    }
 
-        pub fn get_or_create_child_store(&mut self, index: u64, generator: &mut ElementIdGenerator) -> &mut Self {
-            self.children.entry(index).or_insert_with(|| {
-                Box::new(ElementStore {
-                    // TODO: Maybe deduplicate this code
-                    children: HashMap::new(),
-                    data: UnsafeCell::new(None),
-                    element_id: generator.generate(),
-                })
-            })
+    /// An immuatble instance of the element store. See [`ElementStoreMut`] for
+    /// a mutable version.
+    ///
+    /// This type doesn't implement Clone or Copy by design. Calling
+    /// [`lay_out`](crate::element::Element::lay_out) will
+    /// consume the store, making the ownership system catch cases where the
+    /// same store is accidentally passed to multiple elements.
+    pub struct ElementStore<'a> {
+        element_store: &'a InternalElementStore,
+        window_id: u64,
+    }
+
+    impl<'a> ElementStore<'a> {
+        pub(crate) fn new(element_store: &'a InternalElementStore, window_id: u64) -> Self {
+            Self { element_store, window_id }
         }
 
-        pub fn child_store(&self, index: u64) -> &Self {
-            self.children.get(&index).expect("Tried to get invalid child store")
+        pub fn get_window_id(&self) -> u64 {
+            self.window_id
         }
 
-        fn get_data<T>(&self, inputs: T::Inputs) -> &T
-        where
-            T: Any + PersistentData,
-        {
-            let data = unsafe { &mut *self.data.get() };
+        pub fn child_store(&self, index: u64) -> Self {
+            let element_store = self.element_store.children.get(&index).expect("Tried to get invalid child store");
 
-            data.get_or_insert_with(|| Box::new(T::new(inputs))).downcast_ref().unwrap()
+            ElementStore {
+                element_store,
+                window_id: self.window_id,
+            }
         }
 
         pub fn get_element_id(&self) -> ElementId {
-            self.element_id
+            self.element_store.element_id
+        }
+    }
+
+    /// A muatble instance of the element store. See [`ElementStore`] for an
+    /// immutable version.
+    ///
+    /// Calling
+    /// [`create_layout_info`](crate::element::Element::create_layout_info) will
+    /// consume the store, making the ownership system catch cases where the
+    /// same store is accidentally passed to multiple elements.
+    pub struct ElementStoreMut<'a> {
+        element_store: &'a mut InternalElementStore,
+        generator: &'a mut ElementIdGenerator,
+        window_id: u64,
+    }
+
+    impl<'a> ElementStoreMut<'a> {
+        pub(crate) fn new(element_store: &'a mut InternalElementStore, generator: &'a mut ElementIdGenerator, window_id: u64) -> Self {
+            Self {
+                element_store,
+                generator,
+                window_id,
+            }
+        }
+
+        pub fn get_window_id(&self) -> u64 {
+            self.window_id
+        }
+
+        pub fn child_store(&mut self, index: u64) -> ElementStoreMut<'_> {
+            let element_store = self
+                .element_store
+                .children
+                .entry(index)
+                .or_insert_with(|| Box::new(InternalElementStore::root(self.generator)));
+
+            ElementStoreMut {
+                element_store,
+                generator: self.generator,
+                window_id: self.window_id,
+            }
+        }
+
+        pub fn get_element_id(&self) -> ElementId {
+            self.element_store.element_id
+        }
+    }
+
+    pub trait PersistentDataProvider<'a> {
+        fn get_data<T>(&self, inputs: T::Inputs) -> &'a T
+        where
+            T: Any + PersistentData;
+    }
+
+    impl<'a> PersistentDataProvider<'a> for ElementStore<'a> {
+        fn get_data<T>(&self, inputs: T::Inputs) -> &'a T
+        where
+            T: Any + PersistentData,
+        {
+            let data = unsafe { &mut *self.element_store.data.get() };
+
+            data.get_or_insert_with(|| Box::new(T::new(inputs))).downcast_ref().unwrap()
+        }
+    }
+
+    impl<'a> PersistentDataProvider<'a> for ElementStoreMut<'a> {
+        fn get_data<T>(&self, inputs: T::Inputs) -> &'a T
+        where
+            T: Any + PersistentData,
+        {
+            let data = unsafe { &mut *self.element_store.data.get() };
+
+            data.get_or_insert_with(|| Box::new(T::new(inputs))).downcast_ref().unwrap()
         }
     }
 
@@ -131,14 +210,22 @@ pub mod store {
     }
 
     pub trait PersistentExt: Persistent {
-        fn get_persistent_data<'a>(&self, store: &'a ElementStore, inputs: <Self::Data as PersistentData>::Inputs) -> &'a Self::Data;
+        fn get_persistent_data<'a>(
+            &self,
+            store: &impl PersistentDataProvider<'a>,
+            inputs: <Self::Data as PersistentData>::Inputs,
+        ) -> &'a Self::Data;
     }
 
     impl<T> PersistentExt for T
     where
         T: Persistent,
     {
-        fn get_persistent_data<'a>(&self, store: &'a ElementStore, inputs: <Self::Data as PersistentData>::Inputs) -> &'a Self::Data {
+        fn get_persistent_data<'a>(
+            &self,
+            store: &impl PersistentDataProvider<'a>,
+            inputs: <Self::Data as PersistentData>::Inputs,
+        ) -> &'a Self::Data {
             store.get_data::<Self::Data>(inputs)
         }
     }
@@ -146,6 +233,11 @@ pub mod store {
 
 pub struct DefaultLayoutInfo {
     pub area: Area,
+}
+
+pub struct DefaultLayoutInfoWithText<App: Application> {
+    pub area: Area,
+    pub font_size: App::FontSize,
 }
 
 pub struct DefaultLayoutInfoSet<T> {
@@ -159,26 +251,28 @@ pub trait Element<App: Application> {
     fn create_layout_info(
         &mut self,
         state: &Context<App>,
-        store: &mut ElementStore,
-        generator: &mut ElementIdGenerator,
-        resolver: &mut Resolver,
+        store: ElementStoreMut<'_>,
+        resolver: &mut Resolver<'_, App>,
     ) -> Self::LayoutInfo;
 
-    fn layout_element<'a>(
+    fn lay_out<'a>(
         &'a self,
         state: &'a Context<App>,
-        store: &'a ElementStore,
+        store: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, App>,
     );
 }
 
-pub trait ResolverSet {
-    fn with_index<C>(&mut self, index: usize, f: impl FnMut(&mut Resolver) -> C) -> C;
+pub trait ResolverSet<'a, App: Application> {
+    fn with_index<C>(&mut self, index: usize, f: impl FnMut(&mut Resolver<'a, App>) -> C) -> C;
 }
 
-impl ResolverSet for &mut Resolver {
-    fn with_index<C>(&mut self, _: usize, mut f: impl FnMut(&mut Resolver) -> C) -> C {
+impl<'a, App> ResolverSet<'a, App> for &mut Resolver<'a, App>
+where
+    App: Application,
+{
+    fn with_index<C>(&mut self, _: usize, mut f: impl FnMut(&mut Resolver<'a, App>) -> C) -> C {
         f(*self)
     }
 }
@@ -191,17 +285,14 @@ pub trait ElementSet<App: Application> {
     fn create_layout_info(
         &mut self,
         state: &Context<App>,
-        store: &mut ElementStore,
-        // TODO: I think that we don't need this here anymore as of now. It could be bundled with
-        // the ElementStore to make an ElementStoreMut or simlar.
-        generator: &mut ElementIdGenerator,
-        resolver_set: impl ResolverSet,
+        store: ElementStoreMut<'_>,
+        resolver_set: impl ResolverSet<'_, App>,
     ) -> Self::LayoutInfo;
 
-    fn layout_element<'a>(
+    fn lay_out<'a>(
         &'a self,
         state: &'a Context<App>,
-        store: &'a ElementStore,
+        store: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, App>,
     );
@@ -217,9 +308,9 @@ where
         0
     }
 
-    fn create_layout_info(&mut self, _: &Context<App>, _: &mut ElementStore, _: &mut ElementIdGenerator, _: impl ResolverSet) {}
+    fn create_layout_info(&mut self, _: &Context<App>, _: ElementStoreMut<'_>, _: impl ResolverSet<'_, App>) {}
 
-    fn layout_element<'a>(&'a self, _: &'a Context<App>, _: &'a ElementStore, _: &'a Self::LayoutInfo, _: &mut Layout<'a, App>) {}
+    fn lay_out<'a>(&'a self, _: &'a Context<App>, _: ElementStore<'a>, _: &'a Self::LayoutInfo, _: &mut Layout<'a, App>) {}
 }
 
 impl<App, T, const N: usize> ElementSet<App> for [T; N]
@@ -236,31 +327,25 @@ where
     fn create_layout_info(
         &mut self,
         state: &Context<App>,
-        store: &mut ElementStore,
-        generator: &mut ElementIdGenerator,
-        mut resolver_set: impl ResolverSet,
+        mut store: ElementStoreMut<'_>,
+        mut resolver_set: impl ResolverSet<'_, App>,
     ) -> Self::LayoutInfo {
         std::array::from_fn(|index| {
             resolver_set.with_index(index, |resolver| {
-                self[index].create_layout_info(
-                    state,
-                    store.get_or_create_child_store(index as u64, generator),
-                    generator,
-                    resolver,
-                )
+                self[index].create_layout_info(state, store.child_store(index as u64), resolver)
             })
         })
     }
 
-    fn layout_element<'a>(
+    fn lay_out<'a>(
         &'a self,
         state: &'a Context<App>,
-        store: &'a ElementStore,
+        store: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, App>,
     ) {
         for index in 0..N {
-            self[index].layout_element(state, store.child_store(index as u64), &layout_info[index], layout);
+            self[index].lay_out(state, store.child_store(index as u64), &layout_info[index], layout);
         }
     }
 }
@@ -278,14 +363,14 @@ fn impl_element_set(up_to: usize) {
                 format!(
                     "
                     resolver_set.with_index({index}, |resolver| {{
-                        self.{index}.create_layout_info(state, store.get_or_create_child_store({index}, generator), generator, resolver)
+                        self.{index}.create_layout_info(state, store.child_store({index}), resolver)
                     }}), "
                 )
             })
             .collect();
 
-        let layout_elements: String = (0..number_of_elements)
-            .map(|index| format!("self.{index}.layout_element(state, store.child_store({index}), &layout_info.{index}, layout);"))
+        let lay_outs: String = (0..number_of_elements)
+            .map(|index| format!("self.{index}.lay_out(state, store.child_store({index}), &layout_info.{index}, layout);"))
             .collect();
 
         crabtime::output! {
@@ -303,21 +388,20 @@ fn impl_element_set(up_to: usize) {
                 fn create_layout_info(
                     &mut self,
                     state: &Context<App>,
-                    store: &mut ElementStore,
-                    generator: &mut ElementIdGenerator,
-                    mut resolver_set: impl ResolverSet,
+                    mut store: ElementStoreMut<'_>,
+                    mut resolver_set: impl ResolverSet<'_, App>,
                 ) -> Self::LayoutInfo {
                     ({{create_layout_infos}})
                 }
 
-                fn layout_element<'a>(
+                fn lay_out<'a>(
                     &'a self,
                     state: &'a Context<App>,
-                    store: &'a ElementStore,
+                    store: ElementStore<'a>,
                     layout_info: &'a Self::LayoutInfo,
                     layout: &mut Layout<'a, App>,
                 ) {
-                    {{layout_elements}}
+                    {{lay_outs}}
                 }
             }
         }
@@ -359,26 +443,14 @@ where
 {
     type LayoutInfo = ();
 
-    fn create_layout_info(
-        &mut self,
-        state: &Context<App>,
-        store: &mut ElementStore,
-        generator: &mut ElementIdGenerator,
-        resolver: &mut Resolver,
-    ) {
-        let layout_info = self.element.create_layout_info(state, store, generator, resolver);
+    fn create_layout_info(&mut self, state: &Context<App>, store: ElementStoreMut<'_>, resolver: &mut Resolver<'_, App>) {
+        let layout_info = self.element.create_layout_info(state, store, resolver);
         self.layout_info = Some(layout_info);
     }
 
-    fn layout_element<'a>(
-        &'a self,
-        state: &'a Context<App>,
-        store: &'a ElementStore,
-        _: &'a Self::LayoutInfo,
-        layout: &mut Layout<'a, App>,
-    ) {
+    fn lay_out<'a>(&'a self, state: &'a Context<App>, store: ElementStore<'a>, _: &'a Self::LayoutInfo, layout: &mut Layout<'a, App>) {
         let layout_info = self.layout_info.as_ref().expect("no layout created");
-        self.element.layout_element(state, store, layout_info, layout);
+        self.element.lay_out(state, store, layout_info, layout);
     }
 }
 

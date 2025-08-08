@@ -1,4 +1,3 @@
-use crate::layout::alignment::OverflowBehavior;
 use crate::layout::{ClipLayer, Icon};
 use crate::theme::ThemePathGetter;
 use crate::window::Anchor;
@@ -103,6 +102,12 @@ pub trait Application: Sized + 'static {
     /// dragging a resource or rotating the camera.
     type CustomMouseMode;
 
+    /// Application behavior when text overflows.
+    ///
+    /// Typically this would include options line inserting a line break and
+    /// shrinking the text.
+    type OverflowBehavior: Copy;
+
     /// Application text layouter.
     type TextLayouter: TextLayouter<Self>;
 
@@ -157,7 +162,7 @@ pub trait TextLayouter<App: Application>: Clone {
         text: &str,
         font_size: App::FontSize,
         available_width: f32,
-        overflow_behavior: OverflowBehavior,
+        overflow_behavior: App::OverflowBehavior,
     ) -> (App::Size, App::FontSize);
 }
 

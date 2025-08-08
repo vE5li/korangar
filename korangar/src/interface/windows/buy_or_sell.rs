@@ -1,57 +1,49 @@
-use derive_new::new;
-use korangar_interface::element::{ButtonBuilder, ElementWrap};
-use korangar_interface::window::{StateWindow, Window, WindowBuilder};
-use korangar_interface::{dimension_bound, size_bound};
+use korangar_interface::window::{CustomWindow, Window};
 use ragnarok_packets::{BuyOrSellOption, ShopId};
 
+use super::WindowClass;
 use crate::input::InputEvent;
-use crate::interface::application::InterfaceSettings;
-use crate::interface::layout::ScreenSize;
-use crate::interface::windows::WindowCache;
+use crate::state::ClientState;
+use crate::state::theme::InterfaceThemeType;
 
-#[derive(new)]
 pub struct BuyOrSellWindow {
     shop_id: ShopId,
 }
 
 impl BuyOrSellWindow {
-    pub const WINDOW_CLASS: &'static str = "buy_or_sell";
+    pub fn new(shop_id: ShopId) -> Self {
+        Self { shop_id }
+    }
 }
 
-impl StateWindow<InterfaceSettings> for BuyOrSellWindow {
-    fn window_class(&self) -> Option<&str> {
-        Some(Self::WINDOW_CLASS)
+impl CustomWindow<ClientState> for BuyOrSellWindow {
+    fn window_class() -> Option<WindowClass> {
+        Some(WindowClass::BuyOrSell)
     }
 
-    fn to_window(
-        &self,
-    ) -> Window<InterfaceSettings> {
-        let elements = vec![
-            ButtonBuilder::new()
-                .with_text("Buy")
-                .with_event(InputEvent::BuyOrSell {
-                    shop_id: self.shop_id,
-                    buy_or_sell: BuyOrSellOption::Buy,
-                })
-                .with_width_bound(dimension_bound!(50%))
-                .build()
-                .wrap(),
-            ButtonBuilder::new()
-                .with_text("Sell")
-                .with_event(InputEvent::BuyOrSell {
-                    shop_id: self.shop_id,
-                    buy_or_sell: BuyOrSellOption::Sell,
-                })
-                .with_width_bound(dimension_bound!(!))
-                .build()
-                .wrap(),
-        ];
+    fn to_window<'a>(self) -> impl Window<ClientState> + 'a {
+        use korangar_interface::prelude::*;
 
-        WindowBuilder::new()
-            .with_title("Buy or sell".to_string())
-            .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size_bound(size_bound!(300 > 400 < 500, ? < 60%))
-            .with_elements(elements)
-            .build(window_cache, application, available_space)
+        window! {
+            title: "Buy or sell",
+            class: Self::window_class(),
+            theme: InterfaceThemeType::Game,
+            elements: (
+                button! {
+                    text: "Buy",
+                    event: InputEvent::BuyOrSell {
+                        shop_id: self.shop_id,
+                        buy_or_sell: BuyOrSellOption::Buy,
+                    },
+                },
+                button! {
+                    text: "Sell",
+                    event: InputEvent::BuyOrSell {
+                        shop_id: self.shop_id,
+                        buy_or_sell: BuyOrSellOption::Sell,
+                    },
+                },
+            ),
+        }
     }
 }

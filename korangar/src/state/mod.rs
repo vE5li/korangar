@@ -31,7 +31,7 @@ use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenS
 use crate::interface::windows::ProfilerWindowState;
 use crate::interface::windows::{ChatWindowState, DialogWindowState, FriendListWindowState, LoginWindowState, WindowCache, WindowClass};
 use crate::inventory::{Hotbar, Inventory, SkillTree};
-use crate::loaders::{ClientInfo, FontLoader, FontSize, GameFileLoader, load_client_info};
+use crate::loaders::{ClientInfo, FontLoader, FontSize, GameFileLoader, OverflowBehavior, load_client_info};
 use crate::renderer::InterfaceRenderer;
 use crate::settings::{GraphicsSettingsCapabilities, LoginSettings};
 use crate::state::theme::{GameTheme, ThemeDefault};
@@ -89,6 +89,9 @@ pub struct ClientState {
     /// The current map.
     // TODO: These are currently pub due to some code in the main render update loop. Ideally these
     // could be private after rewriting that.
+    // FIX: Actually this should be removed from the client state completely and moved to the
+    // client. That will fix the issues I was describing and we can have the raw loaded maps in the
+    // client state instead. This will also allow for inspecting multiple maps at the same time.
     #[hidden_element]
     pub map: Option<Box<Map>>,
     /// All entities on the map.
@@ -105,11 +108,21 @@ pub struct ClientState {
     // TODO: Unhide this
     #[hidden_element]
     shop_items: Vec<ShopItem<ResourceMetadata>>,
+    /// List of items in the buying cart.
+    // TODO: This should be a UniqueVec or something.
+    // TODO: Unhide this
+    #[hidden_element]
+    buy_cart: Vec<ShopItem<(ResourceMetadata, u32)>>,
     /// List of items that should be sold.
     // TODO: This should be a UniqueVec or something.
     // TODO: Unhide this
     #[hidden_element]
     sell_items: Vec<SellItem<(ResourceMetadata, u16)>>,
+    /// List of items in the selling cart.
+    // TODO: This should be a UniqueVec or something.
+    // TODO: Unhide this
+    #[hidden_element]
+    sell_cart: Vec<SellItem<(ResourceMetadata, u16)>>,
     /// The name of the active character. This information is not available
     /// while playing if we don't save it here.
     player_name: String,
@@ -230,7 +243,9 @@ impl ClientState {
             let dialog_window = DialogWindowState::default();
 
             let shop_items = Vec::default();
+            let buy_cart = Vec::default();
             let sell_items = Vec::default();
+            let sell_cart = Vec::default();
             let player_name = String::new();
             let hotbar = Hotbar::default();
             let inventory = Inventory::default();
@@ -271,7 +286,9 @@ impl ClientState {
             chat_messages,
             friend_list,
             shop_items,
+            buy_cart,
             sell_items,
+            sell_cart,
             player_name,
             hotbar,
             inventory,
@@ -376,6 +393,7 @@ impl Application for ClientState {
     type CustomEvent = InputEvent;
     type CustomMouseMode = MouseInputMode;
     type FontSize = FontSize;
+    type OverflowBehavior = OverflowBehavior;
     type Position = ScreenPosition;
     type Renderer = InterfaceRenderer;
     type Size = ScreenSize;

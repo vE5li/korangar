@@ -1,23 +1,44 @@
-use korangar_interface::element::{Element, StateElement};
-use korangar_interface::window::{CustomWindow, StateWindow, Window};
+use korangar_interface::window::{CustomWindow, Window};
 use korangar_networking::SellItem;
-use rust_state::RustState;
+use rust_state::Path;
 
-use crate::interface::application::InterfaceSettings;
-use crate::interface::elements::SellCartContainer;
-use crate::interface::layout::ScreenSize;
-use crate::interface::windows::WindowCache;
+use super::WindowClass;
+use crate::input::InputEvent;
 use crate::state::ClientState;
+use crate::state::theme::InterfaceThemeType;
 use crate::world::ResourceMetadata;
 
-#[derive(Default, RustState, StateWindow)]
-#[window_class("sell_cart")]
-pub struct SellCartState {
-    items: Vec<SellItem<(ResourceMetadata, u16)>>,
+pub struct SellCartWindow<A> {
+    items_path: A,
 }
 
-impl StateElement<ClientState> for SellCartState {
-    fn to_element(self_path: impl rust_state::Path<ClientState, Self>, name: String) -> impl Element<ClientState> {
-        todo!()
+impl<A> SellCartWindow<A> {
+    pub fn new(items_path: A) -> Self {
+        Self { items_path }
+    }
+}
+
+impl<A> CustomWindow<ClientState> for SellCartWindow<A>
+where
+    A: Path<ClientState, Vec<SellItem<(ResourceMetadata, u16)>>>,
+{
+    fn window_class() -> Option<WindowClass> {
+        Some(WindowClass::SellCart)
+    }
+
+    fn to_window<'a>(self) -> impl Window<ClientState> + 'a {
+        use korangar_interface::prelude::*;
+
+        window! {
+            title: "Cart",
+            class: Self::window_class(),
+            theme: InterfaceThemeType::Game,
+            elements: (
+                button! {
+                    text: "Cancel",
+                    event: InputEvent::CloseShop,
+                },
+            ),
+        }
     }
 }

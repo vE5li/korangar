@@ -1,6 +1,6 @@
 use korangar_interface::components::drop_down::{DefaultClickHandler, DropDownItem};
 use korangar_interface::element::store::{ElementStore, ElementStoreMut};
-use korangar_interface::element::{Element, StateElement};
+use korangar_interface::element::{BaseLayoutInfo, Element, StateElement};
 use korangar_interface::layout::area::Area;
 use korangar_interface::layout::{Layout, Resolver};
 use korangar_interface::window::{CustomWindow, Window};
@@ -97,6 +97,8 @@ impl<A> Element<ClientState> for FrameView<A>
 where
     A: Path<ClientState, ProfilerWindowState>,
 {
+    type LayoutInfo = BaseLayoutInfo;
+
     fn create_layout_info(
         &mut self,
         _: &Context<ClientState>,

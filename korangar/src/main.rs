@@ -61,10 +61,8 @@ use korangar_debug::profile_block;
 use korangar_debug::profiling::Profiler;
 use korangar_interface::Interface;
 use korangar_interface::layout::MouseButton;
-use korangar_interface::window::WindowThemePathExt;
 use korangar_networking::{
     DisconnectReason, HotkeyState, LoginServerLoginData, MessageColor, NetworkEvent, NetworkEventBuffer, NetworkingSystem, SellItem,
-    ShopItem,
 };
 use korangar_util::pathing::PathFinder;
 #[cfg(feature = "debug")]
@@ -1505,38 +1503,24 @@ impl Client {
                     }
                 }
                 NetworkEvent::OpenShop { items } => {
-                    // self.shop_items.mutate(|shop_items| {
-                    //     *shop_items = items
-                    //         .into_iter()
-                    //         .map(|item|
-                    // self.library.load_shop_item_metadata(&self.async_loader,
-                    // item))         .collect()
-                    // });
+                    *self.client_state.follow_mut(client_state().shop_items()) = items
+                        .into_iter()
+                        .map(|item| self.library.load_shop_item_metadata(&self.async_loader, item))
+                        .collect();
 
-                    // self.interface.open_window(
-                    //     &self.client_state,
-                    //     &mut self.focus_state,
-                    //     &BuyWindow::new(self.shop_items.new_remote(),
-                    // cart.clone()), );
-                    // self.interface
-                    //     .open_window(&self.client_state, &mut
-                    // self.focus_state, &BuyCartWindow::new(cart));
+                    self.interface
+                        .open_window(BuyWindow::new(client_state().shop_items(), client_state().buy_cart()));
+                    self.interface.open_window(BuyCartWindow::new(client_state().buy_cart()));
                 }
                 NetworkEvent::AskBuyOrSell { shop_id } => {
-                    // self.interface
-                    //     .open_window(&self.client_state, &mut
-                    // self.focus_state, &BuyOrSellWindow::new(shop_id));
+                    self.interface.open_window(BuyOrSellWindow::new(shop_id));
                 }
                 NetworkEvent::BuyingCompleted { result } => match result {
                     BuyShopItemsResult::Success => {
                         let _ = self.networking_system.close_shop();
 
-                        // self.interface
-                        //     .close_window_with_class(&mut self.focus_state,
-                        // BuyWindow::WINDOW_CLASS);
-                        // self.interface
-                        //     .close_window_with_class(&mut self.focus_state,
-                        // BuyCartWindow::WINDOW_CLASS);
+                        self.interface.close_window_with_class(WindowClass::Buy);
+                        self.interface.close_window_with_class(WindowClass::BuyCart);
                     }
                     BuyShopItemsResult::Error => {
                         self.client_state.follow_mut(client_state().chat_messages()).push(ChatMessage {
@@ -1546,56 +1530,41 @@ impl Client {
                     }
                 },
                 NetworkEvent::SellItemList { items } => {
-                    // let inventory_items = self.inventory.get_items();
+                    let inventory_items = self.client_state.follow(client_state().inventory().items());
+                    let sell_items = items
+                        .into_iter()
+                        .map(|item| {
+                            let inventory_item = inventory_items
+                                .iter()
+                                .find(|inventory_item| inventory_item.index == item.inventory_index)
+                                .expect("item not in inventory");
 
-                    // self.sell_items.mutate(|sell_items| {
-                    //     *sell_items = items
-                    //         .into_iter()
-                    //         .map(|item| {
-                    //             let inventory_item = &inventory_items
-                    //                 .iter()
-                    //                 .find(|inventory_item|
-                    // inventory_item.index == item.inventory_index)
-                    //                 .expect("item not in inventory");
-                    //
-                    //             let name =
-                    // inventory_item.metadata.name.clone();
-                    //             let texture =
-                    // inventory_item.metadata.texture.clone();
-                    //             let quantity = match &inventory_item.details
-                    // {
-                    // korangar_networking::InventoryItemDetails::Regular {
-                    // amount, .. } => *amount,
-                    // korangar_networking::InventoryItemDetails::Equippable {
-                    // .. } => 1,             };
-                    //
-                    //             SellItem {
-                    //                 metadata: (ResourceMetadata { name,
-                    // texture }, quantity),
-                    // inventory_index: item.inventory_index,
-                    //                 price: item.price,
-                    //                 overcharge_price: item.overcharge_price,
-                    //             }
-                    //         })
-                    //         .collect()
-                    // });
+                            let name = inventory_item.metadata.name.clone();
+                            let texture = inventory_item.metadata.texture.clone();
+                            let quantity = match &inventory_item.details {
+                                korangar_networking::InventoryItemDetails::Regular { amount, .. } => *amount,
+                                korangar_networking::InventoryItemDetails::Equippable { .. } => 1,
+                            };
 
-                    // self.interface.open_window(
-                    //     &self.client_state,
-                    //     &mut self.focus_state,
-                    //     &SellWindow::new(self.sell_items.new_remote(),
-                    // cart.clone()), );
-                    // self.interface
-                    //     .open_state_window(&self.client_state,
-                    // client_state().sell_cart());
+                            SellItem {
+                                metadata: (ResourceMetadata { name, texture }, quantity),
+                                inventory_index: item.inventory_index,
+                                price: item.price,
+                                overcharge_price: item.overcharge_price,
+                            }
+                        })
+                        .collect();
+
+                    *self.client_state.follow_mut(client_state().sell_items()) = sell_items;
+
+                    self.interface
+                        .open_window(SellWindow::new(client_state().sell_items(), client_state().sell_cart()));
+                    self.interface.open_window(SellCartWindow::new(client_state().sell_cart()));
                 }
                 NetworkEvent::SellingCompleted { result } => match result {
                     SellItemsResult::Success => {
-                        // self.interface
-                        //     .close_window_with_class(&mut self.focus_state,
-                        // SellWindow::WINDOW_CLASS);
-                        // self.interface.close_window_with_class(&mut
-                        // self.focus_state, "sell_cart");
+                        self.interface.close_window_with_class(WindowClass::Sell);
+                        self.interface.close_window_with_class(WindowClass::SellCart);
                     }
                     SellItemsResult::Error => {
                         self.client_state.follow_mut(client_state().chat_messages()).push(ChatMessage {
@@ -1721,8 +1690,8 @@ impl Client {
                 }
                 InputEvent::CloseTopWindow => self.interface.close_top_window(&self.client_state),
                 InputEvent::ToggleShowInterface => self.show_interface = !self.show_interface,
-                // InputEvent::SaveTheme { theme_kind } => {}                //self.client_state.save_theme(theme_kind),
-                // InputEvent::ReloadTheme { theme_kind } => {}              //self.client_state.reload_theme(theme_kind),
+                // InputEvent::SaveTheme { theme_kind } => self.client_state.save_theme(theme_kind),
+                // InputEvent::ReloadTheme { theme_kind } => self.client_state.reload_theme(theme_kind),
                 InputEvent::SelectCharacter { slot } => {
                     let _ = self.networking_system.select_character(slot);
                 }
@@ -1910,23 +1879,14 @@ impl Client {
                 InputEvent::CloseShop => {
                     let _ = self.networking_system.close_shop();
 
-                    // self.interface
-                    //     .close_window_with_class(&mut self.focus_state,
-                    // BuyWindow::WINDOW_CLASS);
-                    // self.interface
-                    //     .close_window_with_class(&mut self.focus_state,
-                    // BuyCartWindow::WINDOW_CLASS);
-                    // self.interface
-                    //     .close_window_with_class(&mut self.focus_state,
-                    // SellWindow::WINDOW_CLASS);
-                    // self.interface.close_window_with_class(&mut
-                    // self.focus_state, "sell_cart");
+                    self.interface.close_window_with_class(WindowClass::Buy);
+                    self.interface.close_window_with_class(WindowClass::BuyCart);
+                    self.interface.close_window_with_class(WindowClass::Sell);
+                    self.interface.close_window_with_class(WindowClass::SellCart);
                 }
                 InputEvent::BuyOrSell { shop_id, buy_or_sell } => {
                     let _ = self.networking_system.select_buy_or_sell(shop_id, buy_or_sell);
-                    // self.interface
-                    //     .close_window_with_class(&mut self.focus_state,
-                    // BuyOrSellWindow::WINDOW_CLASS);
+                    self.interface.close_window_with_class(WindowClass::BuyOrSell);
                 }
                 InputEvent::SellItems { items } => {
                     let _ = self.networking_system.sell_items(items);

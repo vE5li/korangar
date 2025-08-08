@@ -6,7 +6,6 @@ use korangar_interface::components::state_button::StateButtonTheme;
 use korangar_interface::components::text::TextTheme;
 use korangar_interface::components::text_box::TextBoxTheme;
 use korangar_interface::element::StateElement;
-use korangar_interface::layout::alignment::OverflowBehavior;
 use korangar_interface::layout::tooltip::TooltipTheme;
 use korangar_interface::prelude::{HorizontalAlignment, VerticalAlignment};
 use korangar_interface::window::{StateWindow, WindowTheme};
@@ -14,7 +13,7 @@ use rust_state::RustState;
 
 use crate::graphics::Color;
 use crate::interface::layout::{CornerRadius, ScreenSize};
-use crate::loaders::FontSize;
+use crate::loaders::{FontSize, OverflowBehavior};
 use crate::state::ClientState;
 
 #[derive(RustState, StateElement)]
@@ -86,8 +85,9 @@ impl ThemeDefault for InterfaceTheme {
                 title_height: 45.0,
                 title_gap: 20.0,
                 font_size: FontSize(20.0),
-                text_alignment: HorizontalAlignment::Center { offset: 0.0, border: 5.0 },
+                horizontal_alignment: HorizontalAlignment::Center { offset: 0.0, border: 5.0 },
                 vertical_alignment: VerticalAlignment::Center { offset: 0.0 },
+                overflow_behavior: OverflowBehavior::Shrink,
                 anchor_color: Color::rgb_u8(130, 105, 160),
                 closest_anchor_color: Color::rgb_u8(255, 175, 30),
             },
@@ -107,8 +107,9 @@ impl ThemeDefault for InterfaceTheme {
                 height: 30.0,
                 corner_radius: CornerRadius::uniform(30.0),
                 font_size: FontSize(16.0),
-                text_alignment: HorizontalAlignment::Center { offset: 0.0, border: 5.0 },
+                horizontal_alignment: HorizontalAlignment::Center { offset: 0.0, border: 5.0 },
                 vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
+                overflow_behavior: OverflowBehavior::Shrink,
             },
             state_button: StateButtonTheme {
                 background_color: Color::monochrome_u8(80),
@@ -119,8 +120,9 @@ impl ThemeDefault for InterfaceTheme {
                 height: 24.0,
                 corner_radius: CornerRadius::uniform(24.0),
                 font_size: FontSize(16.0),
-                text_alignment: HorizontalAlignment::Left { offset: 50.0, border: 3.0 },
+                horizontal_alignment: HorizontalAlignment::Left { offset: 50.0, border: 3.0 },
                 vertical_alignment: VerticalAlignment::Center { offset: 0.0 },
+                overflow_behavior: OverflowBehavior::Shrink,
             },
             text_box: TextBoxTheme {
                 background_color: Color::monochrome_u8(45),
@@ -135,7 +137,7 @@ impl ThemeDefault for InterfaceTheme {
                 height: 30.0,
                 corner_radius: CornerRadius::uniform(30.0),
                 font_size: FontSize(16.0),
-                text_alignment: HorizontalAlignment::Center { offset: 0.0, border: 5.0 },
+                horizontal_alignment: HorizontalAlignment::Center { offset: 0.0, border: 5.0 },
                 vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
                 overflow_behavior: OverflowBehavior::LineBreak,
             },
@@ -151,8 +153,9 @@ impl ThemeDefault for InterfaceTheme {
                 border: 10.0,
                 title_height: 30.0,
                 font_size: FontSize(16.0),
-                text_alignment: HorizontalAlignment::Left { offset: 0.0, border: 3.0 },
+                horizontal_alignment: HorizontalAlignment::Left { offset: 0.0, border: 3.0 },
                 vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
+                overflow_behavior: OverflowBehavior::Shrink,
             },
             drop_down: DropDownTheme {
                 item_background_color: Color::monochrome_u8(65),
@@ -162,8 +165,9 @@ impl ThemeDefault for InterfaceTheme {
                 item_height: 30.0,
                 item_corner_radius: CornerRadius::uniform(30.0),
                 item_font_size: FontSize(16.0),
-                item_text_alignment: HorizontalAlignment::Center { offset: 0.0, border: 5.0 },
+                item_horizontal_alignment: HorizontalAlignment::Center { offset: 0.0, border: 5.0 },
                 item_vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
+                item_overflow_behavior: OverflowBehavior::Shrink,
                 list_corner_radius: CornerRadius::uniform(30.0),
                 list_background_color: Color::monochrome_u8(40),
                 list_gaps: 8.0,
@@ -176,8 +180,9 @@ impl ThemeDefault for InterfaceTheme {
                 button_height: 30.0,
                 button_corner_radius: CornerRadius::uniform(30.0),
                 button_font_size: FontSize(16.0),
-                button_text_alignment: HorizontalAlignment::Center { offset: 0.0, border: 5.0 },
+                button_horizontal_alignment: HorizontalAlignment::Center { offset: 0.0, border: 5.0 },
                 button_vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
+                button_overflow_behavior: OverflowBehavior::Shrink,
             },
             field: FieldTheme {
                 background_color: Color::monochrome_u8(80),
@@ -187,6 +192,7 @@ impl ThemeDefault for InterfaceTheme {
                 font_size: FontSize(16.0),
                 horizontal_alignment: HorizontalAlignment::Center { offset: 0.0, border: 5.0 },
                 vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
+                overflow_behavior: OverflowBehavior::LineBreak,
             },
             tooltip: TooltipTheme {
                 background_color: Color::rgba_u8(15, 15, 15, 200),
@@ -196,6 +202,7 @@ impl ThemeDefault for InterfaceTheme {
                 border: 8.0,
                 gap: 4.0,
                 mouse_offset: 20.0,
+                overflow_behavior: OverflowBehavior::LineBreak,
             },
             debug_button: DebugButtonTheme {
                 foreground_color: Color::rgb_u8(255, 167, 89),
@@ -226,8 +233,9 @@ impl ThemeDefault for InterfaceTheme {
                 title_height: 25.0,
                 title_gap: 2.0,
                 font_size: FontSize(15.0),
-                text_alignment: HorizontalAlignment::Center { offset: 0.0, border: 5.0 },
+                horizontal_alignment: HorizontalAlignment::Center { offset: 0.0, border: 5.0 },
                 vertical_alignment: VerticalAlignment::Center { offset: 0.0 },
+                overflow_behavior: OverflowBehavior::Shrink,
                 anchor_color: Color::rgb_u8(140, 105, 130),
                 closest_anchor_color: Color::rgb_u8(255, 175, 30),
             },
@@ -247,8 +255,9 @@ impl ThemeDefault for InterfaceTheme {
                 height: 20.0,
                 corner_radius: CornerRadius::uniform(10.0),
                 font_size: FontSize(14.0),
-                text_alignment: HorizontalAlignment::Center { offset: 0.0, border: 5.0 },
+                horizontal_alignment: HorizontalAlignment::Center { offset: 0.0, border: 5.0 },
                 vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
+                overflow_behavior: OverflowBehavior::Shrink,
             },
             state_button: StateButtonTheme {
                 background_color: Color::monochrome_u8(120),
@@ -259,8 +268,9 @@ impl ThemeDefault for InterfaceTheme {
                 height: 20.0,
                 corner_radius: CornerRadius::uniform(10.0),
                 font_size: FontSize(14.0),
-                text_alignment: HorizontalAlignment::Left { offset: 30.0, border: 3.0 },
+                horizontal_alignment: HorizontalAlignment::Left { offset: 30.0, border: 3.0 },
                 vertical_alignment: VerticalAlignment::Center { offset: 0.0 },
+                overflow_behavior: OverflowBehavior::Shrink,
             },
             text_box: TextBoxTheme {
                 background_color: Color::monochrome_u8(40),
@@ -275,7 +285,7 @@ impl ThemeDefault for InterfaceTheme {
                 height: 20.0,
                 corner_radius: CornerRadius::uniform(10.0),
                 font_size: FontSize(14.0),
-                text_alignment: HorizontalAlignment::Left { offset: 15.0, border: 3.0 },
+                horizontal_alignment: HorizontalAlignment::Left { offset: 15.0, border: 3.0 },
                 vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
                 overflow_behavior: OverflowBehavior::LineBreak,
             },
@@ -291,8 +301,9 @@ impl ThemeDefault for InterfaceTheme {
                 border: 5.0,
                 title_height: 20.0,
                 font_size: FontSize(14.0),
-                text_alignment: HorizontalAlignment::Left { offset: 0.0, border: 3.0 },
+                horizontal_alignment: HorizontalAlignment::Left { offset: 0.0, border: 3.0 },
                 vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
+                overflow_behavior: OverflowBehavior::Shrink,
             },
             drop_down: DropDownTheme {
                 item_background_color: Color::monochrome_u8(80),
@@ -302,8 +313,9 @@ impl ThemeDefault for InterfaceTheme {
                 item_height: 20.0,
                 item_corner_radius: CornerRadius::uniform(10.0),
                 item_font_size: FontSize(14.0),
-                item_text_alignment: HorizontalAlignment::Center { offset: 0.0, border: 5.0 },
+                item_horizontal_alignment: HorizontalAlignment::Center { offset: 0.0, border: 5.0 },
                 item_vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
+                item_overflow_behavior: OverflowBehavior::Shrink,
                 list_corner_radius: CornerRadius::uniform(8.0),
                 list_background_color: Color::monochrome_u8(40),
                 list_gaps: 4.0,
@@ -316,8 +328,9 @@ impl ThemeDefault for InterfaceTheme {
                 button_height: 20.0,
                 button_corner_radius: CornerRadius::uniform(10.0),
                 button_font_size: FontSize(14.0),
-                button_text_alignment: HorizontalAlignment::Center { offset: 0.0, border: 5.0 },
+                button_horizontal_alignment: HorizontalAlignment::Center { offset: 0.0, border: 5.0 },
                 button_vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
+                button_overflow_behavior: OverflowBehavior::Shrink,
             },
             field: FieldTheme {
                 background_color: Color::monochrome_u8(100),
@@ -327,6 +340,7 @@ impl ThemeDefault for InterfaceTheme {
                 font_size: FontSize(14.0),
                 horizontal_alignment: HorizontalAlignment::Left { offset: 10.0, border: 3.0 },
                 vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
+                overflow_behavior: OverflowBehavior::LineBreak,
             },
             tooltip: TooltipTheme {
                 background_color: Color::rgba_u8(15, 15, 15, 200),
@@ -336,6 +350,7 @@ impl ThemeDefault for InterfaceTheme {
                 border: 4.0,
                 gap: 3.0,
                 mouse_offset: 16.0,
+                overflow_behavior: OverflowBehavior::LineBreak,
             },
             debug_button: DebugButtonTheme {
                 foreground_color: Color::rgb_u8(255, 167, 89),

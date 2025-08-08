@@ -91,7 +91,7 @@ pub fn derive_packet_struct(
                 self_path: impl rust_state::Path<App, Self>,
                 name: String,
             ) -> Box<dyn korangar_interface::element::Element<App, LayoutInfo = ()>> {
-                Box::new(korangar_interface::element::ErasedElement::new(<Self as korangar_interface::element::StateElement<App>>::to_element(self_path, name)))
+                korangar_interface::element::ErasedElement::new(<Self as korangar_interface::element::StateElement<App>>::to_element(self_path, name))
             }
         }
     }

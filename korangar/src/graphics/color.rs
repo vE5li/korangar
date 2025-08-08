@@ -1,7 +1,7 @@
 use std::ops::{Add, Mul, Sub};
 
 use korangar_interface::element::store::{ElementStore, ElementStoreMut};
-use korangar_interface::element::{Element, StateElement};
+use korangar_interface::element::{BaseLayoutInfo, Element, StateElement};
 use korangar_interface::layout::{Layout, Resolver};
 use mlua::{Lua, Value};
 use ragnarok_formats::color::{ColorBGRA, ColorRGB};
@@ -271,6 +271,8 @@ impl StateElement<ClientState> for Color {
         where
             P: Path<ClientState, Color>,
         {
+            type LayoutInfo = BaseLayoutInfo;
+
             fn create_layout_info(
                 &mut self,
                 _: &Context<ClientState>,
@@ -317,6 +319,8 @@ impl StateElement<ClientState> for Color {
         where
             P: Path<ClientState, Color>,
         {
+            type LayoutInfo = BaseLayoutInfo;
+
             fn create_layout_info(
                 &mut self,
                 _: &Context<ClientState>,

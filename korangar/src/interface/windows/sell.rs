@@ -1,42 +1,41 @@
-use derive_new::new;
-use korangar_interface::element::{ElementWrap, ScrollView};
-use korangar_interface::size_bound;
-use korangar_interface::state::{PlainRemote, PlainTrackedState};
-use korangar_interface::window::{StateWindow, Window, WindowBuilder};
+use korangar_interface::window::{CustomWindow, Window};
 use korangar_networking::SellItem;
+use rust_state::Path;
 
-use crate::interface::application::InterfaceSettings;
-use crate::interface::elements::SellContainer;
-use crate::interface::layout::ScreenSize;
-use crate::interface::windows::WindowCache;
+use super::WindowClass;
+use crate::state::ClientState;
+use crate::state::theme::InterfaceThemeType;
 use crate::world::ResourceMetadata;
 
-#[derive(new)]
-pub struct SellWindow {
-    items: PlainRemote<Vec<SellItem<(ResourceMetadata, u16)>>>,
-    cart: PlainTrackedState<Vec<SellItem<(ResourceMetadata, u16)>>>,
+pub struct SellWindow<A, B> {
+    items_path: A,
+    cart_path: B,
 }
 
-impl SellWindow {
-    pub const WINDOW_CLASS: &'static str = "sell";
+impl<A, B> SellWindow<A, B> {
+    pub fn new(items_path: A, cart_path: B) -> Self {
+        Self { items_path, cart_path }
+    }
 }
 
-impl StateWindow<InterfaceSettings> for SellWindow {
-    fn window_class(&self) -> Option<&str> {
-        Some(Self::WINDOW_CLASS)
+impl<A, B> CustomWindow<ClientState> for SellWindow<A, B>
+where
+    A: Path<ClientState, Vec<SellItem<(ResourceMetadata, u16)>>>,
+    B: Path<ClientState, Vec<SellItem<(ResourceMetadata, u16)>>>,
+{
+    fn window_class() -> Option<WindowClass> {
+        Some(WindowClass::Sell)
     }
 
-    fn to_window(
-        &self,
-    ) -> Window<InterfaceSettings> {
-        let elements = vec![SellContainer::new(self.items.clone(), self.cart.clone()).wrap()];
-        let elements = vec![ScrollView::new(elements, size_bound!(100%, ? < super)).wrap()];
+    fn to_window<'a>(self) -> impl Window<ClientState> + 'a {
+        use korangar_interface::prelude::*;
 
-        WindowBuilder::new()
-            .with_title("Sell".to_string())
-            .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size_bound(size_bound!(300 > 400 < 500, ? < 60%))
-            .with_elements(elements)
-            .build(window_cache, application, available_space)
+        window! {
+            title: "Sell",
+            class: Self::window_class(),
+            theme: InterfaceThemeType::Game,
+            elements: (
+            ),
+        }
     }
 }

@@ -231,11 +231,11 @@ pub mod store {
     }
 }
 
-pub struct DefaultLayoutInfo {
+pub struct BaseLayoutInfo {
     pub area: Area,
 }
 
-pub struct DefaultLayoutInfoWithText<App: Application> {
+pub struct DefaultLayoutInfo<App: Application> {
     pub area: Area,
     pub font_size: App::FontSize,
 }
@@ -246,7 +246,7 @@ pub struct DefaultLayoutInfoSet<T> {
 }
 
 pub trait Element<App: Application> {
-    type LayoutInfo = DefaultLayoutInfo;
+    type LayoutInfo = DefaultLayoutInfo<App>;
 
     fn create_layout_info(
         &mut self,
@@ -426,12 +426,12 @@ where
     App: Application,
     E: Element<App>,
 {
-    pub fn new(element: E) -> Self {
-        Self {
+    pub fn new(element: E) -> Box<Self> {
+        Box::new(Self {
             element,
             layout_info: None,
             _marker: PhantomData,
-        }
+        })
     }
 }
 

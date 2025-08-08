@@ -1,4 +1,3 @@
-use super::alignment::OverflowBehavior;
 use super::area::{Area, PartialArea};
 use crate::application::{Application, TextLayouter};
 use crate::prelude::HorizontalAlignment;
@@ -79,7 +78,7 @@ where
         text: &str,
         font_size: App::FontSize,
         horizontal_alignment: HorizontalAlignment,
-        overflow_behavior: OverflowBehavior,
+        overflow_behavior: App::OverflowBehavior,
     ) -> (App::Size, App::FontSize) {
         let offset = match horizontal_alignment {
             HorizontalAlignment::Left { offset, border } => offset + border,

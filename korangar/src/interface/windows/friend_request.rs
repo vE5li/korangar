@@ -23,13 +23,14 @@ impl CustomWindow<ClientState> for FriendRequestWindow {
         window! {
             title: "Friend request",
             class: Some(WindowClass::FriendRequest),
-            theme: InterfaceThemeType::Menu,
+            theme: InterfaceThemeType::Game,
             closable: true,
             elements: (
                 text! {
                     text: format!("^ffaa00{}^000000 wants to be friends with you", self.friend.name),
                 },
                 split! {
+                    gaps: theme().window().gaps(),
                     children: (
                         button! {
                             text: "Reject",

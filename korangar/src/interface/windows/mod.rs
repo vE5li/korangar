@@ -1,4 +1,7 @@
 mod audio_settings;
+mod buy;
+mod buy_cart;
+mod buy_or_sell;
 mod cache;
 mod character_creation;
 mod character_overview;
@@ -27,6 +30,8 @@ mod profiler;
 #[cfg(feature = "debug")]
 mod render_options;
 mod respawn;
+mod sell;
+mod sell_cart;
 mod server_selection;
 mod skill_tree;
 #[cfg(feature = "debug")]
@@ -35,6 +40,9 @@ mod time;
 use serde::{Deserialize, Serialize};
 
 pub use self::audio_settings::AudioSettingsWindow;
+pub use self::buy::BuyWindow;
+pub use self::buy_cart::BuyCartWindow;
+pub use self::buy_or_sell::BuyOrSellWindow;
 pub use self::cache::WindowCache;
 pub use self::character_creation::CharacterCreationWindow;
 pub use self::character_overview::CharacterOverviewWindow;
@@ -62,6 +70,8 @@ pub use self::profiler::{ProfilerWindow, ProfilerWindowState};
 #[cfg(feature = "debug")]
 pub use self::render_options::RenderOptionsWindow;
 pub use self::respawn::RespawnWindow;
+pub use self::sell::SellWindow;
+pub use self::sell_cart::SellCartWindow;
 pub use self::server_selection::ServerSelectionWindow;
 pub use self::skill_tree::SkillTreeWindow;
 #[cfg(feature = "debug")]
@@ -70,6 +80,9 @@ pub use self::time::TimeWindow;
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum WindowClass {
     AudioSettings,
+    Buy,
+    BuyCart,
+    BuyOrSell,
     Chat,
     CharacterCreation,
     CharacterOverview,
@@ -86,6 +99,8 @@ pub enum WindowClass {
     Menu,
     Respawn,
     SelectServer,
+    Sell,
+    SellCart,
     #[cfg(feature = "debug")]
     Time,
     #[cfg(feature = "debug")]

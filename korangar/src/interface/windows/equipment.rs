@@ -1,4 +1,3 @@
-use korangar_components::item_box;
 use korangar_interface::element::Element;
 use korangar_interface::window::{CustomWindow, Window};
 use korangar_networking::{InventoryItem, InventoryItemDetails};
@@ -65,34 +64,19 @@ where
     }
 }
 
-pub struct EquipmentWindow<P> {
-    items_path: P,
+pub struct EquipmentWindow<A> {
+    items_path: A,
 }
 
-impl<P> EquipmentWindow<P> {
-    pub fn new(items_path: P) -> Self {
+impl<A> EquipmentWindow<A> {
+    pub fn new(items_path: A) -> Self {
         Self { items_path }
     }
 }
 
-fn equip_box(
-    items_path: impl Path<ClientState, Vec<InventoryItem<ResourceMetadata>>>,
-    equip_position: EquipPosition,
-) -> impl Element<ClientState> {
-    let equipment_path = EquipmentPath {
-        equip_position,
-        path: items_path,
-    };
-
-    item_box! {
-        item_path: equipment_path,
-        handler: ItemBoxHandler::new(equipment_path, ItemSource::Equipment { position: equip_position }),
-    }
-}
-
-impl<P> CustomWindow<ClientState> for EquipmentWindow<P>
+impl<A> CustomWindow<ClientState> for EquipmentWindow<A>
 where
-    P: Path<ClientState, Vec<InventoryItem<ResourceMetadata>>>,
+    A: Path<ClientState, Vec<InventoryItem<ResourceMetadata>>>,
 {
     fn window_class() -> Option<WindowClass> {
         Some(WindowClass::Equipment)
@@ -100,6 +84,62 @@ where
 
     fn to_window<'a>(self) -> impl Window<ClientState> + 'a {
         use korangar_interface::prelude::*;
+
+        fn equip_box(
+            items_path: impl Path<ClientState, Vec<InventoryItem<ResourceMetadata>>>,
+            equip_position: EquipPosition,
+        ) -> impl Element<ClientState> {
+            use korangar_components::item_box;
+            use korangar_interface::prelude::*;
+
+            let equipment_path = EquipmentPath {
+                equip_position,
+                path: items_path,
+            };
+
+            let display_name = match equip_position {
+                _ if equip_position.contains(EquipPosition::HEAD_LOWER) => "Head lower",
+                _ if equip_position.contains(EquipPosition::HEAD_MIDDLE) => "Head middle",
+                _ if equip_position.contains(EquipPosition::HEAD_TOP) => "Head top",
+                _ if equip_position.contains(EquipPosition::RIGHT_HAND) => "Right hand",
+                _ if equip_position.contains(EquipPosition::LEFT_HAND) => "Left hand",
+                _ if equip_position.contains(EquipPosition::ARMOR) => "Armor",
+                _ if equip_position.contains(EquipPosition::SHOES) => "Shoes",
+                _ if equip_position.contains(EquipPosition::GARMENT) => "Garment",
+                _ if equip_position.contains(EquipPosition::LEFT_ACCESSORY) => "Left accessory",
+                _ if equip_position.contains(EquipPosition::RIGTH_ACCESSORY) => "Right accessory",
+                _ if equip_position.contains(EquipPosition::COSTUME_HEAD_TOP) => "Costume head top",
+                _ if equip_position.contains(EquipPosition::COSTUME_HEAD_MIDDLE) => "Costume head middle",
+                _ if equip_position.contains(EquipPosition::COSTUME_HEAD_LOWER) => "Costume head lower",
+                _ if equip_position.contains(EquipPosition::COSTUME_GARMENT) => "Costume garment",
+                _ if equip_position.contains(EquipPosition::AMMO) => "Ammo",
+                _ if equip_position.contains(EquipPosition::SHADOW_ARMOR) => "Shadow ammo",
+                _ if equip_position.contains(EquipPosition::SHADOW_WEAPON) => "Shadow weapon",
+                _ if equip_position.contains(EquipPosition::SHADOW_SHIELD) => "Shadow shield",
+                _ if equip_position.contains(EquipPosition::SHADOW_SHOES) => "Shadow shoes",
+                _ if equip_position.contains(EquipPosition::SHADOW_RIGHT_ACCESSORY) => "Shadow right accessory",
+                _ if equip_position.contains(EquipPosition::SHADOW_LEFT_ACCESSORY) => "Shadow left accessory",
+                _ if equip_position.contains(EquipPosition::LEFT_RIGHT_ACCESSORY) => "Accessory",
+                _ if equip_position.contains(EquipPosition::LEFT_RIGHT_HAND) => "Two hand weapon",
+                _ if equip_position.contains(EquipPosition::SHADOW_LEFT_RIGHT_ACCESSORY) => "Shadow accessory",
+                _ => panic!("no display name for equip position"),
+            };
+
+            split! {
+                gaps: theme().window().gaps(),
+                children: (
+                    item_box! {
+                        item_path: equipment_path,
+                        handler: ItemBoxHandler::new(equipment_path, ItemSource::Equipment { position: equip_position }),
+                    },
+                    text! {
+                        text: display_name,
+                        // Get this height from the skill box theme.
+                        height: 40.0,
+                    }
+                ),
+            }
+        }
 
         window! {
             title: "Equipment",

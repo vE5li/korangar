@@ -2,9 +2,9 @@ use std::cell::UnsafeCell;
 use std::sync::mpsc::TryRecvError;
 
 use korangar_debug::logging::{Colorize, print_debug};
-use korangar_interface::application::Application;
+use korangar_interface::application::{Application, SizeTrait};
 use korangar_interface::element::store::{ElementStore, ElementStoreMut};
-use korangar_interface::element::{Element, ErasedElement, StateElement};
+use korangar_interface::element::{Element, StateElement};
 use korangar_interface::layout::{Layout, Resolver};
 use korangar_interface::prelude::*;
 use korangar_interface::theme::theme;
@@ -44,7 +44,6 @@ where
         resolver: &mut Resolver<'_, App>,
     ) -> Self::LayoutInfo {
         let height = *state.get(&theme().text().height());
-        let area = resolver.with_height(height);
 
         let data = state.get(&self.path);
         if data.len() >= 2 {
@@ -59,7 +58,14 @@ where
             }
         }
 
-        Self::LayoutInfo { area }
+        let font_size = *state.get(&theme().text().font_size());
+        let horizontal_alignment = *state.get(&theme().text().horizontal_alignment());
+        let overflow_behavior = *state.get(&theme().text().overflow_behavior());
+
+        let (size, font_size) = resolver.get_text_dimensions(&self.text, font_size, horizontal_alignment, overflow_behavior);
+        let area = resolver.with_height(height.max(size.height()));
+
+        Self::LayoutInfo { area, font_size }
     }
 
     fn lay_out<'a>(
@@ -72,7 +78,7 @@ where
         layout.add_text(
             layout_info.area,
             &self.text,
-            *state.get(&theme().text().font_size()),
+            layout_info.font_size,
             *state.get(&theme().text().color()),
             // TODO: Check if we really want it like this.
             *state.get(&theme().text().horizontal_alignment()),
@@ -111,16 +117,22 @@ where
         _: ElementStoreMut<'_>,
         resolver: &mut Resolver<'_, App>,
     ) -> Self::LayoutInfo {
+        let height = *state.get(&theme().text().height());
+
         let error = state.get(&self.path);
         if !self.cached.as_ref().is_some_and(|cached| cached == error) {
             self.text = format!("{error:?}");
             self.cached = Some(error.clone());
         }
 
-        let height = *state.get(&theme().text().height());
-        let area = resolver.with_height(height);
+        let font_size = *state.get(&theme().text().font_size());
+        let horizontal_alignment = *state.get(&theme().text().horizontal_alignment());
+        let overflow_behavior = *state.get(&theme().text().overflow_behavior());
 
-        Self::LayoutInfo { area }
+        let (size, font_size) = resolver.get_text_dimensions(&self.text, font_size, horizontal_alignment, overflow_behavior);
+        let area = resolver.with_height(height.max(size.height()));
+
+        Self::LayoutInfo { area, font_size }
     }
 
     fn lay_out<'a>(
@@ -133,7 +145,7 @@ where
         layout.add_text(
             layout_info.area,
             &self.text,
-            *state.get(&theme().text().font_size()),
+            layout_info.font_size,
             *state.get(&theme().text().color()),
             // TODO: Check if we really want it like this.
             *state.get(&theme().text().horizontal_alignment()),
@@ -169,7 +181,7 @@ impl Packet for UnknownPacket {
     ) -> Box<dyn korangar_interface::element::Element<App, LayoutInfo = ()>> {
         use korangar_interface::prelude::*;
 
-        Box::new(ErasedElement::new(collapsable! {
+        ErasedElement::new(collapsable! {
             text: name,
             children: (
                 split! {
@@ -185,7 +197,7 @@ impl Packet for UnknownPacket {
                 // behavior.
                 StateElement::to_element(self_path.bytes(), "data".to_owned()),
             ),
-        }))
+        })
     }
 }
 
@@ -214,7 +226,7 @@ impl Packet for ErrorPacket {
     ) -> Box<dyn korangar_interface::element::Element<App, LayoutInfo = ()>> {
         use korangar_interface::prelude::*;
 
-        Box::new(ErasedElement::new(collapsable! {
+        ErasedElement::new(collapsable! {
             text: name,
             children: (
                 split! {
@@ -238,7 +250,7 @@ impl Packet for ErrorPacket {
                 // behavior.
                 StateElement::to_element(self_path.bytes(), "data".to_owned()),
             ),
-        }))
+        })
     }
 }
 

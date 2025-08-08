@@ -1,6 +1,6 @@
 use character_slot_preview::{CharacterSlotPreview, CharacterSlotPreviewHandler, OverlayHandler};
 use korangar_interface::element::store::{ElementStore, ElementStoreMut};
-use korangar_interface::element::{DefaultLayoutInfo, Element};
+use korangar_interface::element::{BaseLayoutInfo, Element};
 use korangar_interface::layout::{Layout, Resolver};
 use korangar_interface::window::{CustomWindow, Window};
 use rust_state::{Context, Path};
@@ -15,9 +15,9 @@ mod character_slot_preview {
     use std::fmt::Display;
 
     use korangar_interface::element::store::{ElementStore, ElementStoreMut};
-    use korangar_interface::element::{Element, ErasedElement};
-    use korangar_interface::event::{ClickAction, Event, EventQueue};
-    use korangar_interface::layout::alignment::{HorizontalAlignment, OverflowBehavior, VerticalAlignment};
+    use korangar_interface::element::{BaseLayoutInfo, Element};
+    use korangar_interface::event::{ClickAction, EventQueue};
+    use korangar_interface::layout::alignment::{HorizontalAlignment, VerticalAlignment};
     use korangar_interface::layout::tooltip::TooltipExt;
     use korangar_interface::layout::{Layout, MouseButton, Resolver};
     use ragnarok_packets::{CharacterInformation, CharacterInformationPathExt};
@@ -26,7 +26,7 @@ mod character_slot_preview {
     use crate::graphics::Color;
     use crate::input::InputEvent;
     use crate::interface::layout::{CornerRadius, ScreenPosition, ScreenSize};
-    use crate::loaders::FontSize;
+    use crate::loaders::{FontSize, OverflowBehavior};
     use crate::state::ClientState;
 
     pub struct OverlayHandler<A, B> {
@@ -69,7 +69,7 @@ mod character_slot_preview {
             let switch_request_path = self.switch_request_path;
             let character_information_path = self.character_information_path;
 
-            let erased_element = ErasedElement::new(fragment! {
+            let element = ErasedElement::new(fragment! {
                 children: (
                     button! {
                         text: "Delete",
@@ -101,7 +101,7 @@ mod character_slot_preview {
             });
 
             queue.queue(Event::OpenOverlay {
-                element: Box::new(erased_element),
+                element,
                 position: self.position,
                 size: self.size,
                 window_id: self.window_id,
@@ -146,6 +146,8 @@ mod character_slot_preview {
         M: Path<ClientState, Option<usize>>,
         B: Path<ClientState, Option<usize>>,
     {
+        type LayoutInfo = BaseLayoutInfo;
+
         fn create_layout_info(
             &mut self,
             _: &Context<ClientState>,
@@ -484,13 +486,7 @@ where
     fn to_window<'a>(self) -> impl Window<ClientState> + 'a {
         use korangar_interface::prelude::*;
 
-        type RowLayoutInfo = (
-            DefaultLayoutInfo,
-            DefaultLayoutInfo,
-            DefaultLayoutInfo,
-            DefaultLayoutInfo,
-            DefaultLayoutInfo,
-        );
+        type RowLayoutInfo = (BaseLayoutInfo, BaseLayoutInfo, BaseLayoutInfo, BaseLayoutInfo, BaseLayoutInfo);
 
         struct CharacterWrapper<C, M> {
             character_slots: C,

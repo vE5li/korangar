@@ -1,41 +1,44 @@
-use derive_new::new;
-use korangar_interface::element::{ElementWrap, ScrollView};
-use korangar_interface::size_bound;
-use korangar_interface::state::PlainTrackedState;
-use korangar_interface::window::{StateWindow, Window, WindowBuilder};
+use korangar_interface::window::{CustomWindow, Window};
 use korangar_networking::ShopItem;
+use rust_state::Path;
 
-use crate::interface::application::InterfaceSettings;
-use crate::interface::elements::BuyCartContainer;
-use crate::interface::layout::ScreenSize;
-use crate::interface::windows::WindowCache;
+use super::WindowClass;
+use crate::input::InputEvent;
+use crate::state::ClientState;
+use crate::state::theme::InterfaceThemeType;
 use crate::world::ResourceMetadata;
 
-#[derive(new)]
-pub struct BuyCartWindow {
-    cart: PlainTrackedState<Vec<ShopItem<(ResourceMetadata, u32)>>>,
+pub struct BuyCartWindow<A> {
+    cart_path: A,
 }
 
-impl BuyCartWindow {
-    pub const WINDOW_CLASS: &'static str = "buy_cart";
+impl<A> BuyCartWindow<A> {
+    pub fn new(cart_path: A) -> Self {
+        Self { cart_path }
+    }
 }
 
-impl StateWindow<InterfaceSettings> for BuyCartWindow {
-    fn window_class(&self) -> Option<&str> {
-        Some(Self::WINDOW_CLASS)
+impl<A> CustomWindow<ClientState> for BuyCartWindow<A>
+where
+    A: Path<ClientState, Vec<ShopItem<(ResourceMetadata, u32)>>>,
+{
+    fn window_class() -> Option<WindowClass> {
+        Some(WindowClass::BuyCart)
     }
 
-    fn to_window(
-        &self,
-    ) -> Window<InterfaceSettings> {
-        let elements = vec![BuyCartContainer::new(self.cart.clone()).wrap()];
-        let elements = vec![ScrollView::new(elements, size_bound!(100%, ? < super)).wrap()];
+    fn to_window<'a>(self) -> impl Window<ClientState> + 'a {
+        use korangar_interface::prelude::*;
 
-        WindowBuilder::new()
-            .with_title("Cart".to_string())
-            .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size_bound(size_bound!(300 > 400 < 500, ? < 60%))
-            .with_elements(elements)
-            .build(window_cache, application, available_space)
+        window! {
+            title: "Cart",
+            class: Self::window_class(),
+            theme: InterfaceThemeType::Game,
+            elements: (
+                button! {
+                    text: "Cancel",
+                    event: InputEvent::CloseShop,
+                },
+            ),
+        }
     }
 }

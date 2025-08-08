@@ -2,7 +2,6 @@ use std::cmp::Ordering;
 
 use korangar_interface::element::store::{ElementStore, ElementStoreMut};
 use korangar_interface::element::{DefaultLayoutInfo, Element};
-use korangar_interface::event::EventQueue;
 use korangar_interface::layout::{Layout, Resolver};
 use korangar_interface::window::{CustomWindow, Window};
 use ragnarok_packets::{CharacterServerInformation, CharacterServerInformationPathExt};
@@ -37,7 +36,7 @@ where
 
         struct ServerWrapper<P> {
             path: P,
-            item_boxes: Vec<Box<dyn Element<ClientState, LayoutInfo = DefaultLayoutInfo>>>,
+            item_boxes: Vec<Box<dyn Element<ClientState, LayoutInfo = DefaultLayoutInfo<ClientState>>>>,
         }
 
         impl<P> ServerWrapper<P>
@@ -81,7 +80,7 @@ where
         where
             P: Path<ClientState, Vec<CharacterServerInformation>>,
         {
-            type LayoutInfo = Vec<DefaultLayoutInfo>;
+            type LayoutInfo = Vec<DefaultLayoutInfo<ClientState>>;
 
             fn create_layout_info(
                 &mut self,

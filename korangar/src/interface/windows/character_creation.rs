@@ -1,5 +1,4 @@
 use korangar_interface::components::text_box::DefaultHandler;
-use korangar_interface::event::EventQueue;
 use korangar_interface::window::{CustomWindow, Window};
 use rust_state::{Context, Path};
 

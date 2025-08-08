@@ -1,10 +1,10 @@
-use korangar_interface::layout::alignment::OverflowBehavior;
 use korangar_interface::window::{CustomWindow, Window};
 use rust_state::Path;
 
 use crate::graphics::Color;
 use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
+use crate::loaders::OverflowBehavior;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
 

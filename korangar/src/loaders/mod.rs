@@ -19,7 +19,7 @@ pub use self::action::*;
 pub use self::animation::*;
 pub use self::r#async::*;
 pub use self::effect::EffectLoader;
-pub use self::font::{FontLoader, FontSize, GlyphInstruction, Scaling};
+pub use self::font::{FontLoader, FontSize, GlyphInstruction, OverflowBehavior, Scaling};
 pub use self::gamefile::*;
 pub use self::map::{MAP_TILE_SIZE, MapLoader};
 pub use self::model::*;

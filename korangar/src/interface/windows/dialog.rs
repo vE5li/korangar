@@ -1,7 +1,6 @@
 use std::cell::UnsafeCell;
 
 use korangar_interface::element::{Element, ElementBox, ErasedElement, StateElement};
-use korangar_interface::event::EventQueue;
 use korangar_interface::window::{CustomWindow, Window};
 use ragnarok_packets::EntityId;
 use rust_state::{Context, Path, RustState};
@@ -34,7 +33,7 @@ impl DialogElement {
         E: Element<ClientState> + 'static,
     {
         Self {
-            element: UnsafeCell::new(Box::new(ErasedElement::new(element))),
+            element: UnsafeCell::new(ErasedElement::new(element)),
             is_next_button,
         }
     }

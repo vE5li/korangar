@@ -40,10 +40,3 @@ impl VerticalAlignment {
         }
     }
 }
-
-// TODO: These likely need to be moved to the final app.
-#[derive(Clone, Copy)]
-pub enum OverflowBehavior {
-    Shrink,
-    LineBreak,
-}

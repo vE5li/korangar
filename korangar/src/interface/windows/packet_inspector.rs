@@ -1,6 +1,5 @@
 use korangar_interface::element::Element;
 use korangar_interface::element::store::{ElementStore, ElementStoreMut};
-use korangar_interface::event::EventQueue;
 use korangar_interface::layout::{Layout, Resolver};
 use korangar_interface::window::{CustomWindow, Window};
 use rust_state::{Context, Path};

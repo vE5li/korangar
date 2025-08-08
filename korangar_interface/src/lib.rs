@@ -32,7 +32,6 @@ use element::ElementBox;
 use element::id::{ElementId, ElementIdGenerator};
 use element::store::{ElementStore, ElementStoreMut, InternalElementStore};
 use event::{Event, EventQueue};
-use layout::alignment::OverflowBehavior;
 use layout::area::Area;
 use layout::tooltip::TooltipTheme;
 use layout::{Layout, MouseButton, ResizeMode, Resolver};
@@ -59,7 +58,8 @@ pub mod prelude {
     pub use crate::components::state_button::StateButtonThemePathExt;
     pub use crate::components::text::TextThemePathExt;
     pub use crate::components::text_box::TextBoxThemePathExt;
-    pub use crate::event::Toggle;
+    pub use crate::element::ErasedElement;
+    pub use crate::event::{Event, EventQueue, Toggle};
     pub use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
     pub use crate::layout::tooltip::TooltipThemePathExt;
     pub use crate::selector_helpers::*;
@@ -738,7 +738,7 @@ impl<App: Application> InterfaceFrame<'_, App> {
         for tooltip in iterator {
             let (text_dimensions, font_size) =
                 self.text_layouter
-                    .get_text_dimensions(tooltip, font_size, available_width, OverflowBehavior::LineBreak);
+                    .get_text_dimensions(tooltip, font_size, available_width, tooltip_theme.overflow_behavior);
 
             let tooltip_left = match mouse_position.left() > half_window_size.width() {
                 true => mouse_position.left() - text_dimensions.width() - total_offset,

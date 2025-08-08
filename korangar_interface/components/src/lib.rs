@@ -63,7 +63,9 @@ pub fn button(token_stream: TokenStream) -> TokenStream {
         height: { korangar_interface::theme::theme().button().height() },
         corner_radius: { korangar_interface::theme::theme().button().corner_radius() },
         font_size: { korangar_interface::theme::theme().button().font_size() },
-        text_alignment: { korangar_interface::theme::theme().button().text_alignment() },
+        horizontal_alignment: { korangar_interface::theme::theme().button().horizontal_alignment() },
+        vertical_alignment: { korangar_interface::theme::theme().button().vertical_alignment() },
+        overflow_behavior: { korangar_interface::theme::theme().button().overflow_behavior() },
     });
 
     macro_impl(token_stream.into()).into()
@@ -85,7 +87,9 @@ pub fn state_button(token_stream: TokenStream) -> TokenStream {
         height: { korangar_interface::theme::theme().state_button().height() },
         corner_radius: { korangar_interface::theme::theme().state_button().corner_radius() },
         font_size: { korangar_interface::theme::theme().state_button().font_size() },
-        text_alignment: { korangar_interface::theme::theme().state_button().text_alignment() },
+        horizontal_alignment: { korangar_interface::theme::theme().state_button().horizontal_alignment() },
+        vertical_alignment: { korangar_interface::theme::theme().state_button().vertical_alignment() },
+        overflow_behavior: { korangar_interface::theme::theme().state_button().overflow_behavior() },
     });
 
     macro_impl(token_stream.into()).into()
@@ -96,7 +100,6 @@ pub fn drop_down(token_stream: TokenStream) -> TokenStream {
     create_component_macro!(korangar_interface::components::drop_down::DropDown, {
         options: !,
         selected: !,
-        // TODO: Don't use the button theme.
         foreground_color: { korangar_interface::theme::theme().drop_down().button_foreground_color() },
         background_color: { korangar_interface::theme::theme().drop_down().button_background_color() },
         hovered_foreground_color: { korangar_interface::theme::theme().drop_down().button_hovered_foreground_color() },
@@ -104,7 +107,9 @@ pub fn drop_down(token_stream: TokenStream) -> TokenStream {
         height: { korangar_interface::theme::theme().drop_down().button_height() },
         corner_radius: { korangar_interface::theme::theme().drop_down().button_corner_radius() },
         font_size: { korangar_interface::theme::theme().drop_down().button_font_size() },
-        text_alignment: { korangar_interface::theme::theme().drop_down().button_text_alignment() },
+        horizontal_alignment: { korangar_interface::theme::theme().drop_down().button_horizontal_alignment() },
+        vertical_alignment: { korangar_interface::theme::theme().drop_down().button_vertical_alignment() },
+        overflow_behavior: { korangar_interface::theme::theme().drop_down().button_overflow_behavior() },
         click_handler: !,
     });
 
@@ -127,7 +132,9 @@ pub fn collapsable(token_stream: TokenStream) -> TokenStream {
         corner_radius: { korangar_interface::theme::theme().collapsable().corner_radius() },
         title_height: { korangar_interface::theme::theme().collapsable().title_height() },
         font_size: { korangar_interface::theme::theme().collapsable().font_size() },
-        text_alignment: { korangar_interface::theme::theme().collapsable().text_alignment() },
+        horizontal_alignment: { korangar_interface::theme::theme().collapsable().horizontal_alignment() },
+        vertical_alignment: { korangar_interface::theme::theme().collapsable().vertical_alignment() },
+        overflow_behavior: { korangar_interface::theme::theme().collapsable().overflow_behavior() },
         initially_expanded: { false },
         extra_elements: { () },
         children: !,
@@ -160,6 +167,7 @@ pub fn field(token_stream: TokenStream) -> TokenStream {
         font_size: { korangar_interface::theme::theme().field().font_size() },
         horizontal_alignment: { korangar_interface::theme::theme().field().horizontal_alignment() },
         vertical_alignment: { korangar_interface::theme::theme().field().vertical_alignment() },
+        overflow_behavior: { korangar_interface::theme::theme().field().overflow_behavior() },
     });
 
     macro_impl(token_stream.into()).into()
@@ -204,7 +212,8 @@ pub fn text_box(token_stream: TokenStream) -> TokenStream {
         height: { korangar_interface::theme::theme().text_box().height() },
         corner_radius: { korangar_interface::theme::theme().text_box().corner_radius() },
         font_size: { korangar_interface::theme::theme().text_box().font_size() },
-        text_alignment: { korangar_interface::theme::theme().text_box().text_alignment() },
+        horizontal_alignment: { korangar_interface::theme::theme().text_box().horizontal_alignment() },
+        vertical_alignment: { korangar_interface::theme::theme().text_box().vertical_alignment() },
         overflow_behavior: { korangar_interface::theme::theme().text_box().overflow_behavior() },
     });
 

@@ -2,8 +2,6 @@ use korangar_interface::application::SizeTrait;
 use korangar_interface::components::text_box::DefaultHandler;
 use korangar_interface::element::store::{ElementStore, ElementStoreMut};
 use korangar_interface::element::{Element, StateElement};
-use korangar_interface::event::{Event, EventQueue};
-use korangar_interface::layout::alignment::OverflowBehavior;
 use korangar_interface::layout::area::Area;
 use korangar_interface::layout::{Layout, Resolver};
 use korangar_interface::prelude::{HorizontalAlignment, VerticalAlignment};
@@ -14,7 +12,7 @@ use rust_state::{Context, Path, RustState};
 use super::WindowClass;
 use crate::graphics::Color;
 use crate::input::InputEvent;
-use crate::loaders::FontSize;
+use crate::loaders::{FontSize, OverflowBehavior};
 use crate::state::theme::{ChatThemePathExt, InterfaceThemePathExt, InterfaceThemeType};
 use crate::state::{ChatMessage, ClientState, client_theme};
 

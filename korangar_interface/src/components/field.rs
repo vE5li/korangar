@@ -3,9 +3,9 @@ use std::marker::PhantomData;
 use rust_state::{Context, RustState, Selector};
 
 use crate::application::{Application, SizeTrait};
+use crate::element::Element;
 use crate::element::store::{ElementStore, ElementStoreMut};
-use crate::element::{DefaultLayoutInfoWithText, Element};
-use crate::layout::alignment::{HorizontalAlignment, OverflowBehavior, VerticalAlignment};
+use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
 use crate::layout::tooltip::TooltipExt;
 use crate::layout::{Layout, Resolver};
 
@@ -21,9 +21,10 @@ where
     pub font_size: App::FontSize,
     pub horizontal_alignment: HorizontalAlignment,
     pub vertical_alignment: VerticalAlignment,
+    pub overflow_behavior: App::OverflowBehavior,
 }
 
-pub struct Field<Text, Tooltip, A, B, C, D, E, F, G, H, I> {
+pub struct Field<Text, Tooltip, A, B, C, D, E, F, G, H, I, J> {
     pub text_marker: PhantomData<(Text, Tooltip)>,
     pub text: A,
     pub tooltip: B,
@@ -34,9 +35,10 @@ pub struct Field<Text, Tooltip, A, B, C, D, E, F, G, H, I> {
     pub font_size: G,
     pub horizontal_alignment: H,
     pub vertical_alignment: I,
+    pub overflow_behavior: J,
 }
 
-impl<App, Text, Tooltip, A, B, C, D, E, F, G, H, I> Element<App> for Field<Text, Tooltip, A, B, C, D, E, F, G, H, I>
+impl<App, Text, Tooltip, A, B, C, D, E, F, G, H, I, J> Element<App> for Field<Text, Tooltip, A, B, C, D, E, F, G, H, I, J>
 where
     App: Application,
     Text: AsRef<str> + 'static,
@@ -50,16 +52,14 @@ where
     G: Selector<App, App::FontSize>,
     H: Selector<App, HorizontalAlignment>,
     I: Selector<App, VerticalAlignment>,
+    J: Selector<App, App::OverflowBehavior>,
 {
-    type LayoutInfo = DefaultLayoutInfoWithText<App>;
-
     fn create_layout_info(&mut self, state: &Context<App>, _: ElementStoreMut<'_>, resolver: &mut Resolver<'_, App>) -> Self::LayoutInfo {
         let height = *state.get(&self.height);
-
         let text = state.get(&self.text).as_ref();
         let font_size = *state.get(&self.font_size);
         let horizontal_alignment = *state.get(&self.horizontal_alignment);
-        let overflow_behavior = OverflowBehavior::LineBreak;
+        let overflow_behavior = *state.get(&self.overflow_behavior);
 
         let (size, font_size) = resolver.get_text_dimensions(text, font_size, horizontal_alignment, overflow_behavior);
 
@@ -99,7 +99,7 @@ where
             *state.get(&self.foreground_color),
             *state.get(&self.horizontal_alignment),
             *state.get(&self.vertical_alignment),
-            OverflowBehavior::LineBreak,
+            *state.get(&self.overflow_behavior),
         );
     }
 }

@@ -5,14 +5,13 @@ use std::marker::PhantomData;
 use rust_state::{Context, Path, RustState, Selector};
 
 use crate::application::{Application, SizeTrait};
+use crate::element::Element;
 use crate::element::id::FocusIdExt;
 use crate::element::store::{ElementStore, ElementStoreMut, Persistent, PersistentData, PersistentExt};
-use crate::element::{DefaultLayoutInfoWithText, Element};
 use crate::event::{ClickAction, Event, EventQueue};
-use crate::layout::alignment::{HorizontalAlignment, OverflowBehavior, VerticalAlignment};
+use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
 use crate::layout::area::Area;
 use crate::layout::{Icon, InputHandler, Layout, Resolver};
-use crate::theme::ThemePathGetter;
 
 #[derive(RustState)]
 pub struct TextBoxTheme<App>
@@ -31,9 +30,9 @@ where
     pub height: f32,
     pub corner_radius: App::CornerRadius,
     pub font_size: App::FontSize,
-    pub text_alignment: HorizontalAlignment,
+    pub horizontal_alignment: HorizontalAlignment,
     pub vertical_alignment: VerticalAlignment,
-    pub overflow_behavior: OverflowBehavior,
+    pub overflow_behavior: App::OverflowBehavior,
 }
 
 pub struct TextBoxData {
@@ -52,7 +51,7 @@ impl PersistentData for TextBoxData {
     }
 }
 
-pub struct TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Id> {
+pub struct TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Id> {
     pub text_marker: PhantomData<Text>,
     pub ghost_text: A,
     pub state: B,
@@ -70,19 +69,20 @@ pub struct TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, I
     pub height: N,
     pub corner_radius: O,
     pub font_size: P,
-    pub text_alignment: Q,
-    pub overflow_behavior: R,
+    pub horizontal_alignment: Q,
+    pub vertical_alignment: R,
+    pub overflow_behavior: S,
     pub focus_id: Id,
 }
 
-impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Id> Persistent
-    for TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Id>
+impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Id> Persistent
+    for TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Id>
 {
     type Data = TextBoxData;
 }
 
-impl<App, Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Id> Element<App>
-    for TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Id>
+impl<App, Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Id> Element<App>
+    for TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Id>
 where
     App: Application,
     Text: AsRef<str> + 'static,
@@ -103,11 +103,10 @@ where
     O: Selector<App, App::CornerRadius>,
     P: Selector<App, App::FontSize>,
     Q: Selector<App, HorizontalAlignment>,
-    R: Selector<App, OverflowBehavior>,
+    R: Selector<App, VerticalAlignment>,
+    S: Selector<App, App::OverflowBehavior>,
     Id: Any,
 {
-    type LayoutInfo = DefaultLayoutInfoWithText<App>;
-
     fn create_layout_info(
         &mut self,
         state: &Context<App>,
@@ -145,7 +144,7 @@ where
         let (size, font_size) = resolver.get_text_dimensions(
             display_text,
             *state.get(&self.font_size),
-            *state.get(&self.text_alignment),
+            *state.get(&self.horizontal_alignment),
             *state.get(&self.overflow_behavior),
         );
 
@@ -264,8 +263,8 @@ where
             display_text,
             layout_info.font_size,
             foreground_color,
-            *state.get(&self.text_alignment),
-            *state.get(&crate::theme::theme().text_box().vertical_alignment()),
+            *state.get(&self.horizontal_alignment),
+            *state.get(&self.vertical_alignment),
             *state.get(&self.overflow_behavior),
         );
 

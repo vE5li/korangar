@@ -3,13 +3,12 @@ use std::marker::PhantomData;
 
 use rust_state::{Context, RustState, Selector};
 
-use crate::application::Application;
+use crate::application::{Application, SizeTrait};
 use crate::element::store::{ElementStore, ElementStoreMut, Persistent, PersistentData, PersistentExt};
 use crate::element::{Element, ElementSet};
-use crate::layout::alignment::{HorizontalAlignment, OverflowBehavior, VerticalAlignment};
+use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
 use crate::layout::area::Area;
 use crate::layout::{Icon, Layout, Resolver};
-use crate::theme::{ThemePathGetter, theme};
 
 const CHILDREN_STORE_ID: u64 = 0;
 const EXTRA_STORE_ID: u64 = 1;
@@ -30,8 +29,9 @@ where
     pub corner_radius: App::CornerRadius,
     pub title_height: f32,
     pub font_size: App::FontSize,
-    pub text_alignment: HorizontalAlignment,
+    pub horizontal_alignment: HorizontalAlignment,
     pub vertical_alignment: VerticalAlignment,
+    pub overflow_behavior: App::OverflowBehavior,
 }
 
 pub struct CollapsableData {
@@ -48,7 +48,7 @@ impl PersistentData for CollapsableData {
     }
 }
 
-pub struct Collapsable<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, Children> {
+pub struct Collapsable<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, Children> {
     pub text_marker: PhantomData<Text>,
     pub text: A,
     pub foreground_color: B,
@@ -62,26 +62,33 @@ pub struct Collapsable<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, Childr
     pub corner_radius: J,
     pub title_height: K,
     pub font_size: L,
-    pub text_alignment: M,
-    pub initially_expanded: N,
-    pub extra_elements: O,
+    pub horizontal_alignment: M,
+    pub vertical_alignment: N,
+    pub overflow_behavior: O,
+    pub initially_expanded: P,
+    pub extra_elements: Q,
     pub children: Children,
 }
 
-impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, Children> Persistent
-    for Collapsable<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, Children>
+impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, Children> Persistent
+    for Collapsable<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, Children>
 {
     type Data = CollapsableData;
 }
 
-pub struct MyLayoutInfo<C, E> {
+pub struct CollapseableLayoutInfo<App, C, E>
+where
+    App: Application,
+{
     area: Area,
+    title_height: f32,
+    font_size: App::FontSize,
     children: Option<C>,
     extra_elements: E,
 }
 
-impl<App, Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, Children> Element<App>
-    for Collapsable<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, Children>
+impl<App, Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, Children> Element<App>
+    for Collapsable<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, Children>
 where
     App: Application,
     Text: AsRef<str>,
@@ -98,11 +105,13 @@ where
     K: Selector<App, f32>,
     L: Selector<App, App::FontSize>,
     M: Selector<App, HorizontalAlignment>,
-    N: Selector<App, bool>,
-    O: ElementSet<App>,
+    N: Selector<App, VerticalAlignment>,
+    O: Selector<App, App::OverflowBehavior>,
+    P: Selector<App, bool>,
+    Q: ElementSet<App>,
     Children: ElementSet<App>,
 {
-    type LayoutInfo = MyLayoutInfo<Children::LayoutInfo, O::LayoutInfo>;
+    type LayoutInfo = CollapseableLayoutInfo<App, Children::LayoutInfo, Q::LayoutInfo>;
 
     fn create_layout_info(
         &mut self,
@@ -113,7 +122,15 @@ where
         let persistent = self.get_persistent_data(&store, *state.get(&self.initially_expanded));
         let expanded = *persistent.expanded.borrow();
 
-        let title_height = *state.get(&self.title_height);
+        let text = state.get(&self.text).as_ref();
+        let font_size = *state.get(&self.font_size);
+        let horizontal_alignment = *state.get(&self.horizontal_alignment);
+        let overflow_behavior = *state.get(&self.overflow_behavior);
+
+        let (size, font_size) = resolver.get_text_dimensions(text, font_size, horizontal_alignment, overflow_behavior);
+
+        let title_height = state.get(&self.title_height).max(size.height());
+
         let fallback_resolver = resolver.clone();
 
         let (mut area, children) = match expanded {
@@ -155,8 +172,10 @@ where
         let extra_store = store.child_store(EXTRA_STORE_ID);
         let extra_elements = self.extra_elements.create_layout_info(state, extra_store, &mut extra_resolver);
 
-        MyLayoutInfo {
+        Self::LayoutInfo {
             area,
+            title_height,
+            font_size,
             children,
             extra_elements,
         }
@@ -178,13 +197,11 @@ where
             }
         });
 
-        let title_height = *state.get(&self.title_height);
-
         let title_area = Area {
             left: layout_info.area.left,
             top: layout_info.area.top,
             width: layout_info.area.width,
-            height: title_height,
+            height: layout_info.title_height,
         };
 
         let background_color = match use_secondary_color {
@@ -241,11 +258,11 @@ where
         layout.add_text(
             text_area,
             state.get(&self.text).as_ref(),
-            *state.get(&self.font_size),
+            layout_info.font_size,
             foreground_color,
-            *state.get(&self.text_alignment),
-            *state.get(&theme().collapsable().vertical_alignment()),
-            OverflowBehavior::Shrink,
+            *state.get(&self.horizontal_alignment),
+            *state.get(&self.vertical_alignment),
+            *state.get(&self.overflow_behavior),
         );
     }
 }

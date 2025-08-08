@@ -9,7 +9,7 @@ use crate::application::{Application, PositionTrait, SizeTrait};
 use crate::element::store::{ElementStore, ElementStoreMut};
 use crate::element::{DefaultLayoutInfo, Element, ErasedElement};
 use crate::event::{ClickAction, Event, EventQueue};
-use crate::layout::alignment::{HorizontalAlignment, OverflowBehavior, VerticalAlignment};
+use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
 use crate::layout::area::Area;
 use crate::layout::{Layout, MouseButton, Resolver};
 use crate::theme::{ThemePathGetter, theme};
@@ -44,7 +44,7 @@ impl DropDownItem<Option<NonZeroU32>> for Option<NonZeroU32> {
     }
 }
 
-struct InnerButton<Value, Item, A, B, C, D, E, F, G, H, I, J> {
+struct InnerButton<Value, Item, A, B, C, D, E, F, G, H, I, J, K, L> {
     text_marker: PhantomData<(Value, Item)>,
     options: A,
     option_index: usize,
@@ -56,10 +56,12 @@ struct InnerButton<Value, Item, A, B, C, D, E, F, G, H, I, J> {
     height: G,
     corner_radius: H,
     font_size: I,
-    text_alignment: J,
+    horizontal_alignment: J,
+    vertical_alignment: K,
+    overflow_behavior: L,
 }
 
-impl<App, Value, Item, A, B, C, D, E, F, G, H, I, J> Element<App> for InnerButton<Value, Item, A, B, C, D, E, F, G, H, I, J>
+impl<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L> Element<App> for InnerButton<Value, Item, A, B, C, D, E, F, G, H, I, J, K, L>
 where
     App: Application,
     Item: DropDownItem<Value>,
@@ -73,11 +75,23 @@ where
     H: Selector<App, App::CornerRadius>,
     I: Selector<App, App::FontSize>,
     J: Selector<App, HorizontalAlignment>,
+    K: Selector<App, VerticalAlignment>,
+    L: Selector<App, App::OverflowBehavior>,
 {
     fn create_layout_info(&mut self, state: &Context<App>, _: ElementStoreMut<'_>, resolver: &mut Resolver<'_, App>) -> Self::LayoutInfo {
-        let height = state.get(&self.height);
-        let area = resolver.with_height(*height);
-        Self::LayoutInfo { area }
+        let height = *state.get(&self.height);
+        let option = &state.get(&self.options)[self.option_index];
+
+        let text = option.text();
+        let font_size = *state.get(&self.font_size);
+        let horizontal_alignment = *state.get(&self.horizontal_alignment);
+        let overflow_behavior = *state.get(&self.overflow_behavior);
+
+        let (size, font_size) = resolver.get_text_dimensions(text, font_size, horizontal_alignment, overflow_behavior);
+
+        let area = resolver.with_height(height.max(size.height()));
+
+        Self::LayoutInfo { area, font_size }
     }
 
     fn lay_out<'a>(
@@ -111,11 +125,11 @@ where
         layout.add_text(
             layout_info.area,
             option.text(),
-            *state.get(&self.font_size),
+            layout_info.font_size,
             foreground_color,
-            *state.get(&self.text_alignment),
-            *state.get(&theme().drop_down().item_vertical_alignment()),
-            OverflowBehavior::Shrink,
+            *state.get(&self.horizontal_alignment),
+            *state.get(&self.vertical_alignment),
+            *state.get(&self.overflow_behavior),
         );
     }
 }
@@ -126,7 +140,7 @@ where
 {
     value_path: A,
     options: B,
-    item_boxes: Vec<Box<dyn Element<App, LayoutInfo = DefaultLayoutInfo>>>,
+    item_boxes: Vec<Box<dyn Element<App, LayoutInfo = DefaultLayoutInfo<App>>>>,
     _marker: PhantomData<(App, Value, Item)>,
 }
 
@@ -139,7 +153,7 @@ where
     B: Selector<App, Vec<Item>> + Clone,
 {
     // TODO: Refactor to not have to re-allocate this every frame.
-    type LayoutInfo = (Area, Vec<DefaultLayoutInfo>);
+    type LayoutInfo = (Area, Vec<DefaultLayoutInfo<App>>);
 
     fn create_layout_info(
         &mut self,
@@ -161,7 +175,7 @@ where
                         let value_path = self.value_path;
                         let options = self.options.clone();
 
-                        let item_box: Box<dyn Element<App, LayoutInfo = DefaultLayoutInfo>> = Box::new(InnerButton {
+                        let item_box: Box<dyn Element<App, LayoutInfo = DefaultLayoutInfo<App>>> = Box::new(InnerButton {
                             text_marker: PhantomData,
                             options: options.clone(),
                             option_index: index,
@@ -180,7 +194,9 @@ where
                             height: theme().drop_down().item_height(),
                             corner_radius: theme().drop_down().item_corner_radius(),
                             font_size: theme().drop_down().item_font_size(),
-                            text_alignment: theme().drop_down().item_text_alignment(),
+                            horizontal_alignment: theme().drop_down().item_horizontal_alignment(),
+                            vertical_alignment: theme().drop_down().item_vertical_alignment(),
+                            overflow_behavior: theme().drop_down().item_overflow_behavior(),
                         });
                         item_box
                     });
@@ -243,7 +259,7 @@ where
     B: Selector<App, Vec<Item>> + Clone,
 {
     fn execute(&self, _: &Context<App>, queue: &mut EventQueue<App>) {
-        let erased_element = ErasedElement::new(scroll_view! {
+        let element = ErasedElement::new(scroll_view! {
             children: (
                 InnerElement {
                     value_path: self.value_path,
@@ -255,7 +271,7 @@ where
         });
 
         queue.queue(Event::OpenOverlay {
-            element: Box::new(erased_element),
+            element,
             position: self.position,
             size: self.size,
             window_id: self.window_id,
@@ -313,8 +329,9 @@ where
     pub item_height: f32,
     pub item_corner_radius: App::CornerRadius,
     pub item_font_size: App::FontSize,
-    pub item_text_alignment: HorizontalAlignment,
+    pub item_horizontal_alignment: HorizontalAlignment,
     pub item_vertical_alignment: VerticalAlignment,
+    pub item_overflow_behavior: App::OverflowBehavior,
     pub list_corner_radius: App::CornerRadius,
     pub list_background_color: App::Color,
     pub list_gaps: f32,
@@ -327,11 +344,12 @@ where
     pub button_height: f32,
     pub button_corner_radius: App::CornerRadius,
     pub button_font_size: App::FontSize,
-    pub button_text_alignment: HorizontalAlignment,
+    pub button_horizontal_alignment: HorizontalAlignment,
     pub button_vertical_alignment: VerticalAlignment,
+    pub button_overflow_behavior: App::OverflowBehavior,
 }
 
-pub struct DropDown<App, Value, Item, A, B, C, D, E, F, G, H, I, J>
+pub struct DropDown<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L>
 where
     App: Application,
 {
@@ -344,11 +362,13 @@ where
     pub height: G,
     pub corner_radius: H,
     pub font_size: I,
-    pub text_alignment: J,
+    pub horizontal_alignment: J,
+    pub vertical_alignment: K,
+    pub overflow_behavior: L,
     pub click_handler: DefaultClickHandler<App, Value, Item, B, A>,
 }
 
-impl<App, Value, Item, A, B, C, D, E, F, G, H, I, J> Element<App> for DropDown<App, Value, Item, A, B, C, D, E, F, G, H, I, J>
+impl<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L> Element<App> for DropDown<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L>
 where
     App: Application,
     Value: PartialEq + 'static,
@@ -363,6 +383,8 @@ where
     H: Selector<App, App::CornerRadius>,
     I: Selector<App, App::FontSize>,
     J: Selector<App, HorizontalAlignment>,
+    K: Selector<App, VerticalAlignment>,
+    L: Selector<App, App::OverflowBehavior>,
 {
     fn create_layout_info(
         &mut self,
@@ -370,8 +392,24 @@ where
         store: ElementStoreMut<'_>,
         resolver: &mut Resolver<'_, App>,
     ) -> Self::LayoutInfo {
-        let height = state.get(&self.height);
-        let area = resolver.with_height(*height);
+        let mut height = *state.get(&self.height);
+        let mut font_size = *state.get(&self.font_size);
+
+        let selected = state.get(&self.selected);
+        if let Some(index) = state.get(&self.options).iter().position(|value| value.value() == *selected) {
+            if let Some(selected_option) = state.get(&self.options).get(index) {
+                let text = selected_option.text();
+                let horizontal_alignment = *state.get(&self.horizontal_alignment);
+                let overflow_behavior = *state.get(&self.overflow_behavior);
+
+                let (size, new_font_size) = resolver.get_text_dimensions(text, font_size, horizontal_alignment, overflow_behavior);
+
+                height = height.max(size.height());
+                font_size = new_font_size;
+            };
+        };
+
+        let area = resolver.with_height(height);
 
         let list_maximum_height = *state.get(&theme().drop_down().list_maximum_height());
         let border = *state.get(&theme().drop_down().list_border());
@@ -382,7 +420,7 @@ where
             store.get_window_id(),
         );
 
-        Self::LayoutInfo { area }
+        Self::LayoutInfo { area, font_size }
     }
 
     fn lay_out<'a>(
@@ -423,11 +461,11 @@ where
         layout.add_text(
             layout_info.area,
             selected_option.text(),
-            *state.get(&self.font_size),
+            layout_info.font_size,
             foreground_color,
-            *state.get(&self.text_alignment),
-            *state.get(&theme().drop_down().button_vertical_alignment()),
-            OverflowBehavior::Shrink,
+            *state.get(&self.horizontal_alignment),
+            *state.get(&self.vertical_alignment),
+            *state.get(&self.overflow_behavior),
         );
     }
 }

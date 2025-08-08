@@ -6,10 +6,10 @@ pub mod windows;
 pub mod components {
     pub mod item_box {
         use korangar_interface::MouseMode;
-        use korangar_interface::element::Element;
         use korangar_interface::element::store::{ElementStore, ElementStoreMut};
+        use korangar_interface::element::{BaseLayoutInfo, Element};
         use korangar_interface::event::{ClickAction, Event, EventQueue};
-        use korangar_interface::layout::alignment::OverflowBehavior;
+        use korangar_interface::layout::area::Area;
         use korangar_interface::layout::{DropHandler, Layout, MouseButton, Resolver};
         use korangar_interface::prelude::{HorizontalAlignment, VerticalAlignment};
         use korangar_networking::{InventoryItem, InventoryItemDetails};
@@ -19,7 +19,7 @@ pub mod components {
         use crate::input::{InputEvent, MouseInputMode};
         use crate::interface::layout::CornerRadius;
         use crate::interface::resource::ItemSource;
-        use crate::loaders::FontSize;
+        use crate::loaders::{FontSize, OverflowBehavior};
         use crate::renderer::LayoutExt;
         use crate::state::ClientState;
         use crate::world::ResourceMetadata;
@@ -73,7 +73,7 @@ pub mod components {
         where
             P: Path<ClientState, InventoryItem<ResourceMetadata>, false>,
         {
-            fn handle_drop(&self, state: &Context<ClientState>, queue: &mut EventQueue<ClientState>, mouse_mode: &MouseMode<ClientState>) {
+            fn handle_drop(&self, _: &Context<ClientState>, queue: &mut EventQueue<ClientState>, mouse_mode: &MouseMode<ClientState>) {
                 if let MouseMode::Custom {
                     mode: MouseInputMode::MoveItem { source, item },
                 } = mouse_mode
@@ -97,6 +97,8 @@ pub mod components {
         where
             P: Path<ClientState, InventoryItem<ResourceMetadata>, false>,
         {
+            type LayoutInfo = BaseLayoutInfo;
+
             fn create_layout_info(
                 &mut self,
                 state: &Context<ClientState>,
@@ -146,7 +148,15 @@ pub mod components {
                 if let Some(item) = state.try_get(&self.item_path)
                     && let Some(texture) = item.metadata.texture.as_ref()
                 {
-                    layout.add_texture(texture.clone(), layout_info.area, Color::WHITE, false);
+                    let texture_size = layout_info.area.width.min(layout_info.area.height);
+                    let texture_area = Area {
+                        left: layout_info.area.left + (layout_info.area.width - texture_size) / 2.0,
+                        top: layout_info.area.top + (layout_info.area.height - texture_size) / 2.0,
+                        width: texture_size,
+                        height: texture_size,
+                    };
+
+                    layout.add_texture(texture.clone(), texture_area, Color::WHITE, false);
 
                     if is_hovered {
                         layout.add_click_area(layout_info.area, MouseButton::Left, &self.handler);
@@ -174,10 +184,9 @@ pub mod components {
 
     pub mod skill_box {
         use korangar_interface::MouseMode;
-        use korangar_interface::element::Element;
         use korangar_interface::element::store::{ElementStore, ElementStoreMut};
+        use korangar_interface::element::{BaseLayoutInfo, Element};
         use korangar_interface::event::{ClickAction, Event, EventQueue};
-        use korangar_interface::layout::alignment::OverflowBehavior;
         use korangar_interface::layout::{DropHandler, Layout, MouseButton, Resolver};
         use korangar_interface::prelude::{HorizontalAlignment, VerticalAlignment};
         use ragnarok_packets::SkillLevel;
@@ -188,7 +197,7 @@ pub mod components {
         use crate::interface::layout::CornerRadius;
         use crate::interface::resource::SkillSource;
         use crate::inventory::Skill;
-        use crate::loaders::FontSize;
+        use crate::loaders::{FontSize, OverflowBehavior};
         use crate::renderer::LayoutExt;
         use crate::state::ClientState;
 
@@ -252,7 +261,7 @@ pub mod components {
         where
             P: Path<ClientState, Skill, false>,
         {
-            fn handle_drop(&self, state: &Context<ClientState>, queue: &mut EventQueue<ClientState>, mouse_mode: &MouseMode<ClientState>) {
+            fn handle_drop(&self, _: &Context<ClientState>, queue: &mut EventQueue<ClientState>, mouse_mode: &MouseMode<ClientState>) {
                 if let MouseMode::Custom {
                     mode: MouseInputMode::MoveSkill { source, skill },
                 } = mouse_mode
@@ -276,6 +285,8 @@ pub mod components {
         where
             P: Path<ClientState, Skill, false>,
         {
+            type LayoutInfo = BaseLayoutInfo;
+
             fn create_layout_info(
                 &mut self,
                 state: &Context<ClientState>,

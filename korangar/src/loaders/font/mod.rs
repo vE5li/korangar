@@ -16,7 +16,6 @@ use korangar_debug::logging::print_debug;
 use korangar_interface::application::{FontSizeTrait, TextLayouter};
 use korangar_interface::components::drop_down::DropDownItem;
 use korangar_interface::element::ElementDisplay;
-use korangar_interface::layout::alignment::OverflowBehavior;
 use korangar_util::Rectangle;
 use serde::{Deserialize, Serialize};
 
@@ -30,6 +29,12 @@ use crate::state::ClientState;
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct FontSize(pub f32);
+
+#[derive(Clone, Copy)]
+pub enum OverflowBehavior {
+    Shrink,
+    LineBreak,
+}
 
 impl FontSizeTrait for FontSize {
     fn scaled(&self, scaling: f32) -> Self {

@@ -13,8 +13,9 @@ use super::Element;
 use super::store::ElementStoreMut;
 use crate::application::Application;
 use crate::components::text_box::DefaultHandler;
+use crate::element::BaseLayoutInfo;
 use crate::element::store::ElementStore;
-use crate::event::{ClickAction, Event, EventQueue};
+use crate::event::ClickAction;
 use crate::layout::area::Area;
 use crate::layout::tooltip::TooltipExt;
 use crate::layout::{Icon, Layout, MouseButton, Resolver};
@@ -694,6 +695,8 @@ where
             App: Application,
             A: ClickAction<App> + 'static,
         {
+            type LayoutInfo = BaseLayoutInfo;
+
             fn create_layout_info(
                 &mut self,
                 state: &Context<App>,

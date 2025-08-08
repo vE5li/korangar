@@ -1,42 +1,115 @@
-use derive_new::new;
-use korangar_interface::element::{ElementWrap, ScrollView};
-use korangar_interface::size_bound;
-use korangar_interface::state::{PlainRemote, PlainTrackedState};
-use korangar_interface::window::{StateWindow, Window, WindowBuilder};
-use korangar_networking::ShopItem;
+use std::cmp::Ordering;
 
-use crate::interface::application::InterfaceSettings;
-use crate::interface::elements::BuyContainer;
-use crate::interface::layout::ScreenSize;
-use crate::interface::windows::WindowCache;
+use korangar_interface::element::store::{ElementStore, ElementStoreMut};
+use korangar_interface::element::{Element, ElementBox};
+use korangar_interface::layout::{Layout, Resolver};
+use korangar_interface::window::{CustomWindow, Window};
+use korangar_networking::ShopItem;
+use rust_state::{Context, ManuallyAssertExt, Path, VecIndexExt};
+
+use super::WindowClass;
+use crate::state::ClientState;
+use crate::state::theme::InterfaceThemeType;
 use crate::world::ResourceMetadata;
 
-#[derive(new)]
-pub struct BuyWindow {
-    items: PlainRemote<Vec<ShopItem<ResourceMetadata>>>,
-    cart: PlainTrackedState<Vec<ShopItem<(ResourceMetadata, u32)>>>,
+struct ItemList<A> {
+    items_path: A,
+    elements: Vec<ElementBox<ClientState>>,
 }
 
-impl BuyWindow {
-    pub const WINDOW_CLASS: &'static str = "shop";
+impl<A> ItemList<A> {
+    fn new(items_path: A) -> Self {
+        Self {
+            items_path,
+            elements: Vec::new(),
+        }
+    }
 }
 
-impl StateWindow<InterfaceSettings> for BuyWindow {
-    fn window_class(&self) -> Option<&str> {
-        Some(Self::WINDOW_CLASS)
+impl<A> Element<ClientState> for ItemList<A>
+where
+    A: Path<ClientState, Vec<ShopItem<ResourceMetadata>>>,
+{
+    type LayoutInfo = ();
+
+    fn create_layout_info(
+        &mut self,
+        state: &Context<ClientState>,
+        mut store: ElementStoreMut<'_>,
+        resolver: &mut Resolver<'_, ClientState>,
+    ) -> Self::LayoutInfo {
+        use korangar_interface::prelude::*;
+
+        let items = state.get(&self.items_path);
+
+        match items.len().cmp(&self.elements.len()) {
+            Ordering::Less => {
+                self.elements.truncate(items.len());
+            }
+            Ordering::Equal => {}
+            Ordering::Greater => {
+                for index in self.elements.len()..items.len() {
+                    let item_path = self.items_path.index(index).manually_asserted();
+
+                    self.elements.push(ErasedElement::new(button! {
+                        text: "Some item",
+                        event: move |_: &Context<ClientState>, _: &mut EventQueue<ClientState>| {
+                        },
+                    }));
+                }
+            }
+        }
+
+        self.elements.iter_mut().enumerate().for_each(|(index, element)| {
+            element.create_layout_info(state, store.child_store(index as u64), resolver);
+        });
     }
 
-    fn to_window(
-        &self,
-    ) -> Window<InterfaceSettings> {
-        let elements = vec![BuyContainer::new(self.items.clone(), self.cart.clone()).wrap()];
-        let elements = vec![ScrollView::new(elements, size_bound!(100%, ? < super)).wrap()];
+    fn lay_out<'a>(
+        &'a self,
+        state: &'a Context<ClientState>,
+        store: ElementStore<'a>,
+        _: &'a Self::LayoutInfo,
+        layout: &mut Layout<'a, ClientState>,
+    ) {
+        let items = state.get(&self.items_path);
 
-        WindowBuilder::new()
-            .with_title("Buy".to_string())
-            .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size_bound(size_bound!(300 > 400 < 500, ? < 60%))
-            .with_elements(elements)
-            .build(window_cache, application, available_space)
+        self.elements.iter().enumerate().for_each(|(index, element)| {
+            element.lay_out(state, store.child_store(index as u64), &(), layout);
+        });
+    }
+}
+
+pub struct BuyWindow<A, B> {
+    items_path: A,
+    cart_path: B,
+}
+
+impl<A, B> BuyWindow<A, B> {
+    pub fn new(items_path: A, cart_path: B) -> Self {
+        Self { items_path, cart_path }
+    }
+}
+
+impl<A, B> CustomWindow<ClientState> for BuyWindow<A, B>
+where
+    A: Path<ClientState, Vec<ShopItem<ResourceMetadata>>>,
+    B: Path<ClientState, Vec<ShopItem<(ResourceMetadata, u32)>>>,
+{
+    fn window_class() -> Option<WindowClass> {
+        Some(WindowClass::Buy)
+    }
+
+    fn to_window<'a>(self) -> impl Window<ClientState> + 'a {
+        use korangar_interface::prelude::*;
+
+        window! {
+            title: "Buy",
+            class: Self::window_class(),
+            theme: InterfaceThemeType::Game,
+            elements: (
+                ItemList::new(self.items_path),
+            ),
+        }
     }
 }

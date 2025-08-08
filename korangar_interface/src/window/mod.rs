@@ -13,7 +13,7 @@ use crate::application::{Application, CornerRadiusTrait, PositionTrait, SizeTrai
 use crate::element::ElementSet;
 use crate::element::id::ElementIdGenerator;
 use crate::element::store::ElementStore;
-use crate::layout::alignment::{HorizontalAlignment, OverflowBehavior, VerticalAlignment};
+use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
 use crate::layout::area::Area;
 use crate::layout::{Layout, ResizeMode, Resolver};
 use crate::theme::{ThemePathGetter, theme};
@@ -111,8 +111,9 @@ where
     pub title_height: f32,
     pub title_gap: f32,
     pub font_size: App::FontSize,
-    pub text_alignment: HorizontalAlignment,
+    pub horizontal_alignment: HorizontalAlignment,
     pub vertical_alignment: VerticalAlignment,
+    pub overflow_behavior: App::OverflowBehavior,
     pub anchor_color: App::Color,
     pub closest_anchor_color: App::Color,
 }
@@ -390,9 +391,10 @@ where
             state.get(&self.title).as_ref(),
             *state.get(&self.font_size),
             title_color,
-            *state.get(&theme().window().text_alignment()),
+            // TODO: Make this configurable in the window.
+            *state.get(&theme().window().horizontal_alignment()),
             *state.get(&theme().window().vertical_alignment()),
-            OverflowBehavior::Shrink,
+            *state.get(&theme().window().overflow_behavior()),
         );
 
         layout.add_rectangle(
@@ -449,9 +451,10 @@ where
                 "X",
                 *state.get(&self.font_size),
                 *state.get(&self.background_color),
-                HorizontalAlignment::Center { offset: 0.0, border: 8.0 },
+                HorizontalAlignment::Center { offset: 0.0, border: 0.0 },
                 VerticalAlignment::Center { offset: 0.0 },
-                OverflowBehavior::Shrink,
+                // TODO: This shouldn't matter at all.
+                *state.get(&theme().window().overflow_behavior()),
             );
         }
 

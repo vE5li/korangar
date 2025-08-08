@@ -3,13 +3,12 @@ use std::sync::Arc;
 
 use cgmath::EuclideanSpace;
 use korangar_interface::application::RenderLayer;
-use korangar_interface::layout::alignment::OverflowBehavior;
 use korangar_interface::layout::area::Area;
 use korangar_interface::layout::{ClipLayer, ClipLayerId, Icon, Layout};
 
 use crate::graphics::{Color, InterfaceRectangleInstruction, Texture};
 use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
-use crate::loaders::{FontLoader, FontSize, GlyphInstruction, ImageType, Sprite, TextureLoader};
+use crate::loaders::{FontLoader, FontSize, GlyphInstruction, ImageType, OverflowBehavior, Sprite, TextureLoader};
 use crate::renderer::SpriteRenderer;
 use crate::state::ClientState;
 use crate::world::{Actions, SpriteAnimationState};

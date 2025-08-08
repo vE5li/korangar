@@ -8,7 +8,7 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
-use alignment::{HorizontalAlignment, OverflowBehavior, VerticalAlignment};
+use alignment::{HorizontalAlignment, VerticalAlignment};
 use area::Area;
 use num::Signed;
 use rust_state::Context;
@@ -67,7 +67,7 @@ struct TextInstruction<'a, App: Application> {
     color: App::Color,
     horizontal_alignment: HorizontalAlignment,
     vertical_alignment: VerticalAlignment,
-    overflow_behavior: OverflowBehavior,
+    overflow_behavior: App::OverflowBehavior,
 }
 
 struct ClickArea<'a, App> {
@@ -545,7 +545,7 @@ impl<'a, App: Application> Layout<'a, App> {
         color: App::Color,
         horizontal_alignment: HorizontalAlignment,
         vertical_alignment: VerticalAlignment,
-        overflow_behavior: OverflowBehavior,
+        overflow_behavior: App::OverflowBehavior,
     ) {
         let clip_layer = self.get_active_clip_layer();
         let area = self.scale_area(area);

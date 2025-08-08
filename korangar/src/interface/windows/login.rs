@@ -2,15 +2,13 @@ use korangar_interface::components::drop_down::DefaultClickHandler;
 use korangar_interface::components::text_box::DefaultHandler;
 use korangar_interface::element::StateElement;
 use korangar_interface::element::id::FocusIdExt;
-use korangar_interface::event::{Event, EventQueue};
-use korangar_interface::layout::alignment::OverflowBehavior;
 use korangar_interface::window::{CustomWindow, Window};
 use rust_state::{Context, Path, RustState, Selector};
 
 use crate::graphics::Color;
 use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
-use crate::loaders::{ClientInfo, ClientInfoPathExt, ServiceId};
+use crate::loaders::{ClientInfo, ClientInfoPathExt, OverflowBehavior, ServiceId};
 use crate::settings::{LoginSettings, LoginSettingsPathExt, ServiceSettings, ServiceSettingsPathExt};
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;

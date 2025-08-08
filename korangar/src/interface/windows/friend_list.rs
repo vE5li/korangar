@@ -1,9 +1,12 @@
+use std::cmp::Ordering;
+
 use korangar_interface::components::text_box::DefaultHandler;
-use korangar_interface::element::StateElement;
-use korangar_interface::event::{Event, EventQueue};
+use korangar_interface::element::store::{ElementStore, ElementStoreMut};
+use korangar_interface::element::{Element, ElementBox, StateElement};
+use korangar_interface::layout::{Layout, Resolver};
 use korangar_interface::window::{CustomWindow, Window};
-use ragnarok_packets::Friend;
-use rust_state::{Context, Path, RustState};
+use ragnarok_packets::{Friend, FriendPathExt};
+use rust_state::{Context, ManuallyAssertExt, Path, RustState, VecIndexExt};
 
 use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
@@ -14,6 +17,85 @@ use crate::state::theme::InterfaceThemeType;
 // somewhere, maybe a `consts.rs` would be a good idea at this point?
 const MINIMUM_NAME_LENGTH: usize = 4;
 const MAXIMUM_NAME_LENGTH: usize = 24;
+
+struct FriendList<A> {
+    friend_list_path: A,
+    elements: Vec<ElementBox<ClientState>>,
+}
+
+impl<A> FriendList<A> {
+    fn new(friend_list_path: A) -> Self {
+        Self {
+            friend_list_path,
+            elements: Vec::new(),
+        }
+    }
+}
+
+impl<A> Element<ClientState> for FriendList<A>
+where
+    A: Path<ClientState, Vec<Friend>>,
+{
+    type LayoutInfo = ();
+
+    fn create_layout_info(
+        &mut self,
+        state: &Context<ClientState>,
+        mut store: ElementStoreMut<'_>,
+        resolver: &mut Resolver<'_, ClientState>,
+    ) -> Self::LayoutInfo {
+        use korangar_interface::prelude::*;
+
+        let friend_list = state.get(&self.friend_list_path);
+
+        match friend_list.len().cmp(&self.elements.len()) {
+            Ordering::Less => {
+                self.elements.truncate(friend_list.len());
+            }
+            Ordering::Equal => {}
+            Ordering::Greater => {
+                for index in self.elements.len()..friend_list.len() {
+                    let friend_path = self.friend_list_path.index(index).manually_asserted();
+                    let name_path = friend_path.name();
+
+                    self.elements.push(ErasedElement::new(collapsable! {
+                        text: name_path,
+                        children: (
+                            button! {
+                                text: "Remove",
+                                event: move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
+                                    let &Friend { account_id, character_id, .. } = state.get(&friend_path);
+
+                                    queue.queue(
+                                        InputEvent::RemoveFriend { account_id, character_id }
+                                    );
+                                },
+                            },
+                        ),
+                    }));
+                }
+            }
+        }
+
+        self.elements.iter_mut().zip(friend_list.iter()).for_each(|(element, friend)| {
+            element.create_layout_info(state, store.child_store(friend.character_id.0 as u64), resolver);
+        });
+    }
+
+    fn lay_out<'a>(
+        &'a self,
+        state: &'a Context<ClientState>,
+        store: ElementStore<'a>,
+        _: &'a Self::LayoutInfo,
+        layout: &mut Layout<'a, ClientState>,
+    ) {
+        let friend_list = state.get(&self.friend_list_path);
+
+        self.elements.iter().zip(friend_list.iter()).for_each(|(element, friend)| {
+            element.lay_out(state, store.child_store(friend.character_id.0 as u64), &(), layout);
+        });
+    }
+}
 
 /// Internal state of the chat window.
 #[derive(Default, RustState, StateElement)]
@@ -72,6 +154,7 @@ where
                     input_handler: DefaultHandler::<_, _, MAXIMUM_NAME_LENGTH>::new(self.window_state_path.currently_adding(), add_action),
                     focus_id: AddFriendTextBox,
                 },
+                FriendList::new(self.friend_list_path),
             )
         }
     }

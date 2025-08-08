@@ -2,14 +2,13 @@ use std::marker::PhantomData;
 
 use rust_state::{Context, RustState, Selector};
 
-use crate::application::Application;
+use crate::application::{Application, SizeTrait};
 use crate::element::Element;
 use crate::element::store::{ElementStore, ElementStoreMut};
 use crate::event::ClickAction;
-use crate::layout::alignment::{HorizontalAlignment, OverflowBehavior, VerticalAlignment};
+use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
 use crate::layout::tooltip::TooltipExt;
 use crate::layout::{Layout, MouseButton, Resolver};
-use crate::theme::{ThemePathGetter, theme};
 
 #[derive(RustState)]
 pub struct ButtonTheme<App>
@@ -23,11 +22,12 @@ where
     pub height: f32,
     pub corner_radius: App::CornerRadius,
     pub font_size: App::FontSize,
-    pub text_alignment: HorizontalAlignment,
+    pub horizontal_alignment: HorizontalAlignment,
     pub vertical_alignment: VerticalAlignment,
+    pub overflow_behavior: App::OverflowBehavior,
 }
 
-pub struct Button<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L> {
+pub struct Button<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N> {
     pub text_marker: PhantomData<(Text, Tooltip)>,
     pub text: A,
     pub tooltip: B,
@@ -40,10 +40,13 @@ pub struct Button<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L> {
     pub height: I,
     pub corner_radius: J,
     pub font_size: K,
-    pub text_alignment: L,
+    pub horizontal_alignment: L,
+    pub vertical_alignment: M,
+    pub overflow_behavior: N,
 }
 
-impl<App, Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L> Element<App> for Button<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L>
+impl<App, Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N> Element<App>
+    for Button<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N>
 where
     App: Application,
     Text: AsRef<str> + 'static,
@@ -60,11 +63,21 @@ where
     J: Selector<App, App::CornerRadius>,
     K: Selector<App, App::FontSize>,
     L: Selector<App, HorizontalAlignment>,
+    M: Selector<App, VerticalAlignment>,
+    N: Selector<App, App::OverflowBehavior>,
 {
     fn create_layout_info(&mut self, state: &Context<App>, _: ElementStoreMut<'_>, resolver: &mut Resolver<'_, App>) -> Self::LayoutInfo {
-        let height = state.get(&self.height);
-        let area = resolver.with_height(*height);
-        Self::LayoutInfo { area }
+        let height = *state.get(&self.height);
+
+        let text = state.get(&self.text).as_ref();
+        let font_size = *state.get(&self.font_size);
+        let horizontal_alignment = *state.get(&self.horizontal_alignment);
+        let overflow_behavior = *state.get(&self.overflow_behavior);
+
+        let (size, font_size) = resolver.get_text_dimensions(text, font_size, horizontal_alignment, overflow_behavior);
+
+        let area = resolver.with_height(height.max(size.height()));
+        Self::LayoutInfo { area, font_size }
     }
 
     fn lay_out<'a>(
@@ -103,11 +116,11 @@ where
         layout.add_text(
             layout_info.area,
             state.get(&self.text).as_ref(),
-            *state.get(&self.font_size),
+            layout_info.font_size,
             foreground_color,
-            *state.get(&self.text_alignment),
-            *state.get(&theme().button().vertical_alignment()),
-            OverflowBehavior::Shrink,
+            *state.get(&self.horizontal_alignment),
+            *state.get(&self.vertical_alignment),
+            *state.get(&self.overflow_behavior),
         );
     }
 }

@@ -3,9 +3,9 @@ use std::marker::PhantomData;
 use rust_state::{Context, RustState, Selector};
 
 use crate::application::{Application, SizeTrait};
+use crate::element::Element;
 use crate::element::store::{ElementStore, ElementStoreMut};
-use crate::element::{DefaultLayoutInfoWithText, Element};
-use crate::layout::alignment::{HorizontalAlignment, OverflowBehavior, VerticalAlignment};
+use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
 use crate::layout::{Layout, Resolver};
 
 #[derive(RustState)]
@@ -18,7 +18,7 @@ where
     pub font_size: App::FontSize,
     pub horizontal_alignment: HorizontalAlignment,
     pub vertical_alignment: VerticalAlignment,
-    pub overflow_behavior: OverflowBehavior,
+    pub overflow_behavior: App::OverflowBehavior,
 }
 
 pub struct Text<T, A, B, C, D, E, F, G> {
@@ -42,10 +42,8 @@ where
     D: Selector<App, App::FontSize>,
     E: Selector<App, HorizontalAlignment>,
     F: Selector<App, VerticalAlignment>,
-    G: Selector<App, OverflowBehavior>,
+    G: Selector<App, App::OverflowBehavior>,
 {
-    type LayoutInfo = DefaultLayoutInfoWithText<App>;
-
     fn create_layout_info(&mut self, state: &Context<App>, _: ElementStoreMut<'_>, resolver: &mut Resolver<'_, App>) -> Self::LayoutInfo {
         let height = *state.get(&self.height);
 

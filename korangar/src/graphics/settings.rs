@@ -296,7 +296,7 @@ pub struct RenderOptions {
     pub show_objects: bool,
     #[new(value = "true")]
     pub show_entities: bool,
-    #[new(value = "true")]
+    #[new(default)]
     pub show_entities_paper: bool,
     #[new(default)]
     pub show_entities_debug: bool,

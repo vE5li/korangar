@@ -348,7 +348,7 @@ where
             }
         };
 
-        self.windows.insert(0, WindowWrapper {
+        self.windows.push(WindowWrapper {
             window: Box::new(window),
             data: WindowData { id, anchor, size },
             display_information: DisplayInformation {

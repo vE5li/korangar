@@ -1720,6 +1720,7 @@ impl Client {
                         ));
                     }
                 }
+                InputEvent::CloseTopWindow => self.interface.close_top_window(),
                 InputEvent::ToggleShowInterface => self.show_interface = !self.show_interface,
                 // InputEvent::SaveTheme { theme_kind } => {}                //self.client_state.save_theme(theme_kind),
                 // InputEvent::ReloadTheme { theme_kind } => {}              //self.client_state.reload_theme(theme_kind),

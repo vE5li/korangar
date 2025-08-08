@@ -220,6 +220,10 @@ impl InputSystem {
             events.push(InputEvent::ToggleShowInterface);
         }
 
+        if control_down && self.get_key(KeyCode::KeyQ).pressed() {
+            events.push(InputEvent::CloseTopWindow);
+        }
+
         if self.get_key(KeyCode::KeyJ).pressed() {
             events.push(InputEvent::CastSkill { slot: HotbarSlot(0) });
         }

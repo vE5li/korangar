@@ -411,6 +411,13 @@ where
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
+    pub fn close_top_window(&mut self) {
+        if let Some(index) = self.windows.len().checked_sub(1) {
+            self.remove_window(index);
+        }
+    }
+
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn close_window_with_class(&mut self, window_class: App::WindowClass) {
         if let Some(index_from_back) = self
             .windows

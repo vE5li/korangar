@@ -63,7 +63,7 @@ pub enum InputEvent {
     OpenAudioSettingsWindow,
     /// Open the friend list window. Only works while playing.
     OpenFriendListWindow,
-    /// Close the most recently opened or clicked window.
+    /// Close the most recently opened or clicked closable window.
     CloseTopWindow,
     /// Toggle if the user interface should be rendered or not.
     ToggleShowInterface,

@@ -33,6 +33,9 @@ pub trait Window<App: Application>: private::Sealed {
     /// Get the window theme.
     fn get_theme_type(&self) -> App::ThemeType;
 
+    /// Returns if the window is closable or not.
+    fn is_closable(&self, state: &Context<App>) -> bool;
+
     /// Create the layout info for the window.
     #[allow(private_interfaces)]
     fn create_layout_info(
@@ -204,6 +207,10 @@ where
 
     fn get_theme_type(&self) -> <App as Application>::ThemeType {
         self.theme
+    }
+
+    fn is_closable(&self, state: &Context<App>) -> bool {
+        *state.get(&self.closable)
     }
 
     #[allow(private_interfaces)]

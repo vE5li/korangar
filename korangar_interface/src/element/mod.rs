@@ -280,7 +280,7 @@ where
 pub trait ElementSet<App: Application> {
     type LayoutInfo;
 
-    fn get_element_count(&self) -> usize;
+    fn get_element_count(&self, state: &Context<App>) -> usize;
 
     fn create_layout_info(
         &mut self,
@@ -304,7 +304,7 @@ where
 {
     type LayoutInfo = ();
 
-    fn get_element_count(&self) -> usize {
+    fn get_element_count(&self, _: &Context<App>) -> usize {
         0
     }
 
@@ -320,7 +320,7 @@ where
 {
     type LayoutInfo = [T::LayoutInfo; N];
 
-    fn get_element_count(&self) -> usize {
+    fn get_element_count(&self, _: &Context<App>) -> usize {
         N
     }
 
@@ -381,7 +381,7 @@ fn impl_element_set(up_to: usize) {
             {
                 type LayoutInfo = ({{layout_info}});
 
-                fn get_element_count(&self) -> usize {
+                fn get_element_count(&self, _: &Context<App>) -> usize {
                     {{number_of_elements}}
                 }
 

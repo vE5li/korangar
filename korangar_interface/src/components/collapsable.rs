@@ -82,6 +82,7 @@ where
 {
     area: Area,
     title_height: f32,
+    expanded: bool,
     font_size: App::FontSize,
     children: Option<C>,
     extra_elements: E,
@@ -131,9 +132,7 @@ where
 
         let title_height = state.get(&self.title_height).max(size.height());
 
-        let fallback_resolver = resolver.clone();
-
-        let (mut area, children) = match expanded {
+        let (area, children) = match expanded && self.children.get_element_count(state) > 0 {
             true => resolver.with_derived_borderless(*state.get(&self.gaps), *state.get(&self.border), 0.0, |resolver| {
                 resolver.push_top(title_height);
 
@@ -146,15 +145,6 @@ where
             }),
             false => (resolver.with_height(title_height), None),
         };
-
-        // Special check so that an expanded `Collapsable` without any elements looks
-        // the same as a non-expanded one.
-        // FIX: Don't do this. Instead just pass get_element_count the same arguments as
-        // create_layout_info.
-        if expanded && self.children.get_element_count() == 0 {
-            *resolver = fallback_resolver;
-            area = resolver.with_height(title_height);
-        }
 
         // TODO: Figure out a better way to space the elements from the right.
         let extra_space = 40.0;
@@ -175,6 +165,7 @@ where
         Self::LayoutInfo {
             area,
             title_height,
+            expanded,
             font_size,
             children,
             extra_elements,
@@ -224,7 +215,7 @@ where
         layout.add_icon(
             icon_area,
             Icon::ExpandArrow {
-                expanded: layout_info.children.is_some(),
+                expanded: layout_info.expanded,
             },
             *state.get(&self.icon_color),
         );

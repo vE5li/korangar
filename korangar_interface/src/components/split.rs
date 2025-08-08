@@ -71,7 +71,7 @@ where
         resolver: &mut Resolver<'_, App>,
     ) -> Self::LayoutInfo {
         let gaps = *state.get(&self.gaps);
-        let element_count = self.children.get_element_count();
+        let element_count = self.children.get_element_count(state);
 
         let available_area = resolver.push_available_area();
         let available_width = available_area.width - gaps * element_count.saturating_sub(1) as f32;

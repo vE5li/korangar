@@ -9,8 +9,8 @@ use std::sync::Arc;
 use interface_components::collapsable;
 use rust_state::{ArrayLookupExt, Context, ManuallyAssertExt, OptionExt, Path, Selector, VecIndexExt};
 
-use super::Element;
 use super::store::ElementStoreMut;
+use super::{Element, ElementSet, ResolverSet};
 use crate::application::Application;
 use crate::components::text_box::DefaultHandler;
 use crate::element::BaseLayoutInfo;
@@ -582,7 +582,10 @@ where
     _marker: PhantomData<T>,
 }
 
-impl<App, T, P> Element<App> for VecWrapper<App, T, P>
+// NOTE: We implement `ElementSet` rather than `Element` so that the collapsable
+// can check if the number of elements is larger than zero. That way empty
+// `collapsable`s will be rendered correctly.
+impl<App, T, P> ElementSet<App> for VecWrapper<App, T, P>
 where
     App: Application,
     T: StateElement<App> + 'static,
@@ -591,11 +594,15 @@ where
     // TODO: Refactor to not have to re-allocate this every frame.
     type LayoutInfo = Vec<T::LayoutInfoMut>;
 
+    fn get_element_count(&self, state: &Context<App>) -> usize {
+        state.get(&self.self_path).len()
+    }
+
     fn create_layout_info(
         &mut self,
         state: &Context<App>,
         mut store: ElementStoreMut<'_>,
-        resolver: &mut Resolver<'_, App>,
+        mut resolver_set: impl ResolverSet<'_, App>,
     ) -> Self::LayoutInfo {
         let vector = state.get(&self.self_path);
 
@@ -618,15 +625,17 @@ where
             Ordering::Equal => {}
         }
 
-        let (_area, layout_info) = resolver.with_derived(2.0, 4.0, |resolver| {
-            self.item_boxes
-                .iter_mut()
-                .enumerate()
-                .map(|(index, item_box)| item_box.create_layout_info(state, store.child_store(index as u64), resolver))
-                .collect()
-        });
+        resolver_set.with_index(0, |resolver| {
+            let (_area, layout_info) = resolver.with_derived(2.0, 4.0, |resolver| {
+                self.item_boxes
+                    .iter_mut()
+                    .enumerate()
+                    .map(|(index, item_box)| item_box.create_layout_info(state, store.child_store(index as u64), resolver))
+                    .collect()
+            });
 
-        layout_info
+            layout_info
+        })
     }
 
     fn lay_out<'a>(
@@ -672,13 +681,11 @@ where
     {
         collapsable! {
             text: name,
-            children: (
-                VecWrapper {
-                    self_path,
-                    item_boxes: Vec::new(),
-                    _marker: PhantomData,
-                },
-            ),
+            children: VecWrapper {
+                self_path,
+                item_boxes: Vec::new(),
+                _marker: PhantomData,
+            },
         }
     }
 
@@ -750,13 +757,11 @@ where
 
         collapsable! {
             text: name,
-            children: (
-                VecWrapper {
-                    self_path,
-                    item_boxes: Vec::new(),
-                    _marker: PhantomData,
-                },
-            ),
+            children: VecWrapper {
+                self_path,
+                item_boxes: Vec::new(),
+                _marker: PhantomData,
+            },
             extra_elements: (
                 ClearButton {
                     event: move |state: &rust_state::Context<App>, _: &mut korangar_interface::event::EventQueue<App>| {

@@ -1,7 +1,7 @@
 use korangar_interface::application::SizeTrait;
 use korangar_interface::components::text_box::DefaultHandler;
 use korangar_interface::element::store::{ElementStore, ElementStoreMut};
-use korangar_interface::element::{DefaultLayoutInfo, Element, StateElement};
+use korangar_interface::element::{Element, StateElement};
 use korangar_interface::event::{Event, EventQueue};
 use korangar_interface::layout::alignment::OverflowBehavior;
 use korangar_interface::layout::area::Area;

@@ -60,7 +60,6 @@ use korangar_debug::profile_block;
 #[cfg(feature = "debug")]
 use korangar_debug::profiling::Profiler;
 use korangar_interface::Interface;
-use korangar_interface::application::Application;
 use korangar_interface::layout::MouseButton;
 use korangar_interface::window::WindowThemePathExt;
 use korangar_networking::{
@@ -79,8 +78,8 @@ use ragnarok_packets::{
 use renderer::InterfaceRenderer;
 use rust_state::{AsRefExt, Context, ManuallyAssertExt, OptionExt};
 use settings::{AudioSettings, AudioSettingsPathExt, GraphicsSettingsCapabilities, GraphicsSettingsPathExt};
-use state::theme::{CursorThemePathExt, GameThemePathExt, IndicatorThemePathExt, InterfaceThemePathExt, InterfaceThemeType};
-use state::{ChatMessage, ClientState, ClientStatePathExt, ClientStateRootExt, client_state, client_theme, this_entity, this_player};
+use state::theme::{CursorThemePathExt, GameThemePathExt, IndicatorThemePathExt, InterfaceThemePathExt};
+use state::{ChatMessage, ClientState, ClientStatePathExt, ClientStateRootExt, client_state, this_entity, this_player};
 #[cfg(feature = "debug")]
 use wgpu::Device;
 use wgpu::util::initialize_adapter_from_env_or_default;

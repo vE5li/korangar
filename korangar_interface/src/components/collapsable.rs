@@ -41,33 +41,11 @@ pub struct CollapsableData {
 impl PersistentData for CollapsableData {
     type Inputs = bool;
 
-    fn new(inputs: Self::Inputs) -> Self {
+    fn from_inputs(inputs: Self::Inputs) -> Self {
         Self {
             expanded: RefCell::new(inputs),
         }
     }
-}
-
-pub struct Collapsable<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, Children> {
-    pub text_marker: PhantomData<Text>,
-    pub text: A,
-    pub foreground_color: B,
-    pub hovered_foreground_color: C,
-    pub background_color: D,
-    pub secondary_background_color: E,
-    pub icon_color: F,
-    pub icon_size: G,
-    pub gaps: H,
-    pub border: I,
-    pub corner_radius: J,
-    pub title_height: K,
-    pub font_size: L,
-    pub horizontal_alignment: M,
-    pub vertical_alignment: N,
-    pub overflow_behavior: O,
-    pub initially_expanded: P,
-    pub extra_elements: Q,
-    pub children: Children,
 }
 
 impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, Children> Persistent
@@ -86,6 +64,79 @@ where
     font_size: App::FontSize,
     children: Option<C>,
     extra_elements: E,
+}
+
+pub struct Collapsable<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, Children> {
+    text_marker: PhantomData<Text>,
+    text: A,
+    foreground_color: B,
+    hovered_foreground_color: C,
+    background_color: D,
+    secondary_background_color: E,
+    icon_color: F,
+    icon_size: G,
+    gaps: H,
+    border: I,
+    corner_radius: J,
+    title_height: K,
+    font_size: L,
+    horizontal_alignment: M,
+    vertical_alignment: N,
+    overflow_behavior: O,
+    initially_expanded: P,
+    extra_elements: Q,
+    children: Children,
+}
+
+impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, Children>
+    Collapsable<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, Children>
+{
+    /// This function is supposed to be called from a component macro and not
+    /// intended to be called manually.
+    #[inline(always)]
+    #[allow(clippy::too_many_arguments)]
+    pub fn component_new(
+        text: A,
+        foreground_color: B,
+        hovered_foreground_color: C,
+        background_color: D,
+        secondary_background_color: E,
+        icon_color: F,
+        icon_size: G,
+        gaps: H,
+        border: I,
+        corner_radius: J,
+        title_height: K,
+        font_size: L,
+        horizontal_alignment: M,
+        vertical_alignment: N,
+        overflow_behavior: O,
+        initially_expanded: P,
+        extra_elements: Q,
+        children: Children,
+    ) -> Self {
+        Self {
+            text_marker: PhantomData,
+            text,
+            foreground_color,
+            hovered_foreground_color,
+            background_color,
+            secondary_background_color,
+            icon_color,
+            icon_size,
+            gaps,
+            border,
+            corner_radius,
+            title_height,
+            font_size,
+            horizontal_alignment,
+            vertical_alignment,
+            overflow_behavior,
+            initially_expanded,
+            extra_elements,
+            children,
+        }
+    }
 }
 
 impl<App, Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, Children> Element<App>

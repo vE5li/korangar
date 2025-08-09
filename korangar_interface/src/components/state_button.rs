@@ -29,22 +29,65 @@ where
 }
 
 pub struct StateButton<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O> {
-    pub text_marker: PhantomData<Text>,
-    pub text: A,
-    pub state: B,
-    pub event: C,
-    pub disabled: D,
-    pub foreground_color: E,
-    pub background_color: F,
-    pub hovered_foreground_color: G,
-    pub hovered_background_color: H,
-    pub checkbox_color: I,
-    pub height: J,
-    pub corner_radius: K,
-    pub font_size: L,
-    pub horizontal_alignment: M,
-    pub vertical_alignment: N,
-    pub overflow_behavior: O,
+    text_marker: PhantomData<Text>,
+    text: A,
+    state: B,
+    event: C,
+    disabled: D,
+    foreground_color: E,
+    background_color: F,
+    hovered_foreground_color: G,
+    hovered_background_color: H,
+    checkbox_color: I,
+    height: J,
+    corner_radius: K,
+    font_size: L,
+    horizontal_alignment: M,
+    vertical_alignment: N,
+    overflow_behavior: O,
+}
+
+impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O> StateButton<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O> {
+    /// This function is supposed to be called from a component macro and not
+    /// intended to be called manually.
+    #[inline(always)]
+    #[allow(clippy::too_many_arguments)]
+    pub fn component_new(
+        text: A,
+        state: B,
+        event: C,
+        disabled: D,
+        foreground_color: E,
+        background_color: F,
+        hovered_foreground_color: G,
+        hovered_background_color: H,
+        checkbox_color: I,
+        height: J,
+        corner_radius: K,
+        font_size: L,
+        horizontal_alignment: M,
+        vertical_alignment: N,
+        overflow_behavior: O,
+    ) -> Self {
+        Self {
+            text_marker: PhantomData,
+            text,
+            state,
+            event,
+            disabled,
+            foreground_color,
+            background_color,
+            hovered_foreground_color,
+            hovered_background_color,
+            checkbox_color,
+            height,
+            corner_radius,
+            font_size,
+            horizontal_alignment,
+            vertical_alignment,
+            overflow_behavior,
+        }
+    }
 }
 
 impl<App, Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O> Element<App> for StateButton<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O>

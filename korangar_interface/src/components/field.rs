@@ -25,17 +25,50 @@ where
 }
 
 pub struct Field<Text, Tooltip, A, B, C, D, E, F, G, H, I, J> {
-    pub text_marker: PhantomData<(Text, Tooltip)>,
-    pub text: A,
-    pub tooltip: B,
-    pub foreground_color: C,
-    pub background_color: D,
-    pub height: E,
-    pub corner_radius: F,
-    pub font_size: G,
-    pub horizontal_alignment: H,
-    pub vertical_alignment: I,
-    pub overflow_behavior: J,
+    text_marker: PhantomData<(Text, Tooltip)>,
+    text: A,
+    tooltip: B,
+    foreground_color: C,
+    background_color: D,
+    height: E,
+    corner_radius: F,
+    font_size: G,
+    horizontal_alignment: H,
+    vertical_alignment: I,
+    overflow_behavior: J,
+}
+
+impl<Text, Tooltip, A, B, C, D, E, F, G, H, I, J> Field<Text, Tooltip, A, B, C, D, E, F, G, H, I, J> {
+    /// This function is supposed to be called from a component macro and not
+    /// intended to be called manually.
+    #[inline(always)]
+    #[allow(clippy::too_many_arguments)]
+    pub fn component_new(
+        text: A,
+        tooltip: B,
+        foreground_color: C,
+        background_color: D,
+        height: E,
+        corner_radius: F,
+        font_size: G,
+        horizontal_alignment: H,
+        vertical_alignment: I,
+        overflow_behavior: J,
+    ) -> Self {
+        Self {
+            text_marker: PhantomData,
+            text,
+            tooltip,
+            foreground_color,
+            background_color,
+            height,
+            corner_radius,
+            font_size,
+            horizontal_alignment,
+            vertical_alignment,
+            overflow_behavior,
+        }
+    }
 }
 
 impl<App, Text, Tooltip, A, B, C, D, E, F, G, H, I, J> Element<App> for Field<Text, Tooltip, A, B, C, D, E, F, G, H, I, J>

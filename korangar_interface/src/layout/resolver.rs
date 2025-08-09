@@ -234,3 +234,16 @@ where
         }
     }
 }
+
+pub trait ResolverSet<'a, App: Application> {
+    fn with_index<C>(&mut self, index: usize, f: impl FnMut(&mut Resolver<'a, App>) -> C) -> C;
+}
+
+impl<'a, App> ResolverSet<'a, App> for &mut Resolver<'a, App>
+where
+    App: Application,
+{
+    fn with_index<C>(&mut self, _: usize, mut f: impl FnMut(&mut Resolver<'a, App>) -> C) -> C {
+        f(*self)
+    }
+}

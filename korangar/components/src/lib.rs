@@ -5,8 +5,7 @@ use proc_macro::TokenStream;
 pub fn item_box(token_stream: TokenStream) -> TokenStream {
     create_component_macro!(crate::interface::components::item_box::ItemBox, {
         item_path: !,
-        handler: !,
-        amount_display: { const crate::interface::components::item_box::AmountDisplay::default() },
+        source: !,
     });
 
     macro_impl(token_stream.into()).into()
@@ -16,8 +15,7 @@ pub fn item_box(token_stream: TokenStream) -> TokenStream {
 pub fn skill_box(token_stream: TokenStream) -> TokenStream {
     create_component_macro!(crate::interface::components::skill_box::SkillBox, {
         skill_path: !,
-        handler: !,
-        level_display: { const crate::interface::components::skill_box::LevelDisplay::default() },
+        source: !,
     });
 
     macro_impl(token_stream.into()).into()

@@ -1,4 +1,3 @@
-use korangar_interface::components::drop_down::DefaultClickHandler;
 use korangar_interface::window::{CustomWindow, Window};
 use rust_state::Path;
 
@@ -43,7 +42,6 @@ where
                     drop_down! {
                         selected: self.settings_path.interface_scaling(),
                         options: self.capabilities_path.interface_scalings(),
-                        click_handler: DefaultClickHandler::new(self.settings_path.interface_scaling(), self.capabilities_path.interface_scalings()),
                     }
                 )
             },
@@ -60,7 +58,6 @@ where
                     drop_down! {
                         selected: self.settings_path.lighting_mode(),
                         options: self.capabilities_path.lighting_modes(),
-                        click_handler: DefaultClickHandler::new(self.settings_path.lighting_mode(), self.capabilities_path.lighting_modes()),
                     }
                 )
             },
@@ -78,7 +75,6 @@ where
                     drop_down! {
                         selected: self.settings_path.limit_framerate(),
                         options: self.capabilities_path.limit_framerate_options(),
-                        click_handler: DefaultClickHandler::new(self.settings_path.limit_framerate(), self.capabilities_path.limit_framerate_options()),
                     }
                 )
             },
@@ -90,7 +86,6 @@ where
                     drop_down! {
                         selected: self.settings_path.texture_filtering(),
                         options: self.capabilities_path.texture_filtering_options(),
-                        click_handler: DefaultClickHandler::new(self.settings_path.texture_filtering(), self.capabilities_path.texture_filtering_options()),
                     }
                 )
             },
@@ -102,7 +97,6 @@ where
                     drop_down! {
                         selected: self.settings_path.msaa(),
                         options: self.capabilities_path.supported_msaa(),
-                        click_handler: DefaultClickHandler::new(self.settings_path.msaa(), self.capabilities_path.supported_msaa()),
                     }
                 )
             },
@@ -114,7 +108,6 @@ where
                     drop_down! {
                         selected: self.settings_path.ssaa(),
                         options: self.capabilities_path.ssaa_options(),
-                        click_handler: DefaultClickHandler::new(self.settings_path.ssaa(), self.capabilities_path.ssaa_options()),
                     }
                 )
             },
@@ -126,7 +119,6 @@ where
                     drop_down! {
                         selected: self.settings_path.screen_space_anti_aliasing(),
                         options: self.capabilities_path.screen_space_anti_aliasing_options(),
-                        click_handler: DefaultClickHandler::new(self.settings_path.screen_space_anti_aliasing(), self.capabilities_path.screen_space_anti_aliasing_options()),
                     }
                 )
             },
@@ -138,7 +130,6 @@ where
                     drop_down! {
                         selected: self.settings_path.shadow_quality(),
                         options: self.capabilities_path.shadow_quality_options(),
-                        click_handler: DefaultClickHandler::new(self.settings_path.shadow_quality(), self.capabilities_path.shadow_quality_options()),
                     }
                 )
             },
@@ -150,7 +141,6 @@ where
                     drop_down! {
                         selected: self.settings_path.shadow_detail(),
                         options: self.capabilities_path.shadow_detail_options(),
-                        click_handler: DefaultClickHandler::new(self.settings_path.shadow_detail(), self.capabilities_path.shadow_detail_options()),
                     }
                 )
             },

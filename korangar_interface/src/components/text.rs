@@ -22,14 +22,40 @@ where
 }
 
 pub struct Text<T, A, B, C, D, E, F, G> {
-    pub text_marker: PhantomData<T>,
-    pub text: A,
-    pub color: B,
-    pub height: C,
-    pub font_size: D,
-    pub horizontal_alignment: E,
-    pub vertical_alignment: F,
-    pub overflow_behavior: G,
+    text_marker: PhantomData<T>,
+    text: A,
+    color: B,
+    height: C,
+    font_size: D,
+    horizontal_alignment: E,
+    vertical_alignment: F,
+    overflow_behavior: G,
+}
+
+impl<T, A, B, C, D, E, F, G> Text<T, A, B, C, D, E, F, G> {
+    /// This function is supposed to be called from a component macro and not
+    /// intended to be called manually.
+    #[inline(always)]
+    pub fn component_new(
+        text: A,
+        color: B,
+        height: C,
+        font_size: D,
+        horizontal_alignment: E,
+        vertical_alignment: F,
+        overflow_behavior: G,
+    ) -> Self {
+        Self {
+            text_marker: PhantomData,
+            text,
+            color,
+            height,
+            font_size,
+            horizontal_alignment,
+            vertical_alignment,
+            overflow_behavior,
+        }
+    }
 }
 
 impl<App, T, A, B, C, D, E, F, G> Element<App> for Text<T, A, B, C, D, E, F, G>

@@ -279,8 +279,7 @@ where
     }
 }
 
-// TODO: Pretty this up
-pub struct DefaultClickHandler<App, Value, Item, A, B>
+struct DefaultClickHandler<App, Value, Item, A, B>
 where
     App: Application,
 {
@@ -292,9 +291,6 @@ impl<App, Value, Item, A, B> DefaultClickHandler<App, Value, Item, A, B>
 where
     App: Application,
     Value: 'static,
-    Item: DropDownItem<Value> + 'static,
-    A: Path<App, Value>,
-    B: Selector<App, Vec<Item>>,
 {
     pub fn new(value_path: A, options_path: B) -> DefaultClickHandler<App, Value, Item, A, B> {
         DefaultClickHandler {
@@ -353,19 +349,62 @@ pub struct DropDown<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L>
 where
     App: Application,
 {
-    pub options: A,
-    pub selected: B,
-    pub foreground_color: C,
-    pub background_color: D,
-    pub hovered_foreground_color: E,
-    pub hovered_background_color: F,
-    pub height: G,
-    pub corner_radius: H,
-    pub font_size: I,
-    pub horizontal_alignment: J,
-    pub vertical_alignment: K,
-    pub overflow_behavior: L,
-    pub click_handler: DefaultClickHandler<App, Value, Item, B, A>,
+    options: A,
+    selected: B,
+    foreground_color: C,
+    background_color: D,
+    hovered_foreground_color: E,
+    hovered_background_color: F,
+    height: G,
+    corner_radius: H,
+    font_size: I,
+    horizontal_alignment: J,
+    vertical_alignment: K,
+    overflow_behavior: L,
+    click_handler: DefaultClickHandler<App, Value, Item, B, A>,
+}
+
+impl<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L> DropDown<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L>
+where
+    App: Application,
+    Value: 'static,
+    A: Clone,
+    B: Copy,
+{
+    /// This function is supposed to be called from a component macro and not
+    /// intended to be called manually.
+    #[inline(always)]
+    #[allow(clippy::too_many_arguments)]
+    pub fn component_new(
+        options: A,
+        selected: B,
+        foreground_color: C,
+        background_color: D,
+        hovered_foreground_color: E,
+        hovered_background_color: F,
+        height: G,
+        corner_radius: H,
+        font_size: I,
+        horizontal_alignment: J,
+        vertical_alignment: K,
+        overflow_behavior: L,
+    ) -> Self {
+        Self {
+            options: options.clone(),
+            selected,
+            foreground_color,
+            background_color,
+            hovered_foreground_color,
+            hovered_background_color,
+            height,
+            corner_radius,
+            font_size,
+            horizontal_alignment,
+            vertical_alignment,
+            overflow_behavior,
+            click_handler: DefaultClickHandler::new(selected, options),
+        }
+    }
 }
 
 impl<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L> Element<App> for DropDown<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L>

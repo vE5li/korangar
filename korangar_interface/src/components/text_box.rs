@@ -43,7 +43,7 @@ pub struct TextBoxData {
 impl PersistentData for TextBoxData {
     type Inputs = bool;
 
-    fn new(inputs: Self::Inputs) -> Self {
+    fn from_inputs(inputs: Self::Inputs) -> Self {
         Self {
             is_hidden: RefCell::new(inputs),
             hidden_text: UnsafeCell::new(String::new()),
@@ -52,27 +52,82 @@ impl PersistentData for TextBoxData {
 }
 
 pub struct TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Id> {
-    pub text_marker: PhantomData<Text>,
-    pub ghost_text: A,
-    pub state: B,
-    pub input_handler: C,
-    pub hidable: D,
-    pub foreground_color: E,
-    pub background_color: F,
-    pub hovered_foreground_color: G,
-    pub hovered_background_color: H,
-    pub focused_foreground_color: I,
-    pub focused_background_color: J,
-    pub ghost_foreground_color: K,
-    pub hide_icon_color: L,
-    pub hovered_hide_icon_color: M,
-    pub height: N,
-    pub corner_radius: O,
-    pub font_size: P,
-    pub horizontal_alignment: Q,
-    pub vertical_alignment: R,
-    pub overflow_behavior: S,
-    pub focus_id: Id,
+    text_marker: PhantomData<Text>,
+    ghost_text: A,
+    state: B,
+    input_handler: C,
+    hidable: D,
+    foreground_color: E,
+    background_color: F,
+    hovered_foreground_color: G,
+    hovered_background_color: H,
+    focused_foreground_color: I,
+    focused_background_color: J,
+    ghost_foreground_color: K,
+    hide_icon_color: L,
+    hovered_hide_icon_color: M,
+    height: N,
+    corner_radius: O,
+    font_size: P,
+    horizontal_alignment: Q,
+    vertical_alignment: R,
+    overflow_behavior: S,
+    focus_id: Id,
+}
+
+impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Id>
+    TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Id>
+{
+    /// This function is supposed to be called from a component macro and not
+    /// intended to be called manually.
+    #[inline(always)]
+    #[allow(clippy::too_many_arguments)]
+    pub fn component_new(
+        ghost_text: A,
+        state: B,
+        input_handler: C,
+        hidable: D,
+        foreground_color: E,
+        background_color: F,
+        hovered_foreground_color: G,
+        hovered_background_color: H,
+        focused_foreground_color: I,
+        focused_background_color: J,
+        ghost_foreground_color: K,
+        hide_icon_color: L,
+        hovered_hide_icon_color: M,
+        height: N,
+        corner_radius: O,
+        font_size: P,
+        horizontal_alignment: Q,
+        vertical_alignment: R,
+        overflow_behavior: S,
+        focus_id: Id,
+    ) -> Self {
+        Self {
+            text_marker: PhantomData,
+            ghost_text,
+            state,
+            input_handler,
+            hidable,
+            foreground_color,
+            background_color,
+            hovered_foreground_color,
+            hovered_background_color,
+            focused_foreground_color,
+            focused_background_color,
+            ghost_foreground_color,
+            hide_icon_color,
+            hovered_hide_icon_color,
+            height,
+            corner_radius,
+            font_size,
+            horizontal_alignment,
+            vertical_alignment,
+            overflow_behavior,
+            focus_id,
+        }
+    }
 }
 
 impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Id> Persistent

@@ -28,21 +28,62 @@ where
 }
 
 pub struct Button<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N> {
-    pub text_marker: PhantomData<(Text, Tooltip)>,
-    pub text: A,
-    pub tooltip: B,
-    pub event: C,
-    pub disabled: D,
-    pub foreground_color: E,
-    pub background_color: F,
-    pub hovered_foreground_color: G,
-    pub hovered_background_color: H,
-    pub height: I,
-    pub corner_radius: J,
-    pub font_size: K,
-    pub horizontal_alignment: L,
-    pub vertical_alignment: M,
-    pub overflow_behavior: N,
+    text_marker: PhantomData<(Text, Tooltip)>,
+    text: A,
+    tooltip: B,
+    event: C,
+    disabled: D,
+    foreground_color: E,
+    background_color: F,
+    hovered_foreground_color: G,
+    hovered_background_color: H,
+    height: I,
+    corner_radius: J,
+    font_size: K,
+    horizontal_alignment: L,
+    vertical_alignment: M,
+    overflow_behavior: N,
+}
+
+impl<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N> Button<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N> {
+    /// This function is supposed to be called from a component macro and not
+    /// intended to be called manually.
+    #[inline(always)]
+    #[allow(clippy::too_many_arguments)]
+    pub fn component_new(
+        text: A,
+        tooltip: B,
+        event: C,
+        disabled: D,
+        foreground_color: E,
+        background_color: F,
+        hovered_foreground_color: G,
+        hovered_background_color: H,
+        height: I,
+        corner_radius: J,
+        font_size: K,
+        horizontal_alignment: L,
+        vertical_alignment: M,
+        overflow_behavior: N,
+    ) -> Self {
+        Self {
+            text_marker: PhantomData,
+            text,
+            tooltip,
+            event,
+            disabled,
+            foreground_color,
+            background_color,
+            hovered_foreground_color,
+            hovered_background_color,
+            height,
+            corner_radius,
+            font_size,
+            horizontal_alignment,
+            vertical_alignment,
+            overflow_behavior,
+        }
+    }
 }
 
 impl<App, Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N> Element<App>

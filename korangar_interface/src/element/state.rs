@@ -10,7 +10,7 @@ use interface_components::collapsable;
 use rust_state::{ArrayLookupExt, Context, ManuallyAssertExt, OptionExt, Path, Selector, VecIndexExt};
 
 use super::store::ElementStoreMut;
-use super::{Element, ElementSet, ResolverSet};
+use super::{Element, ElementSet};
 use crate::application::Application;
 use crate::components::text_box::DefaultHandler;
 use crate::element::BaseLayoutInfo;
@@ -18,7 +18,7 @@ use crate::element::store::ElementStore;
 use crate::event::ClickAction;
 use crate::layout::area::Area;
 use crate::layout::tooltip::TooltipExt;
-use crate::layout::{Icon, Layout, MouseButton, Resolver};
+use crate::layout::{Icon, Layout, MouseButton, Resolver, ResolverSet};
 use crate::prelude::CollapsableThemePathExt;
 use crate::theme::{ThemePathGetter, theme};
 

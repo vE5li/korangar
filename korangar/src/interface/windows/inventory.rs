@@ -4,7 +4,6 @@ use korangar_networking::InventoryItem;
 use rust_state::{Path, VecIndexExt};
 
 use crate::ItemSource;
-use crate::interface::components::item_box::ItemBoxHandler;
 use crate::interface::windows::WindowClass;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
@@ -48,7 +47,7 @@ where
 
                         item_box! {
                             item_path: path,
-                            handler: ItemBoxHandler::new(path, ItemSource::Inventory),
+                            source: ItemSource::Inventory,
                         }
                     }),
                 }

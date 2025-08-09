@@ -2,9 +2,9 @@ use rust_state::{Context, Selector};
 
 use crate::application::Application;
 use crate::element::store::{ElementStore, ElementStoreMut};
-use crate::element::{Element, ElementSet, ResolverSet};
+use crate::element::{Element, ElementSet};
 use crate::layout::area::PartialArea;
-use crate::layout::{Layout, Resolver};
+use crate::layout::{Layout, Resolver, ResolverSet};
 
 struct CellResolverSet<'a, App: Application> {
     initial_available_area: PartialArea,
@@ -52,8 +52,17 @@ where
 }
 
 pub struct Split<A, Children> {
-    pub gaps: A,
-    pub children: Children,
+    gaps: A,
+    children: Children,
+}
+
+impl<A, Children> Split<A, Children> {
+    /// This function is supposed to be called from a component macro and not
+    /// intended to be called manually.
+    #[inline(always)]
+    pub fn component_new(gaps: A, children: Children) -> Self {
+        Self { gaps, children }
+    }
 }
 
 impl<App, A, Children> Element<App> for Split<A, Children>

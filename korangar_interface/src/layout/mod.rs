@@ -14,7 +14,7 @@ use num::Signed;
 use rust_state::Context;
 use tooltip::{Tooltip, TooltipId};
 
-pub use self::resolver::Resolver;
+pub use self::resolver::{Resolver, ResolverSet};
 use crate::MouseMode;
 use crate::application::{Application, ClipTrait, CornerRadiusTrait, FontSizeTrait, PositionTrait, RenderLayer, SizeTrait, TextLayouter};
 use crate::element::id::{ElementId, FocusId};

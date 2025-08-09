@@ -1,6 +1,5 @@
 use std::num::NonZeroU32;
 
-use korangar_interface::components::drop_down::DefaultClickHandler;
 use korangar_interface::element::Element;
 use korangar_interface::window::{CustomWindow, Window};
 use rust_state::Path;

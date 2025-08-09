@@ -1,4 +1,3 @@
-use korangar_interface::components::drop_down::DefaultClickHandler;
 use korangar_interface::components::text_box::DefaultHandler;
 use korangar_interface::element::StateElement;
 use korangar_interface::element::id::FocusIdExt;

@@ -6,9 +6,18 @@ use crate::element::{Element, ElementSet};
 use crate::layout::{Layout, Resolver};
 
 pub struct Fragment<A, B, Children> {
-    pub gaps: A,
-    pub border: B,
-    pub children: Children,
+    gaps: A,
+    border: B,
+    children: Children,
+}
+
+impl<A, B, Children> Fragment<A, B, Children> {
+    /// This function is supposed to be called from a component macro and not
+    /// intended to be called manually.
+    #[inline(always)]
+    pub fn component_new(gaps: A, border: B, children: Children) -> Self {
+        Self { gaps, border, children }
+    }
 }
 
 impl<App, A, B, Children> Element<App> for Fragment<A, B, Children>

@@ -4,7 +4,6 @@ use proc_macro::TokenStream;
 #[proc_macro]
 pub fn window(token_stream: TokenStream) -> TokenStream {
     create_component_macro!(korangar_interface::window::WindowInternal, {
-        title_marker: { const std::marker::PhantomData },
         title: !,
         title_color: { korangar_interface::theme::theme().window().title_color() },
         hovered_title_color: { korangar_interface::theme::theme().window().hovered_title_color() },
@@ -23,10 +22,9 @@ pub fn window(token_stream: TokenStream) -> TokenStream {
         maximum_width: { korangar_interface::theme::theme().window().maximum_width() },
         minimum_height: { korangar_interface::theme::theme().window().minimum_height() },
         maximum_height: { korangar_interface::theme::theme().window().maximum_height() },
-        class: { None },
         theme: !,
+        class: { None },
         elements: !,
-        layout_info: { const None },
     });
 
     macro_impl(token_stream.into()).into()
@@ -35,7 +33,6 @@ pub fn window(token_stream: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn text(token_stream: TokenStream) -> TokenStream {
     create_component_macro!(korangar_interface::components::text::Text, {
-        text_marker: { const std::marker::PhantomData },
         text: !,
         color: { korangar_interface::theme::theme().text().color() },
         height: { korangar_interface::theme::theme().text().height() },
@@ -51,7 +48,6 @@ pub fn text(token_stream: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn button(token_stream: TokenStream) -> TokenStream {
     create_component_macro!(korangar_interface::components::button::Button, {
-        text_marker: { const std::marker::PhantomData },
         text: !,
         tooltip: { "" },
         event: !,
@@ -74,7 +70,6 @@ pub fn button(token_stream: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn state_button(token_stream: TokenStream) -> TokenStream {
     create_component_macro!(korangar_interface::components::state_button::StateButton, {
-        text_marker: { const std::marker::PhantomData },
         text: !,
         state: !,
         event: !,
@@ -110,7 +105,6 @@ pub fn drop_down(token_stream: TokenStream) -> TokenStream {
         horizontal_alignment: { korangar_interface::theme::theme().drop_down().button_horizontal_alignment() },
         vertical_alignment: { korangar_interface::theme::theme().drop_down().button_vertical_alignment() },
         overflow_behavior: { korangar_interface::theme::theme().drop_down().button_overflow_behavior() },
-        click_handler: !,
     });
 
     macro_impl(token_stream.into()).into()
@@ -119,7 +113,6 @@ pub fn drop_down(token_stream: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn collapsable(token_stream: TokenStream) -> TokenStream {
     create_component_macro!(korangar_interface::components::collapsable::Collapsable, {
-        text_marker: { const std::marker::PhantomData },
         text: !,
         foreground_color: { korangar_interface::theme::theme().collapsable().foreground_color() },
         background_color: { korangar_interface::theme::theme().collapsable().background_color() },
@@ -157,7 +150,6 @@ pub fn fragment(token_stream: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn field(token_stream: TokenStream) -> TokenStream {
     create_component_macro!(korangar_interface::components::field::Field, {
-        text_marker: { const std::marker::PhantomData },
         text: !,
         tooltip: { "" },
         foreground_color: { korangar_interface::theme::theme().field().foreground_color() },
@@ -195,7 +187,6 @@ pub fn scroll_view(token_stream: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn text_box(token_stream: TokenStream) -> TokenStream {
     create_component_macro!(korangar_interface::components::text_box::TextBox, {
-        text_marker: { const std::marker::PhantomData },
         ghost_text: !,
         state: !,
         input_handler: !,
@@ -215,6 +206,7 @@ pub fn text_box(token_stream: TokenStream) -> TokenStream {
         horizontal_alignment: { korangar_interface::theme::theme().text_box().horizontal_alignment() },
         vertical_alignment: { korangar_interface::theme::theme().text_box().vertical_alignment() },
         overflow_behavior: { korangar_interface::theme::theme().text_box().overflow_behavior() },
+        focus_id: !,
     });
 
     macro_impl(token_stream.into()).into()

@@ -25,7 +25,7 @@ pub mod components {
         use crate::world::ResourceMetadata;
 
         #[derive(Default)]
-        pub struct AmountDisplay {
+        struct AmountDisplay {
             amount: u16,
             string: Option<String>,
         }
@@ -39,13 +39,13 @@ pub mod components {
             }
         }
 
-        pub struct ItemBoxHandler<P> {
+        struct ItemBoxHandler<P> {
             item_path: P,
             source: ItemSource,
         }
 
         impl<P> ItemBoxHandler<P> {
-            pub fn new(item_path: P, source: ItemSource) -> Self {
+            fn new(item_path: P, source: ItemSource) -> Self {
                 Self { item_path, source }
             }
         }
@@ -87,15 +87,31 @@ pub mod components {
             }
         }
 
-        pub struct ItemBox<P> {
-            pub item_path: P,
-            pub handler: ItemBoxHandler<P>,
-            pub amount_display: AmountDisplay,
+        pub struct ItemBox<A> {
+            item_path: A,
+            handler: ItemBoxHandler<A>,
+            amount_display: AmountDisplay,
         }
 
-        impl<P> Element<ClientState> for ItemBox<P>
+        impl<A> ItemBox<A>
         where
-            P: Path<ClientState, InventoryItem<ResourceMetadata>, false>,
+            A: Copy,
+        {
+            /// This function is supposed to be called from a component macro
+            /// and not intended to be called manually.
+            #[inline(always)]
+            pub fn component_new(item_path: A, source: ItemSource) -> Self {
+                Self {
+                    item_path,
+                    handler: ItemBoxHandler::new(item_path, source),
+                    amount_display: AmountDisplay::default(),
+                }
+            }
+        }
+
+        impl<A> Element<ClientState> for ItemBox<A>
+        where
+            A: Path<ClientState, InventoryItem<ResourceMetadata>, false>,
         {
             type LayoutInfo = BaseLayoutInfo;
 
@@ -201,7 +217,7 @@ pub mod components {
         use crate::renderer::LayoutExt;
         use crate::state::ClientState;
 
-        pub struct LevelDisplay {
+        struct LevelDisplay {
             level: SkillLevel,
             string: Option<String>,
         }
@@ -224,13 +240,13 @@ pub mod components {
             }
         }
 
-        pub struct SkillBoxHandler<P> {
+        struct SkillBoxHandler<P> {
             skill_path: P,
             source: SkillSource,
         }
 
         impl<P> SkillBoxHandler<P> {
-            pub fn new(skill_path: P, source: SkillSource) -> Self {
+            fn new(skill_path: P, source: SkillSource) -> Self {
                 Self { skill_path, source }
             }
         }
@@ -275,15 +291,31 @@ pub mod components {
             }
         }
 
-        pub struct SkillBox<P> {
-            pub skill_path: P,
-            pub handler: SkillBoxHandler<P>,
-            pub level_display: LevelDisplay,
+        pub struct SkillBox<A> {
+            skill_path: A,
+            handler: SkillBoxHandler<A>,
+            level_display: LevelDisplay,
         }
 
-        impl<P> Element<ClientState> for SkillBox<P>
+        impl<A> SkillBox<A>
         where
-            P: Path<ClientState, Skill, false>,
+            A: Copy,
+        {
+            /// This function is supposed to be called from a component macro
+            /// and not intended to be called manually.
+            #[inline(always)]
+            pub fn component_new(skill_path: A, source: SkillSource) -> Self {
+                Self {
+                    skill_path,
+                    handler: SkillBoxHandler::new(skill_path, source),
+                    level_display: LevelDisplay::default(),
+                }
+            }
+        }
+
+        impl<A> Element<ClientState> for SkillBox<A>
+        where
+            A: Path<ClientState, Skill, false>,
         {
             type LayoutInfo = BaseLayoutInfo;
 

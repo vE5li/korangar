@@ -3,7 +3,6 @@ use korangar_interface::window::{CustomWindow, Window};
 use rust_state::{Path, VecIndexExt};
 
 use crate::SkillSource;
-use crate::interface::components::skill_box::SkillBoxHandler;
 use crate::interface::windows::WindowClass;
 use crate::inventory::Skill;
 use crate::state::ClientState;
@@ -47,7 +46,7 @@ where
 
                         skill_box! {
                             skill_path: path,
-                            handler: SkillBoxHandler::new(path, SkillSource::SkillTree),
+                            source: SkillSource::SkillTree,
                         }
                     }),
                 }

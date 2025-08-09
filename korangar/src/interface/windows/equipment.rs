@@ -5,7 +5,6 @@ use ragnarok_packets::EquipPosition;
 use rust_state::{Path, Selector};
 
 use crate::ItemSource;
-use crate::interface::components::item_box::ItemBoxHandler;
 use crate::interface::windows::WindowClass;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
@@ -130,7 +129,7 @@ where
                 children: (
                     item_box! {
                         item_path: equipment_path,
-                        handler: ItemBoxHandler::new(equipment_path, ItemSource::Equipment { position: equip_position }),
+                        source: ItemSource::Equipment { position: equip_position },
                     },
                     text! {
                         text: display_name,

@@ -1,4 +1,4 @@
-use korangar_interface::components::drop_down::{DefaultClickHandler, DropDownItem};
+use korangar_interface::components::drop_down::DropDownItem;
 use korangar_interface::element::store::{ElementStore, ElementStoreMut};
 use korangar_interface::element::{BaseLayoutInfo, Element, StateElement};
 use korangar_interface::layout::area::Area;

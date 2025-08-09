@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use proc_macro2::Span;
 use quote::quote;
 use syn::parse::{Parse, ParseStream};
 use syn::{Expr, Ident, Path, Token};
@@ -8,16 +7,30 @@ use syn::{Expr, Ident, Path, Token};
 pub enum ParameterValue {
     MustSet,
     CanOverride(Expr),
-    Fixed(Expr),
 }
 
 pub fn component_macro_inner(
     token_stream: proc_macro2::TokenStream,
     element_type: Path,
-    property_values: &HashMap<&'static str, ParameterValue>,
+    property_values: &Vec<(&'static str, ParameterValue)>,
 ) -> proc_macro2::TokenStream {
+    #[derive(Clone)]
+    enum ExprOrIdent {
+        Expr(Expr),
+        Ident(Ident),
+    }
+
+    impl quote::ToTokens for ExprOrIdent {
+        fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+            match self {
+                ExprOrIdent::Expr(expr) => expr.to_tokens(tokens),
+                ExprOrIdent::Ident(ident) => ident.to_tokens(tokens),
+            }
+        }
+    }
+
     struct PropertyValueInput {
-        entries: HashMap<String, Expr>,
+        entries: HashMap<String, ExprOrIdent>,
     }
 
     impl Parse for PropertyValueInput {
@@ -26,10 +39,13 @@ pub fn component_macro_inner(
 
             while !input.is_empty() {
                 let property_name: Ident = input.parse()?;
-                input.parse::<Token![:]>()?;
+                if input.parse::<Token![:]>().is_err() {
+                    entries.insert(property_name.to_string(), ExprOrIdent::Ident(property_name));
+                    continue;
+                }
 
                 let value: Expr = input.parse()?;
-                entries.insert(property_name.to_string(), value);
+                entries.insert(property_name.to_string(), ExprOrIdent::Expr(value));
 
                 if input.peek(Token![,]) {
                     input.parse::<Token![,]>()?;
@@ -44,37 +60,20 @@ pub fn component_macro_inner(
 
     // TODO: Don't unwrap.
     let property_value_pairs: PropertyValueInput = syn::parse2(token_stream).unwrap();
-    let mut entries = property_value_pairs.entries;
+    let entries = property_value_pairs.entries;
 
-    // Fill in missing default values
-    for (property, value) in property_values {
-        if let ParameterValue::Fixed(..) = value {
-            if entries.contains_key(*property) {
-                // TODO: Collect errors and return multiple.
-                panic!("Property {} can not be overwritten", property);
-            }
-        }
-
-        entries.entry((*property).to_owned()).or_insert_with(|| {
-            match value {
-                // TODO: Collect errors and return multiple.
-                ParameterValue::MustSet => panic!("Property {} needs to be set", property),
-                ParameterValue::CanOverride(expr) => expr.clone(),
-                ParameterValue::Fixed(expr) => expr.clone(),
-            }
-        });
-    }
-
-    let properties = entries.keys().map(|field_name| syn::Ident::new(field_name, Span::call_site()));
-    let values = entries.values();
+    let values = property_values.iter().map(|(property, value)| {
+        entries.get(*property).cloned().unwrap_or_else(|| match value {
+            ParameterValue::MustSet => panic!("Property {} needs to be set", property),
+            ParameterValue::CanOverride(expr) => ExprOrIdent::Expr(expr.clone()),
+        })
+    });
 
     quote! {
         {
             use korangar_interface::prelude::*;
 
-            #element_type {
-                #(#properties : #values),*
-            }
+            #element_type::component_new(#(#values),*)
         }
     }
 }
@@ -83,7 +82,7 @@ pub fn component_macro_inner(
 macro_rules! create_component_macro {
     ($path:path, { $( $property:ident: $value:tt ,)* }) => {
         fn macro_impl(token_stream: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
-            let parameters = std::collections::HashMap::from([
+            let parameters = Vec::from([
                 $(
                     (stringify!($property), create_component_macro!(_dont_use, $value))
                 ),*
@@ -94,9 +93,6 @@ macro_rules! create_component_macro {
     };
     (_dont_use, !) => {
         $crate::ParameterValue::MustSet
-    };
-    (_dont_use, { const $value:expr }) => {
-        $crate::ParameterValue::Fixed(syn::parse_quote!($value))
     };
     (_dont_use, { $value:expr }) => {
         $crate::ParameterValue::CanOverride(syn::parse_quote!($value))

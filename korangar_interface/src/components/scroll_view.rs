@@ -21,7 +21,16 @@ pub struct ScrollViewLayoutInfo<L> {
 }
 
 pub struct ScrollView<Children> {
-    pub children: Children,
+    children: Children,
+}
+
+impl<Children> ScrollView<Children> {
+    /// This function is supposed to be called from a component macro and not
+    /// intended to be called manually.
+    #[inline(always)]
+    pub fn component_new(children: Children) -> Self {
+        Self { children }
+    }
 }
 
 impl<Children> Persistent for ScrollView<Children> {

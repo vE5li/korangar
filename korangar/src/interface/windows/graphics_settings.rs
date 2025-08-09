@@ -50,8 +50,6 @@ where
             state_button! {
                 text: "Triple buffering",
                 state: self.settings_path.triple_buffering(),
-                // TODO: Also mark the state to rebuild the graphics engine. This could be done by
-                // setting a variable in the state or by storing a `Rc<RefCell<bool>>` on the window.
                 event: Toggle(self.settings_path.triple_buffering()),
             },
             split! {
@@ -72,7 +70,6 @@ where
                 event: Toggle(self.settings_path.vsync()),
                 disabled: self.capabilities_path.additional_settings_disabled(),
             },
-            // TODO: Disable this option conditionally
             split! {
                 children: (
                     text! {

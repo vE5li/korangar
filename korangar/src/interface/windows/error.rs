@@ -18,10 +18,12 @@ impl CustomWindow<ClientState> for ErrorWindow {
             title: "Error",
             theme: InterfaceThemeType::Menu,
             closable: true,
-            elements: (text! {
-                text: self.message,
-                color: Color::rgb_u8(220, 100, 100)
-            },),
+            elements: (
+                text! {
+                    text: self.message,
+                    color: Color::rgb_u8(220, 100, 100)
+                },
+            ),
         }
     }
 }

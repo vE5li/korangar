@@ -117,14 +117,14 @@ impl LoginWindowState {
     }
 }
 
-pub struct LoginWindow<P, S, C> {
-    window_state_path: P,
-    service_settings_path: S,
+pub struct LoginWindow<A, B, C> {
+    window_state_path: A,
+    service_settings_path: B,
     client_info_path: C,
 }
 
-impl<P, S, C> LoginWindow<P, S, C> {
-    pub fn new(window_state_path: P, service_settings_path: S, client_info_path: C) -> Self {
+impl<A, B, C> LoginWindow<A, B, C> {
+    pub fn new(window_state_path: A, service_settings_path: B, client_info_path: C) -> Self {
         Self {
             window_state_path,
             service_settings_path,
@@ -133,10 +133,10 @@ impl<P, S, C> LoginWindow<P, S, C> {
     }
 }
 
-impl<P, S, C> CustomWindow<ClientState> for LoginWindow<P, S, C>
+impl<A, B, C> CustomWindow<ClientState> for LoginWindow<A, B, C>
 where
-    P: Path<ClientState, LoginWindowState>,
-    S: Path<ClientState, LoginSettings>,
+    A: Path<ClientState, LoginWindowState>,
+    B: Path<ClientState, LoginSettings>,
     C: Path<ClientState, ClientInfo>,
 {
     fn window_class() -> Option<WindowClass> {
@@ -210,6 +210,7 @@ where
                 },
                 text! { text: "Account data" },
                 fragment! {
+                    // TODO: Theme this
                     gaps: 8.0,
                     children: (
                         text_box! {
@@ -230,6 +231,7 @@ where
                     ),
                 },
                 fragment! {
+                    // TODO: Theme this
                     gaps: 8.0,
                     children: (
                         state_button! {

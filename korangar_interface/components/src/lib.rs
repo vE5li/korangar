@@ -115,9 +115,9 @@ pub fn collapsable(token_stream: TokenStream) -> TokenStream {
     create_component_macro!(korangar_interface::components::collapsable::Collapsable, {
         text: !,
         foreground_color: { korangar_interface::theme::theme().collapsable().foreground_color() },
+        hovered_foreground_color: { korangar_interface::theme::theme().collapsable().hovered_foreground_color() },
         background_color: { korangar_interface::theme::theme().collapsable().background_color() },
         secondary_background_color: { korangar_interface::theme::theme().collapsable().secondary_background_color() },
-        hovered_foreground_color: { korangar_interface::theme::theme().collapsable().hovered_foreground_color() },
         icon_color: { korangar_interface::theme::theme().collapsable().icon_color() },
         icon_size: { korangar_interface::theme::theme().collapsable().icon_size() },
         gaps: { korangar_interface::theme::theme().collapsable().gaps() },

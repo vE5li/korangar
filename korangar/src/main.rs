@@ -1915,9 +1915,17 @@ impl Client {
                 #[cfg(feature = "debug")]
                 InputEvent::OpenClientStateInspectorWindow => self.interface.open_state_window_mut(client_state()),
                 #[cfg(feature = "debug")]
-                InputEvent::OpenMapsWindow => self.interface.open_window(MapsWindow),
+                InputEvent::OpenMapsWindow => {
+                    if self.client_state.follow(client_state().map()).is_some() {
+                        self.interface.open_window(MapsWindow);
+                    }
+                }
                 #[cfg(feature = "debug")]
-                InputEvent::OpenCommandsWindow => self.interface.open_window(CommandsWindow),
+                InputEvent::OpenCommandsWindow => {
+                    if self.client_state.follow(client_state().map()).is_some() {
+                        self.interface.open_window(CommandsWindow);
+                    }
+                }
                 #[cfg(feature = "debug")]
                 InputEvent::OpenTimeWindow => self.interface.open_window(TimeWindow),
                 #[cfg(feature = "debug")]

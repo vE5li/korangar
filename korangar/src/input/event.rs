@@ -231,10 +231,10 @@ pub enum InputEvent {
     /// Open the client state inspector window.
     #[cfg(feature = "debug")]
     OpenClientStateInspectorWindow,
-    /// Open the maps window.
+    /// Open the maps window. Only works while playing.
     #[cfg(feature = "debug")]
     OpenMapsWindow,
-    /// Open the commands window.
+    /// Open the commands window. Only works while playing.
     #[cfg(feature = "debug")]
     OpenCommandsWindow,
     /// Open the time window.

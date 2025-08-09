@@ -284,7 +284,7 @@ impl Display for ScreenSpaceAntiAliasing {
 #[cfg(feature = "debug")]
 #[derive(Copy, Clone, Default, RustState, StateElement, new)]
 pub struct RenderOptions {
-    #[new(value = "true")]
+    #[new(default)]
     pub show_frames_per_second: bool,
     #[new(value = "true")]
     pub frustum_culling: bool,

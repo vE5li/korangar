@@ -295,7 +295,11 @@ mod character_slot_preview {
 
                 layout.add_text(
                     layout_info.area,
-                    &character_information.map_name,
+                    // TODO: Replace with a map name lookup
+                    character_information
+                        .map_name
+                        .strip_suffix(".gat")
+                        .unwrap_or(&character_information.map_name),
                     FontSize(14.0),
                     Color::rgb_u8(200, 200, 150),
                     HorizontalAlignment::Left { offset: 5.0, border: 3.0 },

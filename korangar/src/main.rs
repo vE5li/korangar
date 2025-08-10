@@ -2484,6 +2484,8 @@ impl Client {
                         if is_interface_hovered {
                             interface_frame.click(&self.client_state, input_report.mouse_position, mouse_button);
                         } else {
+                            interface_frame.unfocus();
+
                             if mouse_button == MouseButton::Left {
                                 match input_report.mouse_target {
                                     PickerTarget::Nothing => {}

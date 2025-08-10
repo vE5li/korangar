@@ -859,6 +859,10 @@ impl<App: Application> InterfaceFrame<'_, App> {
             focus_id: focus_id.focus_id(),
         });
     }
+
+    pub fn unfocus(&mut self) {
+        self.event_queue.queue(Event::Unfocus);
+    }
 }
 
 impl<App: Application> Drop for InterfaceFrame<'_, App> {

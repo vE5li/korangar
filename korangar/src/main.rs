@@ -2535,13 +2535,14 @@ impl Client {
                         }
                     }
 
-                    if interface_has_focus {
-                        if !interface_frame.input_characters(&self.client_state, &input_report.characters)
-                            && input_report.characters.iter().any(|character| *character == '\x0d')
-                            && is_chat_open
-                        {
-                            interface_frame.focus_element(ChatTextBox);
-                        }
+                    // Open the chat if the interface is not focused, no other element is capturing
+                    // the keyboard input, enter was pressed, and the chat
+                    // window is open.
+                    if (!interface_has_focus || !interface_frame.input_characters(&self.client_state, &input_report.characters))
+                        && input_report.characters.iter().any(|character| *character == '\x0d')
+                        && is_chat_open
+                    {
+                        interface_frame.focus_element(ChatTextBox);
                     }
 
                     interface_frame

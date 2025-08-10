@@ -2537,7 +2537,7 @@ impl Client {
                         }
                     }
 
-                    // Open the chat if the interface is not focused, no other element is capturing
+                    // Focus the chat if the interface is not focused, no other element is capturing
                     // the keyboard input, enter was pressed, and the chat
                     // window is open.
                     if (!interface_has_focus || !interface_frame.input_characters(&self.client_state, &input_report.characters))

@@ -24,17 +24,17 @@ impl CustomWindow<ClientState> for MenuWindow {
             elements: (
                 button! {
                     text: "Graphics settings",
-                    event: InputEvent::OpenGraphicsSettingsWindow,
+                    event: InputEvent::ToggleGraphicsSettingsWindow,
                 },
                 button! {
                     text: "Audio settings",
-                    event: InputEvent::OpenAudioSettingsWindow,
+                    event: InputEvent::ToggleAudioSettingsWindow,
                 },
                 #[cfg(feature = "debug")]
                 button! {
                     text: "Render options",
                     tooltip: "Special render options (only available in debug mode)",
-                    event: InputEvent::OpenRenderOptionsWindow,
+                    event: InputEvent::ToggleRenderOptionsWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
                     hovered_background_color: client_theme().debug_button().hovered_background_color(),
                 },
@@ -50,7 +50,7 @@ impl CustomWindow<ClientState> for MenuWindow {
                 button! {
                     text: "Client state inspector",
                     tooltip: "Inspect and modify the internal client state (only available in debug mode)",
-                    event: InputEvent::OpenClientStateInspectorWindow,
+                    event: InputEvent::ToggleClientStateInspectorWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
                     hovered_background_color: client_theme().debug_button().hovered_background_color(),
                 },
@@ -58,7 +58,7 @@ impl CustomWindow<ClientState> for MenuWindow {
                 button! {
                     text: "Maps",
                     tooltip: "List of maps used for testing (only available in debug mode)",
-                    event: InputEvent::OpenMapsWindow,
+                    event: InputEvent::ToggleMapsWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
                     hovered_background_color: client_theme().debug_button().hovered_background_color(),
                 },
@@ -66,7 +66,7 @@ impl CustomWindow<ClientState> for MenuWindow {
                 button! {
                     text: "Commands",
                     tooltip: "List of commands used for testing (only available in debug mode)",
-                    event: InputEvent::OpenCommandsWindow,
+                    event: InputEvent::ToggleCommandsWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
                     hovered_background_color: client_theme().debug_button().hovered_background_color(),
                 },
@@ -74,7 +74,7 @@ impl CustomWindow<ClientState> for MenuWindow {
                 button! {
                     text: "Time",
                     tooltip: "Time control (only available in debug mode)",
-                    event: InputEvent::OpenTimeWindow,
+                    event: InputEvent::ToggleTimeWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
                     hovered_background_color: client_theme().debug_button().hovered_background_color(),
                 },
@@ -90,7 +90,7 @@ impl CustomWindow<ClientState> for MenuWindow {
                 button! {
                     text: "Profiler",
                     tooltip: "Profile the client (only available in debug mode)",
-                    event: InputEvent::OpenProfilerWindow,
+                    event: InputEvent::ToggleProfilerWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
                     hovered_background_color: client_theme().debug_button().hovered_background_color(),
                 },
@@ -98,7 +98,7 @@ impl CustomWindow<ClientState> for MenuWindow {
                 button! {
                     text: "Packet inspector",
                     tooltip: "Inspect all incoming and outgoing packets (only available in debug mode)",
-                    event: InputEvent::OpenPacketInspectorWindow,
+                    event: InputEvent::TogglePacketInspectorWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
                     hovered_background_color: client_theme().debug_button().hovered_background_color(),
                 },

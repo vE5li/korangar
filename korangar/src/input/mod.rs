@@ -209,11 +209,11 @@ impl InputSystem {
         let control_down = self.get_key(KeyCode::ControlLeft).down();
 
         if self.get_key(KeyCode::Escape).pressed() {
-            events.push(InputEvent::OpenMenuWindow);
+            events.push(InputEvent::ToggleMenuWindow);
         }
 
         if alt_down && self.get_key(KeyCode::KeyE).pressed() {
-            events.push(InputEvent::OpenInventoryWindow);
+            events.push(InputEvent::ToggleInventoryWindow);
         }
 
         if control_down && self.get_key(KeyCode::KeyH).pressed() {
@@ -250,27 +250,27 @@ impl InputSystem {
 
         #[cfg(feature = "debug")]
         if control_down && self.get_key(KeyCode::KeyM).pressed() {
-            events.push(InputEvent::OpenMapsWindow);
+            events.push(InputEvent::ToggleMapsWindow);
         }
 
         #[cfg(feature = "debug")]
         if control_down && self.get_key(KeyCode::KeyC).pressed() {
-            events.push(InputEvent::OpenClientStateInspectorWindow);
+            events.push(InputEvent::ToggleClientStateInspectorWindow);
         }
 
         #[cfg(feature = "debug")]
         if control_down && self.get_key(KeyCode::KeyR).pressed() {
-            events.push(InputEvent::OpenRenderOptionsWindow);
+            events.push(InputEvent::ToggleRenderOptionsWindow);
         }
 
         #[cfg(feature = "debug")]
         if control_down && self.get_key(KeyCode::KeyT).pressed() {
-            events.push(InputEvent::OpenTimeWindow);
+            events.push(InputEvent::ToggleTimeWindow);
         }
 
         #[cfg(feature = "debug")]
         if control_down && self.get_key(KeyCode::KeyP).pressed() {
-            events.push(InputEvent::OpenPacketInspectorWindow);
+            events.push(InputEvent::TogglePacketInspectorWindow);
         }
 
         #[cfg(feature = "debug")]

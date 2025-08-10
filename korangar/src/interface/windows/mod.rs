@@ -63,7 +63,7 @@ pub use self::login::{LoginWindow, LoginWindowState};
 pub use self::maps::MapsWindow;
 pub use self::menu::MenuWindow;
 #[cfg(feature = "debug")]
-pub use self::packet_inspector::PacketInspector;
+pub use self::packet_inspector::PacketInspectorWindow;
 #[cfg(feature = "debug")]
 pub use self::profiler::{ProfilerWindow, ProfilerWindowState};
 #[cfg(feature = "debug")]

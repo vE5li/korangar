@@ -9,17 +9,17 @@ use crate::networking::{PacketHistory, PacketHistoryPathExt};
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
 
-pub struct PacketInspector<A> {
+pub struct PacketInspectorWindow<A> {
     packet_history_path: A,
 }
 
-impl<A> PacketInspector<A> {
+impl<A> PacketInspectorWindow<A> {
     pub fn new(packet_history_path: A) -> Self {
         Self { packet_history_path }
     }
 }
 
-impl<A> CustomWindow<ClientState> for PacketInspector<A>
+impl<A> CustomWindow<ClientState> for PacketInspectorWindow<A>
 where
     A: Path<ClientState, PacketHistory>,
 {

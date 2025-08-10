@@ -93,23 +93,23 @@ where
                 },
                 button! {
                     text: "Inventory",
-                    event: InputEvent::OpenInventoryWindow,
+                    event: InputEvent::ToggleInventoryWindow,
                 },
                 button! {
                     text: "Equipment",
-                    event: InputEvent::OpenEquipmentWindow,
+                    event: InputEvent::ToggleEquipmentWindow,
                 },
                 button! {
                     text: "Skill tree",
-                    event: InputEvent::OpenSkillTreeWindow,
+                    event: InputEvent::ToggleSkillTreeWindow,
                 },
                 button! {
                     text: "Friend list",
-                    event: InputEvent::OpenFriendListWindow,
+                    event: InputEvent::ToggleFriendListWindow,
                 },
                 button! {
                     text: "Menu",
-                    event: InputEvent::OpenMenuWindow,
+                    event: InputEvent::ToggleMenuWindow,
                 },
             ),
         }

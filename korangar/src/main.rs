@@ -1652,40 +1652,62 @@ impl Client {
                 InputEvent::ZoomCamera { zoom_factor } => self.player_camera.soft_zoom(zoom_factor),
                 InputEvent::RotateCamera { rotation } => self.player_camera.soft_rotate(rotation),
                 InputEvent::ResetCameraRotation => self.player_camera.reset_rotation(),
-                InputEvent::OpenMenuWindow => {
+                InputEvent::ToggleMenuWindow => {
                     if self.client_state.try_follow(this_entity()).is_some() {
-                        self.interface.open_window(MenuWindow)
+                        match self.interface.is_window_with_class_open(WindowClass::Menu) {
+                            true => self.interface.close_window_with_class(WindowClass::Menu),
+                            false => self.interface.open_window(MenuWindow),
+                        }
                     }
                 }
-                InputEvent::OpenInventoryWindow => {
+                InputEvent::ToggleInventoryWindow => {
                     if self.client_state.try_follow(this_entity()).is_some() {
-                        self.interface.open_window(InventoryWindow::new(client_state().inventory().items()));
+                        match self.interface.is_window_with_class_open(WindowClass::Inventory) {
+                            true => self.interface.close_window_with_class(WindowClass::Inventory),
+                            false => self.interface.open_window(InventoryWindow::new(client_state().inventory().items())),
+                        }
                     }
                 }
-                InputEvent::OpenEquipmentWindow => {
+                InputEvent::ToggleEquipmentWindow => {
                     if self.client_state.try_follow(this_entity()).is_some() {
-                        self.interface.open_window(EquipmentWindow::new(client_state().inventory().items()));
+                        match self.interface.is_window_with_class_open(WindowClass::Equipment) {
+                            true => self.interface.close_window_with_class(WindowClass::Equipment),
+                            false => self.interface.open_window(EquipmentWindow::new(client_state().inventory().items())),
+                        }
                     }
                 }
-                InputEvent::OpenSkillTreeWindow => {
+                InputEvent::ToggleSkillTreeWindow => {
                     if self.client_state.try_follow(this_entity()).is_some() {
-                        self.interface
-                            .open_window(SkillTreeWindow::new(client_state().skill_tree().skills()))
+                        match self.interface.is_window_with_class_open(WindowClass::SkillTree) {
+                            true => self.interface.close_window_with_class(WindowClass::SkillTree),
+                            false => self
+                                .interface
+                                .open_window(SkillTreeWindow::new(client_state().skill_tree().skills())),
+                        }
                     }
                 }
-                InputEvent::OpenGraphicsSettingsWindow => self.interface.open_window(GraphicsSettingsWindow::new(
-                    client_state().graphics_settings(),
-                    client_state().graphics_settings_capabilities(),
-                )),
-                InputEvent::OpenAudioSettingsWindow => self
-                    .interface
-                    .open_window(AudioSettingsWindow::new(client_state().audio_settings())),
-                InputEvent::OpenFriendListWindow => {
+                InputEvent::ToggleGraphicsSettingsWindow => match self.interface.is_window_with_class_open(WindowClass::GraphicsSettings) {
+                    true => self.interface.close_window_with_class(WindowClass::GraphicsSettings),
+                    false => self.interface.open_window(GraphicsSettingsWindow::new(
+                        client_state().graphics_settings(),
+                        client_state().graphics_settings_capabilities(),
+                    )),
+                },
+                InputEvent::ToggleAudioSettingsWindow => match self.interface.is_window_with_class_open(WindowClass::AudioSettings) {
+                    true => self.interface.close_window_with_class(WindowClass::AudioSettings),
+                    flaes => self
+                        .interface
+                        .open_window(AudioSettingsWindow::new(client_state().audio_settings())),
+                },
+                InputEvent::ToggleFriendListWindow => {
                     if self.client_state.try_follow(this_entity()).is_some() {
-                        self.interface.open_window(FriendListWindow::new(
-                            client_state().friend_list_window(),
-                            client_state().friend_list(),
-                        ));
+                        match self.interface.is_window_with_class_open(WindowClass::FriendList) {
+                            true => self.interface.close_window_with_class(WindowClass::FriendList),
+                            false => self.interface.open_window(FriendListWindow::new(
+                                client_state().friend_list_window(),
+                                client_state().friend_list(),
+                            )),
+                        }
                     }
                 }
                 InputEvent::CloseTopWindow => self.interface.close_top_window(&self.client_state),
@@ -1902,9 +1924,12 @@ impl Client {
                     }
                 }
                 #[cfg(feature = "debug")]
-                InputEvent::OpenRenderOptionsWindow => self
-                    .interface
-                    .open_window(RenderOptionsWindow::new(client_state().render_options())),
+                InputEvent::ToggleRenderOptionsWindow => match self.interface.is_window_with_class_open(WindowClass::RenderOptions) {
+                    true => self.interface.close_window_with_class(WindowClass::RenderOptions),
+                    false => self
+                        .interface
+                        .open_window(RenderOptionsWindow::new(client_state().render_options())),
+                },
                 #[cfg(feature = "debug")]
                 InputEvent::OpenMapDataWindow => {
                     if self.client_state.follow(client_state().map()).is_some() {
@@ -1913,21 +1938,35 @@ impl Client {
                     }
                 }
                 #[cfg(feature = "debug")]
-                InputEvent::OpenClientStateInspectorWindow => self.interface.open_state_window_mut(client_state()),
-                #[cfg(feature = "debug")]
-                InputEvent::OpenMapsWindow => {
-                    if self.client_state.follow(client_state().map()).is_some() {
-                        self.interface.open_window(MapsWindow);
+                InputEvent::ToggleClientStateInspectorWindow => {
+                    match self.interface.is_window_with_class_open(WindowClass::ClientStateInspector) {
+                        true => self.interface.close_window_with_class(WindowClass::ClientStateInspector),
+                        false => self.interface.open_state_window_mut(client_state()),
                     }
                 }
                 #[cfg(feature = "debug")]
-                InputEvent::OpenCommandsWindow => {
+                InputEvent::ToggleMapsWindow => {
                     if self.client_state.follow(client_state().map()).is_some() {
-                        self.interface.open_window(CommandsWindow);
+                        match self.interface.is_window_with_class_open(WindowClass::Maps) {
+                            true => self.interface.close_window_with_class(WindowClass::Maps),
+                            false => self.interface.open_window(MapsWindow),
+                        }
                     }
                 }
                 #[cfg(feature = "debug")]
-                InputEvent::OpenTimeWindow => self.interface.open_window(TimeWindow),
+                InputEvent::ToggleCommandsWindow => {
+                    if self.client_state.follow(client_state().map()).is_some() {
+                        match self.interface.is_window_with_class_open(WindowClass::Commands) {
+                            true => self.interface.close_window_with_class(WindowClass::Commands),
+                            false => self.interface.open_window(CommandsWindow),
+                        }
+                    }
+                }
+                #[cfg(feature = "debug")]
+                InputEvent::ToggleTimeWindow => match self.interface.is_window_with_class_open(WindowClass::Time) {
+                    true => self.interface.close_window_with_class(WindowClass::Time),
+                    false => self.interface.open_window(TimeWindow),
+                },
                 #[cfg(feature = "debug")]
                 InputEvent::SetTime { day_seconds } => self.game_timer.set_day_timer(day_seconds),
                 #[cfg(feature = "debug")]
@@ -1936,9 +1975,17 @@ impl Client {
                     self.interface.open_state_window(client_state().menu_theme())
                 }
                 #[cfg(feature = "debug")]
-                InputEvent::OpenProfilerWindow => self.interface.open_window(ProfilerWindow::new(client_state().profiler_window())),
+                InputEvent::ToggleProfilerWindow => match self.interface.is_window_with_class_open(WindowClass::Profiler) {
+                    true => self.interface.close_window_with_class(WindowClass::Profiler),
+                    false => self.interface.open_window(ProfilerWindow::new(client_state().profiler_window())),
+                },
                 #[cfg(feature = "debug")]
-                InputEvent::OpenPacketInspectorWindow => self.interface.open_window(PacketInspector::new(client_state().packet_history())),
+                InputEvent::TogglePacketInspectorWindow => match self.interface.is_window_with_class_open(WindowClass::PacketInspector) {
+                    true => self.interface.close_window_with_class(WindowClass::PacketInspector),
+                    false => self
+                        .interface
+                        .open_window(PacketInspectorWindow::new(client_state().packet_history())),
+                },
                 #[cfg(feature = "debug")]
                 InputEvent::CameraLookAround { offset } => self.debug_camera.look_around(offset),
                 #[cfg(feature = "debug")]

@@ -49,20 +49,20 @@ pub enum InputEvent {
     },
     /// Reset the player camera rotation.
     ResetCameraRotation,
-    /// Open the menu window. Only works while playing.
-    OpenMenuWindow,
-    /// Open the inventory window. Only works while playing.
-    OpenInventoryWindow,
-    /// Open the equipment window. Only works while playing.
-    OpenEquipmentWindow,
-    /// Open the skill tree window. Only works while playing.
-    OpenSkillTreeWindow,
-    /// Open the graphics settings window.
-    OpenGraphicsSettingsWindow,
-    /// Open the audio settings window.
-    OpenAudioSettingsWindow,
-    /// Open the friend list window. Only works while playing.
-    OpenFriendListWindow,
+    /// Open or close the menu window. Only works while playing.
+    ToggleMenuWindow,
+    /// Open or close the inventory window. Only works while playing.
+    ToggleInventoryWindow,
+    /// Open or close the equipment window. Only works while playing.
+    ToggleEquipmentWindow,
+    /// Open or close the skill tree window. Only works while playing.
+    ToggleSkillTreeWindow,
+    /// Open or close the graphics settings window.
+    ToggleGraphicsSettingsWindow,
+    /// Open or close the audio settings window.
+    ToggleAudioSettingsWindow,
+    /// Open or close the friend list window. Only works while playing.
+    ToggleFriendListWindow,
     /// Close the most recently opened or clicked closable window.
     CloseTopWindow,
     /// Toggle if the user interface should be rendered or not.
@@ -222,24 +222,24 @@ pub enum InputEvent {
         /// Id of the marker to inspect.
         marker_identifier: MarkerIdentifier,
     },
-    /// Open the render options window.
+    /// Open or close the render options window.
     #[cfg(feature = "debug")]
-    OpenRenderOptionsWindow,
+    ToggleRenderOptionsWindow,
     /// Open the map data window.
     #[cfg(feature = "debug")]
     OpenMapDataWindow,
-    /// Open the client state inspector window.
+    /// Open or close the client state inspector window.
     #[cfg(feature = "debug")]
-    OpenClientStateInspectorWindow,
-    /// Open the maps window. Only works while playing.
+    ToggleClientStateInspectorWindow,
+    /// Open or close the maps window. Only works while playing.
     #[cfg(feature = "debug")]
-    OpenMapsWindow,
-    /// Open the commands window. Only works while playing.
+    ToggleMapsWindow,
+    /// Open or close the commands window. Only works while playing.
     #[cfg(feature = "debug")]
-    OpenCommandsWindow,
-    /// Open the time window.
+    ToggleCommandsWindow,
+    /// Open or close the time window.
     #[cfg(feature = "debug")]
-    OpenTimeWindow,
+    ToggleTimeWindow,
     /// Set the current time.
     #[cfg(feature = "debug")]
     SetTime {
@@ -249,12 +249,12 @@ pub enum InputEvent {
     /// Open the theme inspector window.
     #[cfg(feature = "debug")]
     OpenThemeInspectorWindow,
-    /// Open the profiler window.
+    /// Open or close the profiler window.
     #[cfg(feature = "debug")]
-    OpenProfilerWindow,
-    /// Open the packet inspector window.
+    ToggleProfilerWindow,
+    /// Open or close the packet inspector window.
     #[cfg(feature = "debug")]
-    OpenPacketInspectorWindow,
+    TogglePacketInspectorWindow,
     /// Move the view direction of the debug camera.
     #[cfg(feature = "debug")]
     CameraLookAround {

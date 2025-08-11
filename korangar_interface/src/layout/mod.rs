@@ -311,6 +311,10 @@ impl<'a, App: Application> Layout<'a, App> {
         self.mouse_mode = Some(mouse_mode);
     }
 
+    pub fn get_interface_scaling(&self) -> f32 {
+        self.interface_scaling
+    }
+
     pub fn scale_area(&self, area: Area) -> Area {
         Area {
             left: (area.left - self.window_position.left()) * self.interface_scaling + self.window_position.left(),

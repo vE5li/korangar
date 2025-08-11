@@ -374,6 +374,7 @@ struct SpriteInstruction<'a> {
     clip_layer: ClipLayerId,
     area: Area,
     color: Color,
+    scaling: f32,
 }
 
 /// A custom layout instruction.
@@ -418,6 +419,7 @@ impl RenderLayer<ClientState> for InterfaceRenderer {
                 clip_layer,
                 area,
                 color,
+                scaling,
             }) => {
                 let position = ScreenPosition {
                     left: area.left + area.width / 2.0,
@@ -425,7 +427,7 @@ impl RenderLayer<ClientState> for InterfaceRenderer {
                 };
                 let screen_clip = clip_layers[clip_layer.0].get();
 
-                actions.render_sprite(self, sprite, animation_state, position, 0, screen_clip, color, 1.0);
+                actions.render_sprite(self, sprite, animation_state, position, 0, screen_clip, color, scaling);
             }
             CustomInstruction::Texture(TextureInstruction {
                 texture,
@@ -484,6 +486,7 @@ impl<'a> LayoutExt<'a> for Layout<'a, ClientState> {
     ) {
         let clip_layer = self.get_active_clip_layer();
         let area = self.scale_area(area);
+        let scaling = self.get_interface_scaling();
 
         self.add_custom_instruction(CustomInstruction::Sprite(SpriteInstruction {
             actions,
@@ -492,6 +495,7 @@ impl<'a> LayoutExt<'a> for Layout<'a, ClientState> {
             clip_layer,
             area,
             color,
+            scaling,
         }));
     }
 }

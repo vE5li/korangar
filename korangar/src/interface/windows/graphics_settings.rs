@@ -37,6 +37,17 @@ where
             split! {
                 children: (
                     text! {
+                        text: "Language",
+                    },
+                    drop_down! {
+                        selected: self.settings_path.language(),
+                        options: self.capabilities_path.languages(),
+                    }
+                )
+            },
+            split! {
+                children: (
+                    text! {
                         text: "Interface scale",
                     },
                     drop_down! {
@@ -65,7 +76,8 @@ where
                 text: "Enable VSYNC",
                 state: self.settings_path.vsync(),
                 event: Toggle(self.settings_path.vsync()),
-                disabled: self.capabilities_path.additional_settings_disabled(),
+                disabled: self.capabilities_path.vsync_setting_disabled(),
+                disabled_tooltip: "This setting is not supported on your system",
             },
             split! {
                 children: (
@@ -156,7 +168,7 @@ where
             class: Self::window_class(),
             theme: InterfaceThemeType::Game,
             closable: true,
-            elements: elements,
+            elements,
         }
     }
 }

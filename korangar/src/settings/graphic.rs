@@ -6,11 +6,15 @@ use ron::ser::PrettyConfig;
 use rust_state::RustState;
 use serde::{Deserialize, Serialize};
 
-use crate::graphics::{LimitFramerate, Msaa, ScreenSpaceAntiAliasing, ShadowDetail, ShadowQuality, Ssaa, TextureSamplerType};
+use crate::graphics::{
+    LimitFramerate, Msaa, PresentModeInfo, ScreenSpaceAntiAliasing, ShadowDetail, ShadowQuality, Ssaa, TextureSamplerType,
+};
 use crate::loaders::Scaling;
+use crate::state::translation::Language;
 
 #[derive(Clone, Serialize, Deserialize, RustState, StateElement)]
 pub struct GraphicsSettings {
+    pub language: Language,
     pub interface_scaling: Scaling,
     pub lighting_mode: LightingMode,
     pub vsync: bool,
@@ -28,6 +32,7 @@ pub struct GraphicsSettings {
 impl Default for GraphicsSettings {
     fn default() -> Self {
         Self {
+            language: Language::English,
             interface_scaling: Scaling::new(1.0),
             lighting_mode: LightingMode::Enhanced,
             vsync: true,
@@ -104,6 +109,7 @@ impl DropDownItem<LightingMode> for LightingMode {
 
 #[derive(RustState, StateElement)]
 pub struct GraphicsSettingsCapabilities {
+    languages: Vec<Language>,
     interface_scalings: Vec<Scaling>,
     lighting_modes: Vec<LightingMode>,
     texture_filtering_options: Vec<TextureSamplerType>,
@@ -113,13 +119,13 @@ pub struct GraphicsSettingsCapabilities {
     screen_space_anti_aliasing_options: Vec<ScreenSpaceAntiAliasing>,
     shadow_quality_options: Vec<ShadowQuality>,
     shadow_detail_options: Vec<ShadowDetail>,
-    // TODO: Rename most likely.
-    additional_settings_disabled: bool,
+    vsync_setting_disabled: bool,
 }
 
-impl GraphicsSettingsCapabilities {
-    pub fn new(supported_msaa: Vec<Msaa>, additional_settings_disabled: bool) -> Self {
+impl Default for GraphicsSettingsCapabilities {
+    fn default() -> Self {
         Self {
+            languages: vec![Language::English, Language::German],
             interface_scalings: vec![
                 Scaling::new(0.5),
                 Scaling::new(0.6),
@@ -154,7 +160,7 @@ impl GraphicsSettingsCapabilities {
                 LimitFramerate::Limit(144),
                 LimitFramerate::Limit(240),
             ],
-            supported_msaa,
+            supported_msaa: Vec::new(),
             ssaa_options: vec![Ssaa::Off, Ssaa::X2, Ssaa::X3, Ssaa::X4],
             screen_space_anti_aliasing_options: vec![ScreenSpaceAntiAliasing::Off, ScreenSpaceAntiAliasing::Fxaa],
             shadow_quality_options: vec![
@@ -166,7 +172,14 @@ impl GraphicsSettingsCapabilities {
                 ShadowQuality::SoftPCSSx64,
             ],
             shadow_detail_options: vec![ShadowDetail::Normal, ShadowDetail::Ultra, ShadowDetail::Insane],
-            additional_settings_disabled,
+            vsync_setting_disabled: true,
         }
+    }
+}
+
+impl GraphicsSettingsCapabilities {
+    pub fn update(&mut self, supported_msaa: Vec<Msaa>, present_mode_info: PresentModeInfo) {
+        self.supported_msaa = supported_msaa;
+        self.vsync_setting_disabled = !present_mode_info.supports_mailbox && !present_mode_info.supports_immediate;
     }
 }

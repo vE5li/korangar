@@ -10,8 +10,9 @@ use rust_state::{Context, ManuallyAssertExt, Path, RustState, VecIndexExt};
 
 use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
-use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
+use crate::state::translation::TranslationPathExt;
+use crate::state::{ClientState, ClientStatePathExt, client_state};
 
 // TODO: These constants are duplicated troughout the code base. Unify this
 // somewhere, maybe a `consts.rs` would be a good idea at this point?
@@ -62,7 +63,7 @@ where
                         text: name_path,
                         children: (
                             button! {
-                                text: "Remove",
+                                text: client_state().translation().remove_button_text(),
                                 event: move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
                                     let &Friend { account_id, character_id, .. } = state.get(&friend_path);
 
@@ -143,13 +144,13 @@ where
         };
 
         window! {
-            title: "Friend list",
+            title: client_state().translation().friend_list_window_title(),
             class: Self::window_class(),
             theme: InterfaceThemeType::Game,
             closable: true,
             elements: (
                 text_box! {
-                    ghost_text: "Add friend by name",
+                    ghost_text: client_state().translation().friend_list_text_box_message(),
                     state: self.window_state_path.currently_adding(),
                     input_handler: DefaultHandler::<_, _, MAXIMUM_NAME_LENGTH>::new(self.window_state_path.currently_adding(), add_action),
                     focus_id: AddFriendTextBox,

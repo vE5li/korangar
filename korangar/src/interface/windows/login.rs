@@ -9,8 +9,9 @@ use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
 use crate::loaders::{ClientInfo, ClientInfoPathExt, OverflowBehavior, ServiceId};
 use crate::settings::{LoginSettings, LoginSettingsPathExt, ServiceSettings, ServiceSettingsPathExt};
-use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
+use crate::state::translation::TranslationPathExt;
+use crate::state::{ClientState, ClientStatePathExt, client_state};
 
 const MAXIMUM_USERNAME_LENGTH: usize = 24;
 const MAXIMUM_PASSWORD_LENGTH: usize = 24;
@@ -151,7 +152,10 @@ where
         let remember_username_path = selected_service_path.remember_username();
         let remember_password_path = selected_service_path.remember_password();
 
-        let disabled = move |state: &Context<ClientState>| !state.get(&username_path).is_empty() && !state.get(&password_path).is_empty();
+        let disabled_selector = ComputedSelector::new_default(move |state: &ClientState| {
+            selected_service_path.username().follow(state).unwrap().is_empty()
+                || selected_service_path.password().follow(state).unwrap().is_empty()
+        });
 
         let login_action = move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
             let selected_service_path = self.window_state_path.selected_service();
@@ -195,32 +199,32 @@ where
         };
 
         window! {
-            title: "Log In",
+            title: client_state().translation().log_in_window_title(),
             class: Self::window_class(),
             theme: InterfaceThemeType::Menu,
             minimum_width: 450.0,
             maximum_width: 450.0,
             elements: (
-                text! { text: "Select service" },
+                text! { text: client_state().translation().select_service_text() },
                 drop_down! {
                     options: self.client_info_path.services(),
                     selected: self.window_state_path.selected_service(),
                     click_handler: DefaultClickHandler::new(self.window_state_path.selected_service(), self.client_info_path.services()),
                 },
-                text! { text: "Account data" },
+                text! { text: client_state().translation().account_data_text() },
                 fragment! {
                     // TODO: Theme this
                     gaps: 8.0,
                     children: (
                         text_box! {
-                            ghost_text: "Username",
+                            ghost_text: client_state().translation().username_text(),
                             state: username_path,
                             input_handler: DefaultHandler::<_, _, MAXIMUM_USERNAME_LENGTH>::new(username_path, username_action),
                             focus_id: UsernameTextBox,
                             overflow_behavior: OverflowBehavior::Shrink,
                         },
                         text_box! {
-                            ghost_text: "Password",
+                            ghost_text: client_state().translation().password_text(),
                             state: password_path,
                             input_handler: DefaultHandler::<_, _, MAXIMUM_PASSWORD_LENGTH>::new(password_path, password_action),
                             focus_id: PasswordTextBox,
@@ -234,14 +238,14 @@ where
                     gaps: 8.0,
                     children: (
                         state_button! {
-                            text: "Remember username",
+                            text: client_state().translation().remember_username_text(),
                             state: remember_username_path,
                             event: Toggle(remember_username_path),
                             background_color: Color::TRANSPARENT,
                             hovered_background_color: Color::TRANSPARENT,
                         },
                         state_button! {
-                            text: "Remember password",
+                            text: client_state().translation().remember_password_text(),
                             state: remember_password_path,
                             event: Toggle(remember_password_path),
                             background_color: Color::TRANSPARENT,
@@ -250,8 +254,9 @@ where
                     ),
                 },
                 button! {
-                    text: "Log in",
-                    // disabled: selector,
+                    text: client_state().translation().log_in_button_text(),
+                    disabled: disabled_selector,
+                    disabled_tooltip: client_state().translation().log_in_button_tooltip(),
                     event: login_action,
                 },
             ),

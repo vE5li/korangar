@@ -14,7 +14,8 @@ use crate::graphics::Color;
 use crate::input::InputEvent;
 use crate::loaders::{FontSize, OverflowBehavior};
 use crate::state::theme::{ChatThemePathExt, InterfaceThemePathExt, InterfaceThemeType};
-use crate::state::{ChatMessage, ClientState, client_theme};
+use crate::state::translation::TranslationPathExt;
+use crate::state::{ChatMessage, ClientState, ClientStatePathExt, client_state, client_theme};
 
 const MAXIMUM_CHAT_MESSAGE_LENGTH: usize = 80;
 
@@ -181,7 +182,7 @@ where
         };
 
         window! {
-            title: "Chat",
+            title: client_state().translation().chat_window_title(),
             class: Self::window_class(),
             theme: InterfaceThemeType::Game,
             background_color: client_theme().chat().window_color(),
@@ -193,7 +194,7 @@ where
             maximum_height: 800.0,
             elements: (
                 text_box! {
-                    ghost_text: "Enter chat message or command",
+                    ghost_text: client_state().translation().chat_text_box_message(),
                     state: current_text_path,
                     input_handler: DefaultHandler::<_, _, MAXIMUM_CHAT_MESSAGE_LENGTH>::new(current_text_path, send_action),
                     background_color: client_theme().chat().text_box_background_color(),

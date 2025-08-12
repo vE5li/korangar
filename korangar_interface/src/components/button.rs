@@ -19,6 +19,8 @@ where
     pub background_color: App::Color,
     pub hovered_foreground_color: App::Color,
     pub hovered_background_color: App::Color,
+    pub disabled_foreground_color: App::Color,
+    pub disabled_background_color: App::Color,
     pub height: f32,
     pub corner_radius: App::CornerRadius,
     pub font_size: App::FontSize,
@@ -27,25 +29,30 @@ where
     pub overflow_behavior: App::OverflowBehavior,
 }
 
-pub struct Button<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N> {
-    text_marker: PhantomData<(Text, Tooltip)>,
+pub struct Button<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q> {
+    text_marker: PhantomData<(Text, Tooltip, DisabledTooltip)>,
     text: A,
     tooltip: B,
     event: C,
     disabled: D,
-    foreground_color: E,
-    background_color: F,
-    hovered_foreground_color: G,
-    hovered_background_color: H,
-    height: I,
-    corner_radius: J,
-    font_size: K,
-    horizontal_alignment: L,
-    vertical_alignment: M,
-    overflow_behavior: N,
+    disabled_tooltip: E,
+    foreground_color: F,
+    background_color: G,
+    hovered_foreground_color: H,
+    hovered_background_color: I,
+    disabled_foreground_color: J,
+    disabled_background_color: K,
+    height: L,
+    corner_radius: M,
+    font_size: N,
+    horizontal_alignment: O,
+    vertical_alignment: P,
+    overflow_behavior: Q,
 }
 
-impl<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N> Button<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N> {
+impl<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q>
+    Button<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q>
+{
     /// This function is supposed to be called from a component macro and not
     /// intended to be called manually.
     #[inline(always)]
@@ -55,16 +62,19 @@ impl<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N> Button<Text, Toolt
         tooltip: B,
         event: C,
         disabled: D,
-        foreground_color: E,
-        background_color: F,
-        hovered_foreground_color: G,
-        hovered_background_color: H,
-        height: I,
-        corner_radius: J,
-        font_size: K,
-        horizontal_alignment: L,
-        vertical_alignment: M,
-        overflow_behavior: N,
+        disabled_tooltip: E,
+        foreground_color: F,
+        background_color: G,
+        hovered_foreground_color: H,
+        hovered_background_color: I,
+        disabled_foreground_color: J,
+        disabled_background_color: K,
+        height: L,
+        corner_radius: M,
+        font_size: N,
+        horizontal_alignment: O,
+        vertical_alignment: P,
+        overflow_behavior: Q,
     ) -> Self {
         Self {
             text_marker: PhantomData,
@@ -72,10 +82,13 @@ impl<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N> Button<Text, Toolt
             tooltip,
             event,
             disabled,
+            disabled_tooltip,
             foreground_color,
             background_color,
             hovered_foreground_color,
             hovered_background_color,
+            disabled_foreground_color,
+            disabled_background_color,
             height,
             corner_radius,
             font_size,
@@ -86,26 +99,30 @@ impl<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N> Button<Text, Toolt
     }
 }
 
-impl<App, Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N> Element<App>
-    for Button<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N>
+impl<App, Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q> Element<App>
+    for Button<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q>
 where
     App: Application,
     Text: AsRef<str> + 'static,
     Tooltip: AsRef<str> + 'static,
+    DisabledTooltip: AsRef<str> + 'static,
     A: Selector<App, Text>,
     B: Selector<App, Tooltip>,
     C: ClickAction<App> + 'static,
     D: Selector<App, bool>,
-    E: Selector<App, App::Color>,
+    E: Selector<App, DisabledTooltip>,
     F: Selector<App, App::Color>,
     G: Selector<App, App::Color>,
     H: Selector<App, App::Color>,
-    I: Selector<App, f32>,
-    J: Selector<App, App::CornerRadius>,
-    K: Selector<App, App::FontSize>,
-    L: Selector<App, HorizontalAlignment>,
-    M: Selector<App, VerticalAlignment>,
-    N: Selector<App, App::OverflowBehavior>,
+    I: Selector<App, App::Color>,
+    J: Selector<App, App::Color>,
+    K: Selector<App, App::Color>,
+    L: Selector<App, f32>,
+    M: Selector<App, App::CornerRadius>,
+    N: Selector<App, App::FontSize>,
+    O: Selector<App, HorizontalAlignment>,
+    P: Selector<App, VerticalAlignment>,
+    Q: Selector<App, App::OverflowBehavior>,
 {
     fn create_layout_info(&mut self, state: &Context<App>, _: ElementStoreMut<'_>, resolver: &mut Resolver<'_, App>) -> Self::LayoutInfo {
         let height = *state.get(&self.height);
@@ -129,20 +146,30 @@ where
         layout: &mut Layout<'a, App>,
     ) {
         let is_hoverered = layout.is_area_hovered_and_active(layout_info.area);
+        let is_disabled = *state.get(&self.disabled);
 
         if is_hoverered {
-            layout.add_click_area(layout_info.area, MouseButton::Left, &self.event);
             layout.mark_hovered();
 
-            let tooltip = state.get(&self.tooltip).as_ref();
+            struct ButtonTooltip;
 
+            let tooltip = state.get(&self.tooltip).as_ref();
             if !tooltip.is_empty() {
-                struct ButtonTooltip;
                 layout.add_tooltip(tooltip, ButtonTooltip.tooltip_id());
+            }
+
+            if is_disabled {
+                let disabled_tooltip = state.get(&self.disabled_tooltip).as_ref();
+                if !disabled_tooltip.is_empty() {
+                    layout.add_tooltip(disabled_tooltip, ButtonTooltip.tooltip_id());
+                }
+            } else {
+                layout.add_click_area(layout_info.area, MouseButton::Left, &self.event);
             }
         }
 
         let background_color = match is_hoverered {
+            _ if is_disabled => *state.get(&self.disabled_background_color),
             true => *state.get(&self.hovered_background_color),
             false => *state.get(&self.background_color),
         };
@@ -150,6 +177,7 @@ where
         layout.add_rectangle(layout_info.area, *state.get(&self.corner_radius), background_color);
 
         let foreground_color = match is_hoverered {
+            _ if is_disabled => *state.get(&self.disabled_foreground_color),
             true => *state.get(&self.hovered_foreground_color),
             false => *state.get(&self.foreground_color),
         };

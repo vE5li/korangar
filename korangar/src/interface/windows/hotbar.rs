@@ -6,8 +6,9 @@ use rust_state::{ArrayLookupExt, OptionExt, Path};
 use crate::interface::resource::SkillSource;
 use crate::interface::windows::WindowClass;
 use crate::inventory::Skill;
-use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
+use crate::state::translation::TranslationPathExt;
+use crate::state::{ClientState, ClientStatePathExt, client_state};
 
 pub struct HotbarWindow<P, const N: usize> {
     skills_path: P,
@@ -31,7 +32,7 @@ where
         use korangar_interface::prelude::*;
 
         window! {
-            title: "Hotbar",
+            title: client_state().translation().hotbar_window_title(),
             class: Self::window_class(),
             theme: InterfaceThemeType::Game,
             elements: (

@@ -41,6 +41,13 @@ pub fn component_macro_inner(
                 let property_name: Ident = input.parse()?;
                 if input.parse::<Token![:]>().is_err() {
                     entries.insert(property_name.to_string(), ExprOrIdent::Ident(property_name));
+
+                    if input.peek(Token![,]) {
+                        input.parse::<Token![,]>()?;
+                    } else {
+                        break;
+                    }
+
                     continue;
                 }
 

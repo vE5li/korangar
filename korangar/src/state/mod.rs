@@ -1,4 +1,5 @@
 pub mod theme;
+pub mod translation;
 
 use std::sync::Arc;
 
@@ -18,6 +19,7 @@ use korangar_networking::{MessageColor, SellItem, ShopItem};
 use ragnarok_packets::{CharacterId, CharacterServerInformation, Friend};
 use rust_state::{Path, RustState, Selector};
 use theme::{InterfaceTheme, InterfaceThemePathExt, InterfaceThemeType};
+use translation::Translation;
 
 #[cfg(feature = "debug")]
 use crate::PacketHistory;
@@ -58,6 +60,9 @@ pub struct ChatMessage {
 #[window_title("Client State Inspector")]
 #[state_root]
 pub struct ClientState {
+    /// Translation for the selected language.
+    translation: Translation,
+
     /// Saved settings of previous connections and credentials.
     login_settings: LoginSettings,
     /// Saved audio settings.
@@ -168,9 +173,12 @@ impl ClientState {
         game_file_loader: &GameFileLoader,
         map: Box<Map>,
         graphics_settings: GraphicsSettings,
-        graphics_settings_capabilities: GraphicsSettingsCapabilities,
         #[cfg(feature = "debug")] packet_history: PacketHistory,
     ) -> Self {
+        time_phase!("load translation", {
+            let translation = Translation::load_language(game_file_loader, graphics_settings.language);
+        });
+
         time_phase!("load settings", {
             let mut login_settings = LoginSettings::new();
             let audio_settings = AudioSettings::new();
@@ -254,6 +262,7 @@ impl ClientState {
 
         time_phase!("create window resources", {
             let window_size = ScreenSize::default();
+            let graphics_settings_capabilities = GraphicsSettingsCapabilities::default();
         });
 
         #[cfg(feature = "debug")]
@@ -269,6 +278,7 @@ impl ClientState {
         debug_timer.stop();
 
         ClientState {
+            translation,
             login_settings,
             audio_settings,
             graphics_settings,

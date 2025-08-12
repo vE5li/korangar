@@ -4,8 +4,9 @@ use rust_state::{Context, Path};
 
 use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
-use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
+use crate::state::translation::TranslationPathExt;
+use crate::state::{ClientState, ClientStatePathExt, client_state};
 
 const MINIMUM_NAME_LENGTH: usize = 4;
 const MAXIMUM_NAME_LENGTH: usize = 24;
@@ -34,31 +35,31 @@ where
 
         struct CharacterName;
 
+        let disabled = ComputedSelector::new_default(move |state: &ClientState| {
+            self.character_name_path.follow(state).unwrap().len() < MINIMUM_NAME_LENGTH
+        });
+
         let create_action = move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
             let name = state.get(&self.character_name_path).clone();
-
-            // TODO: Give some sort of error if the name is too short.
-            if name.len() >= MINIMUM_NAME_LENGTH {
-                queue.queue(InputEvent::CreateCharacter { slot: self.slot, name });
-            }
+            queue.queue(InputEvent::CreateCharacter { slot: self.slot, name });
         };
 
         window! {
-            title: "Create Character",
+            title: client_state().translation().create_character_window_title(),
             class: Self::window_class(),
             theme: InterfaceThemeType::Menu,
             closable: true,
             elements: (
                 text_box! {
-                    ghost_text: "Character name",
+                    ghost_text: client_state().translation().character_name_text(),
                     state: self.character_name_path,
                     input_handler: DefaultHandler::<_, _, MAXIMUM_NAME_LENGTH>::new(self.character_name_path, create_action),
                     focus_id: CharacterName,
                 },
                 button! {
-                    text: "Create",
-                    // TODO: Disable if the name is too short.
-                    // disabled: selector,
+                    text: client_state().translation().create_character_button_text(),
+                    disabled,
+                    disabled_tooltip: client_state().translation().create_character_button_tooltip(),
                     event: create_action,
                 }
             ),

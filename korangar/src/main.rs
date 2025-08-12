@@ -77,6 +77,7 @@ use renderer::InterfaceRenderer;
 use rust_state::{AsRefExt, Context, ManuallyAssertExt, OptionExt};
 use settings::{AudioSettings, AudioSettingsPathExt, GraphicsSettingsCapabilities, GraphicsSettingsPathExt};
 use state::theme::{CursorThemePathExt, GameThemePathExt, IndicatorThemePathExt, InterfaceThemePathExt};
+use state::translation::Translation;
 use state::{ChatMessage, ClientState, ClientStatePathExt, ClientStateRootExt, client_state, this_entity, this_player};
 #[cfg(feature = "debug")]
 use wgpu::Device;
@@ -310,6 +311,7 @@ fn initialize_shutdown_signal() {
 }
 
 struct Client {
+    game_file_loader: Arc<GameFileLoader>,
     action_loader: Arc<ActionLoader>,
     async_loader: Arc<AsyncLoader>,
     effect_loader: Arc<EffectLoader>,
@@ -595,12 +597,6 @@ impl Client {
                 texture_loader: texture_loader.clone(),
                 picker_value,
             });
-
-            let graphics_settings_capabilities = GraphicsSettingsCapabilities::new(
-                graphics_engine.get_supported_msaa(),
-                // FIX: Get this from the present info later on.
-                true,
-            );
         });
 
         time_phase!("initialize interface", {
@@ -702,7 +698,6 @@ impl Client {
                 &game_file_loader,
                 map,
                 graphics_settings.clone(),
-                graphics_settings_capabilities,
                 #[cfg(feature = "debug")]
                 packet_history,
             ));
@@ -715,6 +710,7 @@ impl Client {
         ));
 
         Some(Self {
+            game_file_loader,
             action_loader,
             async_loader,
             effect_loader,
@@ -2828,6 +2824,13 @@ impl Client {
                 .set_high_quality_interface(graphics_settings.high_quality_interface);
             self.active_graphics_settings.high_quality_interface = graphics_settings.high_quality_interface;
         }
+
+        let language = graphics_settings.language;
+
+        if self.active_graphics_settings.language != language {
+            *self.client_state.follow_mut(client_state().translation()) = Translation::load_language(&self.game_file_loader, language);
+            self.active_graphics_settings.language = language;
+        }
     }
 }
 
@@ -2883,6 +2886,17 @@ impl ApplicationHandler for Client {
                 graphics_settings.screen_space_anti_aliasing,
                 graphics_settings.high_quality_interface,
             );
+
+            // Update graphics settings capabilities based on the new surface.
+            // We don't expect the capabilities to change on consecutive calls but we
+            // can't get the present mode info when initializing the client, so
+            // we do it here instead.
+            self.client_state
+                .follow_mut(client_state().graphics_settings_capabilities())
+                .update(
+                    self.graphics_engine.get_supported_msaa(),
+                    self.graphics_engine.get_present_mode_info(),
+                );
 
             window.set_visible(true);
         }

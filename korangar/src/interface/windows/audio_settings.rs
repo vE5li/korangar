@@ -3,8 +3,9 @@ use rust_state::Path;
 
 use crate::interface::windows::WindowClass;
 use crate::settings::{AudioSettings, AudioSettingsPathExt};
-use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
+use crate::state::translation::TranslationPathExt;
+use crate::state::{ClientState, ClientStatePathExt, client_state};
 
 #[derive(Default)]
 pub struct AudioSettingsWindow<A> {
@@ -29,13 +30,13 @@ where
         use korangar_interface::prelude::*;
 
         window! {
-            title: "Audio Settings",
+            title: client_state().translation().audio_settings_window_title(),
             class: Self::window_class(),
             theme: InterfaceThemeType::Game,
             closable: true,
             elements: (
                 state_button! {
-                    text: "Mute audio on focus loss",
+                    text: client_state().translation().mute_audio_on_focus_loss_button_text(),
                     state: self.audio_settings_path.mute_on_focus_loss(),
                     event: Toggle(self.audio_settings_path.mute_on_focus_loss()),
                 },

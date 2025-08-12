@@ -216,6 +216,26 @@ impl InputSystem {
             events.push(InputEvent::ToggleInventoryWindow);
         }
 
+        if alt_down && self.get_key(KeyCode::KeyS).pressed() {
+            events.push(InputEvent::ToggleSkillTreeWindow);
+        }
+
+        if alt_down && self.get_key(KeyCode::KeyZ).pressed() {
+            events.push(InputEvent::ToggleFriendListWindow);
+        }
+
+        if alt_down && self.get_key(KeyCode::KeyQ).pressed() {
+            events.push(InputEvent::ToggleEquipmentWindow);
+        }
+
+        if control_down && self.get_key(KeyCode::KeyG).pressed() {
+            events.push(InputEvent::ToggleGraphicsSettingsWindow);
+        }
+
+        if control_down && self.get_key(KeyCode::KeyA).pressed() {
+            events.push(InputEvent::ToggleAudioSettingsWindow);
+        }
+
         if control_down && self.get_key(KeyCode::KeyH).pressed() {
             events.push(InputEvent::ToggleShowInterface);
         }

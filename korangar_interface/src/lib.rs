@@ -156,6 +156,38 @@ pub mod selector_helpers {
             unsafe { Some(self.text.as_ref_unchecked()) }
         }
     }
+
+    pub struct ComputedSelector<F, T> {
+        closure: F,
+        latest_value: UnsafeCell<T>,
+    }
+
+    impl<F, T> ComputedSelector<F, T>
+    where
+        T: Default,
+    {
+        pub fn new_default(closure: F) -> Self {
+            Self {
+                closure,
+                latest_value: UnsafeCell::new(T::default()),
+            }
+        }
+    }
+
+    impl<App, F, T> Selector<App, T> for ComputedSelector<F, T>
+    where
+        F: Fn(&App) -> T + 'static,
+        T: 'static,
+    {
+        fn select<'a>(&'a self, state: &'a App) -> Option<&'a T> {
+            let new_value = (self.closure)(state);
+
+            let latest_value = unsafe { &mut *self.latest_value.get() };
+            *latest_value = new_value;
+
+            Some(latest_value)
+        }
+    }
 }
 
 // TODO: This will likely be renamed + Moved

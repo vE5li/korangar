@@ -8,6 +8,7 @@ use crate::element::store::{ElementStore, ElementStoreMut};
 use crate::event::ClickAction;
 use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
 use crate::layout::area::Area;
+use crate::layout::tooltip::TooltipExt;
 use crate::layout::{Icon, Layout, MouseButton, Resolver};
 
 #[derive(RustState)]
@@ -19,7 +20,11 @@ where
     pub background_color: App::Color,
     pub hovered_foreground_color: App::Color,
     pub hovered_background_color: App::Color,
+    pub disabled_foreground_color: App::Color,
+    pub disabled_background_color: App::Color,
     pub checkbox_color: App::Color,
+    pub hovered_checkbox_color: App::Color,
+    pub disabled_checkbox_color: App::Color,
     pub height: f32,
     pub corner_radius: App::CornerRadius,
     pub font_size: App::FontSize,
@@ -28,58 +33,78 @@ where
     pub overflow_behavior: App::OverflowBehavior,
 }
 
-pub struct StateButton<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O> {
-    text_marker: PhantomData<Text>,
+pub struct StateButton<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U> {
+    text_marker: PhantomData<(Text, Tooltip, DisabledTooltip)>,
     text: A,
-    state: B,
-    event: C,
-    disabled: D,
-    foreground_color: E,
-    background_color: F,
-    hovered_foreground_color: G,
-    hovered_background_color: H,
-    checkbox_color: I,
-    height: J,
-    corner_radius: K,
-    font_size: L,
-    horizontal_alignment: M,
-    vertical_alignment: N,
-    overflow_behavior: O,
+    tooltip: B,
+    state: C,
+    event: D,
+    disabled: E,
+    disabled_tooltip: F,
+    foreground_color: G,
+    background_color: H,
+    hovered_foreground_color: I,
+    hovered_background_color: J,
+    disabled_foreground_color: K,
+    disabled_background_color: L,
+    checkbox_color: M,
+    hovered_checkbox_color: N,
+    disabled_checkbox_color: O,
+    height: P,
+    corner_radius: Q,
+    font_size: R,
+    horizontal_alignment: S,
+    vertical_alignment: T,
+    overflow_behavior: U,
 }
 
-impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O> StateButton<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O> {
+impl<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U>
+    StateButton<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U>
+{
     /// This function is supposed to be called from a component macro and not
     /// intended to be called manually.
     #[inline(always)]
     #[allow(clippy::too_many_arguments)]
     pub fn component_new(
         text: A,
-        state: B,
-        event: C,
-        disabled: D,
-        foreground_color: E,
-        background_color: F,
-        hovered_foreground_color: G,
-        hovered_background_color: H,
-        checkbox_color: I,
-        height: J,
-        corner_radius: K,
-        font_size: L,
-        horizontal_alignment: M,
-        vertical_alignment: N,
-        overflow_behavior: O,
+        tooltip: B,
+        state: C,
+        event: D,
+        disabled: E,
+        disabled_tooltip: F,
+        foreground_color: G,
+        background_color: H,
+        hovered_foreground_color: I,
+        hovered_background_color: J,
+        disabled_foreground_color: K,
+        disabled_background_color: L,
+        checkbox_color: M,
+        hovered_checkbox_color: N,
+        disabled_checkbox_color: O,
+        height: P,
+        corner_radius: Q,
+        font_size: R,
+        horizontal_alignment: S,
+        vertical_alignment: T,
+        overflow_behavior: U,
     ) -> Self {
         Self {
             text_marker: PhantomData,
             text,
+            tooltip,
             state,
             event,
             disabled,
+            disabled_tooltip,
             foreground_color,
             background_color,
             hovered_foreground_color,
             hovered_background_color,
+            disabled_foreground_color,
+            disabled_background_color,
             checkbox_color,
+            hovered_checkbox_color,
+            disabled_checkbox_color,
             height,
             corner_radius,
             font_size,
@@ -90,25 +115,34 @@ impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O> StateButton<Text, A, B, 
     }
 }
 
-impl<App, Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O> Element<App> for StateButton<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O>
+impl<App, Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U> Element<App>
+    for StateButton<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U>
 where
     App: Application,
     Text: AsRef<str> + 'static,
+    Tooltip: AsRef<str> + 'static,
+    DisabledTooltip: AsRef<str> + 'static,
     A: Selector<App, Text>,
-    B: Selector<App, bool>,
-    C: ClickAction<App> + 'static,
-    D: Selector<App, bool>,
-    E: Selector<App, App::Color>,
-    F: Selector<App, App::Color>,
+    B: Selector<App, Tooltip>,
+    C: Selector<App, bool>,
+    D: ClickAction<App> + 'static,
+    E: Selector<App, bool>,
+    F: Selector<App, DisabledTooltip>,
     G: Selector<App, App::Color>,
     H: Selector<App, App::Color>,
     I: Selector<App, App::Color>,
-    J: Selector<App, f32>,
-    K: Selector<App, App::CornerRadius>,
-    L: Selector<App, App::FontSize>,
-    M: Selector<App, HorizontalAlignment>,
-    N: Selector<App, VerticalAlignment>,
-    O: Selector<App, App::OverflowBehavior>,
+    J: Selector<App, App::Color>,
+    K: Selector<App, App::Color>,
+    L: Selector<App, App::Color>,
+    M: Selector<App, App::Color>,
+    N: Selector<App, App::Color>,
+    O: Selector<App, App::Color>,
+    P: Selector<App, f32>,
+    Q: Selector<App, App::CornerRadius>,
+    R: Selector<App, App::FontSize>,
+    S: Selector<App, HorizontalAlignment>,
+    T: Selector<App, VerticalAlignment>,
+    U: Selector<App, App::OverflowBehavior>,
 {
     fn create_layout_info(&mut self, state: &Context<App>, _: ElementStoreMut<'_>, resolver: &mut Resolver<'_, App>) -> Self::LayoutInfo {
         let height = *state.get(&self.height);
@@ -133,13 +167,30 @@ where
         layout: &mut Layout<'a, App>,
     ) {
         let is_hoverered = layout.is_area_hovered_and_active(layout_info.area);
+        let is_disabled = *state.get(&self.disabled);
 
         if is_hoverered {
-            layout.add_click_area(layout_info.area, MouseButton::Left, &self.event);
             layout.mark_hovered();
+
+            struct StateButtonTooltip;
+
+            let tooltip = state.get(&self.tooltip).as_ref();
+            if !tooltip.is_empty() {
+                layout.add_tooltip(tooltip, StateButtonTooltip.tooltip_id());
+            }
+
+            if is_disabled {
+                let disabled_tooltip = state.get(&self.disabled_tooltip).as_ref();
+                if !disabled_tooltip.is_empty() {
+                    layout.add_tooltip(disabled_tooltip, StateButtonTooltip.tooltip_id());
+                }
+            } else {
+                layout.add_click_area(layout_info.area, MouseButton::Left, &self.event);
+            }
         }
 
         let background_color = match is_hoverered {
+            _ if is_disabled => *state.get(&self.disabled_background_color),
             true => *state.get(&self.hovered_background_color),
             false => *state.get(&self.background_color),
         };
@@ -147,6 +198,7 @@ where
         layout.add_rectangle(layout_info.area, *state.get(&self.corner_radius), background_color);
 
         let foreground_color = match is_hoverered {
+            _ if is_disabled => *state.get(&self.disabled_foreground_color),
             true => *state.get(&self.hovered_foreground_color),
             false => *state.get(&self.foreground_color),
         };
@@ -162,6 +214,11 @@ where
         );
 
         let checkbox_size = layout_info.area.height - 6.0;
+        let checkbox_color = match is_hoverered {
+            _ if is_disabled => *state.get(&self.disabled_checkbox_color),
+            true => *state.get(&self.hovered_checkbox_color),
+            false => *state.get(&self.checkbox_color),
+        };
 
         layout.add_icon(
             Area {
@@ -173,7 +230,7 @@ where
             Icon::Checkbox {
                 checked: *state.get(&self.state),
             },
-            *state.get(&self.checkbox_color),
+            checkbox_color,
         );
     }
 }

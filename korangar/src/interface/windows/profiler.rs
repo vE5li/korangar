@@ -239,7 +239,6 @@ where
                         drop_down! {
                             selected: self.window_state_path.visible_thread(),
                             options: visible_thread_options.clone(),
-                            click_handler: DefaultClickHandler::new(self.window_state_path.visible_thread(), visible_thread_options.clone()),
                         },
                         state_button! {
                             text: "Halt",

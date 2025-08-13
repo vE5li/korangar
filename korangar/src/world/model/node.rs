@@ -32,7 +32,7 @@ pub struct Node {
     pub rotation_keyframes: Vec<RotationKeyframeData>,
 }
 
-#[derive(RustState, StateElement)]
+#[derive(Clone, RustState, StateElement)]
 pub struct SubMesh {
     pub vertex_offset: usize,
     pub vertex_count: usize,

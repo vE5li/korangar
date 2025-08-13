@@ -2,6 +2,7 @@ use korangar_interface::window::{CustomWindow, Window};
 use rust_state::Path;
 
 use crate::interface::windows::WindowClass;
+use crate::loaders::OverflowBehavior;
 use crate::settings::{GraphicsSettingsCapabilitiesPathExt, GraphicsSettingsPathExt};
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
@@ -37,22 +38,12 @@ where
             split! {
                 children: (
                     text! {
-                        text: "Language",
+                        text: "Lighting mode",
+                        overflow_behavior: OverflowBehavior::Shrink,
                     },
                     drop_down! {
-                        selected: self.settings_path.language(),
-                        options: self.capabilities_path.languages(),
-                    }
-                )
-            },
-            split! {
-                children: (
-                    text! {
-                        text: "Interface scale",
-                    },
-                    drop_down! {
-                        selected: self.settings_path.interface_scaling(),
-                        options: self.capabilities_path.interface_scalings(),
+                        selected: self.settings_path.lighting_mode(),
+                        options: self.capabilities_path.lighting_modes(),
                     }
                 )
             },
@@ -60,17 +51,6 @@ where
                 text: "Triple buffering",
                 state: self.settings_path.triple_buffering(),
                 event: Toggle(self.settings_path.triple_buffering()),
-            },
-            split! {
-                children: (
-                    text! {
-                        text: "Lighting mode",
-                    },
-                    drop_down! {
-                        selected: self.settings_path.lighting_mode(),
-                        options: self.capabilities_path.lighting_modes(),
-                    }
-                )
             },
             state_button! {
                 text: "Enable VSYNC",
@@ -83,6 +63,7 @@ where
                 children: (
                     text! {
                         text: "Limit framerate",
+                        overflow_behavior: OverflowBehavior::Shrink,
                     },
                     drop_down! {
                         selected: self.settings_path.limit_framerate(),
@@ -94,6 +75,7 @@ where
                 children: (
                     text! {
                         text: "Texture filtering",
+                        overflow_behavior: OverflowBehavior::Shrink,
                     },
                     drop_down! {
                         selected: self.settings_path.texture_filtering(),
@@ -105,6 +87,7 @@ where
                 children: (
                     text! {
                         text: "Multisampling",
+                        overflow_behavior: OverflowBehavior::Shrink,
                     },
                     drop_down! {
                         selected: self.settings_path.msaa(),
@@ -116,6 +99,7 @@ where
                 children: (
                     text! {
                         text: "Supersampling",
+                        overflow_behavior: OverflowBehavior::Shrink,
                     },
                     drop_down! {
                         selected: self.settings_path.ssaa(),
@@ -127,6 +111,7 @@ where
                 children: (
                     text! {
                         text: "Screen space AA",
+                        overflow_behavior: OverflowBehavior::Shrink,
                     },
                     drop_down! {
                         selected: self.settings_path.screen_space_anti_aliasing(),
@@ -138,6 +123,7 @@ where
                 children: (
                     text! {
                         text: "Shadow quality",
+                        overflow_behavior: OverflowBehavior::Shrink,
                     },
                     drop_down! {
                         selected: self.settings_path.shadow_quality(),
@@ -149,6 +135,7 @@ where
                 children: (
                     text! {
                         text: "Shadow detail",
+                        overflow_behavior: OverflowBehavior::Shrink,
                     },
                     drop_down! {
                         selected: self.settings_path.shadow_detail(),

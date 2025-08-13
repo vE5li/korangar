@@ -2,8 +2,7 @@ use korangar_interface::element::StateElement;
 use rust_state::RustState;
 use serde::{Deserialize, Serialize};
 
-use crate::graphics::Color;
-use crate::interface::layout::{ScreenPosition, ScreenSize};
+use crate::graphics::{Color, ScreenPosition, ScreenSize};
 use crate::loaders::FontSize;
 
 #[derive(Serialize, Deserialize, RustState, StateElement)]

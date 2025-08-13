@@ -2,8 +2,10 @@
 
 mod audio;
 mod graphic;
+mod interface;
 mod login;
 
-pub(crate) use audio::*;
-pub(crate) use graphic::*;
-pub(crate) use login::*;
+pub use audio::*;
+pub use graphic::*;
+pub use interface::*;
+pub use login::*;

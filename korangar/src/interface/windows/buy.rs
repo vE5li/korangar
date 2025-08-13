@@ -1,34 +1,138 @@
 use std::cmp::Ordering;
 
 use korangar_interface::element::store::{ElementStore, ElementStoreMut};
-use korangar_interface::element::{Element, ElementBox};
+use korangar_interface::element::{Element, ElementBox, ElementSet};
+use korangar_interface::event::ClickAction;
+use korangar_interface::layout::area::Area;
 use korangar_interface::layout::{Layout, Resolver};
+use korangar_interface::prelude::HorizontalAlignment;
 use korangar_interface::window::{CustomWindow, Window};
-use korangar_networking::ShopItem;
-use rust_state::{Context, ManuallyAssertExt, Path, VecIndexExt};
+use korangar_networking::{ItemQuantity, ShopItem};
+use rust_state::{Context, ManuallyAssertExt, Path, Selector, VecIndexExt};
 
 use super::WindowClass;
+use crate::graphics::{Color, CornerDiameter};
+use crate::loaders::{FontSize, OverflowBehavior};
+use crate::renderer::LayoutExt;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
 use crate::world::ResourceMetadata;
 
-struct ItemList<A> {
+struct ItemLayoutInfo<A> {
+    area: Area,
+    texture_area: Area,
+    text_area: Area,
+    children: A,
+}
+
+struct ItemElement<A, B, C> {
+    item_path: A,
+    // TODO: Remove the cart path, it's not needed.
+    cart_path: B,
+    children: C,
+}
+
+impl<A, B, C> ItemElement<A, B, C> {
+    fn new(item_path: A, cart_path: B, children: C) -> Self {
+        Self {
+            item_path,
+            cart_path,
+            children,
+        }
+    }
+}
+
+impl<A, B, C> Element<ClientState> for ItemElement<A, B, C>
+where
+    A: Path<ClientState, ShopItem<ResourceMetadata>>,
+    B: Path<ClientState, Vec<ShopItem<(ResourceMetadata, u32)>>>,
+    C: ElementSet<ClientState>,
+{
+    type LayoutInfo = ItemLayoutInfo<C::LayoutInfo>;
+
+    fn create_layout_info(
+        &mut self,
+        state: &Context<ClientState>,
+        store: ElementStoreMut<'_>,
+        resolver: &mut Resolver<'_, ClientState>,
+    ) -> Self::LayoutInfo {
+        let (area, (texture_area, text_area, children)) = resolver.with_derived(3.0, 3.0, |resolver| {
+            let area = resolver.with_height(34.0);
+
+            let texture_area = Area {
+                width: 34.0,
+                height: 34.0,
+                ..area
+            };
+
+            let text_area = Area {
+                left: area.left + 43.0,
+                width: area.width - 43.0,
+                ..area
+            };
+
+            let children = self.children.create_layout_info(state, store, resolver);
+
+            (texture_area, text_area, children)
+        });
+
+        Self::LayoutInfo {
+            area,
+            texture_area,
+            text_area,
+            children,
+        }
+    }
+
+    fn lay_out<'a>(
+        &'a self,
+        state: &'a Context<ClientState>,
+        store: ElementStore<'a>,
+        layout_info: &'a Self::LayoutInfo,
+        layout: &mut Layout<'a, ClientState>,
+    ) {
+        let item = state.get(&self.item_path);
+
+        layout.add_rectangle(layout_info.area, CornerDiameter::uniform(4.0), Color::rgb_u8(80, 80, 80));
+
+        if let Some(texture) = &item.metadata.texture {
+            layout.add_texture(texture.clone(), layout_info.texture_area, Color::WHITE, false);
+        }
+
+        layout.add_text(
+            layout_info.text_area,
+            &item.metadata.name,
+            FontSize(16.0),
+            Color::monochrome_u8(220),
+            HorizontalAlignment::Left { offset: 3.0, border: 3.0 },
+            korangar_interface::prelude::VerticalAlignment::Center { offset: 0.0 },
+            OverflowBehavior::Shrink,
+        );
+
+        self.children.lay_out(state, store, &layout_info.children, layout);
+    }
+}
+
+struct ItemList<A, B> {
     items_path: A,
+    cart_path: B,
     elements: Vec<ElementBox<ClientState>>,
 }
 
-impl<A> ItemList<A> {
-    fn new(items_path: A) -> Self {
+impl<A, B> ItemList<A, B> {
+    fn new(items_path: A, cart_path: B) -> Self {
         Self {
             items_path,
+            cart_path,
             elements: Vec::new(),
         }
     }
 }
 
-impl<A> Element<ClientState> for ItemList<A>
+impl<A, B> Element<ClientState> for ItemList<A, B>
 where
     A: Path<ClientState, Vec<ShopItem<ResourceMetadata>>>,
+    B: Path<ClientState, Vec<ShopItem<(ResourceMetadata, u32)>>>,
 {
     type LayoutInfo = ();
 
@@ -50,12 +154,116 @@ where
             Ordering::Greater => {
                 for index in self.elements.len()..items.len() {
                     let item_path = self.items_path.index(index).manually_asserted();
+                    let cart_path = self.cart_path;
 
-                    self.elements.push(ErasedElement::new(button! {
-                        text: "Some item",
-                        event: move |_: &Context<ClientState>, _: &mut EventQueue<ClientState>| {
-                        },
-                    }));
+                    fn disabled_cutoff<A, B>(item_path: A, cart_path: B, amount: u32) -> impl Selector<ClientState, bool>
+                    where
+                        A: Path<ClientState, ShopItem<ResourceMetadata>>,
+                        B: Path<ClientState, Vec<ShopItem<(ResourceMetadata, u32)>>>,
+                    {
+                        ComputedSelector::new_default(move |state: &ClientState| {
+                            // SAFETY:
+                            //
+                            // Unwrap is safe here because of the bounds.
+                            let item = item_path.follow(state).unwrap();
+
+                            // SAFETY:
+                            //
+                            // Unwrap is safe here because of the bounds.
+                            let cart = cart_path.follow(state).unwrap();
+
+                            cart.iter()
+                                .find(|purchase| purchase.item_id == item.item_id)
+                                .map(|purchase| matches!(item.quantity, ItemQuantity::Fixed(quantity) if quantity - purchase.metadata.1 < amount))
+                                .unwrap_or(false)
+                        })
+                    }
+
+                    fn resolve_amount(
+                        amount: ItemQuantity,
+                        item: &ShopItem<ResourceMetadata>,
+                        cart: &Vec<ShopItem<(ResourceMetadata, u32)>>,
+                    ) -> u32 {
+                        match amount {
+                            ItemQuantity::Fixed(count) => count,
+                            ItemQuantity::Infinite => todo!(),
+                        }
+                    }
+
+                    struct AddAction<A, B> {
+                        item_path: A,
+                        cart_path: B,
+                        amount: ItemQuantity,
+                    }
+
+                    impl<A, B> AddAction<A, B> {
+                        fn new(item_path: A, cart_path: B, amount: ItemQuantity) -> Self {
+                            Self {
+                                item_path,
+                                cart_path,
+                                amount,
+                            }
+                        }
+                    }
+
+                    impl<A, B> ClickAction<ClientState> for AddAction<A, B>
+                    where
+                        A: Path<ClientState, ShopItem<ResourceMetadata>>,
+                        B: Path<ClientState, Vec<ShopItem<(ResourceMetadata, u32)>>>,
+                    {
+                        fn execute(&self, state: &Context<ClientState>, queue: &mut korangar_interface::prelude::EventQueue<ClientState>) {
+                            let item = state.get(&self.item_path).clone();
+                            let amount = self.amount;
+
+                            state.update_value_with(self.cart_path, move |cart| {
+                                let amount = resolve_amount(amount, &item, cart);
+
+                                if let Some(purchase) = cart.iter_mut().find(|purchase| purchase.item_id == item.item_id) {
+                                    purchase.metadata.1 += amount;
+                                } else {
+                                    cart.push(ShopItem {
+                                        metadata: (item.metadata.clone(), amount),
+                                        item_id: item.item_id,
+                                        item_type: item.item_type,
+                                        price: item.price,
+                                        quantity: item.quantity,
+                                        weight: item.weight,
+                                        location: item.location,
+                                    });
+                                }
+                            });
+                        }
+                    }
+
+                    let buttons = (split! {
+                        gaps: theme().window().gaps(),
+                        children: (
+                            button! {
+                                text: "+1",
+                                disabled: disabled_cutoff(item_path, cart_path, 1),
+                                event: AddAction::new(item_path, cart_path, ItemQuantity::Fixed(1)),
+                            },
+                            button! {
+                                text: "+10",
+                                disabled: disabled_cutoff(item_path, cart_path, 10),
+                                event: AddAction::new(item_path, cart_path, ItemQuantity::Fixed(10)),
+                            },
+                            button! {
+                                text: "+100",
+                                disabled: disabled_cutoff(item_path, cart_path, 100),
+                                event: AddAction::new(item_path, cart_path, ItemQuantity::Fixed(100)),
+                            },
+                            // TODO: Needs special treatment.
+                            // button! {
+                            //     text: "+All",
+                            //     disabled: DisabledCutoff::new(item_path, cart_path, 1),
+                            //     event: AddAction::new(item_path, cart_path, ItemQuantity::Infinite),
+                            // },
+                        ),
+                    },);
+
+                    self.elements
+                        .push(ErasedElement::new(ItemElement::new(item_path, self.cart_path, buttons)));
                 }
             }
         }
@@ -107,8 +315,13 @@ where
             title: "Buy",
             class: Self::window_class(),
             theme: InterfaceThemeType::Game,
+            resizable: true,
             elements: (
-                ItemList::new(self.items_path),
+                scroll_view! {
+                    children: (
+                        ItemList::new(self.items_path, self.cart_path),
+                    ),
+                },
             ),
         }
     }

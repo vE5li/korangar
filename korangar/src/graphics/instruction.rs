@@ -10,7 +10,7 @@ use super::color::Color;
 use super::settings::RenderOptions;
 use super::vertices::ModelVertex;
 use super::{Buffer, ShadowQuality, Texture, TextureSet, TileVertex};
-use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
+use crate::graphics::{CornerDiameter, ScreenClip, ScreenPosition, ScreenSize};
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 
@@ -219,14 +219,14 @@ pub enum InterfaceRectangleInstruction {
         screen_size: ScreenSize,
         screen_clip: ScreenClip,
         color: Color,
-        corner_radius: CornerRadius,
+        corner_diameter: CornerDiameter,
     },
     Sprite {
         screen_position: ScreenPosition,
         screen_size: ScreenSize,
         screen_clip: ScreenClip,
         color: Color,
-        corner_radius: CornerRadius,
+        corner_diameter: CornerDiameter,
         texture: Arc<Texture>,
         smooth: bool,
     },
@@ -235,7 +235,7 @@ pub enum InterfaceRectangleInstruction {
         screen_size: ScreenSize,
         screen_clip: ScreenClip,
         color: Color,
-        corner_radius: CornerRadius,
+        corner_diameter: CornerDiameter,
         texture: Arc<Texture>,
     },
     Text {

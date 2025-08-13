@@ -8,7 +8,7 @@ use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 
 use super::WindowClass;
-use crate::interface::layout::ScreenSize;
+use crate::graphics::ScreenSize;
 use crate::state::ClientState;
 
 #[derive(Serialize, Deserialize, new)]
@@ -64,6 +64,10 @@ impl korangar_interface::application::WindowCache<ClientState> for WindowCache {
         })
     }
 
+    fn get_window_state(&self, class: WindowClass) -> Option<(Anchor<ClientState>, ScreenSize)> {
+        self.entries.get(&class).map(|entry| (entry.anchor.clone(), entry.size))
+    }
+
     fn register_window(&mut self, class: WindowClass, anchor: Anchor<ClientState>, size: ScreenSize) {
         if let Some(entry) = self.entries.get_mut(&class) {
             entry.anchor = anchor;
@@ -84,10 +88,6 @@ impl korangar_interface::application::WindowCache<ClientState> for WindowCache {
         if let Some(entry) = self.entries.get_mut(&class) {
             entry.size = size;
         }
-    }
-
-    fn get_window_state(&self, class: WindowClass) -> Option<(Anchor<ClientState>, ScreenSize)> {
-        self.entries.get(&class).map(|entry| (entry.anchor.clone(), entry.size))
     }
 }
 

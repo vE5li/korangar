@@ -2,7 +2,7 @@ use std::cell::UnsafeCell;
 use std::sync::mpsc::TryRecvError;
 
 use korangar_debug::logging::{Colorize, print_debug};
-use korangar_interface::application::{Application, SizeTrait};
+use korangar_interface::application::{Application, Size};
 use korangar_interface::element::store::{ElementStore, ElementStoreMut};
 use korangar_interface::element::{Element, StateElement};
 use korangar_interface::layout::{Layout, Resolver};

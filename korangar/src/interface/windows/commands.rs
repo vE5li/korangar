@@ -2,6 +2,7 @@ use korangar_interface::window::{CustomWindow, Window};
 
 use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
+use crate::loaders::OverflowBehavior;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
 
@@ -23,6 +24,7 @@ impl CustomWindow<ClientState> for CommandsWindow {
             elements: (
                 text! {
                     text: "Base level",
+                    overflow_behavior: OverflowBehavior::Shrink,
                 },
                 split! {
                     gaps: theme().window().gaps(),
@@ -51,6 +53,7 @@ impl CustomWindow<ClientState> for CommandsWindow {
                 },
                 text! {
                     text: "Job level",
+                    overflow_behavior: OverflowBehavior::Shrink,
                 },
                 split! {
                     gaps: theme().window().gaps(),
@@ -79,6 +82,7 @@ impl CustomWindow<ClientState> for CommandsWindow {
                 },
                 text! {
                     text: "Stats",
+                    overflow_behavior: OverflowBehavior::Shrink,
                 },
                 button! {
                     text: "Set all to max",
@@ -87,6 +91,7 @@ impl CustomWindow<ClientState> for CommandsWindow {
                 },
                 text! {
                     text: "Skills",
+                    overflow_behavior: OverflowBehavior::Shrink,
                 },
                 button! {
                     text: "Unlock all",
@@ -95,6 +100,7 @@ impl CustomWindow<ClientState> for CommandsWindow {
                 },
                 text! {
                     text: "Resources",
+                    overflow_behavior: OverflowBehavior::Shrink,
                 },
                 button! {
                     text: "Give 10,000 Zeny",
@@ -103,6 +109,7 @@ impl CustomWindow<ClientState> for CommandsWindow {
                 },
                 text! {
                     text: "Player state",
+                    overflow_behavior: OverflowBehavior::Shrink,
                 },
                 button! {
                     text: "Mount",

@@ -16,7 +16,7 @@ use tooltip::{Tooltip, TooltipId};
 
 pub use self::resolver::{Resolver, ResolverSet};
 use crate::MouseMode;
-use crate::application::{Application, ClipTrait, CornerRadiusTrait, FontSizeTrait, PositionTrait, RenderLayer, SizeTrait, TextLayouter};
+use crate::application::{Application, Clip, CornerDiameter, FontSize, Position, RenderLayer, Size, TextLayouter};
 use crate::element::id::{ElementId, FocusId};
 use crate::event::{ClickAction, Event, EventQueue};
 
@@ -48,7 +48,7 @@ pub enum Icon<App: Application> {
 struct RectangleInsturction<App: Application> {
     clip_layer: ClipLayerId,
     area: Area,
-    corner_radius: App::CornerRadius,
+    corner_diameter: App::CornerDiameter,
     color: App::Color,
 }
 
@@ -528,15 +528,15 @@ impl<'a, App: Application> Layout<'a, App> {
         self.layers[self.current_layer].input_handlers.push(input_handler);
     }
 
-    pub fn add_rectangle(&mut self, area: Area, corner_radius: App::CornerRadius, color: App::Color) {
+    pub fn add_rectangle(&mut self, area: Area, corner_diameter: App::CornerDiameter, color: App::Color) {
         let clip_layer = self.get_active_clip_layer();
         let area = self.scale_area(area);
-        let corner_radius = corner_radius.scaled(self.interface_scaling);
+        let corner_diameter = corner_diameter.scaled(self.interface_scaling);
 
         self.layers[self.current_layer].rectangles.push(RectangleInsturction {
             clip_layer,
             area,
-            corner_radius,
+            corner_diameter,
             color,
         });
     }
@@ -620,7 +620,7 @@ impl<'a, App: Application> Layout<'a, App> {
     }
 
     pub fn render(&mut self, renderer: &App::Renderer, text_layouter: &App::TextLayouter) {
-        fn combine_clip<T: ClipTrait>(clip: T, other: T) -> T {
+        fn combine_clip<T: Clip>(clip: T, other: T) -> T {
             T::new(
                 clip.left().max(other.left()),
                 clip.top().max(other.top()),
@@ -645,7 +645,7 @@ impl<'a, App: Application> Layout<'a, App> {
                 |RectangleInsturction {
                      clip_layer,
                      area,
-                     corner_radius,
+                     corner_diameter,
                      color,
                  }: RectangleInsturction<App>| {
                     let clip = self.clip_layers[clip_layer.0].clip;
@@ -654,7 +654,7 @@ impl<'a, App: Application> Layout<'a, App> {
                         App::Position::new(area.left, area.top),
                         App::Size::new(area.width, area.height),
                         clip,
-                        corner_radius,
+                        corner_diameter,
                         color,
                     );
                 },
@@ -750,7 +750,7 @@ impl<'a, App: Application> Layout<'a, App> {
     ) -> bool {
         let mut clicked = false;
 
-        fn apply_clip<T: ClipTrait>(clip: T, area: Area) -> T {
+        fn apply_clip<T: Clip>(clip: T, area: Area) -> T {
             T::new(
                 area.left.max(clip.left()),
                 area.top.max(clip.top()),
@@ -877,7 +877,7 @@ impl<'a, App: Application> Layout<'a, App> {
         let mut handled = false;
 
         // TODO: Deduplicate this function.
-        fn apply_clip<T: ClipTrait>(clip: T, area: Area) -> T {
+        fn apply_clip<T: Clip>(clip: T, area: Area) -> T {
             T::new(
                 area.left.max(clip.left()),
                 area.top.max(clip.top()),
@@ -906,7 +906,7 @@ impl<'a, App: Application> Layout<'a, App> {
     }
 
     pub fn do_scroll(&self, mouse_position: App::Position, delta: f32) -> bool {
-        fn apply_clip<T: ClipTrait>(clip: T, area: Area) -> T {
+        fn apply_clip<T: Clip>(clip: T, area: Area) -> T {
             T::new(
                 area.left.max(clip.left()),
                 area.top.max(clip.top()),

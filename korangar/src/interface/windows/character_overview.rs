@@ -5,8 +5,8 @@ use crate::graphics::Color;
 use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
 use crate::loaders::OverflowBehavior;
+use crate::state::localization::LocalizationPathExt;
 use crate::state::theme::InterfaceThemeType;
-use crate::state::translation::TranslationPathExt;
 use crate::state::{ClientState, ClientStatePathExt, client_state};
 
 pub struct CharacterOverviewWindow<A, B, C> {
@@ -39,7 +39,7 @@ where
         use korangar_interface::prelude::*;
 
         window! {
-            title: client_state().translation().character_overview_window_title(),
+            title: client_state().localization().character_overview_window_title(),
             class: Self::window_class(),
             theme: InterfaceThemeType::Game,
             minimum_width: 300.0,
@@ -51,7 +51,7 @@ where
                         split! {
                             children: (
                                 text! {
-                                    text: client_state().translation().name_text(),
+                                    text: client_state().localization().name_text(),
                                     overflow_behavior: OverflowBehavior::Shrink,
                                 },
                                 text! {
@@ -65,7 +65,7 @@ where
                         split! {
                             children: (
                                 text! {
-                                    text: client_state().translation().base_level_text(),
+                                    text: client_state().localization().base_level_text(),
                                     overflow_behavior: OverflowBehavior::Shrink,
                                 },
                                 text! {
@@ -79,7 +79,7 @@ where
                         split! {
                             children: (
                                 text! {
-                                    text: client_state().translation().job_level_text(),
+                                    text: client_state().localization().job_level_text(),
                                     overflow_behavior: OverflowBehavior::Shrink,
                                 },
                                 text! {
@@ -93,23 +93,23 @@ where
                     ),
                 },
                 button! {
-                    text: client_state().translation().inventory_button_text(),
+                    text: client_state().localization().inventory_button_text(),
                     event: InputEvent::ToggleInventoryWindow,
                 },
                 button! {
-                    text: client_state().translation().equipment_button_text(),
+                    text: client_state().localization().equipment_button_text(),
                     event: InputEvent::ToggleEquipmentWindow,
                 },
                 button! {
-                    text: client_state().translation().skill_tree_button_text(),
+                    text: client_state().localization().skill_tree_button_text(),
                     event: InputEvent::ToggleSkillTreeWindow,
                 },
                 button! {
-                    text: client_state().translation().friend_list_button_text(),
+                    text: client_state().localization().friend_list_button_text(),
                     event: InputEvent::ToggleFriendListWindow,
                 },
                 button! {
-                    text: client_state().translation().menu_button_text(),
+                    text: client_state().localization().menu_button_text(),
                     event: InputEvent::ToggleMenuWindow,
                 },
             ),

@@ -4,8 +4,9 @@ use rust_state::{Context, Path};
 
 use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
+use crate::loaders::OverflowBehavior;
+use crate::state::localization::LocalizationPathExt;
 use crate::state::theme::InterfaceThemeType;
-use crate::state::translation::TranslationPathExt;
 use crate::state::{ClientState, ClientStatePathExt, client_state};
 
 const MINIMUM_NAME_LENGTH: usize = 4;
@@ -45,21 +46,22 @@ where
         };
 
         window! {
-            title: client_state().translation().create_character_window_title(),
+            title: client_state().localization().create_character_window_title(),
             class: Self::window_class(),
             theme: InterfaceThemeType::Menu,
             closable: true,
             elements: (
                 text_box! {
-                    ghost_text: client_state().translation().character_name_text(),
+                    ghost_text: client_state().localization().character_name_text(),
                     state: self.character_name_path,
                     input_handler: DefaultHandler::<_, _, MAXIMUM_NAME_LENGTH>::new(self.character_name_path, create_action),
                     focus_id: CharacterName,
+                    overflow_behavior: OverflowBehavior::Shrink,
                 },
                 button! {
-                    text: client_state().translation().create_character_button_text(),
+                    text: client_state().localization().create_character_button_text(),
                     disabled,
-                    disabled_tooltip: client_state().translation().create_character_button_tooltip(),
+                    disabled_tooltip: client_state().localization().create_character_button_tooltip(),
                     event: create_action,
                 }
             ),

@@ -2,8 +2,8 @@ use derive_new::new;
 use korangar_interface::window::{CustomWindow, Window};
 
 use crate::graphics::Color;
+use crate::state::localization::LocalizationPathExt;
 use crate::state::theme::InterfaceThemeType;
-use crate::state::translation::TranslationPathExt;
 use crate::state::{ClientState, ClientStatePathExt, client_state};
 
 #[derive(new)]
@@ -16,7 +16,7 @@ impl CustomWindow<ClientState> for ErrorWindow {
         use korangar_interface::prelude::*;
 
         window! {
-            title: client_state().translation().error_window_title(),
+            title: client_state().localization().error_window_title(),
             theme: InterfaceThemeType::Menu,
             closable: true,
             elements: (

@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 
 use rust_state::{Context, RustState, Selector};
 
-use crate::application::{Application, SizeTrait};
+use crate::application::{Application, Size};
 use crate::element::store::{ElementStore, ElementStoreMut, Persistent, PersistentData, PersistentExt};
 use crate::element::{Element, ElementSet};
 use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
@@ -26,7 +26,7 @@ where
     pub icon_size: f32,
     pub gaps: f32,
     pub border: f32,
-    pub corner_radius: App::CornerRadius,
+    pub corner_diameter: App::CornerDiameter,
     pub title_height: f32,
     pub font_size: App::FontSize,
     pub horizontal_alignment: HorizontalAlignment,
@@ -77,7 +77,7 @@ pub struct Collapsable<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, 
     icon_size: G,
     gaps: H,
     border: I,
-    corner_radius: J,
+    corner_diameter: J,
     title_height: K,
     font_size: L,
     horizontal_alignment: M,
@@ -105,7 +105,7 @@ impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, Children>
         icon_size: G,
         gaps: H,
         border: I,
-        corner_radius: J,
+        corner_diameter: J,
         title_height: K,
         font_size: L,
         horizontal_alignment: M,
@@ -126,7 +126,7 @@ impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, Children>
             icon_size,
             gaps,
             border,
-            corner_radius,
+            corner_diameter,
             title_height,
             font_size,
             horizontal_alignment,
@@ -153,7 +153,7 @@ where
     G: Selector<App, f32>,
     H: Selector<App, f32>,
     I: Selector<App, f32>,
-    J: Selector<App, App::CornerRadius>,
+    J: Selector<App, App::CornerDiameter>,
     K: Selector<App, f32>,
     L: Selector<App, App::FontSize>,
     M: Selector<App, HorizontalAlignment>,
@@ -251,7 +251,7 @@ where
             false => *state.get(&self.background_color),
         };
 
-        layout.add_rectangle(layout_info.area, *state.get(&self.corner_radius), background_color);
+        layout.add_rectangle(layout_info.area, *state.get(&self.corner_diameter), background_color);
 
         let icon_size = *state.get(&self.icon_size);
         let icon_spacing = (title_area.height - icon_size) / 2.0;

@@ -6,10 +6,9 @@ use std::num::NonZeroU32;
 use derive_new::new;
 use korangar_interface::components::drop_down::DropDownItem;
 use korangar_interface::element::StateElement;
-use rust_state::RustState;
 use serde::{Deserialize, Serialize};
 
-use crate::interface::layout::ScreenSize;
+use crate::graphics::ScreenSize;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, StateElement)]
 pub enum LimitFramerate {
@@ -282,7 +281,7 @@ impl Display for ScreenSpaceAntiAliasing {
 }
 
 #[cfg(feature = "debug")]
-#[derive(Copy, Clone, Default, RustState, StateElement, new)]
+#[derive(Copy, Clone, Default, rust_state::RustState, StateElement, new)]
 pub struct RenderOptions {
     #[new(default)]
     pub show_frames_per_second: bool,

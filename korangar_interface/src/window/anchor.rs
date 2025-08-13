@@ -1,7 +1,7 @@
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::application::{Application, ClipTrait, CornerRadiusTrait, PositionTrait, RenderLayer, SizeTrait};
+use crate::application::{Application, Clip, CornerDiameter, Position, RenderLayer, Size};
 
 macro_rules! anchor_color {
     ($anchor_point:expr, $anchor_color:expr, $closest_anchor_color:expr, $name:ident) => {
@@ -234,14 +234,14 @@ where
             ),
             dot_size,
             screen_clip,
-            App::CornerRadius::new(dot_width, dot_width, dot_width, dot_width),
+            App::CornerDiameter::new(dot_width, dot_width, dot_width, dot_width),
             anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, Center),
         );
         renderer.render_rectangle(
             window_position,
             dot_size,
             screen_clip,
-            App::CornerRadius::new(0.0, 0.0, dot_width, 0.0),
+            App::CornerDiameter::new(0.0, 0.0, dot_width, 0.0),
             anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, TopLeft),
         );
         renderer.render_rectangle(
@@ -251,14 +251,14 @@ where
             ),
             App::Size::new(wide_dot_width, dot_width),
             screen_clip,
-            App::CornerRadius::new(0.0, 0.0, dot_width, dot_width),
+            App::CornerDiameter::new(0.0, 0.0, dot_width, dot_width),
             anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, TopCenter),
         );
         renderer.render_rectangle(
             App::Position::new(window_position.left() + window_size.width() - dot_width, window_position.top()),
             dot_size,
             screen_clip,
-            App::CornerRadius::new(0.0, 0.0, 0.0, dot_width),
+            App::CornerDiameter::new(0.0, 0.0, 0.0, dot_width),
             anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, TopRight),
         );
         renderer.render_rectangle(
@@ -268,7 +268,7 @@ where
             ),
             App::Size::new(dot_width, wide_dot_width),
             screen_clip,
-            App::CornerRadius::new(dot_width, 0.0, 0.0, dot_width),
+            App::CornerDiameter::new(dot_width, 0.0, 0.0, dot_width),
             anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, CenterRight),
         );
         renderer.render_rectangle(
@@ -278,7 +278,7 @@ where
             ),
             dot_size,
             screen_clip,
-            App::CornerRadius::new(dot_width, 0.0, 0.0, 0.0),
+            App::CornerDiameter::new(dot_width, 0.0, 0.0, 0.0),
             anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, BottomRight),
         );
         renderer.render_rectangle(
@@ -288,14 +288,14 @@ where
             ),
             App::Size::new(wide_dot_width, dot_width),
             screen_clip,
-            App::CornerRadius::new(dot_width, dot_width, 0.0, 0.0),
+            App::CornerDiameter::new(dot_width, dot_width, 0.0, 0.0),
             anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, BottomCenter),
         );
         renderer.render_rectangle(
             App::Position::new(window_position.left(), window_position.top() + window_size.height() - dot_width),
             dot_size,
             screen_clip,
-            App::CornerRadius::new(0.0, dot_width, 0.0, 0.0),
+            App::CornerDiameter::new(0.0, dot_width, 0.0, 0.0),
             anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, BottomLeft),
         );
         renderer.render_rectangle(
@@ -305,7 +305,7 @@ where
             ),
             App::Size::new(dot_width, wide_dot_width),
             screen_clip,
-            App::CornerRadius::new(0.0, dot_width, dot_width, 0.0),
+            App::CornerDiameter::new(0.0, dot_width, dot_width, 0.0),
             anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, CenterLeft),
         );
     }
@@ -330,28 +330,28 @@ where
             ),
             dot_size,
             screen_clip,
-            App::CornerRadius::new(dot_width, dot_width, dot_width, dot_width),
+            App::CornerDiameter::new(dot_width, dot_width, dot_width, dot_width),
             anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, Center),
         );
         renderer.render_rectangle(
             App::Position::new(0.0, 0.0),
             dot_size,
             screen_clip,
-            App::CornerRadius::new(0.0, 0.0, dot_width, 0.0),
+            App::CornerDiameter::new(0.0, 0.0, dot_width, 0.0),
             anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, TopLeft),
         );
         renderer.render_rectangle(
             App::Position::new((available_space.width() - wide_dot_width) / 2.0, 0.0),
             App::Size::new(wide_dot_width, dot_width),
             screen_clip,
-            App::CornerRadius::new(0.0, 0.0, dot_width, dot_width),
+            App::CornerDiameter::new(0.0, 0.0, dot_width, dot_width),
             anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, TopCenter),
         );
         renderer.render_rectangle(
             App::Position::new(available_space.width() - dot_width, 0.0),
             dot_size,
             screen_clip,
-            App::CornerRadius::new(0.0, 0.0, 0.0, dot_width),
+            App::CornerDiameter::new(0.0, 0.0, 0.0, dot_width),
             anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, TopRight),
         );
         renderer.render_rectangle(
@@ -361,14 +361,14 @@ where
             ),
             App::Size::new(dot_width, wide_dot_width),
             screen_clip,
-            App::CornerRadius::new(dot_width, 0.0, 0.0, dot_width),
+            App::CornerDiameter::new(dot_width, 0.0, 0.0, dot_width),
             anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, CenterRight),
         );
         renderer.render_rectangle(
             App::Position::new(available_space.width() - dot_width, available_space.height() - dot_width),
             dot_size,
             screen_clip,
-            App::CornerRadius::new(dot_width, 0.0, 0.0, 0.0),
+            App::CornerDiameter::new(dot_width, 0.0, 0.0, 0.0),
             anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, BottomRight),
         );
         renderer.render_rectangle(
@@ -378,21 +378,21 @@ where
             ),
             App::Size::new(wide_dot_width, dot_width),
             screen_clip,
-            App::CornerRadius::new(dot_width, dot_width, 0.0, 0.0),
+            App::CornerDiameter::new(dot_width, dot_width, 0.0, 0.0),
             anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, BottomCenter),
         );
         renderer.render_rectangle(
             App::Position::new(0.0, available_space.height() - dot_width),
             dot_size,
             screen_clip,
-            App::CornerRadius::new(0.0, dot_width, 0.0, 0.0),
+            App::CornerDiameter::new(0.0, dot_width, 0.0, 0.0),
             anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, BottomLeft),
         );
         renderer.render_rectangle(
             App::Position::new(0.0, (available_space.height() - wide_dot_width) / 2.0),
             App::Size::new(dot_width, wide_dot_width),
             screen_clip,
-            App::CornerRadius::new(0.0, dot_width, dot_width, 0.0),
+            App::CornerDiameter::new(0.0, dot_width, dot_width, 0.0),
             anchor_color!(self.anchor_point, anchor_color, closest_anchor_color, CenterLeft),
         );
     }

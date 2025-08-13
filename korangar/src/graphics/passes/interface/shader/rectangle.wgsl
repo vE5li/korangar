@@ -20,7 +20,7 @@ struct GlobalUniforms {
 
 struct InstanceData {
     color: vec4<f32>,
-    corner_radius: vec4<f32>,
+    corner_diameter: vec4<f32>,
     screen_clip: vec4<f32>,
     screen_position: vec2<f32>,
     screen_size: vec2<f32>,
@@ -61,7 +61,7 @@ fn vs_main(
     let vertex = vertex_data(vertex_index);
 
     let pixel_size = vec2<f32>(1.0 / f32(global_uniforms.interface_size.x), 1.0 / f32(global_uniforms.interface_size.y));
-    let size_adjustment = select(vec2<f32>(0.0), (BREATHING_ROOM * 2.0) * pixel_size, any(instance.corner_radius != vec4<f32>(0.0)));
+    let size_adjustment = select(vec2<f32>(0.0), (BREATHING_ROOM * 2.0) * pixel_size, any(instance.corner_diameter != vec4<f32>(0.0)));
 
     let adjusted_size = instance.screen_size + size_adjustment;
     let clip_size = adjusted_size * 2.0;
@@ -79,7 +79,7 @@ fn vs_main(
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     let instance = instance_data[input.instance_index];
 
-    let clip_adjustment = select(vec4<f32>(0.0), vec4<f32>(-0.5, -0.5, 0.5, 0.5), any(instance.corner_radius != vec4<f32>(0.0)));
+    let clip_adjustment = select(vec4<f32>(0.0), vec4<f32>(-0.5, -0.5, 0.5, 0.5), any(instance.corner_diameter != vec4<f32>(0.0)));
     let adjusted_clip = instance.screen_clip + clip_adjustment;
 
     if (input.position.x < adjusted_clip.x || input.position.y < adjusted_clip.y ||
@@ -114,7 +114,7 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     return rectangle_with_rounded_edges(
-        instance.corner_radius,
+        instance.corner_diameter,
         instance.screen_position,
         instance.screen_size,
         input.fragment_position,
@@ -157,18 +157,18 @@ fn rectangle_with_rounded_edges(
     let rectangle_center = origin + half_size;
     let relative_position = position - rectangle_center;
 
-    // Determine which corner radius to use based on the quadrant this fragment is in.
+    // Determine which corner diameter to use based on the quadrant this fragment is in.
     let is_right = relative_position.x > 0.0;
     let is_bottom = relative_position.y > 0.0;
     let radii_pair = select(corner_radii.xy, corner_radii.zw, is_bottom);
-    let corner_radius = select(radii_pair.x, radii_pair.y, is_right);
+    let corner_diameter = select(radii_pair.x, radii_pair.y, is_right);
 
-    if (corner_radius == 0.0) {
+    if (corner_diameter == 0.0) {
         return color;
     }
 
     // We multi-sample the edges of a rectangle to get the best possible anti-aliasing.
-    let distance = rectangle_sdf(relative_position, half_size, corner_radius);
+    let distance = rectangle_sdf(relative_position, half_size, corner_diameter);
 
     var alpha: f32 = step(0.0, -distance);
 
@@ -176,7 +176,7 @@ fn rectangle_with_rounded_edges(
         var total = alpha;
         for (var index = 0u; index < 8u; index++) {
             let offset = SAMPLE_OFFSETS[index];
-            let sample_distance = rectangle_sdf(relative_position + offset, half_size, corner_radius);
+            let sample_distance = rectangle_sdf(relative_position + offset, half_size, corner_diameter);
             total += step(0.0, -sample_distance);
         }
         alpha = total * (1.0 / 9.0);
@@ -234,11 +234,11 @@ fn clip_to_screen_space(ndc: vec2<f32>) -> vec2<f32> {
 fn rectangle_sdf(
     relative_position: vec2<f32>,
     half_size: vec2<f32>,
-    corner_radius: f32
+    corner_diameter: f32
 ) -> f32 {
-    let shrunk_corner_position = half_size - corner_radius;
+    let shrunk_corner_position = half_size - corner_diameter;
     let pixel_to_shrunk_corner = max(vec2<f32>(0.0), abs(relative_position) - shrunk_corner_position);
-    return length(pixel_to_shrunk_corner) - corner_radius + BREATHING_ROOM;
+    return length(pixel_to_shrunk_corner) - corner_diameter + BREATHING_ROOM;
 }
 
 fn median(r: f32, g: f32, b: f32) -> f32 {

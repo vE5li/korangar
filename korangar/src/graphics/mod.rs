@@ -8,6 +8,7 @@ mod frame_pacer;
 mod instruction;
 mod passes;
 mod picker_target;
+mod primitives;
 mod projection;
 mod sampler;
 mod settings;
@@ -39,6 +40,7 @@ pub use self::frame_pacer::*;
 pub use self::instruction::*;
 pub use self::passes::{Lanczos3Drawer, MipMapRenderPassContext};
 pub use self::picker_target::PickerTarget;
+pub use self::primitives::*;
 pub use self::projection::*;
 pub use self::settings::*;
 pub use self::surface::*;
@@ -46,7 +48,6 @@ pub use self::texture::*;
 pub use self::vertices::*;
 use crate::NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS;
 use crate::graphics::sampler::{SamplerType, create_new_sampler};
-use crate::interface::layout::ScreenSize;
 use crate::loaders::{ImageType, TextureLoader};
 
 /// The size of a tile in pixel of the tile based light culling.

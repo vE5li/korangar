@@ -1,5 +1,5 @@
+pub mod localization;
 pub mod theme;
-pub mod translation;
 
 use std::sync::Arc;
 
@@ -16,33 +16,35 @@ use korangar_interface::layout::tooltip::TooltipTheme;
 use korangar_interface::theme::ThemePathGetter;
 use korangar_interface::window::{StateWindow, WindowTheme};
 use korangar_networking::{MessageColor, SellItem, ShopItem};
+use localization::Localization;
+use ragnarok_formats::map::{EffectSource, LightSource, MapData, SoundSource};
 use ragnarok_packets::{CharacterId, CharacterServerInformation, Friend};
+#[cfg(feature = "debug")]
+use rust_state::{ManuallyAssertExt, VecIndexExt};
 use rust_state::{Path, RustState, Selector};
 use theme::{InterfaceTheme, InterfaceThemePathExt, InterfaceThemeType};
-use translation::Translation;
 
 #[cfg(feature = "debug")]
 use crate::PacketHistory;
 use crate::character_slots::CharacterSlots;
-use crate::graphics::Color;
 #[cfg(feature = "debug")]
 use crate::graphics::RenderOptions;
+use crate::graphics::{Color, CornerDiameter, ScreenClip, ScreenPosition, ScreenSize};
 use crate::input::{InputEvent, MouseInputMode};
-use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
 #[cfg(feature = "debug")]
 use crate::interface::windows::ProfilerWindowState;
 use crate::interface::windows::{ChatWindowState, DialogWindowState, FriendListWindowState, LoginWindowState, WindowCache, WindowClass};
 use crate::inventory::{Hotbar, Inventory, SkillTree};
 use crate::loaders::{ClientInfo, FontLoader, FontSize, GameFileLoader, OverflowBehavior, load_client_info};
 use crate::renderer::InterfaceRenderer;
-use crate::settings::{GraphicsSettingsCapabilities, LoginSettings};
+use crate::settings::{GraphicsSettingsCapabilities, InterfaceSettings, InterfaceSettingsCapabilities, LoginSettings};
 use crate::state::theme::{GameTheme, ThemeDefault};
-use crate::world::{Entity, Map, Player, ResourceMetadata};
+use crate::world::{Entity, Map, Object, Player, ResourceMetadata};
 use crate::{AudioSettings, GraphicsSettings};
 
 /// A message in the in-game chat.
 ///
-/// The message stores the color separatly rather than baking it into the
+/// The message stores the color separately rather than baking it into the
 /// message so the chat window can use the correct colors when switching themes.
 #[derive(Debug, Clone, RustState, StateElement)]
 pub struct ChatMessage {
@@ -60,13 +62,17 @@ pub struct ChatMessage {
 #[window_title("Client State Inspector")]
 #[state_root]
 pub struct ClientState {
-    /// Translation for the selected language.
-    translation: Translation,
+    /// Localization for the selected language.
+    localization: Localization,
 
     /// Saved settings of previous connections and credentials.
     login_settings: LoginSettings,
     /// Saved audio settings.
     audio_settings: AudioSettings,
+    /// Saved interface settings.
+    interface_settings: InterfaceSettings,
+    /// Interface capabilities used in the interface settings window.
+    interface_settings_capabilities: InterfaceSettingsCapabilities,
     /// Saved graphics settings.
     graphics_settings: GraphicsSettings,
     /// Graphics capabilities used in the graphics settings window.
@@ -91,16 +97,8 @@ pub struct ClientState {
     /// Internal state of the dialog window.
     dialog_window: DialogWindowState,
 
-    /// The current map.
-    // TODO: These are currently pub due to some code in the main render update loop. Ideally these
-    // could be private after rewriting that.
-    // FIX: Actually this should be removed from the client state completely and moved to the
-    // client. That will fix the issues I was describing and we can have the raw loaded maps in the
-    // client state instead. This will also allow for inspecting multiple maps at the same time.
-    #[hidden_element]
-    pub map: Option<Box<Map>>,
     /// All entities on the map.
-    pub entities: Vec<Entity>,
+    entities: Vec<Entity>,
 
     /// List of all received chat messages.
     // TODO: This should be a UniqueVec or something.
@@ -155,6 +153,35 @@ pub struct ClientState {
     /// Size of the Korangar window.
     window_size: ScreenSize,
 
+    /// Map data that is viewed in the inspector. Once added to this vector they
+    /// are never removed so we can ensure the user interface remains valid.
+    #[cfg(feature = "debug")]
+    #[hidden_element]
+    inspecting_maps: Vec<MapData>,
+    /// Objects that are viewed in the inspector. Once added to this vector they
+    /// are never removed so we can ensure the user interface remains valid.
+    #[cfg(feature = "debug")]
+    inspecting_objects: Vec<Object>,
+    /// Light sources that are viewed in the inspector. Once added to this
+    /// vector they are never removed so we can ensure the user interface
+    /// remains valid.
+    #[cfg(feature = "debug")]
+    inspecting_light_sources: Vec<LightSource>,
+    /// Sound sources that are viewed in the inspector. Once added to this
+    /// vector they are never removed so we can ensure the user interface
+    /// remains valid.
+    #[cfg(feature = "debug")]
+    inspecting_sound_sources: Vec<SoundSource>,
+    /// Effect sources that are viewed in the inspector. Once added to this
+    /// vector they are never removed so we can ensure the user interface
+    /// remains valid.
+    #[cfg(feature = "debug")]
+    inspecting_effect_sources: Vec<EffectSource>,
+    /// Entities that are viewed in the inspector. Once added to this vector
+    /// they are never removed so we can ensure the user interface remains
+    /// valid.
+    #[cfg(feature = "debug")]
+    inspecting_entities: Vec<Entity>,
     /// Special render options for debugging the client.
     #[cfg(feature = "debug")]
     render_options: RenderOptions,
@@ -171,17 +198,18 @@ pub struct ClientState {
 impl ClientState {
     pub fn new(
         game_file_loader: &GameFileLoader,
-        map: Box<Map>,
         graphics_settings: GraphicsSettings,
         #[cfg(feature = "debug")] packet_history: PacketHistory,
     ) -> Self {
-        time_phase!("load translation", {
-            let translation = Translation::load_language(game_file_loader, graphics_settings.language);
-        });
-
         time_phase!("load settings", {
             let mut login_settings = LoginSettings::new();
             let audio_settings = AudioSettings::new();
+            let interface_settings = InterfaceSettings::new();
+            let interface_settings_capabilities = InterfaceSettingsCapabilities::default();
+        });
+
+        time_phase!("load localization", {
+            let localization = Localization::load_language(game_file_loader, interface_settings.language);
         });
 
         time_phase!("load themes", {
@@ -269,6 +297,19 @@ impl ClientState {
         let debug_timer = korangar_debug::logging::Timer::new("creating debug resources");
 
         #[cfg(feature = "debug")]
+        let inspecting_maps = Vec::new();
+        #[cfg(feature = "debug")]
+        let inspecting_objects = Vec::new();
+        #[cfg(feature = "debug")]
+        let inspecting_light_sources = Vec::new();
+        #[cfg(feature = "debug")]
+        let inspecting_sound_sources = Vec::new();
+        #[cfg(feature = "debug")]
+        let inspecting_effect_sources = Vec::new();
+        #[cfg(feature = "debug")]
+        let inspecting_entities = Vec::new();
+
+        #[cfg(feature = "debug")]
         let render_options = RenderOptions::new();
 
         #[cfg(feature = "debug")]
@@ -278,9 +319,11 @@ impl ClientState {
         debug_timer.stop();
 
         ClientState {
-            translation,
+            localization,
             login_settings,
             audio_settings,
+            interface_settings,
+            interface_settings_capabilities,
             graphics_settings,
             graphics_settings_capabilities,
             menu_theme,
@@ -291,7 +334,6 @@ impl ClientState {
             chat_window,
             friend_list_window,
             dialog_window,
-            map: Some(map),
             entities: Vec::new(),
             chat_messages,
             friend_list,
@@ -310,12 +352,41 @@ impl ClientState {
             create_character_name,
             window_size,
             #[cfg(feature = "debug")]
+            inspecting_maps,
+            #[cfg(feature = "debug")]
+            inspecting_objects,
+            #[cfg(feature = "debug")]
+            inspecting_light_sources,
+            #[cfg(feature = "debug")]
+            inspecting_sound_sources,
+            #[cfg(feature = "debug")]
+            inspecting_effect_sources,
+            #[cfg(feature = "debug")]
+            inspecting_entities,
+            #[cfg(feature = "debug")]
             render_options,
             #[cfg(feature = "debug")]
             profiler_window,
             #[cfg(feature = "debug")]
             packet_history,
         }
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn prepare_entity_inspection(&mut self, index: u32) -> impl Path<ClientState, Entity> {
+        let entity = &self.entities[index as usize];
+
+        let index = self
+            .inspecting_entities
+            .iter()
+            .position(|item| item.get_entity_id() == entity.get_entity_id())
+            .unwrap_or_else(|| {
+                let index = self.inspecting_entities.len();
+                self.inspecting_entities.push(entity.clone());
+                index
+            });
+
+        client_state().inspecting_entities().index(index).manually_asserted()
     }
 }
 
@@ -399,7 +470,7 @@ impl Application for ClientState {
     type Cache = WindowCache;
     type Clip = ScreenClip;
     type Color = Color;
-    type CornerRadius = CornerRadius;
+    type CornerDiameter = CornerDiameter;
     type CustomEvent = InputEvent;
     type CustomMouseMode = MouseInputMode;
     type FontSize = FontSize;
@@ -486,4 +557,88 @@ pub fn this_entity() -> impl Path<ClientState, Entity, false> {
     }
 
     CustomPath
+}
+
+#[cfg(feature = "debug")]
+pub fn prepare_map_inspection(inspecting_maps: &mut Vec<MapData>, map_data: &MapData) -> impl Path<ClientState, MapData> {
+    let index = inspecting_maps
+        .iter()
+        .position(|item| {
+            item.ground_file == map_data.ground_file
+                && item._ini_file == map_data._ini_file
+                && item.gat_file == map_data.gat_file
+                && item.build_number == map_data.build_number
+        })
+        .unwrap_or_else(|| {
+            let index = inspecting_maps.len();
+            inspecting_maps.push(map_data.clone());
+            index
+        });
+
+    client_state().inspecting_maps().index(index).manually_asserted()
+}
+
+#[cfg(feature = "debug")]
+pub fn prepare_object_inspection(inspecting_objects: &mut Vec<Object>, object: &Object) -> impl Path<ClientState, Object> {
+    let index = inspecting_objects
+        .iter()
+        .position(|item| item.name == object.name && item.model_name == object.model_name && item.transform == object.transform)
+        .unwrap_or_else(|| {
+            let index = inspecting_objects.len();
+            inspecting_objects.push(object.clone());
+            index
+        });
+
+    client_state().inspecting_objects().index(index).manually_asserted()
+}
+
+#[cfg(feature = "debug")]
+pub fn prepare_light_source_inspection(
+    inspecting_light_sources: &mut Vec<LightSource>,
+    light_source: &LightSource,
+) -> impl Path<ClientState, LightSource> {
+    let index = inspecting_light_sources
+        .iter()
+        .position(|item| item == light_source)
+        .unwrap_or_else(|| {
+            let index = inspecting_light_sources.len();
+            inspecting_light_sources.push(light_source.clone());
+            index
+        });
+
+    client_state().inspecting_light_sources().index(index).manually_asserted()
+}
+
+#[cfg(feature = "debug")]
+pub fn prepare_sound_source_inspection(
+    inspecting_sound_sources: &mut Vec<SoundSource>,
+    sound_source: &SoundSource,
+) -> impl Path<ClientState, SoundSource> {
+    let index = inspecting_sound_sources
+        .iter()
+        .position(|item| item == sound_source)
+        .unwrap_or_else(|| {
+            let index = inspecting_sound_sources.len();
+            inspecting_sound_sources.push(sound_source.clone());
+            index
+        });
+
+    client_state().inspecting_sound_sources().index(index).manually_asserted()
+}
+
+#[cfg(feature = "debug")]
+pub fn prepare_effect_source_inspection(
+    inspecting_effect_sources: &mut Vec<EffectSource>,
+    effect_source: &EffectSource,
+) -> impl Path<ClientState, EffectSource> {
+    let index = inspecting_effect_sources
+        .iter()
+        .position(|item| item == effect_source)
+        .unwrap_or_else(|| {
+            let index = inspecting_effect_sources.len();
+            inspecting_effect_sources.push(effect_source.clone());
+            index
+        });
+
+    client_state().inspecting_effect_sources().index(index).manually_asserted()
 }

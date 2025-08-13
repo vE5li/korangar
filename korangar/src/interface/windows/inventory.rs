@@ -5,8 +5,8 @@ use rust_state::{Path, VecIndexExt};
 
 use crate::ItemSource;
 use crate::interface::windows::WindowClass;
+use crate::state::localization::LocalizationPathExt;
 use crate::state::theme::InterfaceThemeType;
-use crate::state::translation::TranslationPathExt;
 use crate::state::{ClientState, ClientStatePathExt, client_state};
 use crate::world::ResourceMetadata;
 
@@ -36,7 +36,7 @@ where
         const INVENTORY_COLUMNS: usize = 10;
 
         window! {
-            title: client_state().translation().inventory_window_title(),
+            title: client_state().localization().inventory_window_title(),
             class: Self::window_class(),
             theme: InterfaceThemeType::Game,
             closable: true,

@@ -10,6 +10,7 @@
     log_in_button_tooltip: "Benutzername und Passwort eingeben",
     menu_window_title: "Menü",
     graphics_settings_button_text: "Grafikeinstellungen",
+    interface_settings_button_text: "Anzeigeeinstellungen",
     audio_settings_button_text: "Audioeinstellungen",
     log_out_button_text: "Ausloggen",
     exit_button_text: "Beenden",
@@ -44,4 +45,7 @@
     disconnect_button_text: "Verbindung trennen",
     server_selection_window_title: "Server auswählen",
     skill_tree_window_title: "Fertigkeitenbaum",
+    interface_settings_window_title: "Anzeigeeinstellungen",
+    language_text: "Sprache",
+    scaling_text: "Skalierung",
 )

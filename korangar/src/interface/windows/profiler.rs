@@ -6,8 +6,7 @@ use korangar_interface::layout::{Layout, Resolver};
 use korangar_interface::window::{CustomWindow, Window};
 use rust_state::{Context, Path, RustState};
 
-use crate::graphics::Color;
-use crate::interface::layout::CornerRadius;
+use crate::graphics::{Color, CornerDiameter};
 use crate::interface::windows::WindowClass;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
@@ -127,7 +126,7 @@ where
         let mut x_position = layout_info.area.left;
         let mut color_lookup = color_lookup::ColorLookup::default();
 
-        layout.add_rectangle(layout_info.area, CornerRadius::uniform(2.0), Color::monochrome_u8(40));
+        layout.add_rectangle(layout_info.area, CornerDiameter::uniform(2.0), Color::monochrome_u8(40));
 
         for entry in entries {
             let mut y_position = layout_info.area.top + layout_info.area.height;
@@ -140,7 +139,7 @@ where
                 height: bar_height,
             };
 
-            layout.add_rectangle(bar_area, CornerRadius::default(), Color::monochrome_u8(80));
+            layout.add_rectangle(bar_area, CornerDiameter::default(), Color::monochrome_u8(80));
 
             let hover_area = Area {
                 left: x_position,
@@ -167,7 +166,7 @@ where
                     height: bar_height,
                 };
 
-                layout.add_rectangle(bar_area, CornerRadius::default(), color);
+                layout.add_rectangle(bar_area, CornerDiameter::default(), color);
             }
 
             x_position += bar_width + gap_width;

@@ -6,27 +6,27 @@ use cgmath::{EuclideanSpace, Point3, Vector2, VectorSpace, Zero};
 use derive_new::new;
 use korangar_audio::{AudioEngine, SoundEffectKey};
 use korangar_interface::element::StateElement;
-use korangar_interface::window::StateWindow;
+use korangar_interface::window::{StateWindow, Window};
 use korangar_networking::EntityData;
 use korangar_util::pathing::{MAX_WALK_PATH_SIZE, PathFinder};
 use ragnarok_packets::{AccountId, CharacterInformation, ClientTick, Direction, EntityId, Sex, StatusType, WorldPosition};
-use rust_state::RustState;
+use rust_state::{Path, RustState};
 #[cfg(feature = "debug")]
 use smallvec::smallvec_inline;
 #[cfg(feature = "debug")]
 use wgpu::{BufferUsages, Device, Queue};
 
-use crate::graphics::EntityInstruction;
 #[cfg(feature = "debug")]
 use crate::graphics::{BindlessSupport, DebugRectangleInstruction};
-use crate::interface::layout::{ScreenPosition, ScreenSize};
+use crate::graphics::{EntityInstruction, ScreenPosition, ScreenSize};
 use crate::loaders::GameFileLoader;
 #[cfg(feature = "debug")]
 use crate::loaders::split_mesh_by_texture;
 use crate::renderer::GameInterfaceRenderer;
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
-use crate::state::theme::GameTheme;
+use crate::state::ClientState;
+use crate::state::theme::{GameTheme, InterfaceThemeType};
 use crate::world::{ActionEvent, AnimationActionType, AnimationData, AnimationState, Camera, Library, Map};
 #[cfg(feature = "debug")]
 use crate::world::{MarkerIdentifier, SubMesh};
@@ -38,6 +38,7 @@ const FEMALE_HAIR_LOOKUP: &[usize] = &[2, 2, 4, 7, 1, 5, 3, 6, 12, 10, 9, 11, 8]
 const SOUND_COOLDOWN_DURATION: u32 = 200;
 const SPATIAL_SOUND_RANGE: f32 = 250.0;
 
+#[derive(Clone)]
 pub enum ResourceState<T> {
     Available(T),
     Unavailable,
@@ -53,7 +54,7 @@ impl<T> ResourceState<T> {
     }
 }
 
-#[derive(RustState, StateElement, new)]
+#[derive(Clone, RustState, StateElement, new)]
 pub struct Movement {
     #[hidden_element]
     steps: ArrayVec<Step, MAX_WALK_PATH_SIZE>,
@@ -65,6 +66,7 @@ pub struct Movement {
 }
 
 #[cfg(feature = "debug")]
+#[derive(Clone)]
 pub struct Pathing {
     pub vertex_buffer: Arc<Buffer<ModelVertex>>,
     pub submeshes: Vec<SubMesh>,
@@ -128,7 +130,7 @@ impl SoundState {
     }
 }
 
-#[derive(RustState, StateElement)]
+#[derive(Clone, RustState, StateElement)]
 pub struct Common {
     pub entity_id: EntityId,
     pub job_id: usize,
@@ -783,7 +785,7 @@ impl Common {
     }
 }
 
-#[derive(RustState, StateWindow)]
+#[derive(Clone, RustState, StateWindow)]
 pub struct Player {
     common: Common,
     pub hair_id: usize,
@@ -917,7 +919,7 @@ impl Player {
     }
 }
 
-#[derive(RustState, StateWindow)]
+#[derive(Clone, RustState, StateWindow)]
 pub struct Npc {
     common: Common,
 }
@@ -983,9 +985,7 @@ impl Npc {
     }
 }
 
-// TODO:
-//#[derive(StateWindow)]
-#[derive(StateElement)]
+#[derive(Clone, StateElement)]
 pub enum Entity {
     Player(Player),
     Npc(Npc),
@@ -1138,16 +1138,27 @@ impl Entity {
     }
 }
 
-// impl StateWindow<InterfaceSettings> for Entity {
-//     fn to_window(
-//         &self,
-//         window_cache: &WindowCache,
-//         application: &InterfaceSettings,
-//         available_space: ScreenSize,
-//     ) -> Window<InterfaceSettings> {
-//         match self {
-//             Entity::Player(player) => player.to_window(window_cache,
-// application, available_space),             Entity::Npc(npc) =>
-// npc.to_window(window_cache, application, available_space),         }
-//     }
-// }
+// TODO: Derive this
+impl StateWindow<ClientState> for Entity {
+    fn to_window<'a>(self_path: impl Path<ClientState, Self>) -> impl Window<ClientState> + 'a {
+        use korangar_interface::prelude::*;
+
+        window! {
+            title: "Entity",
+            theme: InterfaceThemeType::Game,
+            closable: true,
+            elements: (),
+        }
+    }
+
+    fn to_window_mut<'a>(self_path: impl Path<ClientState, Self>) -> impl Window<ClientState> + 'a {
+        use korangar_interface::prelude::*;
+
+        window! {
+            title: "Entity",
+            theme: InterfaceThemeType::Game,
+            closable: true,
+            elements: (),
+        }
+    }
+}

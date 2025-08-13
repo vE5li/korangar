@@ -6,7 +6,7 @@ use korangar_debug::logging::{Colorize, print_debug};
 use rust_state::RustState;
 use wgpu::{Adapter, Device, PresentMode, SurfaceConfiguration, SurfaceTexture, TextureFormat};
 
-use crate::interface::layout::ScreenSize;
+use crate::graphics::ScreenSize;
 
 #[derive(RustState, Debug, Clone, Copy)]
 pub struct PresentModeInfo {

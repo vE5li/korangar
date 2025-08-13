@@ -3,12 +3,11 @@ use std::sync::Arc;
 
 use cgmath::{Point3, Vector2, Vector3};
 use derive_new::new;
-use korangar_interface::application::ClipTrait;
+use korangar_interface::application::Clip;
 use ragnarok_packets::{EntityId, QuestColor, QuestEffectPacket};
 use rand_aes::tls::rand_f32;
 
-use crate::graphics::{Color, Texture};
-use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
+use crate::graphics::{Color, ScreenClip, ScreenPosition, ScreenSize, Texture};
 use crate::loaders::{FontSize, ImageType, Scaling, TextureLoader};
 use crate::renderer::{GameInterfaceRenderer, SpriteRenderer};
 use crate::world::Camera;

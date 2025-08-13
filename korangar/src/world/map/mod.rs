@@ -36,7 +36,7 @@ use crate::graphics::RenderOptions;
 use crate::graphics::{DebugAabbInstruction, DebugCircleInstruction, DebugRectangleInstruction};
 use crate::graphics::{EntityInstruction, IndicatorInstruction, ModelInstruction, Texture, TextureSet, WaterInstruction};
 #[cfg(feature = "debug")]
-use crate::interface::layout::{ScreenPosition, ScreenSize};
+use crate::graphics::{ScreenPosition, ScreenSize};
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
 use crate::settings::LightingMode;
@@ -382,6 +382,33 @@ impl Map {
     }
 
     #[cfg(feature = "debug")]
+    pub fn get_map_data(&self) -> &MapData {
+        &self.map_data
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn get_object(&self, key: u32) -> &Object {
+        self.objects.get(ObjectKey::new(key)).expect("object key should be valid")
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn get_light_source(&self, key: u32) -> &LightSource {
+        self.light_sources
+            .get(LightSourceKey::new(key))
+            .expect("light source key should be valid")
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn get_sound_source(&self, index: u32) -> &SoundSource {
+        &self.sound_sources[index as usize]
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn get_effect_source(&self, index: u32) -> &EffectSource {
+        &self.effect_sources[index as usize]
+    }
+
+    #[cfg(feature = "debug")]
     #[korangar_debug::profile]
     pub fn render_overlay_tiles(
         &self,
@@ -444,26 +471,6 @@ impl Map {
             }
         });
     }
-
-    // #[cfg(feature = "debug")]
-    // pub fn resolve_marker<'a>(
-    //     &'a self,
-    //     entities: &'a [Entity],
-    //     marker_identifier: MarkerIdentifier,
-    // ) -> &'a dyn StateWindow<ClientState> {
-    //     match marker_identifier {
-    //         MarkerIdentifier::Object(key) =>
-    // self.objects.get(ObjectKey::new(key)).unwrap(),
-    //         MarkerIdentifier::LightSource(key) =>
-    // self.light_sources.get(LightSourceKey::new(key)).unwrap(),
-    //         MarkerIdentifier::SoundSource(index) => &self.sound_sources[index as
-    // usize],         MarkerIdentifier::EffectSource(index) =>
-    // &self.effect_sources[index as usize],
-    //         MarkerIdentifier::Particle(..) => todo!(),
-    //         MarkerIdentifier::Entity(index) => &entities[index as usize],
-    //         MarkerIdentifier::Shadow(..) => todo!(),
-    //     }
-    // }
 
     #[cfg(feature = "debug")]
     #[korangar_debug::profile]

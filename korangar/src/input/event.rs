@@ -57,6 +57,8 @@ pub enum InputEvent {
     ToggleEquipmentWindow,
     /// Open or close the skill tree window. Only works while playing.
     ToggleSkillTreeWindow,
+    /// Open or close the interface settings window.
+    ToggleInterfaceSettingsWindow,
     /// Open or close the graphics settings window.
     ToggleGraphicsSettingsWindow,
     /// Open or close the audio settings window.
@@ -208,6 +210,12 @@ pub enum InputEvent {
         /// Items to sell.
         items: Vec<SoldItemInformation>,
     },
+    /// Reload the language from disk.
+    #[cfg(feature = "debug")]
+    ReloadLanguage,
+    /// Save the language to disk.
+    #[cfg(feature = "debug")]
+    SaveLanguage,
     /// Warp the player.
     #[cfg(feature = "debug")]
     WarpToMap {

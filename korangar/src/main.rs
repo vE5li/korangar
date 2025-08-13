@@ -74,10 +74,12 @@ use ragnarok_packets::{
     TilePosition, UnitId, WorldPosition,
 };
 use renderer::InterfaceRenderer;
-use rust_state::{AsRefExt, Context, ManuallyAssertExt, OptionExt};
-use settings::{AudioSettings, AudioSettingsPathExt, GraphicsSettingsCapabilities, GraphicsSettingsPathExt};
+use rust_state::{AsRefExt, Context, ManuallyAssertExt, OptionExt, VecIndexExt};
+use settings::{
+    AudioSettings, AudioSettingsPathExt, GraphicsSettingsCapabilities, GraphicsSettingsPathExt, InterfaceSettings, InterfaceSettingsPathExt,
+};
+use state::localization::Localization;
 use state::theme::{CursorThemePathExt, GameThemePathExt, IndicatorThemePathExt, InterfaceThemePathExt};
-use state::translation::Translation;
 use state::{ChatMessage, ClientState, ClientStatePathExt, ClientStateRootExt, client_state, this_entity, this_player};
 #[cfg(feature = "debug")]
 use wgpu::Device;
@@ -96,7 +98,6 @@ use winit::window::{Icon, Window, WindowId};
 use crate::graphics::*;
 use crate::input::{InputEvent, InputSystem};
 use crate::interface::cursor::{MouseCursor, MouseCursorState};
-use crate::interface::layout::{ScreenPosition, ScreenSize};
 use crate::interface::resource::{ItemSource, SkillSource};
 use crate::interface::windows::*;
 use crate::loaders::*;
@@ -105,6 +106,8 @@ use crate::renderer::DebugMarkerRenderer;
 use crate::renderer::{AlignHorizontal, EffectRenderer, GameInterfaceRenderer};
 use crate::settings::{GraphicsSettings, LightingMode};
 use crate::system::GameTimer;
+#[cfg(feature = "debug")]
+use crate::world::MarkerIdentifier;
 use crate::world::*;
 
 const CLIENT_NAME: &str = "Korangar";
@@ -396,6 +399,7 @@ struct Client {
     #[cfg(not(feature = "debug"))]
     networking_system: NetworkingSystem<NoPacketCallback>,
     audio_engine: Arc<AudioEngine<GameFileLoader>>,
+    active_interface_settings: InterfaceSettings,
     active_graphics_settings: GraphicsSettings,
     graphics_engine: GraphicsEngine,
     queue: Arc<Queue>,
@@ -403,6 +407,7 @@ struct Client {
     device: Arc<Device>,
     window: Option<Arc<Window>>,
 
+    map: Option<Box<Map>>,
     client_state: Context<ClientState>,
 }
 
@@ -696,12 +701,13 @@ impl Client {
         time_phase!("create client state", {
             let client_state = Context::new(ClientState::new(
                 &game_file_loader,
-                map,
                 graphics_settings.clone(),
                 #[cfg(feature = "debug")]
                 packet_history,
             ));
         });
+
+        let active_interface_settings = client_state.follow(crate::client_state().interface_settings()).clone();
 
         interface.open_window(LoginWindow::new(
             ClientState::path().login_window(),
@@ -777,6 +783,7 @@ impl Client {
             main_menu_click_sound_effect,
             networking_system,
             audio_engine,
+            active_interface_settings,
             active_graphics_settings: graphics_settings,
             graphics_engine,
             queue,
@@ -784,6 +791,7 @@ impl Client {
             device,
             window: None,
 
+            map: Some(map),
             client_state,
         })
     }
@@ -832,11 +840,11 @@ impl Client {
         // We can only apply the graphic changes and reconfigure the surface once the
         // previous image was presented. Moving this function to the end of the
         // function results in surface configuration errors under DX12.
-        self.update_graphic_settings();
+        self.update_settings();
 
         // TODO: Shouldn't this happen later? After the scaling has been potentially
         // changed by the UI.
-        let scaling = *self.client_state.follow(client_state().graphics_settings().interface_scaling());
+        let scaling = *self.client_state.follow(client_state().interface_settings().scaling());
         self.bottom_interface_renderer.update_scaling(scaling);
         self.middle_interface_renderer.update_scaling(scaling);
         self.top_interface_renderer.update_scaling(scaling);
@@ -951,7 +959,7 @@ impl Client {
                     let server = self.saved_character_server.clone().unwrap();
                     self.networking_system.connect_to_character_server(login_data, server);
 
-                    *self.client_state.follow_mut(client_state().map()) = None;
+                    self.map = None;
 
                     self.particle_holder.clear();
                     self.effect_holder.clear();
@@ -1078,7 +1086,7 @@ impl Client {
                     // Put the dialog system in a well-defined state.
                     self.client_state.follow_mut(client_state().dialog_window()).end();
 
-                    *self.client_state.follow_mut(client_state().map()) = None;
+                    self.map = None;
 
                     self.particle_holder.clear();
                     self.effect_holder.clear();
@@ -1103,20 +1111,19 @@ impl Client {
                         .open_window(ErrorWindow::new("Failed to switch character slots".to_owned()));
                 }
                 NetworkEvent::AddEntity { entity_data } => {
-                    // FIX: A bit hacky because of borrowing rules.
-                    let client_state = self.client_state.follow_mut(client_state());
-
-                    if let Some(map) = &client_state.map {
+                    if let Some(map) = &self.map {
                         let mut npc = Entity::Npc(Npc::new(map, entity_data, client_tick));
 
                         let entity_id = npc.get_entity_id();
                         let entity_type = npc.get_entity_type();
                         let entity_part_files = npc.get_entity_part_files(&self.library);
 
+                        let entities = self.client_state.follow_mut(client_state().entities());
+
                         // Sometimes (like after a job change) the server will tell the client
                         // that a new entity appeared, even though it was already on screen. So
                         // to prevent the entity existing twice, we remove the old one.
-                        client_state.entities.retain(|entity| entity.get_entity_id() != entity_id);
+                        entities.retain(|entity| entity.get_entity_id() != entity_id);
 
                         if let Some(animation_data) =
                             self.async_loader
@@ -1128,7 +1135,7 @@ impl Client {
                         #[cfg(feature = "debug")]
                         npc.generate_pathing_mesh(&self.device, &self.queue, self.graphics_engine.bindless_support(), map);
 
-                        client_state.entities.push(npc);
+                        entities.push(npc);
                     }
                 }
                 NetworkEvent::RemoveEntity { entity_id, reason } => {
@@ -1169,13 +1176,11 @@ impl Client {
                     destination,
                     starting_timestamp,
                 } => {
-                    // FIX: A bit hacky because of borrowing rules.
-                    let client_state = self.client_state.follow_mut(client_state());
-
-                    let entity = client_state.entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id);
+                    let entities = self.client_state.follow_mut(client_state().entities());
+                    let entity = entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id);
 
                     if let Some(entity) = entity
-                        && let Some(map) = &client_state.map
+                        && let Some(map) = &self.map
                     {
                         let position_from = Vector2::new(origin.x, origin.y);
                         let position_to = Vector2::new(destination.x, destination.y);
@@ -1190,14 +1195,11 @@ impl Client {
                     destination,
                     starting_timestamp,
                 } => {
-                    // FIX: A bit hacky because of borrowing rules.
-                    let client_state = self.client_state.follow_mut(client_state());
-
-                    if let Some(map) = &client_state.map {
+                    if let Some(map) = &self.map {
                         let position_from = Vector2::new(origin.x, origin.y);
                         let position_to = Vector2::new(destination.x, destination.y);
 
-                        if let Some(player) = client_state.entities.get_mut(0) {
+                        if let Some(player) = self.client_state.try_follow_mut(this_entity()) {
                             player.move_from_to(map, &mut self.path_finder, position_from, position_to, starting_timestamp);
                             #[cfg(feature = "debug")]
                             player.generate_pathing_mesh(&self.device, &self.queue, self.graphics_engine.bindless_support(), map);
@@ -1205,7 +1207,7 @@ impl Client {
                     }
                 }
                 NetworkEvent::ChangeMap { map_name, position } => {
-                    *self.client_state.follow_mut(client_state().map()) = None;
+                    self.map = None;
                     self.particle_holder.clear();
                     self.effect_holder.clear();
                     self.point_light_manager.clear();
@@ -1293,7 +1295,7 @@ impl Client {
                     .follow_mut(client_state().dialog_window())
                     .add_choice_buttons(choices),
                 NetworkEvent::AddQuestEffect { quest_effect } => {
-                    if let Some(map) = self.client_state.follow(client_state().map()) {
+                    if let Some(map) = &self.map {
                         self.particle_holder.add_quest_icon(&self.texture_loader, map, quest_effect)
                     }
                 }
@@ -1409,7 +1411,7 @@ impl Client {
                     unit_id,
                     position,
                 } => {
-                    let Some(map) = self.client_state.follow(client_state().map()) else {
+                    let Some(map) = &self.map else {
                         continue;
                     };
 
@@ -1682,6 +1684,14 @@ impl Client {
                         }
                     }
                 }
+                InputEvent::ToggleInterfaceSettingsWindow => match self.interface.is_window_with_class_open(WindowClass::InterfaceSettings)
+                {
+                    true => self.interface.close_window_with_class(WindowClass::InterfaceSettings),
+                    false => self.interface.open_window(InterfaceSettingsWindow::new(
+                        client_state().interface_settings(),
+                        client_state().interface_settings_capabilities(),
+                    )),
+                },
                 InputEvent::ToggleGraphicsSettingsWindow => match self.interface.is_window_with_class_open(WindowClass::GraphicsSettings) {
                     true => self.interface.close_window_with_class(WindowClass::GraphicsSettings),
                     false => self.interface.open_window(GraphicsSettingsWindow::new(
@@ -1910,13 +1920,60 @@ impl Client {
                     let _ = self.networking_system.sell_items(items);
                 }
                 #[cfg(feature = "debug")]
+                InputEvent::ReloadLanguage => {
+                    let language = *self.client_state.follow(client_state().interface_settings().language());
+                    *self.client_state.follow_mut(client_state().localization()) =
+                        Localization::load_language(&self.game_file_loader, language);
+                }
+                #[cfg(feature = "debug")]
+                InputEvent::SaveLanguage => {
+                    let language = *self.client_state.follow(client_state().interface_settings().language());
+                    self.client_state.follow(client_state().localization()).save_language(language);
+                }
+                #[cfg(feature = "debug")]
                 InputEvent::OpenMarkerDetails { marker_identifier } => {
-                    if let Some(map) = self.client_state.follow(client_state().map()) {
-                        // self.interface.open_window(
-                        //     &self.client_state,
-                        //     map.resolve_marker(self.client_state.
-                        // follow(client_state().entities()),
-                        // marker_identifier), );
+                    if let Some(map) = &self.map {
+                        match marker_identifier {
+                            MarkerIdentifier::Object(key) => {
+                                let inspecting_objects = self.client_state.follow_mut(client_state().inspecting_objects());
+                                let object = self.map.as_ref().unwrap().get_object(key);
+                                let object_path = state::prepare_object_inspection(inspecting_objects, object);
+
+                                self.interface.open_state_window(object_path);
+                            }
+                            MarkerIdentifier::LightSource(key) => {
+                                let inspecting_lights = self.client_state.follow_mut(client_state().inspecting_light_sources());
+                                let light_source = self.map.as_ref().unwrap().get_light_source(key);
+                                let light_source_path = state::prepare_light_source_inspection(inspecting_lights, light_source);
+
+                                self.interface.open_state_window(light_source_path);
+                            }
+                            MarkerIdentifier::SoundSource(index) => {
+                                let inspecting_sounds = self.client_state.follow_mut(client_state().inspecting_sound_sources());
+                                let sound_source = self.map.as_ref().unwrap().get_sound_source(index);
+                                let sound_source_path = state::prepare_sound_source_inspection(inspecting_sounds, sound_source);
+
+                                self.interface.open_state_window(sound_source_path);
+                            }
+                            MarkerIdentifier::EffectSource(index) => {
+                                let inspecting_effects = self.client_state.follow_mut(client_state().inspecting_effect_sources());
+                                let effect_source = self.map.as_ref().unwrap().get_effect_source(index);
+                                let effect_source_path = state::prepare_effect_source_inspection(inspecting_effects, effect_source);
+
+                                self.interface.open_state_window(effect_source_path);
+                            }
+                            MarkerIdentifier::Particle(..) => {
+                                // TODO:
+                            }
+                            MarkerIdentifier::Entity(index) => {
+                                let entity_path = self.client_state.follow_mut(client_state()).prepare_entity_inspection(index);
+
+                                self.interface.open_state_window(entity_path);
+                            }
+                            MarkerIdentifier::Shadow(..) => {
+                                // TODO:
+                            }
+                        }
                     }
                 }
                 #[cfg(feature = "debug")]
@@ -1928,9 +1985,12 @@ impl Client {
                 },
                 #[cfg(feature = "debug")]
                 InputEvent::OpenMapDataWindow => {
-                    if self.client_state.follow(client_state().map()).is_some() {
-                        self.interface
-                            .open_state_window(client_state().map().unwrapped().manually_asserted().path_as_ref().map_data());
+                    if self.map.is_some() {
+                        let inspecting_maps = self.client_state.follow_mut(client_state().inspecting_maps());
+                        let map_data = self.map.as_ref().unwrap().get_map_data();
+                        let map_data_path = state::prepare_map_inspection(inspecting_maps, map_data);
+
+                        self.interface.open_state_window(map_data_path);
                     }
                 }
                 #[cfg(feature = "debug")]
@@ -1942,7 +2002,7 @@ impl Client {
                 }
                 #[cfg(feature = "debug")]
                 InputEvent::ToggleMapsWindow => {
-                    if self.client_state.follow(client_state().map()).is_some() {
+                    if self.map.is_some() {
                         match self.interface.is_window_with_class_open(WindowClass::Maps) {
                             true => self.interface.close_window_with_class(WindowClass::Maps),
                             false => self.interface.open_window(MapsWindow),
@@ -1951,7 +2011,7 @@ impl Client {
                 }
                 #[cfg(feature = "debug")]
                 InputEvent::ToggleCommandsWindow => {
-                    if self.client_state.follow(client_state().map()).is_some() {
+                    if self.map.is_some() {
                         match self.interface.is_window_with_class_open(WindowClass::Commands) {
                             true => self.interface.close_window_with_class(WindowClass::Commands),
                             false => self.interface.open_window(CommandsWindow),
@@ -2037,7 +2097,7 @@ impl Client {
                     match self.client_state.try_follow(this_player()).is_none() {
                         true => {
                             // Load of main menu map
-                            let map = self.client_state.follow_mut(client_state().map()).insert(map);
+                            let map = self.map.insert(map);
 
                             map.set_ambient_sound_sources(&self.audio_engine);
                             self.audio_engine.play_background_music_track(DEFAULT_BACKGROUND_MUSIC);
@@ -2053,9 +2113,7 @@ impl Client {
                         }
                         false => {
                             // Normal map switch
-                            // FIX: Kinda hacky because of the borrowing rules.
-                            let client_state = self.client_state.follow_mut(client_state());
-                            let map = client_state.map.insert(map);
+                            let map = self.map.insert(map);
 
                             map.set_ambient_sound_sources(&self.audio_engine);
                             self.audio_engine.play_background_music_track(map.background_music_track_name());
@@ -2067,9 +2125,7 @@ impl Client {
                                 // `manually_asserted` is safe because we are in
                                 // the branch where `this_player`
                                 // is not `None`.
-                                // let player = self.client_state.follow_mut(this_entity().manually_asserted());
-
-                                let player = &mut client_state.entities[0];
+                                let player = self.client_state.follow_mut(this_entity().manually_asserted());
 
                                 player.set_position(map, position, client_tick);
                                 self.player_camera.set_focus_point(player.get_position());
@@ -2095,7 +2151,7 @@ impl Client {
         }
 
         // Main map update and render loop
-        if self.client_state.follow(client_state().map()).is_some() {
+        if self.map.is_some() {
             #[cfg(feature = "debug")]
             let update_main_camera_measurement = Profiler::start_measurement("update main camera");
 
@@ -2134,21 +2190,13 @@ impl Client {
                     false => &self.start_camera,
                 };
 
-                // FIX: Hacky for now because of the client_state borrowing rules.
-                // Ideally this would be moved outside of the render loop.
-                let client_state = self.client_state.follow_mut(client_state());
-
-                client_state.entities.iter_mut().for_each(|entity| {
-                    entity.update(
-                        &self.audio_engine,
-                        client_state.map.as_ref().unwrap(),
-                        current_camera,
-                        client_tick,
-                    )
-                });
+                self.client_state
+                    .follow_mut(client_state().entities())
+                    .iter_mut()
+                    .for_each(|entity| entity.update(&self.audio_engine, self.map.as_ref().unwrap(), current_camera, client_tick));
             }
 
-            let map = self.client_state.follow(client_state().map()).as_ref().unwrap();
+            let map = self.map.as_ref().unwrap();
 
             #[cfg(feature = "debug")]
             let update_videos_measurement = Profiler::start_measurement("update videos");
@@ -2686,9 +2734,7 @@ impl Client {
                         input_report.mouse_position,
                         self.interface.get_mouse_mode().grabbed(),
                         *self.client_state.follow(client_state().game_theme().cursor().color()),
-                        self.client_state
-                            .follow(client_state().graphics_settings().interface_scaling())
-                            .get_factor(),
+                        self.client_state.follow(client_state().interface_settings().scaling()).get_factor(),
                     );
                 }
             }
@@ -2773,7 +2819,7 @@ impl Client {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn update_graphic_settings(&mut self) {
+    fn update_settings(&mut self) {
         let graphics_settings = self.client_state.follow(client_state().graphics_settings());
 
         if self.active_graphics_settings.vsync != graphics_settings.vsync {
@@ -2825,11 +2871,11 @@ impl Client {
             self.active_graphics_settings.high_quality_interface = graphics_settings.high_quality_interface;
         }
 
-        let language = graphics_settings.language;
+        let language = *self.client_state.follow(client_state().interface_settings().language());
 
-        if self.active_graphics_settings.language != language {
-            *self.client_state.follow_mut(client_state().translation()) = Translation::load_language(&self.game_file_loader, language);
-            self.active_graphics_settings.language = language;
+        if self.active_interface_settings.language != language {
+            *self.client_state.follow_mut(client_state().localization()) = Localization::load_language(&self.game_file_loader, language);
+            self.active_interface_settings.language = language;
         }
     }
 }

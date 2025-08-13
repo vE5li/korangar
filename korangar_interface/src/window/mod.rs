@@ -9,7 +9,7 @@ use rust_state::{Context, Path, RustState, Selector};
 use store::WindowStore;
 
 use crate::MouseMode;
-use crate::application::{Application, CornerRadiusTrait, PositionTrait, SizeTrait};
+use crate::application::{Application, CornerDiameter, Position, Size};
 use crate::element::ElementSet;
 use crate::element::id::ElementIdGenerator;
 use crate::element::store::ElementStore;
@@ -101,9 +101,9 @@ where
     pub background_color: App::Color,
     pub gaps: f32,
     pub border: f32,
-    pub corner_radius: App::CornerRadius,
+    pub corner_diameter: App::CornerDiameter,
     pub close_button_size: App::Size,
-    pub close_button_corner_radius: App::CornerRadius,
+    pub close_button_corner_diameter: App::CornerDiameter,
     pub minimum_width: f32,
     pub maximum_width: f32,
     pub minimum_height: f32,
@@ -153,11 +153,11 @@ where
     font_size: G,
     gaps: H,
     border: I,
-    corner_radius: J,
+    corner_diameter: J,
     closable: K,
     resizable: L,
     close_button_size: M,
-    close_button_corner_radius: N,
+    close_button_corner_diameter: N,
     minimum_width: O,
     maximum_width: P,
     minimum_height: Q,
@@ -185,11 +185,11 @@ where
         font_size: G,
         gaps: H,
         border: I,
-        corner_radius: J,
+        corner_diameter: J,
         closable: K,
         resizable: L,
         close_button_size: M,
-        close_button_corner_radius: N,
+        close_button_corner_diameter: N,
         minimum_width: O,
         maximum_width: P,
         minimum_height: Q,
@@ -209,11 +209,11 @@ where
             font_size,
             gaps,
             border,
-            corner_radius,
+            corner_diameter,
             closable,
             resizable,
             close_button_size,
-            close_button_corner_radius,
+            close_button_corner_diameter,
             minimum_width,
             maximum_width,
             minimum_height,
@@ -248,11 +248,11 @@ where
     G: Selector<App, App::FontSize>,
     H: Selector<App, f32>,
     I: Selector<App, f32>,
-    J: Selector<App, App::CornerRadius>,
+    J: Selector<App, App::CornerDiameter>,
     K: Selector<App, bool>,
     L: Selector<App, bool>,
     M: Selector<App, App::Size>,
-    N: Selector<App, App::CornerRadius>,
+    N: Selector<App, App::CornerDiameter>,
     O: Selector<App, f32>,
     P: Selector<App, f32>,
     Q: Selector<App, f32>,
@@ -391,7 +391,7 @@ where
             layout.mark_hovered();
         }
 
-        let corner_radius = *state.get(&self.corner_radius);
+        let corner_diameter = *state.get(&self.corner_diameter);
 
         let horizontal_resize_area = Area {
             left: layout_info.area.left + layout_info.area.width - 3.0,
@@ -406,7 +406,7 @@ where
             height: 6.0,
         };
 
-        let radius = corner_radius.bottom_right() / 2.0;
+        let radius = corner_diameter.bottom_right() / 2.0;
         let corner_offset = radius - (radius.powi(2) / 2.0).sqrt();
         let resize_area = Area {
             left: layout_info.area.left + layout_info.area.width - corner_offset - 6.0,
@@ -457,7 +457,7 @@ where
 
         layout.add_rectangle(
             layout_info.area,
-            *state.get(&self.corner_radius),
+            *state.get(&self.corner_diameter),
             *state.get(&self.background_color),
         );
 
@@ -469,7 +469,7 @@ where
         {
             layout.add_rectangle(
                 horizontal_resize_area,
-                App::CornerRadius::new(6.0, 6.0, 6.0, 6.0),
+                App::CornerDiameter::new(6.0, 6.0, 6.0, 6.0),
                 *state.get(&theme().window().closest_anchor_color()),
             );
         } else if vertical_resize_hovered && vertical_resize_availabe
@@ -480,7 +480,7 @@ where
         {
             layout.add_rectangle(
                 vertical_resize_area,
-                App::CornerRadius::new(6.0, 6.0, 6.0, 6.0),
+                App::CornerDiameter::new(6.0, 6.0, 6.0, 6.0),
                 *state.get(&theme().window().closest_anchor_color()),
             );
         } else if resize_hovered && horizontal_resize_available && vertical_resize_availabe
@@ -491,7 +491,7 @@ where
         {
             layout.add_rectangle(
                 resize_area,
-                App::CornerRadius::new(12.0, 12.0, 12.0, 12.0),
+                App::CornerDiameter::new(12.0, 12.0, 12.0, 12.0),
                 *state.get(&theme().window().closest_anchor_color()),
             );
         }
@@ -499,7 +499,7 @@ where
         if let Some((close_button_area, close_button_color)) = close_button {
             layout.add_rectangle(
                 close_button_area,
-                *state.get(&self.close_button_corner_radius),
+                *state.get(&self.close_button_corner_diameter),
                 close_button_color,
             );
 

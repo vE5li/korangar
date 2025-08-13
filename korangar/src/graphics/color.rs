@@ -8,7 +8,7 @@ use ragnarok_formats::color::{ColorBGRA, ColorRGB};
 use rust_state::{Context, Path};
 use serde::{Deserialize, Serialize};
 
-use crate::interface::layout::CornerRadius;
+use crate::graphics::CornerDiameter;
 use crate::state::ClientState;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
@@ -291,7 +291,7 @@ impl StateElement<ClientState> for Color {
                 layout_info: &'a Self::LayoutInfo,
                 layout: &mut Layout<'a, ClientState>,
             ) {
-                layout.add_rectangle(layout_info.area, CornerRadius::uniform(5.0), *state.get(&self.path));
+                layout.add_rectangle(layout_info.area, CornerDiameter::uniform(5.0), *state.get(&self.path));
             }
         }
 
@@ -339,7 +339,7 @@ impl StateElement<ClientState> for Color {
                 layout_info: &'a Self::LayoutInfo,
                 layout: &mut Layout<'a, ClientState>,
             ) {
-                layout.add_rectangle(layout_info.area, CornerRadius::uniform(5.0), *state.get(&self.path));
+                layout.add_rectangle(layout_info.area, CornerDiameter::uniform(5.0), *state.get(&self.path));
             }
         }
 

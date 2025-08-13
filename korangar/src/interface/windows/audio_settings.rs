@@ -3,8 +3,8 @@ use rust_state::Path;
 
 use crate::interface::windows::WindowClass;
 use crate::settings::{AudioSettings, AudioSettingsPathExt};
+use crate::state::localization::LocalizationPathExt;
 use crate::state::theme::InterfaceThemeType;
-use crate::state::translation::TranslationPathExt;
 use crate::state::{ClientState, ClientStatePathExt, client_state};
 
 #[derive(Default)]
@@ -30,13 +30,13 @@ where
         use korangar_interface::prelude::*;
 
         window! {
-            title: client_state().translation().audio_settings_window_title(),
+            title: client_state().localization().audio_settings_window_title(),
             class: Self::window_class(),
             theme: InterfaceThemeType::Game,
             closable: true,
             elements: (
                 state_button! {
-                    text: client_state().translation().mute_audio_on_focus_loss_button_text(),
+                    text: client_state().localization().mute_audio_on_focus_loss_button_text(),
                     state: self.audio_settings_path.mute_on_focus_loss(),
                     event: Toggle(self.audio_settings_path.mute_on_focus_loss()),
                 },

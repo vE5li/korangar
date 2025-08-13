@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use rust_state::{Context, RustState, Selector};
 
-use crate::application::{Application, SizeTrait};
+use crate::application::{Application, Size};
 use crate::element::Element;
 use crate::element::store::{ElementStore, ElementStoreMut};
 use crate::event::ClickAction;
@@ -26,7 +26,7 @@ where
     pub hovered_checkbox_color: App::Color,
     pub disabled_checkbox_color: App::Color,
     pub height: f32,
-    pub corner_radius: App::CornerRadius,
+    pub corner_diameter: App::CornerDiameter,
     pub font_size: App::FontSize,
     pub horizontal_alignment: HorizontalAlignment,
     pub vertical_alignment: VerticalAlignment,
@@ -51,7 +51,7 @@ pub struct StateButton<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I
     hovered_checkbox_color: N,
     disabled_checkbox_color: O,
     height: P,
-    corner_radius: Q,
+    corner_diameter: Q,
     font_size: R,
     horizontal_alignment: S,
     vertical_alignment: T,
@@ -82,7 +82,7 @@ impl<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O
         hovered_checkbox_color: N,
         disabled_checkbox_color: O,
         height: P,
-        corner_radius: Q,
+        corner_diameter: Q,
         font_size: R,
         horizontal_alignment: S,
         vertical_alignment: T,
@@ -106,7 +106,7 @@ impl<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O
             hovered_checkbox_color,
             disabled_checkbox_color,
             height,
-            corner_radius,
+            corner_diameter,
             font_size,
             horizontal_alignment,
             vertical_alignment,
@@ -138,7 +138,7 @@ where
     N: Selector<App, App::Color>,
     O: Selector<App, App::Color>,
     P: Selector<App, f32>,
-    Q: Selector<App, App::CornerRadius>,
+    Q: Selector<App, App::CornerDiameter>,
     R: Selector<App, App::FontSize>,
     S: Selector<App, HorizontalAlignment>,
     T: Selector<App, VerticalAlignment>,
@@ -195,7 +195,7 @@ where
             false => *state.get(&self.background_color),
         };
 
-        layout.add_rectangle(layout_info.area, *state.get(&self.corner_radius), background_color);
+        layout.add_rectangle(layout_info.area, *state.get(&self.corner_diameter), background_color);
 
         let foreground_color = match is_hoverered {
             _ if is_disabled => *state.get(&self.disabled_foreground_color),

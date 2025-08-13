@@ -2,8 +2,8 @@ use korangar_interface::window::{CustomWindow, Window};
 
 use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
+use crate::state::localization::LocalizationPathExt;
 use crate::state::theme::{DebugButtonThemePathExt, InterfaceThemePathExt, InterfaceThemeType};
-use crate::state::translation::TranslationPathExt;
 use crate::state::{ClientState, ClientStatePathExt, client_state, client_theme};
 
 #[derive(Default)]
@@ -18,17 +18,21 @@ impl CustomWindow<ClientState> for MenuWindow {
         use korangar_interface::prelude::*;
 
         window! {
-            title: client_state().translation().menu_window_title(),
+            title: client_state().localization().menu_window_title(),
             class: Self::window_class(),
             theme: InterfaceThemeType::Game,
             closable: true,
             elements: (
                 button! {
-                    text: client_state().translation().graphics_settings_button_text(),
+                    text: client_state().localization().interface_settings_button_text(),
+                    event: InputEvent::ToggleInterfaceSettingsWindow,
+                },
+                button! {
+                    text: client_state().localization().graphics_settings_button_text(),
                     event: InputEvent::ToggleGraphicsSettingsWindow,
                 },
                 button! {
-                    text: client_state().translation().audio_settings_button_text(),
+                    text: client_state().localization().audio_settings_button_text(),
                     event: InputEvent::ToggleAudioSettingsWindow,
                 },
                 #[cfg(feature = "debug")]
@@ -104,11 +108,11 @@ impl CustomWindow<ClientState> for MenuWindow {
                     hovered_background_color: client_theme().debug_button().hovered_background_color(),
                 },
                 button! {
-                    text: client_state().translation().log_out_button_text(),
+                    text: client_state().localization().log_out_button_text(),
                     event: InputEvent::LogOut,
                 },
                 button! {
-                    text: client_state().translation().exit_button_text(),
+                    text: client_state().localization().exit_button_text(),
                     event: InputEvent::Exit,
                 },
             ),

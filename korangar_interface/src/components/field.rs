@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use rust_state::{Context, RustState, Selector};
 
-use crate::application::{Application, SizeTrait};
+use crate::application::{Application, Size};
 use crate::element::Element;
 use crate::element::store::{ElementStore, ElementStoreMut};
 use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
@@ -17,7 +17,7 @@ where
     pub foreground_color: App::Color,
     pub background_color: App::Color,
     pub height: f32,
-    pub corner_radius: App::CornerRadius,
+    pub corner_diameter: App::CornerDiameter,
     pub font_size: App::FontSize,
     pub horizontal_alignment: HorizontalAlignment,
     pub vertical_alignment: VerticalAlignment,
@@ -31,7 +31,7 @@ pub struct Field<Text, Tooltip, A, B, C, D, E, F, G, H, I, J> {
     foreground_color: C,
     background_color: D,
     height: E,
-    corner_radius: F,
+    corner_diameter: F,
     font_size: G,
     horizontal_alignment: H,
     vertical_alignment: I,
@@ -49,7 +49,7 @@ impl<Text, Tooltip, A, B, C, D, E, F, G, H, I, J> Field<Text, Tooltip, A, B, C, 
         foreground_color: C,
         background_color: D,
         height: E,
-        corner_radius: F,
+        corner_diameter: F,
         font_size: G,
         horizontal_alignment: H,
         vertical_alignment: I,
@@ -62,7 +62,7 @@ impl<Text, Tooltip, A, B, C, D, E, F, G, H, I, J> Field<Text, Tooltip, A, B, C, 
             foreground_color,
             background_color,
             height,
-            corner_radius,
+            corner_diameter,
             font_size,
             horizontal_alignment,
             vertical_alignment,
@@ -81,7 +81,7 @@ where
     C: Selector<App, App::Color>,
     D: Selector<App, App::Color>,
     E: Selector<App, f32>,
-    F: Selector<App, App::CornerRadius>,
+    F: Selector<App, App::CornerDiameter>,
     G: Selector<App, App::FontSize>,
     H: Selector<App, HorizontalAlignment>,
     I: Selector<App, VerticalAlignment>,
@@ -122,7 +122,7 @@ where
 
         layout.add_rectangle(
             layout_info.area,
-            *state.get(&self.corner_radius),
+            *state.get(&self.corner_diameter),
             *state.get(&self.background_color),
         );
         layout.add_text(

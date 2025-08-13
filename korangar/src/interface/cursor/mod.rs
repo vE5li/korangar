@@ -1,10 +1,9 @@
 use std::sync::Arc;
 
-use korangar_interface::application::ClipTrait;
+use korangar_interface::application::Clip;
 use ragnarok_packets::ClientTick;
 
-use super::layout::{ScreenClip, ScreenPosition, ScreenSize};
-use crate::graphics::Color;
+use crate::graphics::{Color, ScreenClip, ScreenPosition, ScreenSize};
 use crate::input::Grabbed;
 use crate::loaders::{ActionLoader, Sprite, SpriteLoader};
 use crate::renderer::{GameInterfaceRenderer, SpriteRenderer};

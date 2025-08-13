@@ -9,13 +9,9 @@ use serde::{Deserialize, Serialize};
 use crate::graphics::{
     LimitFramerate, Msaa, PresentModeInfo, ScreenSpaceAntiAliasing, ShadowDetail, ShadowQuality, Ssaa, TextureSamplerType,
 };
-use crate::loaders::Scaling;
-use crate::state::translation::Language;
 
 #[derive(Clone, Serialize, Deserialize, RustState, StateElement)]
 pub struct GraphicsSettings {
-    pub language: Language,
-    pub interface_scaling: Scaling,
     pub lighting_mode: LightingMode,
     pub vsync: bool,
     pub limit_framerate: LimitFramerate,
@@ -32,8 +28,6 @@ pub struct GraphicsSettings {
 impl Default for GraphicsSettings {
     fn default() -> Self {
         Self {
-            language: Language::English,
-            interface_scaling: Scaling::new(1.0),
             lighting_mode: LightingMode::Enhanced,
             vsync: true,
             limit_framerate: LimitFramerate::Unlimited,
@@ -109,8 +103,6 @@ impl DropDownItem<LightingMode> for LightingMode {
 
 #[derive(RustState, StateElement)]
 pub struct GraphicsSettingsCapabilities {
-    languages: Vec<Language>,
-    interface_scalings: Vec<Scaling>,
     lighting_modes: Vec<LightingMode>,
     texture_filtering_options: Vec<TextureSamplerType>,
     limit_framerate_options: Vec<LimitFramerate>,
@@ -125,25 +117,6 @@ pub struct GraphicsSettingsCapabilities {
 impl Default for GraphicsSettingsCapabilities {
     fn default() -> Self {
         Self {
-            languages: vec![Language::English, Language::German],
-            interface_scalings: vec![
-                Scaling::new(0.5),
-                Scaling::new(0.6),
-                Scaling::new(0.7),
-                Scaling::new(0.8),
-                Scaling::new(0.9),
-                Scaling::new(1.0),
-                Scaling::new(1.1),
-                Scaling::new(1.2),
-                Scaling::new(1.3),
-                Scaling::new(1.4),
-                Scaling::new(1.5),
-                Scaling::new(1.6),
-                Scaling::new(1.7),
-                Scaling::new(1.8),
-                Scaling::new(1.9),
-                Scaling::new(2.0),
-            ],
             lighting_modes: vec![LightingMode::Classic, LightingMode::Enhanced],
             texture_filtering_options: vec![
                 TextureSamplerType::Nearest,

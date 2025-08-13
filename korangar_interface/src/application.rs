@@ -38,17 +38,17 @@ pub trait Application: Sized + 'static {
     /// to represent color.
     type Color: Copy;
 
-    /// Application corner radius type.
+    /// Application corner diameter type.
     ///
     /// Ideally this should be the same type that the application renderer uses
-    /// to represent corner radius.
-    type CornerRadius: CornerRadiusTrait;
+    /// to represent corner diameter.
+    type CornerDiameter: CornerDiameter;
 
     /// Application font size type.
     ///
     /// Ideally this should be the same type that the application renderer uses
     /// to represent font size.
-    type FontSize: FontSizeTrait;
+    type FontSize: FontSize;
 
     /// Application 2D position type.
     ///
@@ -56,13 +56,13 @@ pub trait Application: Sized + 'static {
     /// to represent 2D positions. This might not be possible without conversion
     /// if the application doesn't represent positions from the top left of
     /// the screen.
-    type Position: PositionTrait;
+    type Position: Position;
 
     /// Application 2D size type.
     ///
     /// Ideally this should be the same type that the application renderer uses
     /// to represent 2D sizes.
-    type Size: SizeTrait;
+    type Size: Size;
 
     /// Application clip type.
     ///
@@ -71,7 +71,7 @@ pub trait Application: Sized + 'static {
     ///
     /// Ideally this should be the same type that the application renderer uses
     /// to represent clips.
-    type Clip: ClipTrait;
+    type Clip: Clip;
 
     /// Renderer of the application.
     type Renderer: RenderLayer<Self>;
@@ -114,6 +114,39 @@ pub trait Application: Sized + 'static {
     fn set_current_theme_type(theme: Self::ThemeType);
 }
 
+/// A type for saving and loading window positions and sizes.
+///
+/// [`korangar_interface`] does not depend on any specific behavior of the
+/// window cache, therefore the actual logic of this is up to the implementer.
+/// The implementer may choose to only store the window data in RAM, to save it
+/// to a file, or to add extra logic for the position and size it returns.
+///
+/// All the operations on the cache require the window to have a
+/// [`WindowClass`](Application::WindowClass`), otherwise there is no way to
+/// identify them and they will not be cached.
+pub trait WindowCache<App>
+where
+    App: Application,
+{
+    /// Create or load a new instance of the window cache.
+    fn create() -> Self;
+
+    /// Attempt to get the position and size for a given window class.
+    fn get_window_state(&self, window_class: App::WindowClass) -> Option<(Anchor<App>, App::Size)>;
+
+    /// Register a new window with its size and position.
+    ///
+    /// This is only called if the window is not already cached but the
+    /// implementer should not rely on that.
+    fn register_window(&mut self, window_class: App::WindowClass, anchor: Anchor<App>, size: App::Size);
+
+    /// Update the anchor of a registered window.
+    fn update_anchor(&mut self, window_class: App::WindowClass, anchor: Anchor<App>);
+
+    /// Update the size of a registered window.
+    fn update_size(&mut self, window_class: App::WindowClass, size: App::Size);
+}
+
 /// Glue between [`korangar_interface`] and the renderer of the application.
 pub trait RenderLayer<App: Application> {
     /// Application specific instruction.
@@ -131,7 +164,7 @@ pub trait RenderLayer<App: Application> {
         position: App::Position,
         size: App::Size,
         clip: App::Clip,
-        corner_radius: App::CornerRadius,
+        corner_diameter: App::CornerDiameter,
         color: App::Color,
     );
 
@@ -157,6 +190,8 @@ pub trait RenderLayer<App: Application> {
 /// handles layouting text. Many components change their size based on the
 /// displayed text to avoid clipping text.
 pub trait TextLayouter<App: Application>: Clone {
+    /// Calculate the size of a given string. Depending on the overflow
+    /// behavior, the text might shrink, so we also return a new font size.
     fn get_text_dimensions(
         &self,
         text: &str,
@@ -166,70 +201,83 @@ pub trait TextLayouter<App: Application>: Clone {
     ) -> (App::Size, App::FontSize);
 }
 
-// TODO: Rename
-pub trait FontSizeTrait: Copy {
+/// Size for text elements.
+pub trait FontSize: Copy {
+    /// Scale the font size.
     fn scaled(&self, scaling: f32) -> Self;
 }
 
-// TODO: Rename
-pub trait CornerRadiusTrait: Copy {
-    fn new(top_left: f32, top_right: f32, bottom_right: f32, bottom_left: f32) -> Self;
-
-    fn scaled(&self, scaling: f32) -> Self;
-
-    fn top_left(&self) -> f32;
-
-    fn top_right(&self) -> f32;
-
-    fn bottom_right(&self) -> f32;
-
-    fn bottom_left(&self) -> f32;
-}
-
-// TODO: Rename
-pub trait PositionTrait: Copy {
+/// 2D position.
+pub trait Position: Copy {
+    /// Create new position from the left and top screen offset in pixels.
     fn new(left: f32, top: f32) -> Self;
 
+    /// Get position from the left of the screen in pixels.
     fn left(&self) -> f32;
 
+    /// Get position from the top of the screen in pixels.
     fn top(&self) -> f32;
 }
 
-// TODO: Rename
-pub trait SizeTrait: Copy {
+/// 2D size.
+pub trait Size: Copy {
+    /// Create a new size from the width and height in pixels.
     fn new(width: f32, height: f32) -> Self;
 
+    /// Get the width in pixels.
     fn width(&self) -> f32;
 
+    /// Get the height in pixels.
     fn height(&self) -> f32;
 }
 
-// TODO: Rename
-pub trait ClipTrait: Copy {
-    fn new(left: f32, top: f32, right: f32, bottom: f32) -> Self;
+/// Rectangle corner diameter.
+pub trait CornerDiameter: Copy {
+    /// Create new corner diameter from the corner radii in pixels.
+    fn new(top_left: f32, top_right: f32, bottom_right: f32, bottom_left: f32) -> Self;
 
-    fn unbound() -> Self;
+    /// Scale the corner diameter in pixels.
+    fn scaled(&self, scaling: f32) -> Self;
 
-    fn left(&self) -> f32;
+    /// Get the top left corner diameter in pixels.
+    fn top_left(&self) -> f32;
 
-    fn right(&self) -> f32;
+    /// Get the top right corner diameter in pixels.
+    fn top_right(&self) -> f32;
 
-    fn top(&self) -> f32;
+    /// Get the bottom right corner diameter in pixels.
+    fn bottom_right(&self) -> f32;
 
-    fn bottom(&self) -> f32;
+    /// Get the bottom left corner diameter in pixels.
+    fn bottom_left(&self) -> f32;
 }
 
-pub trait WindowCache<App>
-where
-    App: Application,
-{
-    fn create() -> Self;
+/// A clip for masking rendering operations. The clip is defined by its four
+/// bounds (left, right, top, and bottom) and only pixels within this bound will
+/// be rendered.
+///
+/// This is important for components such as
+/// [`scroll_view`](crate::components::scroll_view)s.
+pub trait Clip: Copy {
+    /// Create a new clip from the boundaries in pixels.
+    fn new(left: f32, top: f32, right: f32, bottom: f32) -> Self;
 
-    fn register_window(&mut self, window_class: App::WindowClass, anchor: Anchor<App>, size: App::Size);
+    /// Create a new unbound clip.
+    fn unbound() -> Self;
 
-    fn update_anchor(&mut self, window_class: App::WindowClass, anchor: Anchor<App>);
+    /// Get the left boundary. No pixel with an x coordinate smaller that this
+    /// will be rendered.
+    fn left(&self) -> f32;
 
-    fn update_size(&mut self, window_class: App::WindowClass, size: App::Size);
+    /// Get the right boundary. No pixel with an x coordinate larger that this
+    /// will be rendered.
+    fn right(&self) -> f32;
 
-    fn get_window_state(&self, window_class: App::WindowClass) -> Option<(Anchor<App>, App::Size)>;
+    /// Get the top boundary. No pixel with a y coordinate smaller that this
+    /// will be rendered.
+    fn top(&self) -> f32;
+
+    /// Get the bottom boundary. No pixel with a y coordinate larger that this
+    /// will be rendered.
+    fn bottom(&self) -> f32;
 }

@@ -20,7 +20,7 @@ use crate::graphics::ModelInstruction;
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
 
-#[derive(RustState, StateElement, StateWindow, new)]
+#[derive(Clone, RustState, StateElement, StateWindow, new)]
 pub struct Object {
     pub name: Option<String>,
     pub model_name: String,

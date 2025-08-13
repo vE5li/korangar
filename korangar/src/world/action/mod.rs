@@ -11,8 +11,7 @@ use ragnarok_formats::action::ActionsData;
 use ragnarok_packets::ClientTick;
 use rust_state::{Path, RustState};
 
-use crate::graphics::Color;
-use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
+use crate::graphics::{Color, ScreenClip, ScreenPosition, ScreenSize};
 use crate::loaders::Sprite;
 use crate::renderer::SpriteRenderer;
 use crate::state::ClientState;

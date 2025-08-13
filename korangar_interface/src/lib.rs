@@ -25,9 +25,7 @@ extern crate self as korangar_interface;
 use std::any::Any;
 use std::collections::BTreeMap;
 
-use application::{
-    Application, ClipTrait, CornerRadiusTrait, FontSizeTrait, PositionTrait, RenderLayer, SizeTrait, TextLayouter, WindowCache,
-};
+use application::{Application, Clip, CornerDiameter, FontSize, Position, RenderLayer, Size, TextLayouter, WindowCache};
 use element::ElementBox;
 use element::id::{ElementId, ElementIdGenerator};
 use element::store::{ElementStore, ElementStoreMut, InternalElementStore};
@@ -537,8 +535,8 @@ where
         mouse_position: App::Position,
     ) -> InterfaceFrame<'a, App> {
         if let Some(overlay_element) = &mut self.overlay_element {
-            match self.windows.iter().any(|wrapper| wrapper.data.id == overlay_element.window_id) {
-                true => {
+            match self.windows.iter().find(|wrapper| wrapper.data.id == overlay_element.window_id) {
+                Some(wrapper) => {
                     let available_area = Area {
                         left: overlay_element.position.left(),
                         top: overlay_element.position.top(),
@@ -549,10 +547,12 @@ where
                     let store = ElementStoreMut::new(&mut overlay_element.store, &mut self.generator, overlay_element.window_id);
                     let mut resolver = Resolver::new(available_area, 0.0, &self.text_layouter);
 
+                    App::set_current_theme_type(wrapper.window.get_theme_type());
+
                     overlay_element.element.create_layout_info(state, store, &mut resolver);
                 }
                 // Window was closed while the overlay was open, so we just close it.
-                false => self.overlay_element = None,
+                None => self.overlay_element = None,
             }
         }
 
@@ -605,6 +605,8 @@ where
             );
 
             let store = ElementStore::new(&overlay_element.store, overlay_element.window_id);
+
+            App::set_current_theme_type(wrapper.window.get_theme_type());
 
             overlay_element.element.lay_out(state, store, &(), layout);
 
@@ -746,7 +748,7 @@ impl<App: Application> InterfaceFrame<'_, App> {
         let background_color = tooltip_theme.background_color;
         let foreground_color = tooltip_theme.foreground_color;
         let font_size = tooltip_theme.font_size.scaled(self.interface_scaling);
-        let corner_radius = tooltip_theme.corner_radius.scaled(self.interface_scaling);
+        let corner_diameter = tooltip_theme.corner_diameter.scaled(self.interface_scaling);
         let border = tooltip_theme.border * self.interface_scaling;
         let gap = tooltip_theme.gap * self.interface_scaling;
         let mouse_offset = tooltip_theme.mouse_offset * self.interface_scaling;
@@ -790,7 +792,7 @@ impl<App: Application> InterfaceFrame<'_, App> {
                 App::Position::new(tooltip_left, tooltip_top),
                 App::Size::new(text_dimensions.width() + border * 2.0, text_dimensions.height() + border * 2.0),
                 App::Clip::unbound(),
-                corner_radius,
+                corner_diameter,
                 background_color,
             );
 

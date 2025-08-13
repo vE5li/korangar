@@ -34,6 +34,7 @@ where
             title: "Sell",
             class: Self::window_class(),
             theme: InterfaceThemeType::Game,
+            resizable: true,
             elements: (
             ),
         }

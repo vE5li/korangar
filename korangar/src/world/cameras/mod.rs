@@ -18,7 +18,7 @@ pub use self::point_shadow::PointShadowCamera;
 pub use self::smoothed::SmoothedValue;
 pub use self::start::StartCamera;
 #[cfg(feature = "debug")]
-use crate::interface::layout::{ScreenPosition, ScreenSize};
+use crate::graphics::{ScreenPosition, ScreenSize};
 
 const MAXIMUM_CAMERA_DISTANCE: f32 = 500.0;
 const MINIMUM_CAMERA_DISTANCE: f32 = 150.0;

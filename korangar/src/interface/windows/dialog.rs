@@ -7,8 +7,8 @@ use rust_state::{Context, Path, RustState};
 
 use super::WindowClass;
 use crate::input::InputEvent;
+use crate::state::localization::LocalizationPathExt;
 use crate::state::theme::InterfaceThemeType;
-use crate::state::translation::TranslationPathExt;
 use crate::state::{ClientState, ClientStatePathExt, client_state};
 
 /// A small wrapper struct that serves two purposes:
@@ -85,7 +85,7 @@ impl DialogWindowState {
 
         self.elements.push(DialogElement::new(
             button! {
-                text: client_state().translation().next_button_text(),
+                text: client_state().localization().next_button_text(),
                 event: move |_: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
                     queue.queue(InputEvent::NextDialog { npc_id });
                 },
@@ -109,7 +109,7 @@ impl DialogWindowState {
 
         self.elements.push(DialogElement::new(
             button! {
-                text: client_state().translation().close_button_text(),
+                text: client_state().localization().close_button_text(),
                 event: move |_: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
                     queue.queue(InputEvent::CloseDialog { npc_id });
                 },
@@ -248,7 +248,7 @@ where
         use korangar_interface::prelude::*;
 
         window! {
-            title: client_state().translation().dialog_window_title(),
+            title: client_state().localization().dialog_window_title(),
             class: Self::window_class(),
             theme: InterfaceThemeType::Game,
             elements: (

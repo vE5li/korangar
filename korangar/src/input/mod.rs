@@ -6,7 +6,6 @@ use std::mem::variant_count;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use cgmath::Vector2;
 use ragnarok_packets::{ClientTick, HotbarSlot};
 use winit::dpi::PhysicalPosition;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta};
@@ -15,8 +14,7 @@ use winit::keyboard::KeyCode;
 pub use self::event::InputEvent;
 pub use self::key::Key;
 pub use self::mode::{Grabbed, MouseInputMode, MouseModeExt};
-use crate::graphics::PickerTarget;
-use crate::interface::layout::{ScreenPosition, ScreenSize};
+use crate::graphics::{PickerTarget, ScreenPosition, ScreenSize};
 
 const MOUSE_SCOLL_MULTIPLIER: f32 = 30.0;
 const KEY_COUNT: usize = variant_count::<KeyCode>();
@@ -228,6 +226,10 @@ impl InputSystem {
             events.push(InputEvent::ToggleEquipmentWindow);
         }
 
+        if control_down && self.get_key(KeyCode::KeyI).pressed() {
+            events.push(InputEvent::ToggleInterfaceSettingsWindow);
+        }
+
         if control_down && self.get_key(KeyCode::KeyG).pressed() {
             events.push(InputEvent::ToggleGraphicsSettingsWindow);
         }
@@ -306,7 +308,7 @@ impl InputSystem {
         // TODO: This should be moved.
         #[cfg(feature = "debug")]
         if self.right_mouse_button.down() && !self.right_mouse_button.pressed() && process_mouse && use_debug_camera {
-            let offset = -Vector2::new(self.mouse_delta.width, self.mouse_delta.height);
+            let offset = -cgmath::Vector2::new(self.mouse_delta.width, self.mouse_delta.height);
             events.push(InputEvent::CameraLookAround { offset });
         }
 

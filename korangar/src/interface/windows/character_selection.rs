@@ -23,9 +23,8 @@ mod character_slot_preview {
     use ragnarok_packets::{CharacterInformation, CharacterInformationPathExt};
     use rust_state::{Context, ManuallyAssertExt, Path, RustState};
 
-    use crate::graphics::Color;
+    use crate::graphics::{Color, CornerDiameter, ScreenPosition, ScreenSize};
     use crate::input::InputEvent;
-    use crate::interface::layout::{CornerRadius, ScreenPosition, ScreenSize};
     use crate::loaders::{FontSize, OverflowBehavior};
     use crate::state::ClientState;
 
@@ -185,7 +184,7 @@ mod character_slot_preview {
                     true => Color::monochrome_u8(80),
                     false => Color::monochrome_u8(60),
                 };
-                layout.add_rectangle(layout_info.area, CornerRadius::uniform(25.0), background_color);
+                layout.add_rectangle(layout_info.area, CornerDiameter::uniform(25.0), background_color);
 
                 if *switch_request == self.slot {
                     layout.add_text(
@@ -227,7 +226,7 @@ mod character_slot_preview {
                     true => Color::monochrome_u8(110),
                     false => Color::monochrome_u8(90),
                 };
-                layout.add_rectangle(layout_info.area, CornerRadius::uniform(25.0), background_color);
+                layout.add_rectangle(layout_info.area, CornerDiameter::uniform(25.0), background_color);
 
                 layout.add_text(
                     layout_info.area,
@@ -324,7 +323,7 @@ mod character_slot_preview {
                     true => Color::monochrome_u8(55),
                     false => Color::monochrome_u8(40),
                 };
-                layout.add_rectangle(layout_info.area, CornerRadius::uniform(25.0), background_color);
+                layout.add_rectangle(layout_info.area, CornerDiameter::uniform(25.0), background_color);
 
                 layout.add_text(
                     layout_info.area,

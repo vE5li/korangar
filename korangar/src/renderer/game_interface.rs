@@ -5,8 +5,7 @@ use std::sync::Arc;
 use cgmath::Point3;
 use cgmath::{EuclideanSpace, Vector2};
 
-use crate::graphics::{Color, RectangleInstruction, Texture};
-use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
+use crate::graphics::{Color, RectangleInstruction, ScreenClip, ScreenPosition, ScreenSize, Texture};
 use crate::loaders::{FontLoader, FontSize, GlyphInstruction, Scaling};
 #[cfg(feature = "debug")]
 use crate::loaders::{ImageType, TextureLoader};

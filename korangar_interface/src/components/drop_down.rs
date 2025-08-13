@@ -5,7 +5,7 @@ use std::num::NonZeroU32;
 use interface_components::scroll_view;
 use rust_state::{Context, Path, RustState, Selector};
 
-use crate::application::{Application, PositionTrait, SizeTrait};
+use crate::application::{Application, Position, Size};
 use crate::element::store::{ElementStore, ElementStoreMut};
 use crate::element::{DefaultLayoutInfo, Element, ErasedElement};
 use crate::event::{ClickAction, Event, EventQueue};
@@ -54,7 +54,7 @@ struct InnerButton<Value, Item, A, B, C, D, E, F, G, H, I, J, K, L> {
     hovered_foreground_color: E,
     hovered_background_color: F,
     height: G,
-    corner_radius: H,
+    corner_diameter: H,
     font_size: I,
     horizontal_alignment: J,
     vertical_alignment: K,
@@ -72,7 +72,7 @@ where
     E: Selector<App, App::Color>,
     F: Selector<App, App::Color>,
     G: Selector<App, f32>,
-    H: Selector<App, App::CornerRadius>,
+    H: Selector<App, App::CornerDiameter>,
     I: Selector<App, App::FontSize>,
     J: Selector<App, HorizontalAlignment>,
     K: Selector<App, VerticalAlignment>,
@@ -113,7 +113,7 @@ where
             false => *state.get(&self.background_color),
         };
 
-        layout.add_rectangle(layout_info.area, *state.get(&self.corner_radius), background_color);
+        layout.add_rectangle(layout_info.area, *state.get(&self.corner_diameter), background_color);
 
         let foreground_color = match is_hoverered {
             true => *state.get(&self.hovered_foreground_color),
@@ -192,7 +192,7 @@ where
                             hovered_foreground_color: theme().drop_down().item_hovered_foreground_color(),
                             hovered_background_color: theme().drop_down().item_hovered_background_color(),
                             height: theme().drop_down().item_height(),
-                            corner_radius: theme().drop_down().item_corner_radius(),
+                            corner_diameter: theme().drop_down().item_corner_diameter(),
                             font_size: theme().drop_down().item_font_size(),
                             horizontal_alignment: theme().drop_down().item_horizontal_alignment(),
                             vertical_alignment: theme().drop_down().item_vertical_alignment(),
@@ -228,7 +228,7 @@ where
     ) {
         layout.add_rectangle(
             layout_info.0,
-            *state.get(&theme().drop_down().list_corner_radius()),
+            *state.get(&theme().drop_down().list_corner_diameter()),
             *state.get(&theme().drop_down().list_background_color()),
         );
 
@@ -323,12 +323,12 @@ where
     pub item_hovered_foreground_color: App::Color,
     pub item_hovered_background_color: App::Color,
     pub item_height: f32,
-    pub item_corner_radius: App::CornerRadius,
+    pub item_corner_diameter: App::CornerDiameter,
     pub item_font_size: App::FontSize,
     pub item_horizontal_alignment: HorizontalAlignment,
     pub item_vertical_alignment: VerticalAlignment,
     pub item_overflow_behavior: App::OverflowBehavior,
-    pub list_corner_radius: App::CornerRadius,
+    pub list_corner_diameter: App::CornerDiameter,
     pub list_background_color: App::Color,
     pub list_gaps: f32,
     pub list_border: f32,
@@ -338,7 +338,7 @@ where
     pub button_hovered_foreground_color: App::Color,
     pub button_hovered_background_color: App::Color,
     pub button_height: f32,
-    pub button_corner_radius: App::CornerRadius,
+    pub button_corner_diameter: App::CornerDiameter,
     pub button_font_size: App::FontSize,
     pub button_horizontal_alignment: HorizontalAlignment,
     pub button_vertical_alignment: VerticalAlignment,
@@ -356,7 +356,7 @@ where
     hovered_foreground_color: E,
     hovered_background_color: F,
     height: G,
-    corner_radius: H,
+    corner_diameter: H,
     font_size: I,
     horizontal_alignment: J,
     vertical_alignment: K,
@@ -383,7 +383,7 @@ where
         hovered_foreground_color: E,
         hovered_background_color: F,
         height: G,
-        corner_radius: H,
+        corner_diameter: H,
         font_size: I,
         horizontal_alignment: J,
         vertical_alignment: K,
@@ -397,7 +397,7 @@ where
             hovered_foreground_color,
             hovered_background_color,
             height,
-            corner_radius,
+            corner_diameter,
             font_size,
             horizontal_alignment,
             vertical_alignment,
@@ -419,7 +419,7 @@ where
     E: Selector<App, App::Color>,
     F: Selector<App, App::Color>,
     G: Selector<App, f32>,
-    H: Selector<App, App::CornerRadius>,
+    H: Selector<App, App::CornerDiameter>,
     I: Selector<App, App::FontSize>,
     J: Selector<App, HorizontalAlignment>,
     K: Selector<App, VerticalAlignment>,
@@ -481,7 +481,7 @@ where
             false => *state.get(&self.background_color),
         };
 
-        layout.add_rectangle(layout_info.area, *state.get(&self.corner_radius), background_color);
+        layout.add_rectangle(layout_info.area, *state.get(&self.corner_diameter), background_color);
 
         let foreground_color = match is_hoverered {
             true => *state.get(&self.hovered_foreground_color),

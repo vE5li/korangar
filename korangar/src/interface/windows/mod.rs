@@ -18,6 +18,7 @@ mod friend_list;
 mod friend_request;
 mod graphics_settings;
 mod hotbar;
+mod interface_settings;
 mod inventory;
 mod login;
 #[cfg(feature = "debug")]
@@ -57,6 +58,7 @@ pub use self::friend_list::{FriendListWindow, FriendListWindowState};
 pub use self::friend_request::FriendRequestWindow;
 pub use self::graphics_settings::GraphicsSettingsWindow;
 pub use self::hotbar::HotbarWindow;
+pub use self::interface_settings::InterfaceSettingsWindow;
 pub use self::inventory::InventoryWindow;
 pub use self::login::{LoginWindow, LoginWindowState};
 #[cfg(feature = "debug")]
@@ -87,6 +89,7 @@ pub enum WindowClass {
     CharacterOverview,
     CharacterSelection,
     Dialog,
+    InterfaceSettings,
     GraphicsSettings,
     Hotbar,
     Inventory,

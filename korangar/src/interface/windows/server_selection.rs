@@ -9,8 +9,8 @@ use rust_state::{Context, Path};
 
 use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
+use crate::state::localization::LocalizationPathExt;
 use crate::state::theme::InterfaceThemeType;
-use crate::state::translation::TranslationPathExt;
 use crate::state::{ClientState, ClientStatePathExt, client_state};
 
 pub struct ServerSelectionWindow<P> {
@@ -118,7 +118,7 @@ where
         }
 
         window! {
-            title: client_state().translation().server_selection_window_title(),
+            title: client_state().localization().server_selection_window_title(),
             class: Self::window_class(),
             theme: InterfaceThemeType::Menu,
             minimum_width: 450.0,

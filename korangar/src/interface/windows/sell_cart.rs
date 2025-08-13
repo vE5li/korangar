@@ -33,6 +33,7 @@ where
             title: "Cart",
             class: Self::window_class(),
             theme: InterfaceThemeType::Game,
+            resizable: true,
             elements: (
                 button! {
                     text: "Cancel",

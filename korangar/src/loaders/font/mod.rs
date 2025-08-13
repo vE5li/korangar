@@ -13,7 +13,7 @@ use image::{ImageBuffer, Rgba, RgbaImage, imageops};
 use korangar_debug::logging::Colorize;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::print_debug;
-use korangar_interface::application::{FontSizeTrait, TextLayouter};
+use korangar_interface::application::TextLayouter;
 use korangar_interface::components::drop_down::DropDownItem;
 use korangar_interface::element::ElementDisplay;
 use korangar_util::Rectangle;
@@ -21,8 +21,7 @@ use serde::{Deserialize, Serialize};
 
 use self::color_span_iterator::ColorSpanIterator;
 use super::{GameFileLoader, TextureLoader};
-use crate::graphics::{Color, MAX_TEXTURE_SIZE, Texture};
-use crate::interface::layout::ScreenSize;
+use crate::graphics::{Color, MAX_TEXTURE_SIZE, ScreenSize, Texture};
 use crate::loaders::font::font_file::FontFile;
 use crate::state::ClientState;
 
@@ -36,7 +35,7 @@ pub enum OverflowBehavior {
     LineBreak,
 }
 
-impl FontSizeTrait for FontSize {
+impl korangar_interface::application::FontSize for FontSize {
     fn scaled(&self, scaling: f32) -> Self {
         Self(self.0 * scaling)
     }

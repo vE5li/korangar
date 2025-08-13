@@ -6,6 +6,7 @@ use rust_state::{Path, Selector};
 
 use crate::ItemSource;
 use crate::interface::windows::WindowClass;
+use crate::loaders::OverflowBehavior;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
 use crate::world::ResourceMetadata;
@@ -135,6 +136,7 @@ where
                         text: display_name,
                         // Get this height from the skill box theme.
                         height: 40.0,
+                        overflow_behavior: OverflowBehavior::Shrink,
                     }
                 ),
             }

@@ -6,8 +6,7 @@ use korangar_interface::application::RenderLayer;
 use korangar_interface::layout::area::Area;
 use korangar_interface::layout::{ClipLayer, ClipLayerId, Icon, Layout};
 
-use crate::graphics::{Color, InterfaceRectangleInstruction, Texture};
-use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
+use crate::graphics::{Color, CornerDiameter, InterfaceRectangleInstruction, ScreenClip, ScreenPosition, ScreenSize, Texture};
 use crate::loaders::{FontLoader, FontSize, GlyphInstruction, ImageType, OverflowBehavior, Sprite, TextureLoader};
 use crate::renderer::SpriteRenderer;
 use crate::state::ClientState;
@@ -133,7 +132,7 @@ impl InterfaceRenderer {
         position: ScreenPosition,
         size: ScreenSize,
         mut screen_clip: ScreenClip,
-        mut corner_radius: CornerRadius,
+        mut corner_diameter: CornerDiameter,
         color: Color,
     ) {
         // If the rectangle is not even within the bounds of the clip, discard it early
@@ -148,19 +147,19 @@ impl InterfaceRenderer {
 
         if self.high_quality_interface {
             screen_clip = screen_clip * 2.0;
-            corner_radius = corner_radius * 2.0;
+            corner_diameter = corner_diameter * 2.0;
         }
 
         let screen_position = position / self.window_size;
         let screen_size = size / self.window_size;
-        let corner_radius = corner_radius * 0.5;
+        let corner_diameter = corner_diameter * 0.5;
 
         self.instructions.borrow_mut().push(InterfaceRectangleInstruction::Solid {
             screen_position,
             screen_size,
             screen_clip,
             color,
-            corner_radius,
+            corner_diameter,
         });
     }
 
@@ -305,14 +304,14 @@ impl SpriteRenderer for InterfaceRenderer {
         // Normalize screen_position and screen_size in range 0.0 and 1.0.
         let screen_position = position / self.window_size;
         let screen_size = size / self.window_size;
-        let corner_radius = CornerRadius::default();
+        let corner_diameter = CornerDiameter::default();
 
         self.instructions.borrow_mut().push(InterfaceRectangleInstruction::Sprite {
             screen_position,
             screen_size,
             screen_clip,
             color,
-            corner_radius,
+            corner_diameter,
             texture,
             smooth,
         });
@@ -336,14 +335,14 @@ impl SpriteRenderer for InterfaceRenderer {
         // Normalize screen_position and screen_size in range 0.0 and 1.0.
         let screen_position = position / self.window_size;
         let screen_size = size / self.window_size;
-        let corner_radius = CornerRadius::default();
+        let corner_diameter = CornerDiameter::default();
 
         self.instructions.borrow_mut().push(InterfaceRectangleInstruction::Sdf {
             screen_position,
             screen_size,
             screen_clip,
             color,
-            corner_radius,
+            corner_diameter,
             texture,
         });
     }
@@ -392,8 +391,15 @@ impl RenderLayer<ClientState> for InterfaceRenderer {
     type CustomIcon = ();
     type CustomInstruction<'a> = CustomInstruction<'a>;
 
-    fn render_rectangle(&self, position: ScreenPosition, size: ScreenSize, clip: ScreenClip, corner_radius: CornerRadius, color: Color) {
-        self.render_rectangle(position, size, clip, corner_radius, color);
+    fn render_rectangle(
+        &self,
+        position: ScreenPosition,
+        size: ScreenSize,
+        clip: ScreenClip,
+        corner_diameter: CornerDiameter,
+        color: Color,
+    ) {
+        self.render_rectangle(position, size, clip, corner_diameter, color);
     }
 
     fn render_text(&self, text: &str, position: ScreenPosition, available_width: f32, clip: ScreenClip, color: Color, font_size: FontSize) {

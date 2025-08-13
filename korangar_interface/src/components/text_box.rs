@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 
 use rust_state::{Context, Path, RustState, Selector};
 
-use crate::application::{Application, SizeTrait};
+use crate::application::{Application, Size};
 use crate::element::Element;
 use crate::element::id::FocusIdExt;
 use crate::element::store::{ElementStore, ElementStoreMut, Persistent, PersistentData, PersistentExt};
@@ -28,7 +28,7 @@ where
     pub hide_icon_color: App::Color,
     pub hovered_hide_icon_color: App::Color,
     pub height: f32,
-    pub corner_radius: App::CornerRadius,
+    pub corner_diameter: App::CornerDiameter,
     pub font_size: App::FontSize,
     pub horizontal_alignment: HorizontalAlignment,
     pub vertical_alignment: VerticalAlignment,
@@ -67,7 +67,7 @@ pub struct TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S
     hide_icon_color: L,
     hovered_hide_icon_color: M,
     height: N,
-    corner_radius: O,
+    corner_diameter: O,
     font_size: P,
     horizontal_alignment: Q,
     vertical_alignment: R,
@@ -97,7 +97,7 @@ impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Id>
         hide_icon_color: L,
         hovered_hide_icon_color: M,
         height: N,
-        corner_radius: O,
+        corner_diameter: O,
         font_size: P,
         horizontal_alignment: Q,
         vertical_alignment: R,
@@ -120,7 +120,7 @@ impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Id>
             hide_icon_color,
             hovered_hide_icon_color,
             height,
-            corner_radius,
+            corner_diameter,
             font_size,
             horizontal_alignment,
             vertical_alignment,
@@ -155,7 +155,7 @@ where
     L: Selector<App, App::Color>,
     M: Selector<App, App::Color>,
     N: Selector<App, f32>,
-    O: Selector<App, App::CornerRadius>,
+    O: Selector<App, App::CornerDiameter>,
     P: Selector<App, App::FontSize>,
     Q: Selector<App, HorizontalAlignment>,
     R: Selector<App, VerticalAlignment>,
@@ -262,9 +262,9 @@ where
             false => *state.get(&self.background_color),
         };
 
-        let corner_radius = *state.get(&self.corner_radius);
+        let corner_diameter = *state.get(&self.corner_diameter);
 
-        layout.add_rectangle(layout_info.area, corner_radius, background_color);
+        layout.add_rectangle(layout_info.area, corner_diameter, background_color);
 
         let mut display_text = state.get(&self.state).as_str();
 

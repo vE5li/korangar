@@ -33,10 +33,20 @@ where
             title: "Cart",
             class: Self::window_class(),
             theme: InterfaceThemeType::Game,
+            resizable: true,
             elements: (
-                button! {
-                    text: "Cancel",
-                    event: InputEvent::CloseShop,
+                split! {
+                    gaps: theme().window().gaps(),
+                    children: (
+                        button! {
+                            text: "Buy",
+                            event: InputEvent::BuyItems { items: Vec::new() },
+                        },
+                        button! {
+                            text: "Cancel",
+                            event: InputEvent::CloseShop,
+                        },
+                    ),
                 },
             ),
         }

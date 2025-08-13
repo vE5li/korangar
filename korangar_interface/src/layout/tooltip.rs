@@ -29,7 +29,7 @@ where
     pub foreground_color: App::Color,
     pub font_size: App::FontSize,
     pub overflow_behavior: App::OverflowBehavior,
-    pub corner_radius: App::CornerRadius,
+    pub corner_diameter: App::CornerDiameter,
     pub border: f32,
     pub gap: f32,
     pub mouse_offset: f32,

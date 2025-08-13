@@ -506,7 +506,7 @@ pub struct LightSettings {
     pub shadow_map_alpha: Option<f32>,
 }
 
-#[derive(Clone, ByteConvertable)]
+#[derive(Clone, PartialEq, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[cfg_attr(feature = "interface", derive(korangar_interface::window::StateWindow))]
 #[cfg_attr(feature = "interface", window_title("Light Source"))]
@@ -518,7 +518,7 @@ pub struct LightSource {
     pub range: f32,
 }
 
-#[derive(Clone, ByteConvertable)]
+#[derive(Clone, PartialEq, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[cfg_attr(feature = "interface", derive(korangar_interface::window::StateWindow))]
 #[cfg_attr(feature = "interface", window_title("Effect Source"))]
@@ -534,7 +534,7 @@ pub struct EffectSource {
     pub _param3: f32,
 }
 
-#[derive(Clone, ByteConvertable)]
+#[derive(Clone, PartialEq, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[cfg_attr(feature = "interface", derive(korangar_interface::window::StateWindow))]
 #[cfg_attr(feature = "interface", window_title("Sound Source"))]

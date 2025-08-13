@@ -6,8 +6,8 @@ use rust_state::{ArrayLookupExt, OptionExt, Path};
 use crate::interface::resource::SkillSource;
 use crate::interface::windows::WindowClass;
 use crate::inventory::Skill;
+use crate::state::localization::LocalizationPathExt;
 use crate::state::theme::InterfaceThemeType;
-use crate::state::translation::TranslationPathExt;
 use crate::state::{ClientState, ClientStatePathExt, client_state};
 
 pub struct HotbarWindow<P, const N: usize> {
@@ -32,7 +32,7 @@ where
         use korangar_interface::prelude::*;
 
         window! {
-            title: client_state().translation().hotbar_window_title(),
+            title: client_state().localization().hotbar_window_title(),
             class: Self::window_class(),
             theme: InterfaceThemeType::Game,
             elements: (

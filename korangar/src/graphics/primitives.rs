@@ -1,5 +1,4 @@
 use cgmath::Vector2;
-use korangar_interface::application::{ClipTrait, CornerRadiusTrait, PositionTrait, SizeTrait};
 use korangar_interface::element::ElementDisplay;
 use rust_state::RustState;
 use serde::{Deserialize, Serialize};
@@ -110,7 +109,7 @@ impl ElementDisplay for ScreenPosition {
     }
 }
 
-impl PositionTrait for ScreenPosition {
+impl korangar_interface::application::Position for ScreenPosition {
     fn new(left: f32, top: f32) -> Self {
         ScreenPosition { left, top }
     }
@@ -185,7 +184,7 @@ impl ElementDisplay for ScreenSize {
     }
 }
 
-impl SizeTrait for ScreenSize {
+impl korangar_interface::application::Size for ScreenSize {
     fn new(width: f32, height: f32) -> Self {
         ScreenSize { width, height }
     }
@@ -279,7 +278,7 @@ impl From<ScreenClip> for [f32; 4] {
     }
 }
 
-impl ClipTrait for ScreenClip {
+impl korangar_interface::application::Clip for ScreenClip {
     fn new(left: f32, top: f32, right: f32, bottom: f32) -> Self {
         Self { left, right, top, bottom }
     }
@@ -319,14 +318,14 @@ impl std::ops::Mul<f32> for ScreenClip {
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
-pub struct CornerRadius {
+pub struct CornerDiameter {
     pub top_left: f32,
     pub top_right: f32,
     pub bottom_left: f32,
     pub bottom_right: f32,
 }
 
-impl CornerRadius {
+impl CornerDiameter {
     pub fn uniform(value: f32) -> Self {
         Self {
             top_left: value,
@@ -337,7 +336,7 @@ impl CornerRadius {
     }
 }
 
-impl ElementDisplay for CornerRadius {
+impl ElementDisplay for CornerDiameter {
     fn element_display(&self) -> String {
         format!(
             "^FFBB00↖^000000{} ^FFBB00↗^000000{} ^FFBB00↘^000000{} ^FFBB00↙^000000{}",
@@ -349,7 +348,7 @@ impl ElementDisplay for CornerRadius {
     }
 }
 
-impl CornerRadiusTrait for CornerRadius {
+impl korangar_interface::application::CornerDiameter for CornerDiameter {
     fn new(top_left: f32, top_right: f32, bottom_right: f32, bottom_left: f32) -> Self {
         Self {
             top_left,
@@ -385,7 +384,7 @@ impl CornerRadiusTrait for CornerRadius {
     }
 }
 
-impl std::ops::Mul<f32> for CornerRadius {
+impl std::ops::Mul<f32> for CornerDiameter {
     type Output = Self;
 
     fn mul(self, rhs: f32) -> Self {
@@ -398,8 +397,8 @@ impl std::ops::Mul<f32> for CornerRadius {
     }
 }
 
-impl From<CornerRadius> for [f32; 4] {
-    fn from(val: CornerRadius) -> Self {
+impl From<CornerDiameter> for [f32; 4] {
+    fn from(val: CornerDiameter) -> Self {
         [val.top_left, val.top_right, val.bottom_left, val.bottom_right]
     }
 }

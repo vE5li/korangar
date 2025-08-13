@@ -22,9 +22,9 @@ use super::{
     AntiAliasingResources, Capabilities, FramePacer, FrameStage, GlobalContext, LimitFramerate, Msaa, Prepare, PresentModeInfo,
     RENDER_TO_TEXTURE_FORMAT, ScreenSpaceAntiAliasing, ShadowDetail, Ssaa, Surface, TextureSamplerType,
 };
+use crate::graphics::ScreenSize;
 use crate::graphics::instruction::RenderInstruction;
 use crate::graphics::passes::*;
-use crate::interface::layout::ScreenSize;
 use crate::loaders::TextureLoader;
 use crate::{NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS, init_tls_rand};
 

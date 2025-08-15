@@ -91,7 +91,7 @@ impl StateElement<ClientState> for LocalizationControls {
         }
     }
 
-    fn to_element_mut<P>(self_path: P, name: String) -> Self::ReturnMut<P>
+    fn to_element_mut<P>(_: P, name: String) -> Self::ReturnMut<P>
     where
         P: rust_state::Path<ClientState, Self>,
     {

@@ -1,11 +1,12 @@
 use std::cmp::Ordering;
+use std::fmt::Display;
 
 use korangar_interface::element::store::{ElementStore, ElementStoreMut};
 use korangar_interface::element::{Element, ElementBox, ElementSet};
 use korangar_interface::event::ClickAction;
 use korangar_interface::layout::area::Area;
 use korangar_interface::layout::{Layout, Resolver};
-use korangar_interface::prelude::HorizontalAlignment;
+use korangar_interface::prelude::{HorizontalAlignment, VerticalAlignment};
 use korangar_interface::window::{CustomWindow, Window};
 use korangar_networking::{ItemQuantity, ShopItem};
 use rust_state::{Context, ManuallyAssertExt, Path, Selector, VecIndexExt};
@@ -18,6 +19,36 @@ use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
 use crate::world::ResourceMetadata;
 
+struct PartialEqDisplayStr<T> {
+    last_value: Option<T>,
+    text: String,
+}
+
+impl<T> PartialEqDisplayStr<T> {
+    pub fn new() -> Self {
+        Self {
+            last_value: None,
+            text: String::new(),
+        }
+    }
+}
+
+impl<T> PartialEqDisplayStr<T>
+where
+    T: Clone + PartialEq + Display + 'static,
+{
+    fn update(&mut self, value: T) {
+        if self.last_value.is_none() || self.last_value.as_ref().is_some_and(|last| *last != value) {
+            self.text = value.to_string();
+            self.last_value = Some(value.clone());
+        }
+    }
+
+    fn get_str(&self) -> &str {
+        &self.text
+    }
+}
+
 struct ItemLayoutInfo<A> {
     area: Area,
     texture_area: Area,
@@ -25,30 +56,30 @@ struct ItemLayoutInfo<A> {
     children: A,
 }
 
-struct ItemElement<A, B, C> {
+struct ItemElement<A, B> {
     item_path: A,
-    // TODO: Remove the cart path, it's not needed.
-    cart_path: B,
-    children: C,
+    children: B,
+    amount_string: PartialEqDisplayStr<u32>,
+    price_string: PartialEqDisplayStr<u32>,
 }
 
-impl<A, B, C> ItemElement<A, B, C> {
-    fn new(item_path: A, cart_path: B, children: C) -> Self {
+impl<A, B> ItemElement<A, B> {
+    fn new(item_path: A, children: B) -> Self {
         Self {
             item_path,
-            cart_path,
             children,
+            amount_string: PartialEqDisplayStr::new(),
+            price_string: PartialEqDisplayStr::new(),
         }
     }
 }
 
-impl<A, B, C> Element<ClientState> for ItemElement<A, B, C>
+impl<A, B> Element<ClientState> for ItemElement<A, B>
 where
     A: Path<ClientState, ShopItem<ResourceMetadata>>,
-    B: Path<ClientState, Vec<ShopItem<(ResourceMetadata, u32)>>>,
-    C: ElementSet<ClientState>,
+    B: ElementSet<ClientState>,
 {
-    type LayoutInfo = ItemLayoutInfo<C::LayoutInfo>;
+    type LayoutInfo = ItemLayoutInfo<B::LayoutInfo>;
 
     fn create_layout_info(
         &mut self,
@@ -76,6 +107,14 @@ where
             (texture_area, text_area, children)
         });
 
+        let item = state.get(&self.item_path);
+
+        if let ItemQuantity::Fixed(count) = item.quantity {
+            self.amount_string.update(count);
+        }
+
+        self.price_string.update(item.price.0);
+
         Self::LayoutInfo {
             area,
             texture_area,
@@ -97,6 +136,18 @@ where
 
         if let Some(texture) = &item.metadata.texture {
             layout.add_texture(texture.clone(), layout_info.texture_area, Color::WHITE, false);
+
+            if matches!(item.quantity, ItemQuantity::Fixed(..)) {
+                layout.add_text(
+                    layout_info.texture_area,
+                    self.amount_string.get_str(),
+                    FontSize(16.0),
+                    Color::monochrome_u8(220),
+                    HorizontalAlignment::Right { offset: 3.0, border: 3.0 },
+                    VerticalAlignment::Bottom { offset: 0.0 },
+                    OverflowBehavior::Shrink,
+                );
+            }
         }
 
         layout.add_text(
@@ -105,7 +156,17 @@ where
             FontSize(16.0),
             Color::monochrome_u8(220),
             HorizontalAlignment::Left { offset: 3.0, border: 3.0 },
-            korangar_interface::prelude::VerticalAlignment::Center { offset: 0.0 },
+            VerticalAlignment::Center { offset: 0.0 },
+            OverflowBehavior::Shrink,
+        );
+
+        layout.add_text(
+            layout_info.text_area,
+            self.price_string.get_str(),
+            FontSize(16.0),
+            Color::rgb_u8(250, 230, 130),
+            HorizontalAlignment::Right { offset: 3.0, border: 3.0 },
+            VerticalAlignment::Center { offset: 0.0 },
             OverflowBehavior::Shrink,
         );
 
@@ -175,14 +236,14 @@ where
                             cart.iter()
                                 .find(|purchase| purchase.item_id == item.item_id)
                                 .map(|purchase| matches!(item.quantity, ItemQuantity::Fixed(quantity) if quantity - purchase.metadata.1 < amount))
-                                .unwrap_or(false)
+                                .unwrap_or_else(|| matches!(item.quantity, ItemQuantity::Fixed(quantity) if quantity < amount))
                         })
                     }
 
                     fn resolve_amount(
                         amount: ItemQuantity,
-                        item: &ShopItem<ResourceMetadata>,
-                        cart: &Vec<ShopItem<(ResourceMetadata, u32)>>,
+                        _item: &ShopItem<ResourceMetadata>,
+                        _cart: &Vec<ShopItem<(ResourceMetadata, u32)>>,
                     ) -> u32 {
                         match amount {
                             ItemQuantity::Fixed(count) => count,
@@ -211,7 +272,7 @@ where
                         A: Path<ClientState, ShopItem<ResourceMetadata>>,
                         B: Path<ClientState, Vec<ShopItem<(ResourceMetadata, u32)>>>,
                     {
-                        fn execute(&self, state: &Context<ClientState>, queue: &mut korangar_interface::prelude::EventQueue<ClientState>) {
+                        fn execute(&self, state: &Context<ClientState>, _: &mut EventQueue<ClientState>) {
                             let item = state.get(&self.item_path).clone();
                             let amount = self.amount;
 
@@ -253,7 +314,8 @@ where
                                 disabled: disabled_cutoff(item_path, cart_path, 100),
                                 event: AddAction::new(item_path, cart_path, ItemQuantity::Fixed(100)),
                             },
-                            // TODO: Needs special treatment.
+                            // TODO: Needs special treatment. Should be +All or +1000 depending on
+                            // the available quantity.
                             // button! {
                             //     text: "+All",
                             //     disabled: DisabledCutoff::new(item_path, cart_path, 1),
@@ -262,8 +324,7 @@ where
                         ),
                     },);
 
-                    self.elements
-                        .push(ErasedElement::new(ItemElement::new(item_path, self.cart_path, buttons)));
+                    self.elements.push(ErasedElement::new(ItemElement::new(item_path, buttons)));
                 }
             }
         }
@@ -280,8 +341,6 @@ where
         _: &'a Self::LayoutInfo,
         layout: &mut Layout<'a, ClientState>,
     ) {
-        let items = state.get(&self.items_path);
-
         self.elements.iter().enumerate().for_each(|(index, element)| {
             element.lay_out(state, store.child_store(index as u64), &(), layout);
         });

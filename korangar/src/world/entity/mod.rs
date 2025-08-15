@@ -10,7 +10,7 @@ use korangar_interface::window::{StateWindow, Window};
 use korangar_networking::EntityData;
 use korangar_util::pathing::{MAX_WALK_PATH_SIZE, PathFinder};
 use ragnarok_packets::{AccountId, CharacterInformation, ClientTick, Direction, EntityId, Sex, StatusType, WorldPosition};
-use rust_state::{Path, RustState};
+use rust_state::{Path, RustState, VecItem};
 #[cfg(feature = "debug")]
 use smallvec::smallvec_inline;
 #[cfg(feature = "debug")]
@@ -1138,26 +1138,38 @@ impl Entity {
     }
 }
 
+impl VecItem for Entity {
+    type Id = EntityId;
+
+    fn get_id(&self) -> Self::Id {
+        self.get_entity_id()
+    }
+}
+
 // TODO: Derive this
 impl StateWindow<ClientState> for Entity {
-    fn to_window<'a>(self_path: impl Path<ClientState, Self>) -> impl Window<ClientState> + 'a {
+    fn to_window<'a>(_self_path: impl Path<ClientState, Self>) -> impl Window<ClientState> + 'a {
         use korangar_interface::prelude::*;
 
         window! {
             title: "Entity",
             theme: InterfaceThemeType::Game,
             closable: true,
+            // TODO: This is gonna be a bit hacky but we want to have this save path possibly be
+            // None and dispaly a message if the entity disappeared.
             elements: (),
         }
     }
 
-    fn to_window_mut<'a>(self_path: impl Path<ClientState, Self>) -> impl Window<ClientState> + 'a {
+    fn to_window_mut<'a>(_self_path: impl Path<ClientState, Self>) -> impl Window<ClientState> + 'a {
         use korangar_interface::prelude::*;
 
         window! {
             title: "Entity",
             theme: InterfaceThemeType::Game,
             closable: true,
+            // TODO: This is gonna be a bit hacky but we want to have this save path possibly be
+            // None and dispaly a message if the entity disappeared.
             elements: (),
         }
     }

@@ -40,8 +40,6 @@ use crate::graphics::{ScreenPosition, ScreenSize};
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
 use crate::settings::LightingMode;
-#[cfg(feature = "debug")]
-use crate::state::ClientState;
 use crate::{Buffer, Color, GameFileLoader, MAP_TILE_SIZE, ModelVertex, TileVertex};
 
 create_simple_key!(ObjectKey, "Key to an object inside the map");

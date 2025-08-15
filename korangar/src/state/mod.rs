@@ -2,6 +2,7 @@ pub mod localization;
 pub mod theme;
 
 use std::sync::Arc;
+use std::time::Instant;
 
 use korangar_interface::application::Application;
 use korangar_interface::components::button::ButtonTheme;
@@ -39,7 +40,7 @@ use crate::loaders::{ClientInfo, FontLoader, FontSize, GameFileLoader, OverflowB
 use crate::renderer::InterfaceRenderer;
 use crate::settings::{GraphicsSettingsCapabilities, InterfaceSettings, InterfaceSettingsCapabilities, LoginSettings};
 use crate::state::theme::{GameTheme, ThemeDefault};
-use crate::world::{Entity, Map, Object, Player, ResourceMetadata};
+use crate::world::{Entity, Object, Player, ResourceMetadata};
 use crate::{AudioSettings, GraphicsSettings};
 
 /// A message in the in-game chat.
@@ -48,10 +49,24 @@ use crate::{AudioSettings, GraphicsSettings};
 /// message so the chat window can use the correct colors when switching themes.
 #[derive(Debug, Clone, RustState, StateElement)]
 pub struct ChatMessage {
+    /// Instant that the message was received.
+    // TODO: Unhide element
+    #[hidden_element]
+    pub received: Instant,
     /// Raw message.
     pub text: String,
     /// Color of the message.
     pub color: MessageColor,
+}
+
+impl ChatMessage {
+    pub fn new(text: String, color: MessageColor) -> Self {
+        Self {
+            received: Instant::now(),
+            text,
+            color,
+        }
+    }
 }
 
 /// Internal state of the client. Everything that can be viewed or modified via
@@ -101,28 +116,22 @@ pub struct ClientState {
     entities: Vec<Entity>,
 
     /// List of all received chat messages.
-    // TODO: This should be a UniqueVec or something.
     chat_messages: Vec<ChatMessage>,
     /// List of all friends.
-    // TODO: This should be a UniqueVec or something.
     friend_list: Vec<Friend>,
     /// List of items offered in the shop.
-    // TODO: This should be a UniqueVec or something.
     // TODO: Unhide this
     #[hidden_element]
     shop_items: Vec<ShopItem<ResourceMetadata>>,
     /// List of items in the buying cart.
-    // TODO: This should be a UniqueVec or something.
     // TODO: Unhide this
     #[hidden_element]
     buy_cart: Vec<ShopItem<(ResourceMetadata, u32)>>,
     /// List of items that should be sold.
-    // TODO: This should be a UniqueVec or something.
     // TODO: Unhide this
     #[hidden_element]
     sell_items: Vec<SellItem<(ResourceMetadata, u16)>>,
     /// List of items in the selling cart.
-    // TODO: This should be a UniqueVec or something.
     // TODO: Unhide this
     #[hidden_element]
     sell_cart: Vec<SellItem<(ResourceMetadata, u16)>>,
@@ -137,7 +146,6 @@ pub struct ClientState {
     skill_tree: SkillTree,
 
     /// List of all available character servers.
-    // TODO: This should be a UniqueVec or something.
     character_servers: Vec<CharacterServerInformation>,
     /// List of all the slots and characters on the current character server.
     character_slots: CharacterSlots,
@@ -177,11 +185,6 @@ pub struct ClientState {
     /// remains valid.
     #[cfg(feature = "debug")]
     inspecting_effect_sources: Vec<EffectSource>,
-    /// Entities that are viewed in the inspector. Once added to this vector
-    /// they are never removed so we can ensure the user interface remains
-    /// valid.
-    #[cfg(feature = "debug")]
-    inspecting_entities: Vec<Entity>,
     /// Special render options for debugging the client.
     #[cfg(feature = "debug")]
     render_options: RenderOptions,
@@ -250,10 +253,7 @@ impl ClientState {
                 "Welcome to ^ff8800Korangar^000000 version ^ff8800{}^000000!",
                 env!("CARGO_PKG_VERSION")
             );
-            let chat_messages = vec![ChatMessage {
-                text: welcome_string,
-                color: MessageColor::Server,
-            }];
+            let chat_messages = vec![ChatMessage::new(welcome_string, MessageColor::Server)];
 
             let chat_window = ChatWindowState::default();
         });
@@ -306,8 +306,6 @@ impl ClientState {
         let inspecting_sound_sources = Vec::new();
         #[cfg(feature = "debug")]
         let inspecting_effect_sources = Vec::new();
-        #[cfg(feature = "debug")]
-        let inspecting_entities = Vec::new();
 
         #[cfg(feature = "debug")]
         let render_options = RenderOptions::new();
@@ -362,31 +360,12 @@ impl ClientState {
             #[cfg(feature = "debug")]
             inspecting_effect_sources,
             #[cfg(feature = "debug")]
-            inspecting_entities,
-            #[cfg(feature = "debug")]
             render_options,
             #[cfg(feature = "debug")]
             profiler_window,
             #[cfg(feature = "debug")]
             packet_history,
         }
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn prepare_entity_inspection(&mut self, index: u32) -> impl Path<ClientState, Entity> {
-        let entity = &self.entities[index as usize];
-
-        let index = self
-            .inspecting_entities
-            .iter()
-            .position(|item| item.get_entity_id() == entity.get_entity_id())
-            .unwrap_or_else(|| {
-                let index = self.inspecting_entities.len();
-                self.inspecting_entities.push(entity.clone());
-                index
-            });
-
-        client_state().inspecting_entities().index(index).manually_asserted()
     }
 }
 

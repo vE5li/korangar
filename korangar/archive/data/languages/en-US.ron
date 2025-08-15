@@ -35,7 +35,7 @@
     next_button_text: "Next",
     close_button_text: "Close",
     error_window_title: "Error",
-    friend_list_window_title: "Frield List",
+    friend_list_window_title: "Friend List",
     friend_list_text_box_message: "Add friend by name",
     remove_button_text: "Remove",
     hotbar_window_title: "Hotbar",

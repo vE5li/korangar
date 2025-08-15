@@ -74,7 +74,7 @@ use ragnarok_packets::{
     TilePosition, UnitId, WorldPosition,
 };
 use renderer::InterfaceRenderer;
-use rust_state::{AsRefExt, Context, ManuallyAssertExt, OptionExt, VecIndexExt};
+use rust_state::{Context, ManuallyAssertExt, VecIndexExt, VecLookupExt};
 use settings::{
     AudioSettings, AudioSettingsPathExt, GraphicsSettingsCapabilities, GraphicsSettingsPathExt, InterfaceSettings, InterfaceSettingsPathExt,
 };
@@ -1227,7 +1227,7 @@ impl Client {
                 NetworkEvent::ChatMessage { text, color } => {
                     self.client_state
                         .follow_mut(client_state().chat_messages())
-                        .push(ChatMessage { text, color });
+                        .push(ChatMessage::new(text, color));
                 }
                 NetworkEvent::UpdateEntityDetails { entity_id, name } => {
                     let entity = self
@@ -1517,14 +1517,16 @@ impl Client {
                     BuyShopItemsResult::Success => {
                         let _ = self.networking_system.close_shop();
 
+                        // Clear the cart.
+                        self.client_state.follow_mut(client_state().buy_cart()).clear();
+
                         self.interface.close_window_with_class(WindowClass::Buy);
                         self.interface.close_window_with_class(WindowClass::BuyCart);
                     }
                     BuyShopItemsResult::Error => {
-                        self.client_state.follow_mut(client_state().chat_messages()).push(ChatMessage {
-                            text: "Failed to buy items".to_owned(),
-                            color: MessageColor::Error,
-                        });
+                        self.client_state
+                            .follow_mut(client_state().chat_messages())
+                            .push(ChatMessage::new("Failed to buy items".to_owned(), MessageColor::Error));
                     }
                 },
                 NetworkEvent::SellItemList { items } => {
@@ -1561,14 +1563,16 @@ impl Client {
                 }
                 NetworkEvent::SellingCompleted { result } => match result {
                     SellItemsResult::Success => {
+                        // Clear the cart.
+                        self.client_state.follow_mut(client_state().buy_cart()).clear();
+
                         self.interface.close_window_with_class(WindowClass::Sell);
                         self.interface.close_window_with_class(WindowClass::SellCart);
                     }
                     SellItemsResult::Error => {
-                        self.client_state.follow_mut(client_state().chat_messages()).push(ChatMessage {
-                            text: "Failed to sell items".to_owned(),
-                            color: MessageColor::Error,
-                        });
+                        self.client_state
+                            .follow_mut(client_state().chat_messages())
+                            .push(ChatMessage::new("Failed to sell items".to_owned(), MessageColor::Error));
                     }
                 },
             }
@@ -1701,7 +1705,7 @@ impl Client {
                 },
                 InputEvent::ToggleAudioSettingsWindow => match self.interface.is_window_with_class_open(WindowClass::AudioSettings) {
                     true => self.interface.close_window_with_class(WindowClass::AudioSettings),
-                    flaes => self
+                    false => self
                         .interface
                         .open_window(AudioSettingsWindow::new(client_state().audio_settings())),
                 },
@@ -1907,6 +1911,10 @@ impl Client {
                 InputEvent::CloseShop => {
                     let _ = self.networking_system.close_shop();
 
+                    // Clear the carts.
+                    self.client_state.follow_mut(client_state().buy_cart()).clear();
+                    self.client_state.follow_mut(client_state().sell_cart()).clear();
+
                     self.interface.close_window_with_class(WindowClass::Buy);
                     self.interface.close_window_with_class(WindowClass::BuyCart);
                     self.interface.close_window_with_class(WindowClass::Sell);
@@ -1936,28 +1944,28 @@ impl Client {
                         match marker_identifier {
                             MarkerIdentifier::Object(key) => {
                                 let inspecting_objects = self.client_state.follow_mut(client_state().inspecting_objects());
-                                let object = self.map.as_ref().unwrap().get_object(key);
+                                let object = map.get_object(key);
                                 let object_path = state::prepare_object_inspection(inspecting_objects, object);
 
                                 self.interface.open_state_window(object_path);
                             }
                             MarkerIdentifier::LightSource(key) => {
                                 let inspecting_lights = self.client_state.follow_mut(client_state().inspecting_light_sources());
-                                let light_source = self.map.as_ref().unwrap().get_light_source(key);
+                                let light_source = map.get_light_source(key);
                                 let light_source_path = state::prepare_light_source_inspection(inspecting_lights, light_source);
 
                                 self.interface.open_state_window(light_source_path);
                             }
                             MarkerIdentifier::SoundSource(index) => {
                                 let inspecting_sounds = self.client_state.follow_mut(client_state().inspecting_sound_sources());
-                                let sound_source = self.map.as_ref().unwrap().get_sound_source(index);
+                                let sound_source = map.get_sound_source(index);
                                 let sound_source_path = state::prepare_sound_source_inspection(inspecting_sounds, sound_source);
 
                                 self.interface.open_state_window(sound_source_path);
                             }
                             MarkerIdentifier::EffectSource(index) => {
                                 let inspecting_effects = self.client_state.follow_mut(client_state().inspecting_effect_sources());
-                                let effect_source = self.map.as_ref().unwrap().get_effect_source(index);
+                                let effect_source = map.get_effect_source(index);
                                 let effect_source_path = state::prepare_effect_source_inspection(inspecting_effects, effect_source);
 
                                 self.interface.open_state_window(effect_source_path);
@@ -1966,7 +1974,15 @@ impl Client {
                                 // TODO:
                             }
                             MarkerIdentifier::Entity(index) => {
-                                let entity_path = self.client_state.follow_mut(client_state()).prepare_entity_inspection(index);
+                                let entity_id = self
+                                    .client_state
+                                    .try_follow(client_state().entities().index(index as usize))
+                                    .expect("entity should exist")
+                                    .get_entity_id();
+
+                                // This can technically still be `None`, violating the API but we handle this
+                                // case in the state window.
+                                let entity_path = client_state().entities().lookup(entity_id).manually_asserted();
 
                                 self.interface.open_state_window(entity_path);
                             }

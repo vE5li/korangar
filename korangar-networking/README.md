@@ -17,3 +17,10 @@ cargo run --example ollama-chat-bot
 ```
 
 ##### Note: Make sure that Ollama is serving and the model specified in `OLLAMA_MODEL` is installed, otherwise you will get a `404`
+
+
+### Specific packet version
+
+A small example of how can be implement a specific packet version.
+
+It creates 3 server (login, char, map) and simulate packet exchange using actual packet from older version of the game.

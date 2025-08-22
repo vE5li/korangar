@@ -60,8 +60,10 @@ use korangar_debug::profile_block;
 use korangar_debug::profiling::Profiler;
 use korangar_interface::Interface;
 use korangar_interface::layout::MouseButton;
+use korangar_networking::packet_version::{CharPacketHandlerRegister, LoginPacketHandlerRegister, MapPacketHandlerRegister};
 use korangar_networking::{
-    DisconnectReason, HotkeyState, LoginServerLoginData, MessageColor, NetworkEvent, NetworkEventBuffer, NetworkingSystem, SellItem,
+    CharPacketFactory, DisconnectReason, HotkeyState, LoginPacketFactory, LoginServerLoginData, MapPacketFactory, MessageColor,
+    NetworkEvent, NetworkEventBuffer, NetworkingSystem, SellItem,
 };
 use korangar_util::pathing::PathFinder;
 #[cfg(feature = "debug")]
@@ -299,7 +301,23 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     let sync_cache = args.len() > 1 && &args[1] == "sync-cache";
 
-    let Some(mut client) = Client::init(sync_cache) else {
+    let login_packet_factory = korangar_networking::packet_version::sender_base::BaseLoginPacketFactory;
+    let char_packet_factory = korangar_networking::packet_version::sender_base::BaseCharPacketFactory;
+    let map_packet_factory = korangar_networking::packet_version::sender_base::BaseMapPacketFactory;
+
+    let login_packet_handler_register = korangar_networking::packet_version::receiver_base::BaseLoginPacketReceiver;
+    let char_packet_handler_register = korangar_networking::packet_version::receiver_base::BaseCharPacketReceiver;
+    let map_packet_handler_register = korangar_networking::packet_version::receiver_base::BaseMapPacketReceiver;
+
+    let Some(mut client) = Client::init(
+        sync_cache,
+        login_packet_factory,
+        char_packet_factory,
+        map_packet_factory,
+        login_packet_handler_register,
+        char_packet_handler_register,
+        map_packet_handler_register,
+    ) else {
         return;
     };
 
@@ -316,7 +334,7 @@ fn initialize_shutdown_signal() {
     .expect("Error setting Ctrl-C handler");
 }
 
-struct Client {
+struct Client<L, C, M> {
     game_file_loader: Arc<GameFileLoader>,
     action_loader: Arc<ActionLoader>,
     async_loader: Arc<AsyncLoader>,
@@ -398,9 +416,9 @@ struct Client {
     main_menu_click_sound_effect: SoundEffectKey,
 
     #[cfg(feature = "debug")]
-    networking_system: NetworkingSystem<PacketHistoryCallback>,
+    networking_system: NetworkingSystem<PacketHistoryCallback, L, C, M>,
     #[cfg(not(feature = "debug"))]
-    networking_system: NetworkingSystem<NoPacketCallback>,
+    networking_system: NetworkingSystem<NoPacketCallback, L, C, M>,
     audio_engine: Arc<AudioEngine<GameFileLoader>>,
     active_interface_settings: InterfaceSettings,
     active_graphics_settings: GraphicsSettings,
@@ -414,8 +432,21 @@ struct Client {
     client_state: Context<ClientState>,
 }
 
-impl Client {
-    fn init(sync_cache: bool) -> Option<Self> {
+impl<L, C, M> Client<L, C, M>
+where
+    L: LoginPacketFactory,
+    C: CharPacketFactory,
+    M: MapPacketFactory,
+{
+    fn init(
+        sync_cache: bool,
+        login_packet_factory: L,
+        char_packet_factory: C,
+        map_packet_factory: M,
+        login_packet_handler_register: impl LoginPacketHandlerRegister,
+        char_packet_handler_register: impl CharPacketHandlerRegister,
+        map_packet_handler_register: impl MapPacketHandlerRegister,
+    ) -> Option<Self> {
         time_phase!("load settings", {
             let picker_value = Arc::new(AtomicU64::new(0));
             let input_system = InputSystem::new(picker_value.clone());
@@ -635,12 +666,27 @@ impl Client {
 
         time_phase!("initialize networking", {
             #[cfg(not(feature = "debug"))]
-            let (networking_system, network_event_buffer) = NetworkingSystem::spawn();
+            let (networking_system, network_event_buffer) = NetworkingSystem::spawn(
+                login_packet_factory,
+                char_packet_factory,
+                map_packet_factory,
+                login_packet_handler_register,
+                char_packet_handler_register,
+                map_packet_handler_register,
+            );
 
             #[cfg(feature = "debug")]
             let (packet_history, packet_history_callback) = PacketHistory::new();
             #[cfg(feature = "debug")]
-            let (networking_system, network_event_buffer) = NetworkingSystem::spawn_with_callback(packet_history_callback);
+            let (networking_system, network_event_buffer) = NetworkingSystem::spawn_with_callback_and_factory(
+                packet_history_callback,
+                login_packet_factory,
+                char_packet_factory,
+                map_packet_factory,
+                login_packet_handler_register,
+                char_packet_handler_register,
+                map_packet_handler_register,
+            );
         });
 
         time_phase!("create resources", {
@@ -2932,7 +2978,12 @@ impl Client {
     }
 }
 
-impl ApplicationHandler for Client {
+impl<L, C, M> ApplicationHandler for Client<L, C, M>
+where
+    L: LoginPacketFactory,
+    C: CharPacketFactory,
+    M: MapPacketFactory,
+{
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         // To be as portable as possible, winit recommends to initialize the window and
         // graphics backend after the first resume event is received.

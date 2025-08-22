@@ -2,10 +2,11 @@
 #![cfg_attr(feature = "interface", feature(negative_impls))]
 
 mod entity;
-mod event;
+pub mod event;
 mod hotkey;
 mod items;
 mod message;
+pub mod packet_version;
 mod server;
 
 use std::cell::RefCell;
@@ -34,9 +35,11 @@ pub use self::event::{DisconnectReason, NetworkEvent};
 pub use self::hotkey::HotkeyState;
 pub use self::items::{InventoryItem, InventoryItemDetails, ItemQuantity, NoMetadata, SellItem, ShopItem};
 pub use self::message::MessageColor;
+pub use self::packet_version::{CharPacketFactory, LoginPacketFactory, MapPacketFactory};
 pub use self::server::{
     CharacterServerLoginData, LoginServerLoginData, NotConnectedError, UnifiedCharacterSelectionFailedReason, UnifiedLoginFailedReason,
 };
+use crate::packet_version::{CharPacketHandlerRegister, LoginPacketHandlerRegister, MapPacketHandlerRegister, MapPacketHandlerState};
 use crate::server::NetworkTaskError;
 
 /// Buffer for networking events. This struct exists to reduce heap allocations
@@ -84,30 +87,63 @@ impl TimeSynchronization {
     }
 }
 
-pub struct NetworkingSystem<Callback> {
+pub struct NetworkingSystem<Callback, LoginPacketFactory, CharPacketFactory, MapPacketFactory> {
     command_sender: UnboundedSender<ServerConnectCommand>,
     time_synchronization: Arc<Mutex<TimeSynchronization>>,
     login_server_connection: ServerConnection,
     character_server_connection: ServerConnection,
     map_server_connection: ServerConnection,
     packet_callback: Callback,
+    login_packet_factory: LoginPacketFactory,
+    char_packet_factory: CharPacketFactory,
+    map_packet_factory: MapPacketFactory,
 }
 
-impl NetworkingSystem<NoPacketCallback> {
-    pub fn spawn() -> (Self, NetworkEventBuffer) {
-        let (command_sender, time_synchronization) = Self::spawn_networking_thread(NoPacketCallback);
-        Self::inner_new(command_sender, time_synchronization, NoPacketCallback)
+impl<L, C, M> NetworkingSystem<NoPacketCallback, L, C, M>
+where
+    L: LoginPacketFactory,
+    C: CharPacketFactory,
+    M: MapPacketFactory,
+{
+    pub fn spawn(
+        login_packet_factory: L,
+        char_packet_factory: C,
+        map_packet_factory: M,
+        login_packet_handler_register: impl LoginPacketHandlerRegister,
+        char_packet_handler_register: impl CharPacketHandlerRegister,
+        map_packet_handler_register: impl MapPacketHandlerRegister,
+    ) -> (Self, NetworkEventBuffer) {
+        let (command_sender, time_synchronization) = Self::spawn_networking_thread(
+            NoPacketCallback,
+            login_packet_handler_register,
+            char_packet_handler_register,
+            map_packet_handler_register,
+        );
+        Self::inner_new(
+            command_sender,
+            time_synchronization,
+            NoPacketCallback,
+            login_packet_factory,
+            char_packet_factory,
+            map_packet_factory,
+        )
     }
 }
 
-impl<Callback> NetworkingSystem<Callback>
+impl<Callback, L, C, M> NetworkingSystem<Callback, L, C, M>
 where
     Callback: PacketCallback + Send,
+    L: LoginPacketFactory,
+    C: CharPacketFactory,
+    M: MapPacketFactory,
 {
     fn inner_new(
         command_sender: UnboundedSender<ServerConnectCommand>,
         time_synchronization: Arc<Mutex<TimeSynchronization>>,
         packet_callback: Callback,
+        login_packet_factory: L,
+        char_packet_factory: C,
+        map_packet_factory: M,
     ) -> (Self, NetworkEventBuffer) {
         let networking_system = Self {
             command_sender,
@@ -116,18 +152,46 @@ where
             character_server_connection: ServerConnection::Disconnected,
             map_server_connection: ServerConnection::Disconnected,
             packet_callback,
+            login_packet_factory,
+            char_packet_factory,
+            map_packet_factory,
         };
         let event_buffer = NetworkEventBuffer(Vec::new());
 
         (networking_system, event_buffer)
     }
 
-    pub fn spawn_with_callback(packet_callback: Callback) -> (Self, NetworkEventBuffer) {
-        let (command_sender, time_synchronization) = Self::spawn_networking_thread(packet_callback.clone());
-        Self::inner_new(command_sender, time_synchronization, packet_callback)
+    pub fn spawn_with_callback_and_factory(
+        packet_callback: Callback,
+        login_packet_factory: L,
+        char_packet_factory: C,
+        map_packet_factory: M,
+        login_packet_handler_register: impl LoginPacketHandlerRegister,
+        char_packet_handler_register: impl CharPacketHandlerRegister,
+        map_packet_handler_register: impl MapPacketHandlerRegister,
+    ) -> (Self, NetworkEventBuffer) {
+        let (command_sender, time_synchronization) = Self::spawn_networking_thread(
+            packet_callback.clone(),
+            login_packet_handler_register,
+            char_packet_handler_register,
+            map_packet_handler_register,
+        );
+        Self::inner_new(
+            command_sender,
+            time_synchronization,
+            packet_callback,
+            login_packet_factory,
+            char_packet_factory,
+            map_packet_factory,
+        )
     }
 
-    fn spawn_networking_thread(packet_callback: Callback) -> (UnboundedSender<ServerConnectCommand>, Arc<Mutex<TimeSynchronization>>) {
+    fn spawn_networking_thread(
+        packet_callback: Callback,
+        login_packet_handler_register: impl LoginPacketHandlerRegister,
+        char_packet_handler_register: impl CharPacketHandlerRegister,
+        map_packet_handler_register: impl MapPacketHandlerRegister,
+    ) -> (UnboundedSender<ServerConnectCommand>, Arc<Mutex<TimeSynchronization>>) {
         let (command_sender, mut command_receiver) = tokio::sync::mpsc::unbounded_channel::<ServerConnectCommand>();
         let time_synchronization = Arc::new(Mutex::new(TimeSynchronization::new()));
         let thread_time_synchronization = Arc::clone(&time_synchronization);
@@ -155,7 +219,8 @@ where
                                 let _ = handle.await.unwrap();
                             }
 
-                            let packet_handler = Self::create_login_server_packet_handler(packet_callback.clone()).unwrap();
+                            let packet_handler =
+                                Self::create_login_server_packet_handler(packet_callback.clone(), login_packet_handler_register).unwrap();
                             let handle = local_set.spawn_local(Self::handle_server_connection(
                                 address,
                                 action_receiver,
@@ -179,7 +244,9 @@ where
                                 let _ = handle.await.unwrap();
                             }
 
-                            let packet_handler = Self::create_character_server_packet_handler(packet_callback.clone()).unwrap();
+                            let packet_handler =
+                                Self::create_character_server_packet_handler(packet_callback.clone(), char_packet_handler_register)
+                                    .unwrap();
                             let handle = local_set.spawn_local(Self::handle_server_connection(
                                 address,
                                 action_receiver,
@@ -203,7 +270,8 @@ where
                                 let _ = handle.await.unwrap();
                             }
 
-                            let packet_handler = Self::create_map_server_packet_handler(packet_callback.clone()).unwrap();
+                            let packet_handler =
+                                Self::create_map_server_packet_handler(packet_callback.clone(), map_packet_handler_register).unwrap();
                             let handle = local_set.spawn_local(Self::handle_server_connection(
                                 address,
                                 action_receiver,
@@ -397,7 +465,7 @@ where
             })
             .expect("network thread dropped");
 
-        let login_packet = LoginServerLoginPacket::new(username.into(), password.into());
+        let login_packet = self.login_packet_factory.login_server_login(username.into(), password.into());
 
         self.packet_callback.outgoing_packet(&login_packet);
 
@@ -431,12 +499,7 @@ where
             })
             .expect("network thread dropped");
 
-        let login_packet = CharacterServerLoginPacket::new(
-            login_data.account_id,
-            login_data.login_id1,
-            login_data.login_id2,
-            login_data.sex,
-        );
+        let login_packet = self.char_packet_factory.char_server_login(login_data);
 
         self.packet_callback.outgoing_packet(&login_packet);
 
@@ -474,7 +537,7 @@ where
             })
             .expect("network thread dropped");
 
-        let login_packet = MapServerLoginPacket::new(
+        let login_packet = self.map_packet_factory.map_server_login(
             login_server_login_data.account_id,
             character_server_login_data.character_id,
             login_server_login_data.login_id1,
@@ -523,6 +586,9 @@ where
     }
 
     pub fn send_login_server_packet(&mut self, packet: &impl LoginServerPacket) -> Result<(), NotConnectedError> {
+        if packet.header() == EmptyLoginServerPacket::HEADER {
+            return Ok(());
+        }
         match &mut self.login_server_connection {
             ServerConnection::Connected { action_sender, .. } => {
                 self.packet_callback.outgoing_packet(packet);
@@ -537,6 +603,9 @@ where
     }
 
     pub fn send_character_server_packet(&mut self, packet: &impl CharacterServerPacket) -> Result<(), NotConnectedError> {
+        if packet.header() == EmptyCharServerPacket::HEADER {
+            return Ok(());
+        }
         match &mut self.character_server_connection {
             ServerConnection::Connected { action_sender, .. } => {
                 self.packet_callback.outgoing_packet(packet);
@@ -551,6 +620,9 @@ where
     }
 
     pub fn send_map_server_packet(&mut self, packet: &impl MapServerPacket) -> Result<(), NotConnectedError> {
+        if packet.header() == EmptyMapServerPacket::HEADER {
+            return Ok(());
+        }
         match &mut self.map_server_connection {
             ServerConnection::Connected { action_sender, .. } => {
                 self.packet_callback.outgoing_packet(packet);
@@ -566,6 +638,7 @@ where
 
     fn create_login_server_packet_handler(
         packet_callback: Callback,
+        login_packet_handler_register: impl LoginPacketHandlerRegister,
     ) -> Result<PacketHandler<NetworkEventList, (), Callback>, DuplicateHandlerError> {
         let mut packet_handler = PacketHandler::<NetworkEventList, (), Callback>::with_callback(packet_callback);
 
@@ -609,11 +682,14 @@ where
             NetworkEvent::LoginServerConnectionFailed { reason, message }
         })?;
 
+        login_packet_handler_register.register_version_specific_handler(&mut packet_handler);
+
         Ok(packet_handler)
     }
 
     fn create_character_server_packet_handler(
         packet_callback: Callback,
+        char_packet_handler_register: impl CharPacketHandlerRegister,
     ) -> Result<PacketHandler<NetworkEventList, (), Callback>, DuplicateHandlerError> {
         let mut packet_handler = PacketHandler::<NetworkEventList, (), Callback>::with_callback(packet_callback);
 
@@ -635,7 +711,7 @@ where
         packet_handler.register(|packet: RequestCharacterListSuccessPacket| NetworkEvent::CharacterList {
             characters: packet.character_information,
         })?;
-        packet_handler.register_noop::<CharacterListPacket>()?;
+
         packet_handler.register_noop::<CharacterSlotPagePacket>()?;
         packet_handler.register_noop::<CharacterBanListPacket>()?;
         packet_handler.register_noop::<LoginPincodePacket>()?;
@@ -694,11 +770,14 @@ where
             SwitchCharacterSlotResponseStatus::Error => NetworkEvent::CharacterSlotSwitchFailed,
         })?;
 
+        char_packet_handler_register.register_version_specific_handler(&mut packet_handler);
+
         Ok(packet_handler)
     }
 
     fn create_map_server_packet_handler(
         packet_callback: Callback,
+        map_packet_handler_register: impl MapPacketHandlerRegister,
     ) -> Result<PacketHandler<NetworkEventList, (), Callback>, DuplicateHandlerError> {
         let mut packet_handler = PacketHandler::<NetworkEventList, (), Callback>::with_callback(packet_callback);
 
@@ -709,7 +788,9 @@ where
         //
         // This variable provides some transient storage shared by all the inventory
         // handlers.
-        let inventory_items: Rc<RefCell<Option<Vec<InventoryItem<NoMetadata>>>>> = Rc::new(RefCell::new(None));
+        let state = MapPacketHandlerState {
+            inventory_items: Rc::new(RefCell::new(None)),
+        };
 
         packet_handler.register(|_: MapServerPingPacket| NoNetworkEvents)?;
         packet_handler.register(|packet: BroadcastMessagePacket| NetworkEvent::ChatMessage {
@@ -839,7 +920,7 @@ where
             _ => None,
         })?;
         packet_handler.register({
-            let inventory_items = inventory_items.clone();
+            let inventory_items = state.inventory_items.clone();
 
             move |_: InventoyStartPacket| {
                 *inventory_items.borrow_mut() = Some(Vec::new());
@@ -847,7 +928,7 @@ where
             }
         })?;
         packet_handler.register({
-            let inventory_items = inventory_items.clone();
+            let inventory_items = state.inventory_items.clone();
 
             move |packet: RegularItemListPacket| {
                 inventory_items.borrow_mut().as_mut().expect("Unexpected inventory packet").extend(
@@ -882,7 +963,7 @@ where
             }
         })?;
         packet_handler.register({
-            let inventory_items = inventory_items.clone();
+            let inventory_items = state.inventory_items.clone();
 
             move |packet: EquippableItemListPacket| {
                 inventory_items.borrow_mut().as_mut().expect("Unexpected inventory packet").extend(
@@ -929,7 +1010,7 @@ where
             }
         })?;
         packet_handler.register({
-            let inventory_items = inventory_items.clone();
+            let inventory_items = state.inventory_items.clone();
 
             move |_: InventoyEndPacket| {
                 let items = inventory_items.borrow_mut().take().expect("Unexpected inventory end packet");
@@ -1257,19 +1338,47 @@ where
         packet_handler.register(|packet: SellListPacket| NetworkEvent::SellItemList { items: packet.items })?;
         packet_handler.register(|packet: SellItemsResultPacket| NetworkEvent::SellingCompleted { result: packet.result })?;
 
+        map_packet_handler_register.register_version_specific_handler(&mut packet_handler, &state);
+
         Ok(packet_handler)
     }
 
+    // Login Packets sender
+
+    // Char Packets sender
     pub fn request_character_list(&mut self) -> Result<(), NotConnectedError> {
-        self.send_character_server_packet(&RequestCharacterListPacket::default())
+        self.send_character_server_packet(&self.char_packet_factory.request_character_list())
     }
 
     pub fn select_character(&mut self, character_slot: usize) -> Result<(), NotConnectedError> {
-        self.send_character_server_packet(&SelectCharacterPacket::new(character_slot as u8))
+        self.send_character_server_packet(&self.char_packet_factory.select_character(character_slot))
     }
 
+    pub fn create_character(&mut self, slot: usize, name: String) -> Result<(), NotConnectedError> {
+        let hair_color = 0_usize;
+        let hair_style = 0_usize;
+        let start_job = 0_usize;
+        let sex = Sex::Male;
+
+        self.send_character_server_packet(
+            &self
+                .char_packet_factory
+                .create_character(slot, name, hair_color, hair_style, start_job, sex),
+        )
+    }
+
+    pub fn delete_character(&mut self, character_id: CharacterId) -> Result<(), NotConnectedError> {
+        let email = "a@a.com".to_string();
+        self.send_character_server_packet(&self.char_packet_factory.delete_character(character_id, email))
+    }
+
+    pub fn switch_character_slot(&mut self, origin_slot: usize, destination_slot: usize) -> Result<(), NotConnectedError> {
+        self.send_character_server_packet(&self.char_packet_factory.switch_character_slot(origin_slot, destination_slot))
+    }
+
+    // Map Packets sender
     pub fn map_loaded(&mut self) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&MapLoadedPacket::default())
+        self.send_map_server_packet(&self.map_packet_factory.map_loaded())
     }
 
     pub fn request_client_tick(&mut self) -> Result<(), NotConnectedError> {
@@ -1278,65 +1387,63 @@ where
             .lock()
             .map(|time_synchronization| time_synchronization.client_tick as u32)
             .unwrap_or(100);
-        self.send_map_server_packet(&RequestServerTickPacket::new(ClientTick(client_tick)))
+        self.send_map_server_packet(&self.map_packet_factory.request_client_tick(ClientTick(client_tick)))
     }
 
     pub fn respawn(&mut self) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&RestartPacket::new(RestartType::Respawn))
+        self.send_map_server_packet(&self.map_packet_factory.respawn())
     }
 
     pub fn log_out(&mut self) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&RestartPacket::new(RestartType::Disconnect))
+        self.send_map_server_packet(&self.map_packet_factory.log_out())
     }
 
     pub fn player_move(&mut self, position: WorldPosition) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&RequestPlayerMovePacket::new(position))
+        self.send_map_server_packet(&self.map_packet_factory.player_move(position))
     }
 
     pub fn warp_to_map(&mut self, map_name: String, position: TilePosition) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&RequestWarpToMapPacket::new(map_name, position))
+        self.send_map_server_packet(&self.map_packet_factory.warp_to_map(map_name, position))
     }
 
     pub fn entity_details(&mut self, entity_id: EntityId) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&RequestDetailsPacket::new(entity_id))
+        self.send_map_server_packet(&self.map_packet_factory.entity_details(entity_id))
     }
 
     pub fn player_attack(&mut self, entity_id: EntityId) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&RequestActionPacket::new(entity_id, Action::Attack))
+        self.send_map_server_packet(&self.map_packet_factory.player_attack(entity_id))
     }
 
     pub fn send_chat_message(&mut self, player_name: &str, text: &str) -> Result<(), NotConnectedError> {
-        let message = format!("{} : {}", player_name, text);
-
-        self.send_map_server_packet(&GlobalMessagePacket::new(message))
+        self.send_map_server_packet(&self.map_packet_factory.send_chat_message(player_name, text))
     }
 
     pub fn start_dialog(&mut self, npc_id: EntityId) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&StartDialogPacket::new(npc_id))
+        self.send_map_server_packet(&self.map_packet_factory.start_dialog(npc_id))
     }
 
     pub fn next_dialog(&mut self, npc_id: EntityId) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&NextDialogPacket::new(npc_id))
+        self.send_map_server_packet(&self.map_packet_factory.next_dialog(npc_id))
     }
 
     pub fn close_dialog(&mut self, npc_id: EntityId) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&CloseDialogPacket::new(npc_id))
+        self.send_map_server_packet(&self.map_packet_factory.close_dialog(npc_id))
     }
 
     pub fn choose_dialog_option(&mut self, npc_id: EntityId, option: i8) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&ChooseDialogOptionPacket::new(npc_id, option))
+        self.send_map_server_packet(&self.map_packet_factory.choose_dialog_option(npc_id, option))
     }
 
     pub fn request_item_equip(&mut self, item_index: InventoryIndex, equip_position: EquipPosition) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&RequestEquipItemPacket::new(item_index, equip_position))
+        self.send_map_server_packet(&self.map_packet_factory.request_item_equip(item_index, equip_position))
     }
 
     pub fn request_item_unequip(&mut self, item_index: InventoryIndex) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&RequestUnequipItemPacket::new(item_index))
+        self.send_map_server_packet(&self.map_packet_factory.request_item_unequip(item_index))
     }
 
     pub fn cast_skill(&mut self, skill_id: SkillId, skill_level: SkillLevel, entity_id: EntityId) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&UseSkillAtIdPacket::new(skill_level, skill_id, entity_id))
+        self.send_map_server_packet(&self.map_packet_factory.cast_skill(skill_id, skill_level, entity_id))
     }
 
     pub fn cast_ground_skill(
@@ -1345,7 +1452,7 @@ where
         skill_level: SkillLevel,
         target_position: TilePosition,
     ) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&UseSkillOnGroundPacket::new(skill_level, skill_id, target_position))
+        self.send_map_server_packet(&self.map_packet_factory.cast_ground_skill(skill_id, skill_level, target_position))
     }
 
     pub fn cast_channeling_skill(
@@ -1354,64 +1461,35 @@ where
         skill_level: SkillLevel,
         entity_id: EntityId,
     ) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&StartUseSkillPacket::new(skill_id, skill_level, entity_id))
+        self.send_map_server_packet(&self.map_packet_factory.cast_channeling_skill(skill_id, skill_level, entity_id))
     }
 
     pub fn stop_channeling_skill(&mut self, skill_id: SkillId) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&EndUseSkillPacket::new(skill_id))
+        self.send_map_server_packet(&self.map_packet_factory.stop_channeling_skill(skill_id))
     }
 
     pub fn add_friend(&mut self, name: String) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&AddFriendPacket::new(name))
+        self.send_map_server_packet(&self.map_packet_factory.add_friend(name))
     }
 
     pub fn remove_friend(&mut self, account_id: AccountId, character_id: CharacterId) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&RemoveFriendPacket::new(account_id, character_id))
+        self.send_map_server_packet(&self.map_packet_factory.remove_friend(account_id, character_id))
     }
 
     pub fn reject_friend_request(&mut self, account_id: AccountId, character_id: CharacterId) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&FriendRequestResponsePacket::new(
-            account_id,
-            character_id,
-            FriendRequestResponse::Reject,
-        ))
+        self.send_map_server_packet(&self.map_packet_factory.reject_friend_request(account_id, character_id))
     }
 
     pub fn accept_friend_request(&mut self, account_id: AccountId, character_id: CharacterId) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&FriendRequestResponsePacket::new(
-            account_id,
-            character_id,
-            FriendRequestResponse::Accept,
-        ))
-    }
-
-    pub fn create_character(&mut self, slot: usize, name: String) -> Result<(), NotConnectedError> {
-        let hair_color = 0;
-        let hair_style = 0;
-        let start_job = 0;
-        let sex = Sex::Male;
-
-        self.send_character_server_packet(&CreateCharacterPacket::new(
-            name, slot as u8, hair_color, hair_style, start_job, sex,
-        ))
-    }
-
-    pub fn delete_character(&mut self, character_id: CharacterId) -> Result<(), NotConnectedError> {
-        let email = "a@a.com".to_string();
-
-        self.send_character_server_packet(&DeleteCharacterPacket::new(character_id, email))
-    }
-
-    pub fn switch_character_slot(&mut self, origin_slot: usize, destination_slot: usize) -> Result<(), NotConnectedError> {
-        self.send_character_server_packet(&SwitchCharacterSlotPacket::new(origin_slot as u16, destination_slot as u16))
+        self.send_map_server_packet(&self.map_packet_factory.accept_friend_request(account_id, character_id))
     }
 
     pub fn set_hotkey_data(&mut self, tab: HotbarTab, index: HotbarSlot, hotkey_data: HotkeyData) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&SetHotkeyData2Packet::new(tab, index, hotkey_data))
+        self.send_map_server_packet(&self.map_packet_factory.set_hotkey_data(tab, index, hotkey_data))
     }
 
     pub fn select_buy_or_sell(&mut self, shop_id: ShopId, buy_or_sell: BuyOrSellOption) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&SelectBuyOrSellPacket::new(shop_id, buy_or_sell))
+        self.send_map_server_packet(&self.map_packet_factory.select_buy_or_sell(shop_id, buy_or_sell))
     }
 
     pub fn purchase_items(&mut self, items: Vec<ShopItem<u32>>) -> Result<(), NotConnectedError> {
@@ -1423,15 +1501,15 @@ where
             })
             .collect();
 
-        self.send_map_server_packet(&BuyShopItemsPacket::new(item_information))
+        self.send_map_server_packet(&self.map_packet_factory.purchase_items(item_information))
     }
 
     pub fn close_shop(&mut self) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&CloseShopPacket::new())
+        self.send_map_server_packet(&self.map_packet_factory.close_shop())
     }
 
     pub fn sell_items(&mut self, items: Vec<SoldItemInformation>) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&SellItemsPacket { items })
+        self.send_map_server_packet(&self.map_packet_factory.sell_items(items))
     }
 }
 
@@ -1440,22 +1518,24 @@ mod packet_handlers {
     use ragnarok_packets::handler::NoPacketCallback;
 
     use crate::NetworkingSystem;
+    use crate::packet_version::receiver_base::{BaseCharPacketReceiver, BaseLoginPacketReceiver, BaseMapPacketReceiver};
+    use crate::packet_version::sender_base::{BaseCharPacketFactory, BaseLoginPacketFactory, BaseMapPacketFactory};
 
     #[test]
     fn login_server() {
-        let result = NetworkingSystem::create_login_server_packet_handler(NoPacketCallback);
+        let result = NetworkingSystem::<NoPacketCallback, BaseLoginPacketFactory, BaseCharPacketFactory, BaseMapPacketFactory>::create_login_server_packet_handler(NoPacketCallback, BaseLoginPacketReceiver);
         assert!(result.is_ok());
     }
 
     #[test]
     fn character_server() {
-        let result = NetworkingSystem::create_character_server_packet_handler(NoPacketCallback);
+        let result = NetworkingSystem::<NoPacketCallback, BaseLoginPacketFactory, BaseCharPacketFactory, BaseMapPacketFactory>::create_character_server_packet_handler(NoPacketCallback, BaseCharPacketReceiver);
         assert!(result.is_ok());
     }
 
     #[test]
     fn map_server() {
-        let result = NetworkingSystem::create_map_server_packet_handler(NoPacketCallback);
+        let result = NetworkingSystem::<NoPacketCallback, BaseLoginPacketFactory, BaseCharPacketFactory, BaseMapPacketFactory>::create_map_server_packet_handler(NoPacketCallback, BaseMapPacketReceiver);
         assert!(result.is_ok());
     }
 }

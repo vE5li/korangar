@@ -4,7 +4,8 @@ use std::thread::sleep;
 use std::time::Duration;
 
 use korangar_debug::logging::Colorize;
-use korangar_networking::{DisconnectReason, NetworkEvent, NetworkingSystem};
+use korangar_networking::packet_version::{CharPacketHandlerRegister, LoginPacketHandlerRegister, MapPacketHandlerRegister};
+use korangar_networking::{CharPacketFactory, DisconnectReason, LoginPacketFactory, MapPacketFactory, NetworkEvent, NetworkingSystem};
 use reqwest::StatusCode;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -59,6 +60,28 @@ impl MessageHistory {
     }
 }
 
+#[derive(Copy, Clone)]
+pub struct NoopLoginPacketFactory;
+#[derive(Copy, Clone)]
+pub struct NoopCharPacketFactory;
+#[derive(Copy, Clone)]
+pub struct NoopMapPacketFactory;
+
+#[derive(Copy, Clone)]
+pub struct NoopLoginPacketHandlerRegister;
+#[derive(Copy, Clone)]
+pub struct NoopCharPacketHandlerRegister;
+#[derive(Copy, Clone)]
+pub struct NoopMapPacketHandlerRegister;
+
+impl LoginPacketFactory for NoopLoginPacketFactory {}
+impl CharPacketFactory for NoopCharPacketFactory {}
+impl MapPacketFactory for NoopMapPacketFactory {}
+
+impl LoginPacketHandlerRegister for NoopLoginPacketHandlerRegister {}
+impl CharPacketHandlerRegister for NoopCharPacketHandlerRegister {}
+impl MapPacketHandlerRegister for NoopMapPacketHandlerRegister {}
+
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     // Chat bot settings.
@@ -70,7 +93,14 @@ async fn main() {
     const CHARACTER_NAME: &str = "character name";
 
     // Create the networking system and HTTP client.
-    let (mut networking_system, mut network_event_buffer) = NetworkingSystem::spawn();
+    let (mut networking_system, mut network_event_buffer) = NetworkingSystem::spawn(
+        NoopLoginPacketFactory,
+        NoopCharPacketFactory,
+        NoopMapPacketFactory,
+        NoopLoginPacketHandlerRegister,
+        NoopCharPacketHandlerRegister,
+        NoopMapPacketHandlerRegister,
+    );
     let client = reqwest::Client::new();
 
     // Persistent data.

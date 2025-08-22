@@ -227,7 +227,7 @@ pub enum NetworkEvent {
 /// New-type so we can implement some `From` traits. This will help when
 /// registering the packet handlers.
 #[derive(Default)]
-pub(crate) struct NetworkEventList(pub Vec<NetworkEvent>);
+pub struct NetworkEventList(pub Vec<NetworkEvent>);
 
 pub(crate) struct NoNetworkEvents;
 

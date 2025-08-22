@@ -1,5 +1,5 @@
 use korangar_interface::element::StateElement;
-use korangar_networking::NetworkingSystem;
+use korangar_networking::{CharPacketFactory, LoginPacketFactory, MapPacketFactory, NetworkingSystem};
 use ragnarok_packets::handler::PacketCallback;
 use ragnarok_packets::{HotbarSlot, HotbarTab, HotkeyData};
 use rust_state::RustState;
@@ -18,9 +18,16 @@ impl Hotbar {
     }
 
     /// Update the slot and notify the map server.
-    pub fn update_slot<Callback>(&mut self, networking_system: &mut NetworkingSystem<Callback>, slot: HotbarSlot, skill: Skill)
-    where
+    pub fn update_slot<Callback, L, C, M>(
+        &mut self,
+        networking_system: &mut NetworkingSystem<Callback, L, C, M>,
+        slot: HotbarSlot,
+        skill: Skill,
+    ) where
         Callback: PacketCallback + Send,
+        L: LoginPacketFactory,
+        C: CharPacketFactory,
+        M: MapPacketFactory,
     {
         let _ = networking_system.set_hotkey_data(HotbarTab(0), slot, HotkeyData {
             is_skill: true as u8,
@@ -32,13 +39,16 @@ impl Hotbar {
     }
 
     /// Swap two slots in the hotbar and notify the map server.
-    pub fn swap_slot<Callback>(
+    pub fn swap_slot<Callback, L, C, M>(
         &mut self,
-        networking_system: &mut NetworkingSystem<Callback>,
+        networking_system: &mut NetworkingSystem<Callback, L, C, M>,
         source_slot: HotbarSlot,
         destination_slot: HotbarSlot,
     ) where
         Callback: PacketCallback + Send,
+        L: LoginPacketFactory,
+        C: CharPacketFactory,
+        M: MapPacketFactory,
     {
         if source_slot != destination_slot {
             let first = self.skills[source_slot.0 as usize].take();
@@ -76,9 +86,12 @@ impl Hotbar {
     }
 
     /// Clear the slot and notify the map server.
-    pub fn clear_slot<Callback>(&mut self, networking_system: &mut NetworkingSystem<Callback>, slot: HotbarSlot)
+    pub fn clear_slot<Callback, L, C, M>(&mut self, networking_system: &mut NetworkingSystem<Callback, L, C, M>, slot: HotbarSlot)
     where
         Callback: PacketCallback + Send,
+        L: LoginPacketFactory,
+        C: CharPacketFactory,
+        M: MapPacketFactory,
     {
         let _ = networking_system.set_hotkey_data(HotbarTab(0), slot, HotkeyData::UNBOUND);
 

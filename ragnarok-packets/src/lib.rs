@@ -36,6 +36,10 @@ pub trait Packet: std::fmt::Debug + Send + Clone + 'static {
     /// The header of the Packet.
     const HEADER: PacketHeader;
 
+    fn header(&self) -> PacketHeader {
+        Self::HEADER
+    }
+
     /// Read packet **without the header**. To read the packet with the header,
     /// use [`PacketExt::packet_from_bytes`].
     fn payload_from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self>;
@@ -3110,3 +3114,25 @@ pub enum SellItemsResult {
 pub struct SellItemsResultPacket {
     pub result: SellItemsResult,
 }
+
+/// Empty packets, used by methods which require returning an `impl
+/// LoginServerPacket`, or `impl CharServerPacket` or `impl MapServerPacket`
+/// Some method might return no packet to send depending on the version of the
+/// game.
+#[derive(Debug, Clone, Packet)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0)]
+pub struct EmptyLoginServerPacket {}
+impl LoginServerPacket for EmptyLoginServerPacket {}
+
+#[derive(Debug, Clone, Packet)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0)]
+pub struct EmptyCharServerPacket {}
+impl CharacterServerPacket for EmptyCharServerPacket {}
+
+#[derive(Debug, Clone, Packet)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0)]
+pub struct EmptyMapServerPacket {}
+impl MapServerPacket for EmptyMapServerPacket {}

@@ -1,0 +1,13 @@
+[package]
+name = "ragnarok-bytes"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cgmath = { workspace = true, optional = true }
+encoding_rs = { workspace = true }
+ragnarok-macros = { workspace = true, optional = true }
+
+[features]
+cgmath = ["dep:cgmath"]
+derive = ["ragnarok-macros"]

@@ -1,0 +1,14 @@
+[package]
+name = "ragnarok-formats"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bitflags = { workspace = true }
+cgmath = { workspace = true }
+rust-state = { workspace = true, optional = true }
+korangar-interface = { workspace = true, optional = true }
+ragnarok-bytes = { workspace = true, features = ["derive", "cgmath"] }
+
+[features]
+interface = ["korangar-interface", "rust-state"]

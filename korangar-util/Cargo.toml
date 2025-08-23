@@ -1,0 +1,18 @@
+[package]
+name = "korangar-util"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cgmath = { workspace = true }
+fast-srgb8 = { workspace = true }
+hashbrown = { workspace = true }
+image = { workspace = true }
+rust-state = { workspace = true, optional = true }
+korangar-interface = { workspace = true, optional = true }
+
+[dev-dependencies]
+rand_aes = { workspace = true }
+
+[features]
+interface = ["korangar-interface", "rust-state"]

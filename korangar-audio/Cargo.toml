@@ -1,0 +1,18 @@
+[package]
+name = "korangar-audio"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cpal = { workspace = true }
+cgmath = { workspace = true, features = ["mint"] }
+kira = { workspace = true, features = ["cpal", "mp3", "wav"] }
+korangar-debug = { workspace = true, optional = true }
+korangar-util = { workspace = true }
+rayon = { workspace = true }
+
+[dev-dependencies]
+
+[features]
+debug = ["korangar-debug"]
+flac = ["kira/flac"]

@@ -1,0 +1,21 @@
+[package]
+name = "korangar-interface"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bitflags = { workspace = true }
+cgmath = { workspace = true, optional = true }
+interface-component-macros = { path = "component-macros" }
+interface-components = { path = "components" }
+interface-macros = { path = "macros" }
+korangar-debug = { workspace = true, optional = true }
+num = { workspace = true }
+option-ext = { workspace = true }
+rust-state = { workspace = true }
+serde = { workspace = true, features = ["derive"], optional = true }
+
+[features]
+cgmath = ["dep:cgmath"]
+debug = ["korangar-debug"]
+serde = ["dep:serde"]

@@ -77,7 +77,7 @@ where
                     },
                     state_button! {
                         text: "Show entities debug",
-                        tooltip: "",
+                        tooltip: "Show ^000001bounding rectangles^000000 around each part of the ^000001entity sprites^000000",
                         state: self.render_options_path.show_entities_debug(),
                         event: Toggle(self.render_options_path.show_entities_debug()),
                     },

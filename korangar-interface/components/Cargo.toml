@@ -1,5 +1,5 @@
 [package]
-name = "korangar-components"
+name = "interface-components"
 version = "0.1.0"
 edition = "2024"
 
@@ -9,4 +9,4 @@ proc-macro = true
 [dependencies]
 proc-macro2 = { workspace = true }
 syn = { workspace = true, features = ["full"] }
-korangar-interface = { workspace = true }
+interface-component-macros = { path = "../component-macros" }

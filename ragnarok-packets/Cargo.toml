@@ -1,0 +1,23 @@
+[package]
+name = "ragnarok-packets"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bitflags = { workspace = true }
+korangar-interface = { workspace = true, optional = true }
+rust-state = { workspace = true, optional = true }
+ragnarok-bytes = { workspace = true, features = ["derive"] }
+ragnarok-macros = { workspace = true }
+
+[dev-dependencies]
+etherparse = { workspace = true }
+korangar-debug = { workspace = true }
+pcap = { workspace = true }
+
+[features]
+debug = []
+derive = []
+interface = ["korangar-interface", "rust-state"]
+packet-to-state-element = ["interface"]
+unicode = ["korangar-debug/unicode"]

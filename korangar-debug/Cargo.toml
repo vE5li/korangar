@@ -1,0 +1,12 @@
+[package]
+name = "korangar-debug"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+chrono = { workspace = true }
+debug-macros = { path = "macros" }
+
+[features]
+plain = []
+unicode = []

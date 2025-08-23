@@ -1,0 +1,20 @@
+[package]
+name = "korangar-networking"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+korangar-interface = { workspace = true, optional = true }
+ragnarok-bytes = { workspace = true }
+ragnarok-packets = { workspace = true }
+rust-state = { workspace = true, optional = true }
+tokio = { workspace = true, features = ["rt", "io-util", "net", "macros", "sync", "time"] }
+
+[dev-dependencies]
+korangar-debug = { workspace = true }
+reqwest = { workspace = true, features = ["json"] }
+serde = { workspace = true, features = ["derive"] }
+
+[features]
+debug = []
+interface = ["korangar-interface", "rust-state"]

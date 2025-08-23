@@ -26,14 +26,14 @@ jobs:
       - name: Build Korangar (debug)
         run: cargo build --features "debug"
 
-      - name: Generate ragnarok_packets.json (for bindgen)
-        run: cargo rustdoc -p ragnarok_packets -- -Z unstable-options --output-format json
+      - name: Generate ragnarok-packets.json (for bindgen)
+        run: cargo rustdoc -p ragnarok-packets -- -Z unstable-options --output-format json
 
-      - name: Save ragnarok_packets.json as artifact
+      - name: Save ragnarok-packets.json as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ragnarok_packets.json
-          path: target/doc/ragnarok_packets.json
+          name: ragnarok-packets.json
+          path: target/doc/ragnarok-packets.json
 
   build-nix-dev-shell:
     name: Build Nix devShell

@@ -33,7 +33,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ragnarok-packets.json
-          path: target/doc/ragnarok-packets.json
+          path: target/doc/ragnarok_packets.json
 
   build-nix-dev-shell:
     name: Build Nix devShell

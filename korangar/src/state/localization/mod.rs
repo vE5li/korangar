@@ -200,7 +200,15 @@ impl Localization {
         print_debug!("saving to file {}", file_name.magenta());
 
         let data = ron::ser::to_string_pretty(self, PrettyConfig::new()).unwrap();
-        std::fs::write(file_name, data).expect("unable to write file");
+
+        if let Err(_error) = std::fs::write(&file_name, data) {
+            #[cfg(feature = "debug")]
+            print_debug!(
+                "failed to save language to {}: {}",
+                file_name.magenta(),
+                _error.to_string().red()
+            );
+        }
 
         #[cfg(feature = "debug")]
         timer.stop();

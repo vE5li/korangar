@@ -38,8 +38,17 @@ impl AudioSettings {
     pub fn save(&self) {
         #[cfg(feature = "debug")]
         print_debug!("saving audio settings to {}", Self::FILE_NAME.magenta());
+
         let data = ron::ser::to_string_pretty(self, PrettyConfig::new()).unwrap();
-        std::fs::write(Self::FILE_NAME, data).expect("unable to write file");
+
+        if let Err(_error) = std::fs::write(Self::FILE_NAME, data) {
+            #[cfg(feature = "debug")]
+            print_debug!(
+                "failed to save audio settings to {}: {}",
+                Self::FILE_NAME.magenta(),
+                _error.to_string().red()
+            );
+        }
     }
 }
 

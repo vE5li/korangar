@@ -296,6 +296,25 @@ fn main() {
         init_tls_rand();
     });
 
+    // Check if korangar is in the correct working directory and if not, try to
+    // correct it.
+    // NOTE: This check might be temporary or feature gated in the future.
+    time_phase!("adjust working directory", {
+        if !std::fs::metadata("archive").is_ok_and(|metadata| metadata.is_dir()) {
+            #[cfg(feature = "debug")]
+            print_debug!(
+                "[{}] failed to find archive directory, attempting to change working directory {}",
+                "warning".yellow(),
+                "korangar".magenta()
+            );
+
+            if let Err(_error) = std::env::set_current_dir("korangar") {
+                #[cfg(feature = "debug")]
+                print_debug!("[{}] failed to change working directory: {:?}", "error".red(), _error);
+            }
+        }
+    });
+
     let args: Vec<String> = std::env::args().collect();
     let sync_cache = args.len() > 1 && &args[1] == "sync-cache";
 

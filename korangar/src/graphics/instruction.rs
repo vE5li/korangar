@@ -182,6 +182,9 @@ pub enum InterfaceRectangleInstruction {
         screen_clip: ScreenClip,
         color: Color,
         corner_diameter: CornerDiameter,
+        shadow_spread: f32,
+        shadow_offset: ScreenSize,
+        shadow_color: Color,
     },
     Sprite {
         screen_position: ScreenPosition,

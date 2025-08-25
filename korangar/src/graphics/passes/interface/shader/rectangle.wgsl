@@ -28,6 +28,9 @@ struct InstanceData {
     texture_size: vec2<f32>,
     rectangle_type: u32,
     texture_index: i32,
+    shadow_spread: f32,
+    shadow_offset: vec2<f32>,
+    shadow_color: vec4<f32>,
 }
 
 struct VertexOutput {

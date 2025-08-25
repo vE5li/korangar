@@ -36,7 +36,11 @@ struct InstanceData {
     texture_size: [f32; 2],
     rectangle_type: u32,
     texture_index: i32,
-    padding: [u32; 2],
+    shadow_offset: [f32; 2],
+    shadow_color: [f32; 4],
+    shadow_spread: f32,
+    // TODO: Maybe fix padding.
+    padding: [u32; 3],
 }
 
 pub(crate) struct InterfaceRectangleDrawer {
@@ -272,6 +276,9 @@ impl Prepare for InterfaceRectangleDrawer {
                         screen_clip,
                         color,
                         corner_diameter,
+                        shadow_spread,
+                        shadow_offset,
+                        shadow_color,
                     } => {
                         self.instance_data.push(InstanceData {
                             color: color.components_linear(),
@@ -283,6 +290,9 @@ impl Prepare for InterfaceRectangleDrawer {
                             texture_size: [1.0, 1.0],
                             rectangle_type: 0,
                             texture_index: 0,
+                            shadow_spread: *shadow_spread,
+                            shadow_offset: (*shadow_offset).into(),
+                            shadow_color: shadow_color.components_linear(),
                             padding: Default::default(),
                         });
                     }
@@ -318,6 +328,9 @@ impl Prepare for InterfaceRectangleDrawer {
                             texture_size: [1.0, 1.0],
                             rectangle_type,
                             texture_index,
+                            shadow_spread: 0.0,
+                            shadow_offset: [0.0; 2],
+                            shadow_color: [0.0; 4],
                             padding: Default::default(),
                         });
                     }
@@ -350,6 +363,9 @@ impl Prepare for InterfaceRectangleDrawer {
                             texture_size: [1.0, 1.0],
                             rectangle_type: 3,
                             texture_index,
+                            shadow_spread: 0.0,
+                            shadow_offset: [0.0; 2],
+                            shadow_color: [0.0; 4],
                             padding: Default::default(),
                         });
                     }
@@ -371,6 +387,9 @@ impl Prepare for InterfaceRectangleDrawer {
                             texture_size: (*texture_size).into(),
                             rectangle_type: 4,
                             texture_index: 0,
+                            shadow_spread: 0.0,
+                            shadow_offset: [0.0; 2],
+                            shadow_color: [0.0; 4],
                             padding: Default::default(),
                         });
                     }
@@ -398,6 +417,9 @@ impl Prepare for InterfaceRectangleDrawer {
                         screen_clip,
                         color,
                         corner_diameter,
+                        shadow_spread,
+                        shadow_offset,
+                        shadow_color,
                     } => {
                         self.instance_data.push(InstanceData {
                             color: color.components_linear(),
@@ -409,6 +431,9 @@ impl Prepare for InterfaceRectangleDrawer {
                             texture_size: [1.0, 1.0],
                             rectangle_type: 0,
                             texture_index: 0,
+                            shadow_spread: *shadow_spread,
+                            shadow_offset: (*shadow_offset).into(),
+                            shadow_color: shadow_color.components_linear(),
                             padding: Default::default(),
                         });
                     }
@@ -434,6 +459,9 @@ impl Prepare for InterfaceRectangleDrawer {
                             texture_size: [1.0, 1.0],
                             rectangle_type,
                             texture_index: 0,
+                            shadow_spread: 0.0,
+                            shadow_offset: [0.0; 2],
+                            shadow_color: [0.0; 4],
                             padding: Default::default(),
                         });
                     }
@@ -455,6 +483,9 @@ impl Prepare for InterfaceRectangleDrawer {
                             texture_size: [1.0, 1.0],
                             rectangle_type: 3,
                             texture_index: 0,
+                            shadow_spread: 0.0,
+                            shadow_offset: [0.0; 2],
+                            shadow_color: [0.0; 4],
                             padding: Default::default(),
                         });
                     }
@@ -476,6 +507,9 @@ impl Prepare for InterfaceRectangleDrawer {
                             texture_size: (*texture_size).into(),
                             rectangle_type: 4,
                             texture_index: 0,
+                            shadow_spread: 0.0,
+                            shadow_offset: [0.0; 2],
+                            shadow_color: [0.0; 4],
                             padding: Default::default(),
                         });
                     }

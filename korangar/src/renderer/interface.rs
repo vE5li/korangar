@@ -205,6 +205,9 @@ impl InterfaceRenderer {
                     screen_clip: ScreenClip::unbound(),
                     color: Color::rgba_u8(255, 0, 0, 90),
                     corner_diameter: CornerDiameter::default(),
+                    shadow_spread: 0.0,
+                    shadow_offset: ScreenSize::default(),
+                    shadow_color: Color::TRANSPARENT,
                 });
             }
 
@@ -231,6 +234,9 @@ impl InterfaceRenderer {
                 screen_clip,
                 color: Color::rgba(1.0 - brightness, 1.0 - brightness, 1.0 - brightness, 0.6),
                 corner_diameter: CornerDiameter::default(),
+                shadow_spread: 0.0,
+                shadow_offset: ScreenSize::default(),
+                shadow_color: Color::TRANSPARENT,
             });
 
             return;
@@ -244,6 +250,9 @@ impl InterfaceRenderer {
             screen_clip,
             color,
             corner_diameter,
+            shadow_spread: 0.0,
+            shadow_offset: ScreenSize::default(),
+            shadow_color: Color::TRANSPARENT,
         });
     }
 
@@ -315,6 +324,9 @@ impl InterfaceRenderer {
                             screen_clip: ScreenClip::unbound(),
                             color: Color::rgba_u8(255, 0, 0, 150),
                             corner_diameter: CornerDiameter::default(),
+                            shadow_spread: 0.0,
+                            shadow_offset: ScreenSize::default(),
+                            shadow_color: Color::TRANSPARENT,
                         });
                     }
 
@@ -339,6 +351,9 @@ impl InterfaceRenderer {
                         screen_clip: ScreenClip::unbound(),
                         color: Color::rgba_u8(0, 255, 255, 150),
                         corner_diameter: CornerDiameter::default(),
+                        shadow_spread: 0.0,
+                        shadow_offset: ScreenSize::default(),
+                        shadow_color: Color::TRANSPARENT,
                     });
 
                     return;
@@ -429,6 +444,9 @@ impl SpriteRenderer for InterfaceRenderer {
                     screen_clip: ScreenClip::unbound(),
                     color: Color::rgba_u8(255, 0, 0, 150),
                     corner_diameter: CornerDiameter::default(),
+                    shadow_spread: 0.0,
+                    shadow_offset: ScreenSize::default(),
+                    shadow_color: Color::TRANSPARENT,
                 });
             }
 
@@ -451,6 +469,9 @@ impl SpriteRenderer for InterfaceRenderer {
                 screen_clip: ScreenClip::unbound(),
                 color: Color::rgba_u8(255, 0, 255, 100),
                 corner_diameter: CornerDiameter::default(),
+                shadow_spread: 0.0,
+                shadow_offset: ScreenSize::default(),
+                shadow_color: Color::TRANSPARENT,
             });
 
             return;
@@ -488,6 +509,9 @@ impl SpriteRenderer for InterfaceRenderer {
                     screen_clip: ScreenClip::unbound(),
                     color: Color::rgba_u8(255, 0, 0, 100),
                     corner_diameter: CornerDiameter::default(),
+                    shadow_spread: 0.0,
+                    shadow_offset: ScreenSize::default(),
+                    shadow_color: Color::TRANSPARENT,
                 });
             }
 
@@ -510,6 +534,9 @@ impl SpriteRenderer for InterfaceRenderer {
                 screen_clip: ScreenClip::unbound(),
                 color: Color::rgba_u8(255, 255, 0, 150),
                 corner_diameter: CornerDiameter::default(),
+                shadow_spread: 0.0,
+                shadow_offset: ScreenSize::default(),
+                shadow_color: Color::TRANSPARENT,
             });
 
             return;

@@ -945,6 +945,18 @@ impl Client {
                         let login_data = self.saved_login_data.as_ref().unwrap();
                         let server = self.saved_character_server.clone().unwrap();
                         self.networking_system.connect_to_character_server(login_data, server);
+                    } else if !self.networking_system.is_map_server_connected() {
+                        #[cfg(not(feature = "debug"))]
+                        self.interface.close_all_windows();
+
+                        #[cfg(feature = "debug")]
+                        self.interface.close_all_windows_except(DEBUG_WINDOWS);
+
+                        self.interface.open_window(LoginWindow::new(
+                            client_state().login_window(),
+                            client_state().login_settings(),
+                            client_state().client_info(),
+                        ));
                     }
                 }
                 NetworkEvent::MapServerDisconnected { reason } => {
@@ -1648,6 +1660,9 @@ impl Client {
                 }
                 InputEvent::LogOut => {
                     let _ = self.networking_system.log_out();
+                }
+                InputEvent::LogOutCharacter => {
+                    self.networking_system.disconnect_from_character_server();
                 }
                 InputEvent::Exit => event_loop.exit(),
                 InputEvent::ZoomCamera { zoom_factor } => self.player_camera.soft_zoom(zoom_factor),

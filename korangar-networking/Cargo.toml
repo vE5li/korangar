@@ -12,9 +12,13 @@ tokio = { workspace = true, features = ["rt", "io-util", "net", "macros", "sync"
 
 [dev-dependencies]
 korangar-debug = { workspace = true }
+ragnarok-packets = { workspace = true, features = ["derive"]}
 reqwest = { workspace = true, features = ["json"] }
 serde = { workspace = true, features = ["derive"] }
 
 [features]
 debug = []
-interface = ["korangar-interface", "rust-state"]
+interface = ["korangar-interface", "rust-state", "ragnarok-packets/packet-to-state-element"]
+# This feature is required for specific-packet-version example, without it when running `cargo test` or `cargo test --all-features` on workspace
+# compiler will complain "missing `to_element` in implementation".
+packet-to-state-element = []

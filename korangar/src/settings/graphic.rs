@@ -49,7 +49,7 @@ impl GraphicsSettings {
     pub fn new() -> Self {
         Self::load().unwrap_or_else(|| {
             #[cfg(feature = "debug")]
-            print_debug!("failed to load graphics configuration from {}", Self::FILE_NAME.magenta());
+            print_debug!("failed to load graphics settings from {}", Self::FILE_NAME.magenta());
 
             Default::default()
         })
@@ -57,7 +57,7 @@ impl GraphicsSettings {
 
     pub fn load() -> Option<Self> {
         #[cfg(feature = "debug")]
-        print_debug!("loading graphics configuration from {}", Self::FILE_NAME.magenta());
+        print_debug!("loading graphics settings from {}", Self::FILE_NAME.magenta());
 
         std::fs::read_to_string(Self::FILE_NAME)
             .ok()
@@ -66,10 +66,18 @@ impl GraphicsSettings {
 
     pub fn save(&self) {
         #[cfg(feature = "debug")]
-        print_debug!("saving graphics configuration to {}", Self::FILE_NAME.magenta());
+        print_debug!("saving graphics settings to {}", Self::FILE_NAME.magenta());
 
         let data = ron::ser::to_string_pretty(self, PrettyConfig::new()).unwrap();
-        std::fs::write(Self::FILE_NAME, data).expect("unable to write file");
+
+        if let Err(_error) = std::fs::write(Self::FILE_NAME, data) {
+            #[cfg(feature = "debug")]
+            print_debug!(
+                "failed to save graphics settings to {}: {}",
+                Self::FILE_NAME.magenta(),
+                _error.to_string().red()
+            );
+        }
     }
 }
 

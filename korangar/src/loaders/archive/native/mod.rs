@@ -34,7 +34,13 @@ impl Archive for NativeArchive {
     fn from_path(path: &Path) -> Self {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load game data from {}", path.display().magenta()));
-        let mut file = File::open(path).unwrap();
+
+        let mut file = match File::open(path) {
+            Ok(file) => file,
+            Err(error) => {
+                panic!("Unable to find archive {path:?}, does the file exist in the `archive` directory?\nError: {error:?}");
+            }
+        };
 
         let mut file_header_buffer = vec![0u8; Header::size_in_bytes()];
         file.read_exact(&mut file_header_buffer).unwrap();

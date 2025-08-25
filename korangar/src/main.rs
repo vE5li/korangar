@@ -416,7 +416,7 @@ struct Client {
 
 impl Client {
     fn init(sync_cache: bool) -> Option<Self> {
-        time_phase!("load settings", {
+        time_phase!("load graphics settings", {
             let picker_value = Arc::new(AtomicU64::new(0));
             let input_system = InputSystem::new(picker_value.clone());
             let graphics_settings = GraphicsSettings::new();
@@ -2057,7 +2057,7 @@ impl Client {
                 InputEvent::SetTime { day_seconds } => self.game_timer.set_day_timer(day_seconds),
                 #[cfg(feature = "debug")]
                 InputEvent::OpenThemeInspectorWindow => {
-                    // TODO: Themporary value
+                    // TODO: Temporary value
                     self.interface.open_state_window(client_state().menu_theme())
                 }
                 #[cfg(feature = "debug")]

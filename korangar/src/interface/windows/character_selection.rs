@@ -6,9 +6,11 @@ use korangar_interface::window::{CustomWindow, Window};
 use rust_state::{Context, Path};
 
 use crate::character_slots::{CharacterSlots, CharacterSlotsExt};
+use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
-use crate::state::ClientState;
+use crate::state::localization::LocalizationPathExt;
 use crate::state::theme::InterfaceThemeType;
+use crate::state::{ClientState, ClientStatePathExt, client_state};
 
 mod character_slot_preview {
     use std::cell::UnsafeCell;
@@ -612,7 +614,16 @@ where
             minimum_width: 900.0,
             maximum_width: 900.0,
             elements: (
-                CharacterWrapper::new(self.character_slots, self.switch_request),
+                fragment! {
+                    gaps: 8.0,
+                    children: (
+                        CharacterWrapper::new(self.character_slots, self.switch_request),
+                        button! {
+                            text: client_state().localization().log_out_button_text(),
+                            event: InputEvent::LogOutCharacter,
+                        },
+                    ),
+                },
             ),
         }
     }

@@ -39,6 +39,8 @@ pub enum InputEvent {
     Respawn,
     /// Log out of the map server.
     LogOut,
+    /// Log out of the character server.
+    LogOutCharacter,
     /// Exit Korangar.
     Exit,
     /// Zoom the player camera.

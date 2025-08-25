@@ -510,6 +510,18 @@ where
         self.map_server_connection = ServerConnection::ClosingManually;
     }
 
+    pub fn is_login_server_connected(&self) -> bool {
+        matches!(self.login_server_connection, ServerConnection::Connected { .. })
+    }
+
+    pub fn is_character_server_connected(&self) -> bool {
+        matches!(self.character_server_connection, ServerConnection::Connected { .. })
+    }
+
+    pub fn is_map_server_connected(&self) -> bool {
+        matches!(self.map_server_connection, ServerConnection::Connected { .. })
+    }
+
     pub fn send_login_server_packet(&mut self, packet: &impl LoginServerPacket) -> Result<(), NotConnectedError> {
         match &mut self.login_server_connection {
             ServerConnection::Connected { action_sender, .. } => {

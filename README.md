@@ -16,15 +16,27 @@ Korangar is a next-gen Ragnarok Online client written in Rust. It features real-
 ![geffen 2](.github/geffen_2.png)
 *Geffen at night*
 
-### Running
-If you want to try it out for yourself, check out the [Installation page](https://github.com/vE5li/korangar/wiki/Installation) inside the wiki.
+## 🚀 Running
 
-### Updates
-I created a [Discord server](https://discord.gg/2CqRZsvKja) where I regularly post updates about the progress of development and answer any questions you might have.
+> [!IMPORTANT]
+> Korangar is still very early in development and is anything but feature-complete.
 
-### Contributing
-If you want to contribute to this project, please read [this page](https://github.com/vE5li/korangar/wiki/Contributing).
+If you want to try it out for yourself, check out the [Installation page](wiki/Installation.md).
 
-### Project structure
+## 🔧 Troubleshooting
 
-#### Note: All the `ragnarok-*` crates are meant to be independent from Korangar and have no dependencies to it, meaning they can be used for other Ragnarok Online related projects.
+If you're running into issues while setting up or running Korangar please check the [Troubleshooting page](wiki/Troubleshooting.md). In case your issue is not listed feel free to [create an issue](https://github.com/vE5li/korangar/issues/new) or use the dedicated `support` channel on our [Discord server](https://discord.gg/2CqRZsvKja).
+
+## 🤝 Contributing
+
+This is a very ambitious project and we are always looking for contributors. If you are interested, please read [this page](wiki/Contributing.md).
+
+## 🔥 Updates
+
+There is a dedicated channel for `updates` on our [Discord server](https://discord.gg/2CqRZsvKja). If you want to stay up to date with development or see recent changes, go check it out!
+
+## 📦 Packages
+
+We try to keep the project as modular as possible by splitting the codebase into individual crates. All the crates prefixed with `ragnarok-` are **independent of Korangar and have no dependencies on it**.
+
+We encourage everyone to use these crates for their own Ragnarok Online related projects and contribute back if they want to.

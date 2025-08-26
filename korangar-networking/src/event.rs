@@ -135,10 +135,15 @@ pub enum NetworkEvent {
         text: String,
         npc_id: EntityId,
     },
-    AddNextButton,
-    AddCloseButton,
+    AddNextButton {
+        npc_id: EntityId,
+    },
+    AddCloseButton {
+        npc_id: EntityId,
+    },
     AddChoiceButtons {
         choices: Vec<String>,
+        npc_id: EntityId,
     },
     AddQuestEffect {
         quest_effect: QuestEffectPacket,

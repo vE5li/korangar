@@ -53,10 +53,15 @@ pub struct DialogWindowState {
 }
 
 impl DialogWindowState {
-    /// Start a new dialog or append text to the current dialog. The original
-    /// client uses the same packet for both cases and there is no way to
-    /// tell them apart, so we mirror that behavior.
-    pub fn start(&mut self, text: String, npc_id: EntityId) {
+    /// Initialize the dialog. This is important so we have the correct entity
+    /// id when sending packets to the server.
+    pub fn initialize(&mut self, npc_id: EntityId) -> &mut Self {
+        self.npc_id = npc_id;
+        self
+    }
+
+    /// Add text to the dialog.
+    pub fn add_text(&mut self, text: String) {
         use korangar_interface::prelude::*;
 
         if self.clear_next {
@@ -70,8 +75,6 @@ impl DialogWindowState {
             },
             false,
         ));
-
-        self.npc_id = npc_id;
     }
 
     /// Add add next button to the dialog.
@@ -92,6 +95,7 @@ impl DialogWindowState {
             },
             true,
         ));
+
         self.clear_next = true;
     }
 
@@ -147,10 +151,8 @@ impl DialogWindowState {
     ///
     /// This has no side effects.
     pub fn end(&mut self) {
-        // Micro optimization: instead of clearing directly, we mark the state to be
-        // cleared the next time `start` is called. This avoids clearing, and
-        // therefore dropping, the elements unless its necessary.
-        self.clear_next = true;
+        self.elements.clear();
+        self.clear_next = false;
     }
 }
 

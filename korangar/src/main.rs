@@ -1315,15 +1315,44 @@ impl Client {
                     }
                 }
                 NetworkEvent::OpenDialog { text, npc_id } => {
-                    self.client_state.follow_mut(client_state().dialog_window()).start(text, npc_id);
+                    self.client_state
+                        .follow_mut(client_state().dialog_window())
+                        .initialize(npc_id)
+                        .add_text(text);
+
                     self.interface.open_window(DialogWindow::new(client_state().dialog_window()));
                 }
-                NetworkEvent::AddNextButton => self.client_state.follow_mut(client_state().dialog_window()).add_next_button(),
-                NetworkEvent::AddCloseButton => self.client_state.follow_mut(client_state().dialog_window()).add_close_button(),
-                NetworkEvent::AddChoiceButtons { choices } => self
-                    .client_state
-                    .follow_mut(client_state().dialog_window())
-                    .add_choice_buttons(choices),
+                NetworkEvent::AddNextButton { npc_id } => {
+                    self.client_state
+                        .follow_mut(client_state().dialog_window())
+                        // An NPCs could start the dialog with this packet so we want to make sure it's initialized.
+                        .initialize(npc_id)
+                        .add_next_button();
+
+                    self.interface.open_window(DialogWindow::new(client_state().dialog_window()));
+                }
+                NetworkEvent::AddCloseButton { npc_id } => {
+                    // Some NPCs send the `CloseButtonPacket` after the dialog
+                    // has been closed. We want to filter these out because otherwise we get a
+                    // close button at the start of the next dialog.
+                    if self.interface.is_window_with_class_open(WindowClass::Dialog) {
+                        self.client_state
+                            .follow_mut(client_state().dialog_window())
+                            // Technically this call is redundant since the window is already open
+                            // but we keep it for consistency.
+                            .initialize(npc_id)
+                            .add_close_button();
+                    }
+                }
+                NetworkEvent::AddChoiceButtons { choices, npc_id } => {
+                    self.client_state
+                        .follow_mut(client_state().dialog_window())
+                        // Some NPCs start the dialog with this packet so we need to make sure it's initialized.
+                        .initialize(npc_id)
+                        .add_choice_buttons(choices);
+
+                    self.interface.open_window(DialogWindow::new(client_state().dialog_window()));
+                }
                 NetworkEvent::AddQuestEffect { quest_effect } => {
                     if let Some(map) = &self.map {
                         self.particle_holder.add_quest_icon(&self.texture_loader, map, quest_effect)
@@ -1531,6 +1560,12 @@ impl Client {
                     }
                 }
                 NetworkEvent::OpenShop { items } => {
+                    // Close the dialog. Some NPCs don't use the `BuyOrSellPacket` and instead use
+                    // the regular `DialogMenuPacket`. When opening the shop that dialog should be
+                    // closed.
+                    self.client_state.follow_mut(client_state().dialog_window()).end();
+                    self.interface.close_window_with_class(WindowClass::Dialog);
+
                     *self.client_state.follow_mut(client_state().shop_items()) = items
                         .into_iter()
                         .map(|item| self.library.load_shop_item_metadata(&self.async_loader, item))
@@ -1560,6 +1595,12 @@ impl Client {
                     }
                 },
                 NetworkEvent::SellItemList { items } => {
+                    // Close the dialog. Some NPCs don't use the `BuyOrSellPacket` and instead use
+                    // the regular `DialogMenuPacket`. When opening the shop that dialog should be
+                    // closed.
+                    self.client_state.follow_mut(client_state().dialog_window()).end();
+                    self.interface.close_window_with_class(WindowClass::Dialog);
+
                     let inventory_items = self.client_state.follow(client_state().inventory().items());
                     let sell_items = items
                         .into_iter()

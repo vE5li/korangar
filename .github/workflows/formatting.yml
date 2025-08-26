@@ -17,6 +17,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Add cargo problem matchers
+        run: echo "::add-matcher::$GITHUB_ACTION_PATH/matchers.json"
+
       - name: Add Rustfmt
         run: rustup component add rustfmt
 

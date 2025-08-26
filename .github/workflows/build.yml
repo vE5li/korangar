@@ -20,6 +20,9 @@ jobs:
       - name: Install build dependencies
         run: sudo apt install libasound2-dev nasm
 
+      - name: Add cargo problem matchers
+        run: echo "::add-matcher::.github/workflows/matchers.json"
+
       - name: Build Korangar (release)
         run: cargo build
 

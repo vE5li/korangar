@@ -1,8 +1,14 @@
 on:
   push:
+    branches: [ main ]
   pull_request:
     branches:
       - main
+
+# Cancel previous jobs
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 name: Formatting
 
@@ -19,6 +25,9 @@ jobs:
 
       - name: Add Rustfmt
         run: rustup component add rustfmt
+
+      - name: Add problem matchers
+        run: echo "::add-matcher::.github/workflows/formatting-matchers.json"
 
       - name: Check formatting
         run: cargo fmt --all --check

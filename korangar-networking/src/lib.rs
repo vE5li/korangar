@@ -959,17 +959,22 @@ where
         packet_handler.register_noop::<UpdateConfigurationPacket>()?;
         packet_handler.register_noop::<NavigateToMonsterPacket>()?;
         packet_handler.register_noop::<MarkMinimapPositionPacket>()?;
-        packet_handler.register(|_: NextButtonPacket| NetworkEvent::AddNextButton)?;
-        packet_handler.register(|_: CloseButtonPacket| NetworkEvent::AddCloseButton)?;
-        packet_handler.register(|packet: DialogMenuPacket| {
-            let choices = packet
-                .message
-                .split(':')
-                .map(String::from)
-                .filter(|text| !text.is_empty())
-                .collect();
+        packet_handler.register(|packet: NextButtonPacket| {
+            let NextButtonPacket { npc_id } = packet;
 
-            NetworkEvent::AddChoiceButtons { choices }
+            NetworkEvent::AddNextButton { npc_id }
+        })?;
+        packet_handler.register(|packet: CloseButtonPacket| {
+            let CloseButtonPacket { npc_id } = packet;
+
+            NetworkEvent::AddCloseButton { npc_id }
+        })?;
+        packet_handler.register(|packet: DialogMenuPacket| {
+            let DialogMenuPacket { npc_id, message } = packet;
+
+            let choices = message.split(':').map(String::from).filter(|text| !text.is_empty()).collect();
+
+            NetworkEvent::AddChoiceButtons { choices, npc_id }
         })?;
         packet_handler.register_noop::<DisplaySpecialEffectPacket>()?;
         packet_handler.register_noop::<DisplaySkillCooldownPacket>()?;

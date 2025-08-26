@@ -1860,14 +1860,14 @@ pub struct MarkMinimapPositionPacket {
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x00B5)]
 pub struct NextButtonPacket {
-    pub entity_id: EntityId,
+    pub npc_id: EntityId,
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x00B6)]
 pub struct CloseButtonPacket {
-    pub entity_id: EntityId,
+    pub npc_id: EntityId,
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
@@ -1875,7 +1875,7 @@ pub struct CloseButtonPacket {
 #[header(0x00B7)]
 #[variable_length]
 pub struct DialogMenuPacket {
-    pub entity_id: EntityId,
+    pub npc_id: EntityId,
     #[length_remaining]
     pub message: String,
 }

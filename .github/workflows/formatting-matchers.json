@@ -1,0 +1,15 @@
+{
+    "problemMatcher": [
+        {
+            "owner": "rust-formatter",
+            "pattern": [
+                {
+                    "regexp": "^(Diff in (\\S+)):(\\d+):",
+                    "message": 1,
+                    "file": 2,
+                    "line": 3
+                }
+            ]
+        }
+    ]
+}

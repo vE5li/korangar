@@ -1,0 +1,15 @@
+{
+    "problemMatcher": [
+        {
+            "owner": "rust-compiler",
+            "pattern": [
+                {
+                    "regexp": "^(?:\\x1B\\[[0-9;]*[a-zA-Z])*(warning|warn|error)(\\[(\\S*)\\])?(?:\\x1B\\[[0-9;]*[a-zA-Z])*: (.*?)(?:\\x1B\\[[0-9;]*[a-zA-Z])*$",
+                    "severity": 1,
+                    "message": 4,
+                    "code": 3
+                },
+            ]
+        }
+    ]
+}

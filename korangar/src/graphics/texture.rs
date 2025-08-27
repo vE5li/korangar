@@ -3,7 +3,6 @@ use std::num::NonZeroU32;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
-use derive_new::new;
 use hashbrown::HashMap;
 use korangar_util::container::Cacheable;
 use wgpu::{
@@ -533,12 +532,22 @@ impl AttachmentTexture {
     }
 }
 
-#[derive(new)]
 pub(crate) struct AttachmentTextureFactory<'a> {
     device: &'a Device,
     dimensions: ScreenSize,
     sample_count: u32,
     padded_width: Option<u32>,
+}
+
+impl<'a> AttachmentTextureFactory<'a> {
+    pub(crate) fn new(device: &'a Device, dimensions: ScreenSize, sample_count: u32, padded_width: Option<u32>) -> Self {
+        Self {
+            device,
+            dimensions,
+            sample_count,
+            padded_width,
+        }
+    }
 }
 
 impl AttachmentTextureFactory<'_> {

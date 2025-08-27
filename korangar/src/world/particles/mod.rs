@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use cgmath::{Point3, Vector2, Vector3};
-use derive_new::new;
 use korangar_interface::application::Clip;
 use ragnarok_packets::{EntityId, QuestColor, QuestEffectPacket};
 use rand_aes::tls::rand_f32;
@@ -23,18 +22,26 @@ fn random_velocity() -> f32 {
     rand_f32() * 40.0 - 20.0
 }
 
-#[derive(new)]
 pub struct DamageNumber {
     position: Point3<f32>,
     damage_amount: String,
-    #[new(value = "50.0")]
     velocity_y: f32,
-    #[new(value = "random_velocity()")]
     velocity_x: f32,
-    #[new(value = "random_velocity()")]
     velocity_z: f32,
-    #[new(value = "0.6")]
     timer: f32,
+}
+
+impl DamageNumber {
+    pub fn new(position: Point3<f32>, damage_amount: String) -> Self {
+        Self {
+            position,
+            damage_amount,
+            velocity_y: 50.0,
+            velocity_x: random_velocity(),
+            velocity_z: random_velocity(),
+            timer: 0.6,
+        }
+    }
 }
 
 impl Particle for DamageNumber {
@@ -61,14 +68,22 @@ impl Particle for DamageNumber {
     }
 }
 
-#[derive(new)]
 pub struct HealNumber {
     position: Point3<f32>,
     heal_amount: String,
-    #[new(value = "50.0")]
     velocity_y: f32,
-    #[new(value = "1.0")]
     timer: f32,
+}
+
+impl HealNumber {
+    pub fn new(position: Point3<f32>, heal_amount: String) -> Self {
+        Self {
+            position,
+            heal_amount,
+            velocity_y: 50.0,
+            timer: 1.0,
+        }
+    }
 }
 
 impl Particle for HealNumber {

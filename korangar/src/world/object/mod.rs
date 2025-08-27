@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use derive_new::new;
 use korangar_interface::element::StateElement;
 use korangar_interface::window::StateWindow;
 use korangar_util::collision::AABB;
@@ -19,12 +18,23 @@ use crate::graphics::ModelInstruction;
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
 
-#[derive(Clone, RustState, StateElement, StateWindow, new)]
+#[derive(Clone, RustState, StateElement, StateWindow)]
 pub struct Object {
     pub name: Option<String>,
     pub model_name: String,
     pub model: Arc<Model>,
     pub transform: Transform,
+}
+
+impl Object {
+    pub fn new(name: Option<String>, model_name: String, model: Arc<Model>, transform: Transform) -> Self {
+        Self {
+            name,
+            model_name,
+            model,
+            transform,
+        }
+    }
 }
 
 impl Object {

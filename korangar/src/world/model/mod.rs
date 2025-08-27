@@ -3,7 +3,6 @@ mod node;
 use std::ops::Mul;
 
 use cgmath::{EuclideanSpace, Matrix4, SquareMatrix, Vector3, Vector4, Zero};
-use derive_new::new;
 use korangar_interface::element::StateElement;
 use korangar_util::collision::AABB;
 #[cfg(feature = "debug")]
@@ -20,7 +19,7 @@ use crate::graphics::DebugAabbInstruction;
 use crate::graphics::ModelInstruction;
 use crate::world::Camera;
 
-#[derive(RustState, StateElement, new)]
+#[derive(RustState, StateElement)]
 pub struct Model {
     pub version: InternalVersion,
     pub root_nodes: Vec<Node>,
@@ -28,6 +27,25 @@ pub struct Model {
     pub is_static: bool,
     #[cfg(feature = "debug")]
     pub model_data: ModelData,
+}
+
+impl Model {
+    pub fn new(
+        version: InternalVersion,
+        root_nodes: Vec<Node>,
+        bounding_box: AABB,
+        is_static: bool,
+        #[cfg(feature = "debug")] model_data: ModelData,
+    ) -> Self {
+        Self {
+            version,
+            root_nodes,
+            bounding_box,
+            is_static,
+            #[cfg(feature = "debug")]
+            model_data,
+        }
+    }
 }
 
 impl Model {

@@ -5,7 +5,6 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
 use cgmath::{Deg, Matrix4, Point3, SquareMatrix, Vector2, Vector3};
-use derive_new::new;
 use korangar_audio::AudioEngine;
 use korangar_util::collision::{AABB, Frustum, KDTree, Sphere};
 use korangar_util::container::{SimpleKey, SimpleSlab};
@@ -58,7 +57,6 @@ impl MarkerIdentifier {
     pub const SIZE: f32 = 1.5;
 }
 
-#[derive(new)]
 pub struct WaterPlane {
     water_opacity: f32,
     wave_height: f32,
@@ -71,7 +69,33 @@ pub struct WaterPlane {
     index_buffer: Arc<Buffer<u32>>,
 }
 
-#[derive(RustState, new)]
+impl WaterPlane {
+    pub fn new(
+        water_opacity: f32,
+        wave_height: f32,
+        wave_speed: Deg<f32>,
+        wave_pitch: Deg<f32>,
+        texture_cycling_interval: u32,
+        texture_repeat: f32,
+        water_textures: Vec<Arc<Texture>>,
+        vertex_buffer: Arc<Buffer<WaterVertex>>,
+        index_buffer: Arc<Buffer<u32>>,
+    ) -> Self {
+        Self {
+            water_opacity,
+            wave_height,
+            wave_speed,
+            wave_pitch,
+            texture_cycling_interval,
+            texture_repeat,
+            water_textures,
+            vertex_buffer,
+            index_buffer,
+        }
+    }
+}
+
+#[derive(RustState)]
 pub struct Map {
     width: usize,
     height: usize,
@@ -101,6 +125,104 @@ pub struct Map {
     videos: Mutex<Vec<Video>>,
     #[cfg(feature = "debug")]
     map_data: MapData,
+}
+
+impl Map {
+    #[cfg(not(feature = "debug"))]
+    pub fn new(
+        width: usize,
+        height: usize,
+        lighting: Lighting,
+        water_plane: Option<WaterPlane>,
+        tiles: Vec<Tile>,
+        sub_meshes: Vec<SubMesh>,
+        vertex_buffer: Arc<Buffer<ModelVertex>>,
+        index_buffer: Arc<Buffer<u32>>,
+        texture_set: Arc<TextureSet>,
+        objects: SimpleSlab<ObjectKey, Object>,
+        light_sources: SimpleSlab<LightSourceKey, LightSource>,
+        sound_sources: Vec<SoundSource>,
+        tile_picker_vertex_buffer: Buffer<TileVertex>,
+        tile_picker_index_buffer: Buffer<u32>,
+        object_kdtree: KDTree<ObjectKey, AABB>,
+        light_source_kdtree: KDTree<LightSourceKey, Sphere>,
+        background_music_track_name: Option<String>,
+        videos: Mutex<Vec<Video>>,
+    ) -> Self {
+        Self {
+            width,
+            height,
+            lighting,
+            water_plane,
+            tiles,
+            sub_meshes,
+            vertex_buffer,
+            index_buffer,
+            texture_set,
+            objects,
+            light_sources,
+            sound_sources,
+            tile_picker_vertex_buffer,
+            tile_picker_index_buffer,
+            object_kdtree,
+            light_source_kdtree,
+            background_music_track_name,
+            videos,
+        }
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn new(
+        width: usize,
+        height: usize,
+        lighting: Lighting,
+        water_plane: Option<WaterPlane>,
+        tiles: Vec<Tile>,
+        sub_meshes: Vec<SubMesh>,
+        vertex_buffer: Arc<Buffer<ModelVertex>>,
+        index_buffer: Arc<Buffer<u32>>,
+        texture_set: Arc<TextureSet>,
+        objects: SimpleSlab<ObjectKey, Object>,
+        light_sources: SimpleSlab<LightSourceKey, LightSource>,
+        sound_sources: Vec<SoundSource>,
+        effect_sources: Vec<EffectSource>,
+        tile_picker_vertex_buffer: Buffer<TileVertex>,
+        tile_picker_index_buffer: Buffer<u32>,
+        tile_vertex_buffer: Arc<Buffer<ModelVertex>>,
+        tile_index_buffer: Arc<Buffer<u32>>,
+        tile_submeshes: Vec<SubMesh>,
+        object_kdtree: KDTree<ObjectKey, AABB>,
+        light_source_kdtree: KDTree<LightSourceKey, Sphere>,
+        background_music_track_name: Option<String>,
+        videos: Mutex<Vec<Video>>,
+        map_data: MapData,
+    ) -> Self {
+        Self {
+            width,
+            height,
+            lighting,
+            water_plane,
+            tiles,
+            sub_meshes,
+            vertex_buffer,
+            index_buffer,
+            texture_set,
+            objects,
+            light_sources,
+            sound_sources,
+            effect_sources,
+            tile_picker_vertex_buffer,
+            tile_picker_index_buffer,
+            tile_vertex_buffer,
+            tile_index_buffer,
+            tile_submeshes,
+            object_kdtree,
+            light_source_kdtree,
+            background_music_track_name,
+            videos,
+            map_data,
+        }
+    }
 }
 
 impl Map {

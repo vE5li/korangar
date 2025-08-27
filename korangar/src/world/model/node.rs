@@ -1,5 +1,4 @@
 use cgmath::{Matrix, Matrix4, Point3, SquareMatrix, Transform as PointTransform, Vector4, VectorSpace};
-use derive_new::new;
 use korangar_interface::element::StateElement;
 use ragnarok_formats::model::{RotationKeyframeData, ScaleKeyframeData, TranslationKeyframeData};
 use ragnarok_formats::version::InternalVersion;
@@ -8,7 +7,7 @@ use rust_state::RustState;
 use crate::graphics::ModelInstruction;
 use crate::world::Camera;
 
-#[derive(RustState, StateElement, new)]
+#[derive(RustState, StateElement)]
 pub struct Node {
     pub version: InternalVersion,
     #[hidden_element]
@@ -29,6 +28,38 @@ pub struct Node {
     pub scale_keyframes: Vec<ScaleKeyframeData>,
     pub translation_keyframes: Vec<TranslationKeyframeData>,
     pub rotation_keyframes: Vec<RotationKeyframeData>,
+}
+
+impl Node {
+    pub fn new(
+        version: InternalVersion,
+        transform_matrix: Matrix4<f32>,
+        rotation_matrix: Matrix4<f32>,
+        parent_rotation_matrix: Matrix4<f32>,
+        position: Vector4<f32>,
+        centroid: Point3<f32>,
+        sub_meshes: Vec<SubMesh>,
+        child_nodes: Vec<Node>,
+        animation_length: u32,
+        scale_keyframes: Vec<ScaleKeyframeData>,
+        translation_keyframes: Vec<TranslationKeyframeData>,
+        rotation_keyframes: Vec<RotationKeyframeData>,
+    ) -> Self {
+        Self {
+            version,
+            transform_matrix,
+            rotation_matrix,
+            parent_rotation_matrix,
+            position,
+            centroid,
+            sub_meshes,
+            child_nodes,
+            animation_length,
+            scale_keyframes,
+            translation_keyframes,
+            rotation_keyframes,
+        }
+    }
 }
 
 #[derive(Clone, RustState, StateElement)]

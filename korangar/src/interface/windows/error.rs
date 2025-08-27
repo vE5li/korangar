@@ -1,4 +1,3 @@
-use derive_new::new;
 use korangar_interface::window::{CustomWindow, Window};
 
 use crate::graphics::Color;
@@ -6,9 +5,14 @@ use crate::state::localization::LocalizationPathExt;
 use crate::state::theme::InterfaceThemeType;
 use crate::state::{ClientState, ClientStatePathExt, client_state};
 
-#[derive(new)]
 pub struct ErrorWindow {
     message: String,
+}
+
+impl ErrorWindow {
+    pub fn new(message: String) -> Self {
+        Self { message }
+    }
 }
 
 impl CustomWindow<ClientState> for ErrorWindow {

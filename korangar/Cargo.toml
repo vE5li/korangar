@@ -14,7 +14,6 @@ chrono = { workspace = true }
 cosmic-text = { workspace = true, features = ["std", "fontconfig"] }
 ctrlc = { workspace = true }
 ddsfile = { workspace = true }
-derive-new = { workspace = true }
 encoding_rs = { workspace = true }
 flate2 = { workspace = true, features = ["zlib-rs"] }
 hashbrown = { workspace = true, features = ["serde"] }

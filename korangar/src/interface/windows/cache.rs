@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use derive_new::new;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, print_debug};
 use korangar_interface::window::Anchor;
@@ -11,10 +10,16 @@ use super::WindowClass;
 use crate::graphics::ScreenSize;
 use crate::state::ClientState;
 
-#[derive(Serialize, Deserialize, new)]
+#[derive(Serialize, Deserialize)]
 pub struct WindowState {
     pub anchor: Anchor<ClientState>,
     pub size: ScreenSize,
+}
+
+impl WindowState {
+    pub fn new(anchor: Anchor<ClientState>, size: ScreenSize) -> Self {
+        Self { anchor, size }
+    }
 }
 
 #[derive(Default, Serialize, Deserialize)]

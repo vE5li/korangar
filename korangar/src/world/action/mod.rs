@@ -1,7 +1,6 @@
 use std::ops::Mul;
 
 use cgmath::{Array, Vector2};
-use derive_new::new;
 use korangar_audio::SoundEffectKey;
 use korangar_interface::element::StateElement;
 use korangar_util::container::Cacheable;
@@ -15,13 +14,21 @@ use crate::graphics::{Color, ScreenClip, ScreenPosition, ScreenSize};
 use crate::loaders::Sprite;
 use crate::renderer::SpriteRenderer;
 
-#[derive(Clone, Debug, new, RustState, StateElement)]
+#[derive(Clone, Debug, RustState, StateElement)]
 pub struct SpriteAnimationState {
-    #[new(default)]
     pub action_base_offset: usize,
     pub start_time: ClientTick,
-    #[new(default)]
     pub time: u32,
+}
+
+impl SpriteAnimationState {
+    pub fn new(start_time: ClientTick) -> Self {
+        Self {
+            action_base_offset: 0,
+            start_time,
+            time: 0,
+        }
+    }
 }
 
 impl SpriteAnimationState {

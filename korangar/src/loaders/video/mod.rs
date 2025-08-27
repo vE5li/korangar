@@ -1,7 +1,6 @@
 use std::iter;
 use std::sync::Arc;
 
-use derive_new::new;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, Timer, print_debug};
 use korangar_util::FileLoader;
@@ -13,10 +12,18 @@ use crate::world::{Video, VideoFrame};
 
 const BIK_FILE_ENDING: &str = ".bik";
 
-#[derive(new)]
 pub struct VideoLoader {
     game_file_loader: Arc<GameFileLoader>,
     texture_loader: Arc<TextureLoader>,
+}
+
+impl VideoLoader {
+    pub fn new(game_file_loader: Arc<GameFileLoader>, texture_loader: Arc<TextureLoader>) -> Self {
+        Self {
+            game_file_loader,
+            texture_loader,
+        }
+    }
 }
 
 impl VideoLoader {

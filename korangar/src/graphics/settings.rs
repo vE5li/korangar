@@ -2,8 +2,6 @@ use std::fmt::{Display, Formatter};
 #[cfg(feature = "debug")]
 use std::num::NonZeroU32;
 
-#[cfg(feature = "debug")]
-use derive_new::new;
 use korangar_interface::components::drop_down::DropDownItem;
 use korangar_interface::element::StateElement;
 use serde::{Deserialize, Serialize};
@@ -281,82 +279,90 @@ impl Display for ScreenSpaceAntiAliasing {
 }
 
 #[cfg(feature = "debug")]
-#[derive(Copy, Clone, Default, rust_state::RustState, StateElement, new)]
+#[derive(Copy, Clone, Default, rust_state::RustState, StateElement)]
 pub struct RenderOptions {
-    #[new(default)]
     pub show_frames_per_second: bool,
-    #[new(value = "true")]
     pub frustum_culling: bool,
-    #[new(default)]
     pub show_bounding_boxes: bool,
-    #[new(value = "true")]
     pub show_map: bool,
-    #[new(value = "true")]
     pub show_objects: bool,
-    #[new(value = "true")]
     pub show_entities: bool,
-    #[new(default)]
     pub show_entities_paper: bool,
-    #[new(default)]
     pub show_entities_debug: bool,
-    #[new(value = "true")]
     pub show_water: bool,
-    #[new(value = "true")]
     pub show_indicators: bool,
-    #[new(value = "true")]
     pub enable_ambient_lighting: bool,
-    #[new(value = "true")]
     pub enable_directional_lighting: bool,
-    #[new(value = "true")]
     pub enable_point_lights: bool,
-    #[new(value = "true")]
     pub enable_particle_lighting: bool,
-    #[new(default)]
     pub use_debug_camera: bool,
-    #[new(default)]
     pub show_wireframe: bool,
-    #[new(default)]
     pub show_object_markers: bool,
-    #[new(default)]
     pub show_light_markers: bool,
-    #[new(default)]
     pub show_sound_markers: bool,
-    #[new(default)]
     pub show_effect_markers: bool,
-    #[new(default)]
     pub show_particle_markers: bool,
-    #[new(default)]
     pub show_entity_markers: bool,
-    #[new(default)]
     pub show_shadow_markers: bool,
-    #[new(default)]
     pub show_map_tiles: bool,
-    #[new(default)]
     pub show_pathing: bool,
-    #[new(default)]
     pub show_picker_buffer: bool,
-    #[new(default)]
     pub show_directional_shadow_map: bool,
-    #[new(default)]
     pub show_point_shadow_map: Option<NonZeroU32>,
-    #[new(default)]
     pub show_light_culling_count_buffer: bool,
-    #[new(default)]
     pub show_font_map: bool,
-    #[new(default)]
     pub show_rectangle_instructions: bool,
-    #[new(default)]
     pub show_glyph_instructions: bool,
-    #[new(default)]
     pub show_sprite_instructions: bool,
-    #[new(default)]
     pub show_sdf_instructions: bool,
-    #[new(default)]
     pub show_click_areas: bool,
-    #[new(default)]
     pub show_drop_areas: bool,
-    #[new(default)]
     pub show_scroll_areas: bool,
+}
+
+#[cfg(feature = "debug")]
+impl RenderOptions {
+    pub fn new() -> Self {
+        Self {
+            show_frames_per_second: false,
+            frustum_culling: true,
+            show_bounding_boxes: false,
+            show_map: true,
+            show_objects: true,
+            show_entities: true,
+            show_entities_paper: false,
+            show_entities_debug: false,
+            show_water: true,
+            show_indicators: true,
+            enable_ambient_lighting: true,
+            enable_directional_lighting: true,
+            enable_point_lights: true,
+            enable_particle_lighting: true,
+            use_debug_camera: false,
+            show_wireframe: false,
+            show_object_markers: false,
+            show_light_markers: false,
+            show_sound_markers: false,
+            show_effect_markers: false,
+            show_particle_markers: false,
+            show_entity_markers: false,
+            show_shadow_markers: false,
+            show_map_tiles: false,
+            show_pathing: false,
+            show_picker_buffer: false,
+            show_directional_shadow_map: false,
+            show_point_shadow_map: None,
+            show_light_culling_count_buffer: false,
+            show_font_map: false,
+            show_rectangle_instructions: false,
+            show_glyph_instructions: false,
+            show_sprite_instructions: false,
+            show_sdf_instructions: false,
+            show_click_areas: false,
+            show_drop_areas: false,
+            show_scroll_areas: false,
+        }
+    }
 }
 
 #[cfg(feature = "debug")]

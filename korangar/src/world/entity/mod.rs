@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use arrayvec::ArrayVec;
 use cgmath::{EuclideanSpace, Point3, Vector2, VectorSpace, Zero};
-use derive_new::new;
 use korangar_audio::{AudioEngine, SoundEffectKey};
 use korangar_interface::element::StateElement;
 use korangar_interface::window::{StateWindow, Window};
@@ -56,15 +55,25 @@ impl<T> ResourceState<T> {
     }
 }
 
-#[derive(Clone, RustState, StateElement, new)]
+#[derive(Clone, RustState, StateElement)]
 pub struct Movement {
     #[hidden_element]
     steps: ArrayVec<Step, MAX_WALK_PATH_SIZE>,
     starting_timestamp: u32,
     #[cfg(feature = "debug")]
-    #[new(default)]
     #[hidden_element]
     pub pathing: Option<Pathing>,
+}
+
+impl Movement {
+    pub fn new(steps: ArrayVec<Step, MAX_WALK_PATH_SIZE>, starting_timestamp: u32) -> Self {
+        Self {
+            steps,
+            starting_timestamp,
+            #[cfg(feature = "debug")]
+            pathing: None,
+        }
+    }
 }
 
 #[cfg(feature = "debug")]

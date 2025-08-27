@@ -1,11 +1,10 @@
 use cgmath::{InnerSpace, Point3, Vector2, Vector3};
-use derive_new::new;
 use smallvec::{SmallVec, smallvec_inline};
 
 use crate::graphics::{Color, ModelVertex};
 use crate::loaders::TextureSetTexture;
 
-#[derive(Clone, new)]
+#[derive(Clone)]
 pub struct NativeModelVertex {
     pub position: Point3<f32>,
     pub normal: Vector3<f32>,
@@ -17,6 +16,26 @@ pub struct NativeModelVertex {
 }
 
 impl NativeModelVertex {
+    pub fn new(
+        position: Point3<f32>,
+        normal: Vector3<f32>,
+        texture_coordinates: Vector2<f32>,
+        texture_index: i32,
+        color: Color,
+        wind_affinity: f32,
+        smoothing_groups: SmallVec<[i32; 3]>,
+    ) -> Self {
+        Self {
+            position,
+            normal,
+            texture_coordinates,
+            texture_index,
+            color,
+            wind_affinity,
+            smoothing_groups,
+        }
+    }
+
     pub const fn zeroed() -> NativeModelVertex {
         NativeModelVertex {
             position: Point3::new(0.0, 0.0, 0.0),

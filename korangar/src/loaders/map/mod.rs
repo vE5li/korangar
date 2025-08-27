@@ -5,7 +5,6 @@ use std::sync::{Arc, Mutex};
 
 use bytemuck::Pod;
 use cgmath::Vector3;
-use derive_new::new;
 use hashbrown::HashMap;
 use korangar_audio::AudioEngine;
 #[cfg(feature = "debug")]
@@ -42,13 +41,30 @@ fn assert_byte_reader_empty<Meta>(mut byte_reader: ByteReader<Meta>, file_name: 
     }
 }
 
-#[derive(new)]
 pub struct MapLoader {
     device: Device,
     queue: Queue,
     game_file_loader: Arc<GameFileLoader>,
     audio_engine: Arc<AudioEngine<GameFileLoader>>,
     bindless_support: BindlessSupport,
+}
+
+impl MapLoader {
+    pub fn new(
+        device: Device,
+        queue: Queue,
+        game_file_loader: Arc<GameFileLoader>,
+        audio_engine: Arc<AudioEngine<GameFileLoader>>,
+        bindless_support: BindlessSupport,
+    ) -> Self {
+        Self {
+            device,
+            queue,
+            game_file_loader,
+            audio_engine,
+            bindless_support,
+        }
+    }
 }
 
 impl MapLoader {

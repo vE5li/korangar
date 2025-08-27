@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use cgmath::{Array, EuclideanSpace, Matrix4, Point3, Rad, SquareMatrix, Vector2, Vector3};
-use derive_new::new;
 use hashbrown::{HashMap, HashSet};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, Timer, print_debug};
@@ -20,10 +19,18 @@ use crate::graphics::{BindlessSupport, Color, ModelVertex, NativeModelVertex, re
 use crate::loaders::GameFileLoader;
 use crate::world::{Model, Node, SubMesh};
 
-#[derive(new)]
 pub struct ModelLoader {
     game_file_loader: Arc<GameFileLoader>,
     bindless_support: BindlessSupport,
+}
+
+impl ModelLoader {
+    pub fn new(game_file_loader: Arc<GameFileLoader>, bindless_support: BindlessSupport) -> Self {
+        Self {
+            game_file_loader,
+            bindless_support,
+        }
+    }
 }
 
 impl ModelLoader {

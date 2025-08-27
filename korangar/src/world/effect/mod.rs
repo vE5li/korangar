@@ -3,7 +3,6 @@ mod lookup;
 use std::sync::Arc;
 
 use cgmath::{Point3, Rad, Vector2, Vector3};
-use derive_new::new;
 use korangar_util::collision::{Frustum, Sphere};
 use korangar_util::container::Cacheable;
 use ragnarok_formats::map::EffectSource;
@@ -46,11 +45,20 @@ impl EffectSourceExt for EffectSource {
     }
 }
 
-#[derive(new)]
 pub struct Effect {
     frames_per_second: usize,
     max_key: usize,
     layers: Vec<Layer>,
+}
+
+impl Effect {
+    pub fn new(frames_per_second: usize, max_key: usize, layers: Vec<Layer>) -> Self {
+        Self {
+            frames_per_second,
+            max_key,
+            layers,
+        }
+    }
 }
 
 impl Effect {
@@ -105,11 +113,16 @@ impl Cacheable for Effect {
     }
 }
 
-#[derive(new)]
 pub struct Layer {
     textures: Vec<Arc<Texture>>,
     indices: Vec<Option<usize>>,
     frames: Vec<Frame>,
+}
+
+impl Layer {
+    pub fn new(textures: Vec<Arc<Texture>>, indices: Vec<Option<usize>>, frames: Vec<Frame>) -> Self {
+        Self { textures, indices, frames }
+    }
 }
 
 impl Layer {
@@ -183,7 +196,7 @@ impl Layer {
     }
 }
 
-#[derive(Debug, Clone, new)]
+#[derive(Debug, Clone)]
 pub struct Frame {
     frame_index: usize,
     frame_type: FrameType,
@@ -198,6 +211,40 @@ pub struct Frame {
     source_blend_factor: BlendFactor,
     destination_blend_factor: BlendFactor,
     mt_present: MultiTexturePresent,
+}
+
+impl Frame {
+    pub fn new(
+        frame_index: usize,
+        frame_type: FrameType,
+        offset: Vector2<f32>,
+        uv: [f32; 8],
+        xy: [f32; 8],
+        texture_index: usize,
+        animation_type: AnimationType,
+        delay: f32,
+        angle: Rad<f32>,
+        color: Color,
+        source_blend_factor: BlendFactor,
+        destination_blend_factor: BlendFactor,
+        mt_present: MultiTexturePresent,
+    ) -> Self {
+        Self {
+            frame_index,
+            frame_type,
+            offset,
+            uv,
+            xy,
+            texture_index,
+            animation_type,
+            delay,
+            angle,
+            color,
+            source_blend_factor,
+            destination_blend_factor,
+            mt_present,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]

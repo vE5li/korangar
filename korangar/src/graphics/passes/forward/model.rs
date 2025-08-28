@@ -95,7 +95,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
             (size_of::<InstanceData>() * INITIAL_INSTRUCTION_SIZE) as _,
         );
 
-        // TODO: NHA This instance index vertex buffer is only needed until this issue is fixed for DX12: https://github.com/gfx-rs/wgpu/issues/2471
+        // TODO: NHA This instance index vertex buffer is only needed until this issue is fixed for DX12: https://github.com/gfx-rs/wgpu/issues/7955
         let instance_index_vertex_buffer = Buffer::with_capacity(
             device,
             format!("{DRAWER_NAME} index vertex data"),

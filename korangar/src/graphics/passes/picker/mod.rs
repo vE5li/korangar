@@ -54,6 +54,7 @@ impl RenderPassContext<{ BindGroupCount::One }, { ColorAttachmentCount::One }, {
             label: Some(PASS_NAME),
             color_attachments: &[Some(RenderPassColorAttachment {
                 view: global_context.picker_buffer_texture.get_texture_view(),
+                depth_slice: None,
                 resolve_target: None,
                 ops: Operations {
                     load: LoadOp::Clear(clear_color),

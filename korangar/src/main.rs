@@ -87,7 +87,7 @@ use wgpu::Device;
 use wgpu::util::initialize_adapter_from_env_or_default;
 use wgpu::{
     BackendOptions, Backends, DeviceDescriptor, Dx12BackendOptions, Dx12Compiler, GlBackendOptions, GlFenceBehavior, Gles3MinorVersion,
-    Instance, InstanceDescriptor, InstanceFlags, MemoryHints, NoopBackendOptions, Queue, Trace,
+    Instance, InstanceDescriptor, InstanceFlags, MemoryBudgetThresholds, MemoryHints, NoopBackendOptions, Queue, Trace,
 };
 use winit::application::ApplicationHandler;
 use winit::dpi::{LogicalSize, PhysicalSize};
@@ -445,6 +445,7 @@ impl Client {
             let instance = Instance::new(&InstanceDescriptor {
                 backends: Backends::all().with_env(),
                 flags: InstanceFlags::from_build_config().with_env(),
+                memory_budget_thresholds: MemoryBudgetThresholds::default(),
                 backend_options: BackendOptions {
                     gl: GlBackendOptions {
                         gles_minor_version: Gles3MinorVersion::Automatic,

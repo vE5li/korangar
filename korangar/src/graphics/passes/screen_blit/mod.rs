@@ -36,6 +36,7 @@ impl RenderPassContext<{ BindGroupCount::None }, { ColorAttachmentCount::One }, 
             label: Some(PASS_NAME),
             color_attachments: &[Some(RenderPassColorAttachment {
                 view: pass_data,
+                depth_slice: None,
                 resolve_target: None,
                 ops: Operations {
                     load: LoadOp::Clear(Color::BLACK),

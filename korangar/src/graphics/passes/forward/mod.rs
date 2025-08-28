@@ -54,6 +54,7 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::Three },
             color_attachments: &[
                 Some(RenderPassColorAttachment {
                     view: global_context.forward_color_texture.get_texture_view(),
+                    depth_slice: None,
                     resolve_target: global_context
                         .resolved_color_texture
                         .as_ref()
@@ -65,6 +66,7 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::Three },
                 }),
                 Some(RenderPassColorAttachment {
                     view: global_context.forward_accumulation_texture.get_texture_view(),
+                    depth_slice: None,
                     resolve_target: None,
                     ops: Operations {
                         load: LoadOp::Clear(Color::TRANSPARENT),
@@ -73,6 +75,7 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::Three },
                 }),
                 Some(RenderPassColorAttachment {
                     view: global_context.forward_revealage_texture.get_texture_view(),
+                    depth_slice: None,
                     resolve_target: None,
                     ops: Operations {
                         load: LoadOp::Clear(Color::WHITE),

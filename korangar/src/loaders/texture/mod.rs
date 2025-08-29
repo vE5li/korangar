@@ -28,7 +28,7 @@ use crate::loaders::GameFileLoader;
 use crate::world::Video;
 
 const MAX_CACHE_COUNT: u32 = 4096;
-const MAX_CACHE_SIZE: usize = 512 * 1024 * 1024;
+const MAX_CACHE_SIZE: usize = 512 << 20;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum ImageType {

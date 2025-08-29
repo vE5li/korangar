@@ -17,8 +17,8 @@ use crate::graphics::Color;
 use crate::loaders::GameFileLoader;
 use crate::world::{AnimationType, Effect, Frame, FrameType, Layer, MultiTexturePresent};
 
-const MAX_CACHE_COUNT: u32 = 512;
-const MAX_CACHE_SIZE: usize = 64 * 1024 * 1024;
+const MAX_CACHE_COUNT: u32 = 1000;
+const MAX_CACHE_SIZE: usize = 64 << 20;
 
 pub struct EffectLoader {
     game_file_loader: Arc<GameFileLoader>,

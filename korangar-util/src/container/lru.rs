@@ -3,13 +3,13 @@
 use std::alloc::{Layout, alloc, dealloc};
 use std::boxed::Box;
 use std::marker::PhantomData;
-use std::num::NonZeroU32;
+use std::num::{NonZeroU32, NonZeroUsize};
 use std::ops::Drop;
 use std::ptr;
 use std::ptr::NonNull;
 
-use super::GenerationalKey;
 use super::generational_slab::SecondaryGenerationalSlab;
+use super::{GenerationalKey, ValueTooBig};
 
 struct Entry<I, V> {
     key: Option<I>,
@@ -40,7 +40,8 @@ pub struct Lru<I, V> {
     free: *mut Entry<I, V>,
     size: usize,
     count: u32,
-    max_count: NonZeroU32,
+    max_count: u32,
+    max_size: usize,
     _marker: PhantomData<Entry<I, V>>,
 }
 
@@ -49,7 +50,7 @@ unsafe impl<I, V> Send for Lru<I, V> {}
 impl<I, V> Drop for Lru<I, V> {
     fn drop(&mut self) {
         unsafe {
-            let layout = Layout::array::<Entry<I, V>>(self.max_count.get() as usize).expect("invalid layout");
+            let layout = Layout::array::<Entry<I, V>>(self.max_count as usize).expect("invalid layout");
             dealloc(self.pointer.as_ptr().cast(), layout);
             drop(Box::from_raw(self.list));
             drop(Box::from_raw(self.free));
@@ -60,7 +61,7 @@ impl<I, V> Drop for Lru<I, V> {
 // Any changes to this structs implementation should be tested with miri for
 // soundness.
 impl<I: GenerationalKey + Copy, V> Lru<I, V> {
-    pub(crate) fn new(max_count: NonZeroU32) -> Self {
+    pub(crate) fn new(max_count: NonZeroU32, max_size: NonZeroUsize) -> Self {
         let layout = Layout::array::<Entry<I, V>>(max_count.get() as usize).expect("invalid layout");
         assert!(layout.size() < isize::MAX as usize);
 
@@ -74,7 +75,8 @@ impl<I: GenerationalKey + Copy, V> Lru<I, V> {
             free: Box::into_raw(Box::new(Entry::new_zeroed())),
             size: 0,
             count: 0,
-            max_count,
+            max_count: max_count.get(),
+            max_size: max_size.get(),
             _marker: PhantomData,
         };
 
@@ -168,7 +170,23 @@ impl<I: GenerationalKey + Copy, V> Lru<I, V> {
         }
     }
 
-    pub(crate) fn pop(&mut self) -> Option<(I, V)> {
+    pub(crate) fn make_room_for_value<F>(&mut self, value_size: usize, mut on_evict: F) -> Result<(), ValueTooBig>
+    where
+        F: FnMut(I, V),
+    {
+        if value_size > self.max_size {
+            return Err(ValueTooBig);
+        }
+
+        while self.count > self.max_count.saturating_sub(1) || self.size > self.max_size.saturating_sub(value_size) {
+            let (key, value) = self.pop().ok_or(ValueTooBig)?;
+            on_evict(key, value);
+        }
+
+        Ok(())
+    }
+
+    fn pop(&mut self) -> Option<(I, V)> {
         let prev = unsafe { (*self.list).prev };
 
         (prev != self.list)
@@ -209,7 +227,7 @@ impl<I: GenerationalKey + Copy, V> Lru<I, V> {
 #[allow(clippy::unwrap_used)]
 #[cfg(test)]
 mod tests {
-    use std::num::NonZeroU32;
+    use std::num::{NonZeroU32, NonZeroUsize};
 
     use rand_aes::Aes128Ctr128;
 
@@ -224,7 +242,7 @@ mod tests {
         let key_0 = slab.insert(false).unwrap();
         let key_1 = slab.insert(false).unwrap();
 
-        let mut cache: Lru<TestKey, usize> = Lru::new(NonZeroU32::new(2).unwrap());
+        let mut cache: Lru<TestKey, usize> = Lru::new(NonZeroU32::new(2).unwrap(), NonZeroUsize::new(100).unwrap());
         cache.put(key_0, 1, 10);
         cache.put(key_1, 2, 20);
         assert_eq!(cache.size(), 30);
@@ -236,7 +254,7 @@ mod tests {
         let mut slab = GenerationalSlab::default();
         let key_0 = slab.insert(false).unwrap();
 
-        let mut cache: Lru<TestKey, usize> = Lru::new(NonZeroU32::new(2).unwrap());
+        let mut cache: Lru<TestKey, usize> = Lru::new(NonZeroU32::new(2).unwrap(), NonZeroUsize::new(100).unwrap());
         cache.put(key_0, 1, 10);
         cache.touch(key_0);
         assert_eq!(cache.size(), 10);
@@ -255,7 +273,7 @@ mod tests {
         let key_1 = slab.insert(false).unwrap();
         let key_2 = slab.insert(false).unwrap();
 
-        let mut cache: Lru<TestKey, usize> = Lru::new(NonZeroU32::new(3).unwrap());
+        let mut cache: Lru<TestKey, usize> = Lru::new(NonZeroU32::new(3).unwrap(), NonZeroUsize::new(100).unwrap());
         cache.put(key_0, 1, 10);
         cache.put(key_1, 2, 20);
         cache.put(key_2, 3, 30);
@@ -277,7 +295,7 @@ mod tests {
         let mut slab = GenerationalSlab::default();
         let key_0 = slab.insert(false).unwrap();
 
-        let mut cache: Lru<TestKey, usize> = Lru::new(NonZeroU32::new(2).unwrap());
+        let mut cache: Lru<TestKey, usize> = Lru::new(NonZeroU32::new(2).unwrap(), NonZeroUsize::new(100).unwrap());
         cache.put(key_0, 1, 10);
         cache.remove(key_0);
         cache.put(key_0, 1, 20);
@@ -292,7 +310,7 @@ mod tests {
         let key_0 = slab.insert(false).unwrap();
         let key_1 = slab.insert(false).unwrap();
 
-        let mut cache: Lru<TestKey, usize> = Lru::new(NonZeroU32::new(2).unwrap());
+        let mut cache: Lru<TestKey, usize> = Lru::new(NonZeroU32::new(2).unwrap(), NonZeroUsize::new(100).unwrap());
         cache.put(key_0, 1, 10);
         cache.put(key_1, 2, 20);
 
@@ -314,7 +332,7 @@ mod tests {
 
         let mut slab = GenerationalSlab::default();
 
-        let mut cache: Lru<TestKey, usize> = Lru::new(NonZeroU32::new(1_000).unwrap());
+        let mut cache: Lru<TestKey, usize> = Lru::new(NonZeroU32::new(1_000).unwrap(), NonZeroUsize::new(100_000).unwrap());
 
         let mut keys: Vec<TestKey> = (0..1_000)
             .map(|index| {
@@ -343,7 +361,7 @@ mod tests {
         let key_1 = slab.insert(false).unwrap();
         let key_2 = slab.insert(false).unwrap();
 
-        let mut cache: Lru<TestKey, usize> = Lru::new(NonZeroU32::new(2).unwrap());
+        let mut cache: Lru<TestKey, usize> = Lru::new(NonZeroU32::new(2).unwrap(), NonZeroUsize::new(100).unwrap());
         assert!(cache.put(key_0, 1, 10));
         assert!(cache.put(key_1, 2, 10));
         assert!(!cache.put(key_2, 3, 10));

@@ -25,9 +25,7 @@ impl<K: Clone + Eq + Hash, V: Cacheable> SimpleCache<K, V> {
     pub fn new(max_count: NonZeroU32, max_size: NonZeroUsize) -> Self {
         let lookup = HashMap::new();
         let values = GenerationalSlab::with_capacity(max_count.get());
-
-        let cache_capacity = max_count;
-        let cache = Lru::new(cache_capacity);
+        let cache = Lru::new(max_count, max_size);
 
         let statistics = Arc::new(Statistics {
             count: AtomicU32::new(0),
@@ -82,14 +80,10 @@ impl<K: Clone + Eq + Hash, V: Cacheable> SimpleCache<K, V> {
 
         let _ = self.remove(&key);
 
-        // Drop as many values as we need to fit the new value.
-        while self.cache.count() > self.statistics.max_count.get().saturating_sub(1)
-            || self.cache.size() > self.statistics.max_size.get().saturating_sub(size)
-        {
-            let (_, key) = self.cache.pop().ok_or(ValueTooBig)?;
-            let cache_key = self.lookup.remove(&key).unwrap();
+        self.cache.make_room_for_value(size, |_, evicted_key| {
+            let cache_key = self.lookup.remove(&evicted_key).unwrap();
             let _ = self.values.remove(cache_key);
-        }
+        })?;
 
         let cache_key = self.values.insert(value).expect("slab is full");
         self.lookup.insert(key.clone(), cache_key);

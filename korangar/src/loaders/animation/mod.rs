@@ -13,8 +13,8 @@ use crate::loaders::{ActionLoader, SpriteLoader};
 use crate::world::{ActionEvent, Animation, AnimationData, AnimationFrame, AnimationFramePart, AnimationPair};
 use crate::{Color, EntityType};
 
-const MAX_CACHE_COUNT: u32 = 256;
-const MAX_CACHE_SIZE: usize = 64 * 1024 * 1024;
+const MAX_CACHE_COUNT: u32 = 1000;
+const MAX_CACHE_SIZE: usize = 64 << 20;
 
 pub struct AnimationLoader {
     cache: Mutex<SimpleCache<Vec<String>, Arc<AnimationData>>>,

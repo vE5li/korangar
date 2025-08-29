@@ -18,8 +18,8 @@ use crate::graphics::Texture;
 use crate::loaders::GameFileLoader;
 use crate::loaders::error::LoadError;
 
-const MAX_CACHE_COUNT: u32 = 512;
-const MAX_CACHE_SIZE: usize = 512 * 1024 * 1024;
+const MAX_CACHE_COUNT: u32 = 1000;
+const MAX_CACHE_SIZE: usize = 512 << 20;
 
 #[derive(Clone, Debug, RustState, StateElement)]
 pub struct Sprite {

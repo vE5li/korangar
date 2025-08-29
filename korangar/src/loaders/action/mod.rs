@@ -15,7 +15,7 @@ use crate::loaders::{FALLBACK_ACTIONS_FILE, GameFileLoader};
 use crate::world::{ActionEvent, Actions};
 
 const MAX_CACHE_COUNT: u32 = 256;
-const MAX_CACHE_SIZE: usize = 64 * 1024 * 1024;
+const MAX_CACHE_SIZE: usize = 64 << 20;
 
 pub struct ActionLoader {
     game_file_loader: Arc<GameFileLoader>,

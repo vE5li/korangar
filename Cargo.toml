@@ -11,6 +11,7 @@ bumpalo = "3"
 bytemuck = "1"
 cgmath = "0.18"
 chrono = "0.4"
+clap = "4.5.46"
 cosmic-text = { version = "0.14", default-features = false }
 cpal = "0.15"
 ctrlc = "3"

@@ -15,7 +15,6 @@ cosmic-text = { version = "0.14", default-features = false }
 cpal = "0.15"
 ctrlc = "3"
 ddsfile = "0.5"
-derive-new = "0.7"
 encoding_rs = "0.8"
 etherparse = "0.18"
 fast-srgb8 = "1"

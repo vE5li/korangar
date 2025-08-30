@@ -452,12 +452,22 @@ impl TextureLoader {
             }
         };
 
-        self.cache
+        let _result = self
+            .cache
             .lock()
             .as_mut()
             .unwrap()
-            .insert((path.to_string(), image_type), texture.clone())
-            .unwrap();
+            .insert((path.to_string(), image_type), texture.clone());
+
+        #[cfg(feature = "debug")]
+        if let Err(error) = _result {
+            print_debug!(
+                "[{}] texture could not be added to cache. Path: '{}': {:?}",
+                "error".red(),
+                &path,
+                error
+            );
+        }
 
         Ok(texture)
     }

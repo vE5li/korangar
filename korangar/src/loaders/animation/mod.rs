@@ -5,6 +5,8 @@ use std::sync::{Arc, Mutex};
 #[cfg(feature = "debug")]
 use cgmath::SquareMatrix;
 use cgmath::{Array, Matrix4, Rad, Vector2};
+#[cfg(feature = "debug")]
+use korangar_debug::logging::{Colorize, print_debug};
 use korangar_util::container::SimpleCache;
 use num::Zero;
 
@@ -301,11 +303,21 @@ impl AnimationLoader {
             entity_type,
         });
 
-        self.cache
+        let _result = self
+            .cache
             .lock()
             .unwrap()
-            .insert(entity_part_files.to_vec(), animation_data.clone())
-            .unwrap();
+            .insert(entity_part_files.to_vec(), animation_data.clone());
+
+        #[cfg(feature = "debug")]
+        if let Err(error) = _result {
+            print_debug!(
+                "[{}] animation could not be added to cache. Entity Files: '{}': {:?}",
+                "error".red(),
+                &entity_part_files.join(";"),
+                error
+            );
+        }
 
         Ok(animation_data)
     }

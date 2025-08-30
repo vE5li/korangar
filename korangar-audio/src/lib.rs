@@ -237,17 +237,6 @@ impl<F: FileLoader> AudioEngine<F> {
         sound_effect_key
     }
 
-    /// Unloads und unregisters the registered audio file.
-    pub fn unload(&self, sound_effect_key: SoundEffectKey) {
-        let mut context = self.engine_context.lock().unwrap();
-
-        if let Some(path) = context.sound_effect_paths.remove(sound_effect_key) {
-            let _ = context.lookup.remove(&path);
-        }
-        context.loading_sound_effect.remove(&sound_effect_key);
-        let _ = context.cache.remove(&sound_effect_key);
-    }
-
     /// Sets the global volume.
     pub fn set_main_volume(&self, volume: f32) {
         self.engine_context.lock().unwrap().set_main_volume(linear_to_decibel(volume))
@@ -649,10 +638,11 @@ impl<F: FileLoader> EngineContext<F> {
                 } => {
                     self.loading_sound_effect.remove(&key);
 
+                    // TODO: NHA On load of maps we seem to do double loads for some sound effects.
                     if let Err(_error) = self.cache.insert(key, CachedSoundEffect(*sound_effect)) {
                         #[cfg(feature = "debug")]
                         print_debug!(
-                            "[{}] audio file is too big for cache. Path: '{}': {:?}",
+                            "[{}] audio file could not be added to cache. Path: '{}': {:?}",
                             "error".red(),
                             &_path,
                             _error

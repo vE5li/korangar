@@ -163,7 +163,18 @@ impl SpriteLoader {
             #[cfg(feature = "debug")]
             sprite_data: cloned_sprite_data,
         });
-        let _ = self.cache.lock().unwrap().insert(path.to_string(), sprite.clone());
+
+        let _result = self.cache.lock().unwrap().insert(path.to_string(), sprite.clone());
+
+        #[cfg(feature = "debug")]
+        if let Err(error) = _result {
+            print_debug!(
+                "[{}] sprite could not be added to cache. Path: '{}': {:?}",
+                "error".red(),
+                &path,
+                error
+            );
+        }
 
         #[cfg(feature = "debug")]
         timer.stop();

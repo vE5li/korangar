@@ -899,9 +899,9 @@ impl<App: Application> InterfaceFrame<'_, App> {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn scroll(&self, mouse_position: App::Position, delta: f32) {
+    pub fn scroll(&mut self, state: &Context<App>, mouse_position: App::Position, delta: f32) {
         if let Some(layout) = &self.overlay_layout
-            && layout.handle_scroll(mouse_position, delta)
+            && layout.handle_scroll(state, self.event_queue, mouse_position, delta)
         {
             return;
         }
@@ -909,7 +909,7 @@ impl<App: Application> InterfaceFrame<'_, App> {
         if let Some(window_id) = &self.hovered_window {
             let layout = self.window_layouts.get(window_id).unwrap();
 
-            layout.handle_scroll(mouse_position, delta);
+            layout.handle_scroll(state, self.event_queue, mouse_position, delta);
         }
     }
 

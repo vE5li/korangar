@@ -4,13 +4,11 @@ pub mod alignment;
 pub mod area;
 pub mod tooltip;
 
-use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
 use alignment::{HorizontalAlignment, VerticalAlignment};
 use area::Area;
-use num::Signed;
 use rust_state::Context;
 use tooltip::{Tooltip, TooltipId};
 
@@ -95,21 +93,25 @@ struct DropArea<'a, App> {
     handler: &'a dyn DropHandler<App>,
 }
 
-struct ScrollArea<'a> {
+struct ScrollArea<'a, App> {
     clip_layer: ClipLayerId,
     area: Area,
-    max_scroll: f32,
-    cell: &'a RefCell<f32>,
+    handler: &'a dyn ScrollHandler<App>,
+}
+
+/// Handler for dropping a resource.
+pub trait DropHandler<App: Application> {
+    fn handle_drop(&self, state: &Context<App>, queue: &mut EventQueue<App>, mouse_mode: &MouseMode<App>);
+}
+
+/// Handler for scroll input.
+pub trait ScrollHandler<App: Application> {
+    fn handle_scroll(&self, state: &Context<App>, queue: &mut EventQueue<App>, mouse_position: App::Position, delta: f32) -> bool;
 }
 
 /// Handler for receiving keyboard input.
 pub trait InputHandler<App: Application> {
     fn handle_character(&self, state: &Context<App>, queue: &mut EventQueue<App>, character: char);
-}
-
-/// Handler for handling dropping a resource.
-pub trait DropHandler<App: Application> {
-    fn handle_drop(&self, state: &Context<App>, queue: &mut EventQueue<App>, mouse_mode: &MouseMode<App>);
 }
 
 struct LayoutLayer<'a, App: Application> {
@@ -119,7 +121,7 @@ struct LayoutLayer<'a, App: Application> {
     custom_instructions: Vec<<App::Renderer as RenderLayer<App>>::CustomInstruction<'a>>,
     click_areas: Vec<ClickArea<'a, App>>,
     drop_areas: Vec<DropArea<'a, App>>,
-    scroll_areas: Vec<ScrollArea<'a>>,
+    scroll_areas: Vec<ScrollArea<'a, App>>,
     input_handlers: Vec<&'a dyn InputHandler<App>>,
 }
 
@@ -463,16 +465,13 @@ impl<'a, App: Application> WindowLayout<'a, App> {
             .push(DropArea { clip_layer, area, handler });
     }
 
-    pub fn add_scroll_area(&mut self, area: Area, max_scroll: f32, cell: &'a RefCell<f32>) {
+    pub fn add_scroll_area(&mut self, area: Area, handler: &'a dyn ScrollHandler<App>) {
         let clip_layer = self.get_active_clip_layer();
         let area = self.scale_area(area);
 
-        self.layers[self.current_layer].scroll_areas.push(ScrollArea {
-            clip_layer,
-            area,
-            max_scroll,
-            cell,
-        });
+        self.layers[self.current_layer]
+            .scroll_areas
+            .push(ScrollArea { clip_layer, area, handler });
     }
 
     pub fn add_input_handler(&mut self, input_handler: &'a dyn InputHandler<App>) {
@@ -802,7 +801,7 @@ impl<'a, App: Application> WindowLayout<'a, App> {
         handled
     }
 
-    pub fn handle_scroll(&self, mouse_position: App::Position, delta: f32) -> bool {
+    pub fn handle_scroll(&self, state: &Context<App>, queue: &mut EventQueue<App>, mouse_position: App::Position, delta: f32) -> bool {
         for layer in self.layers.iter().rev() {
             for scroll_area in &layer.scroll_areas {
                 let clip = self.clip_layers[scroll_area.clip_layer.0].clip;
@@ -812,16 +811,8 @@ impl<'a, App: Application> WindowLayout<'a, App> {
                     && mouse_position.left() <= clip.right()
                     && mouse_position.top() >= clip.top()
                     && mouse_position.top() <= clip.bottom()
+                    && scroll_area.handler.handle_scroll(state, queue, mouse_position, delta)
                 {
-                    let mut current_scroll = scroll_area.cell.borrow_mut();
-
-                    // Don't try to scroll stuff that is already at the min or max scroll value.
-                    if delta.is_negative() && *current_scroll >= scroll_area.max_scroll || delta.is_positive() && *current_scroll <= 0.0 {
-                        continue;
-                    }
-
-                    *current_scroll = (*current_scroll - delta).max(0.0).min(scroll_area.max_scroll);
-
                     return true;
                 }
             }

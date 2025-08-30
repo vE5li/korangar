@@ -72,6 +72,7 @@ impl ThemeDefault for InterfaceTheme {
                 title_color: Color::rgb_u8(200, 150, 150),
                 hovered_title_color: Color::rgb_u8(250, 200, 200),
                 background_color: Color::monochrome_u8(30),
+                highlight_color: Color::rgb_u8(255, 160, 60),
                 gaps: 25.0,
                 border: 30.0,
                 corner_diameter: CornerDiameter::uniform(50.0),
@@ -92,6 +93,7 @@ impl ThemeDefault for InterfaceTheme {
             },
             text: TextTheme {
                 color: Color::monochrome_u8(220),
+                highlight_color: Color::rgb_u8(255, 160, 60),
                 height: 15.0,
                 font_size: FontSize(16.0),
                 horizontal_alignment: HorizontalAlignment::Left { offset: 6.0, border: 3.0 },
@@ -101,6 +103,7 @@ impl ThemeDefault for InterfaceTheme {
             button: ButtonTheme {
                 background_color: Color::monochrome_u8(80),
                 foreground_color: Color::monochrome_u8(180),
+                highlight_color: Color::rgb_u8(255, 160, 60),
                 hovered_background_color: Color::monochrome_u8(120),
                 hovered_foreground_color: Color::monochrome_u8(220),
                 disabled_background_color: Color::monochrome_u8(50),
@@ -115,6 +118,7 @@ impl ThemeDefault for InterfaceTheme {
             state_button: StateButtonTheme {
                 background_color: Color::monochrome_u8(80),
                 foreground_color: Color::monochrome_u8(180),
+                highlight_color: Color::rgb_u8(255, 160, 60),
                 hovered_background_color: Color::monochrome_u8(120),
                 hovered_foreground_color: Color::monochrome_u8(220),
                 disabled_background_color: Color::monochrome_u8(50),
@@ -132,6 +136,7 @@ impl ThemeDefault for InterfaceTheme {
             text_box: TextBoxTheme {
                 background_color: Color::monochrome_u8(45),
                 foreground_color: Color::monochrome_u8(180),
+                highlight_color: Color::rgb_u8(255, 160, 60),
                 hovered_background_color: Color::monochrome_u8(75),
                 hovered_foreground_color: Color::monochrome_u8(220),
                 focused_background_color: Color::monochrome_u8(120),
@@ -150,6 +155,7 @@ impl ThemeDefault for InterfaceTheme {
                 background_color: Color::monochrome_u8(45),
                 secondary_background_color: Color::monochrome_u8(30),
                 foreground_color: Color::monochrome_u8(200),
+                highlight_color: Color::rgb_u8(255, 160, 60),
                 hovered_foreground_color: Color::rgb_u8(250, 200, 200),
                 corner_diameter: CornerDiameter::uniform(20.0),
                 icon_color: Color::monochrome_u8(170),
@@ -165,6 +171,7 @@ impl ThemeDefault for InterfaceTheme {
             drop_down: DropDownTheme {
                 item_background_color: Color::monochrome_u8(65),
                 item_foreground_color: Color::monochrome_u8(180),
+                item_highlight_color: Color::rgb_u8(255, 160, 60),
                 item_hovered_background_color: Color::monochrome_u8(105),
                 item_hovered_foreground_color: Color::monochrome_u8(220),
                 item_height: 30.0,
@@ -180,6 +187,7 @@ impl ThemeDefault for InterfaceTheme {
                 list_maximum_height: 700.0,
                 button_background_color: Color::monochrome_u8(80),
                 button_foreground_color: Color::monochrome_u8(180),
+                button_highlight_color: Color::rgb_u8(255, 160, 60),
                 button_hovered_background_color: Color::monochrome_u8(120),
                 button_hovered_foreground_color: Color::monochrome_u8(220),
                 button_height: 30.0,
@@ -192,6 +200,7 @@ impl ThemeDefault for InterfaceTheme {
             field: FieldTheme {
                 background_color: Color::monochrome_u8(80),
                 foreground_color: Color::monochrome_u8(180),
+                highlight_color: Color::rgb_u8(255, 160, 60),
                 height: 30.0,
                 corner_diameter: CornerDiameter::uniform(30.0),
                 font_size: FontSize(16.0),
@@ -202,6 +211,7 @@ impl ThemeDefault for InterfaceTheme {
             tooltip: TooltipTheme {
                 background_color: Color::rgba_u8(15, 15, 15, 200),
                 foreground_color: Color::monochrome_u8(235),
+                highlight_color: Color::rgb_u8(255, 160, 60),
                 font_size: FontSize(16.0),
                 corner_diameter: CornerDiameter::uniform(8.0),
                 border: 8.0,
@@ -226,6 +236,7 @@ impl ThemeDefault for InterfaceTheme {
                 title_color: Color::rgb_u8(185, 155, 155),
                 hovered_title_color: Color::rgb_u8(240, 155, 155),
                 background_color: Color::monochrome_u8(50),
+                highlight_color: Color::rgb_u8(255, 160, 60),
                 gaps: 8.0,
                 border: 10.0,
                 corner_diameter: CornerDiameter::uniform(14.0),
@@ -246,6 +257,7 @@ impl ThemeDefault for InterfaceTheme {
             },
             text: TextTheme {
                 color: Color::monochrome_u8(220),
+                highlight_color: Color::rgb_u8(255, 160, 60),
                 height: 14.0,
                 font_size: FontSize(14.0),
                 horizontal_alignment: HorizontalAlignment::Left { offset: 3.0, border: 3.0 },
@@ -255,6 +267,7 @@ impl ThemeDefault for InterfaceTheme {
             button: ButtonTheme {
                 background_color: Color::monochrome_u8(120),
                 foreground_color: Color::monochrome_u8(220),
+                highlight_color: Color::rgb_u8(255, 160, 60),
                 hovered_background_color: Color::monochrome_u8(150),
                 hovered_foreground_color: Color::monochrome_u8(250),
                 disabled_background_color: Color::monochrome_u8(100),
@@ -269,6 +282,7 @@ impl ThemeDefault for InterfaceTheme {
             state_button: StateButtonTheme {
                 background_color: Color::monochrome_u8(120),
                 foreground_color: Color::monochrome_u8(220),
+                highlight_color: Color::rgb_u8(255, 160, 60),
                 hovered_background_color: Color::monochrome_u8(150),
                 hovered_foreground_color: Color::monochrome_u8(250),
                 disabled_background_color: Color::monochrome_u8(80),
@@ -286,6 +300,7 @@ impl ThemeDefault for InterfaceTheme {
             text_box: TextBoxTheme {
                 background_color: Color::monochrome_u8(40),
                 foreground_color: Color::monochrome_u8(220),
+                highlight_color: Color::rgb_u8(255, 160, 60),
                 hovered_background_color: Color::monochrome_u8(60),
                 hovered_foreground_color: Color::monochrome_u8(250),
                 focused_background_color: Color::monochrome_u8(110),
@@ -304,6 +319,7 @@ impl ThemeDefault for InterfaceTheme {
                 background_color: Color::monochrome_u8(75),
                 secondary_background_color: Color::monochrome_u8(55),
                 foreground_color: Color::monochrome_u8(170),
+                highlight_color: Color::rgb_u8(255, 160, 60),
                 hovered_foreground_color: Color::rgb_u8(250, 200, 200),
                 corner_diameter: CornerDiameter::uniform(10.0),
                 icon_color: Color::monochrome_u8(120),
@@ -319,6 +335,7 @@ impl ThemeDefault for InterfaceTheme {
             drop_down: DropDownTheme {
                 item_background_color: Color::monochrome_u8(80),
                 item_foreground_color: Color::monochrome_u8(180),
+                item_highlight_color: Color::rgb_u8(255, 160, 60),
                 item_hovered_background_color: Color::monochrome_u8(120),
                 item_hovered_foreground_color: Color::monochrome_u8(220),
                 item_height: 20.0,
@@ -334,6 +351,7 @@ impl ThemeDefault for InterfaceTheme {
                 list_maximum_height: 500.0,
                 button_background_color: Color::monochrome_u8(120),
                 button_foreground_color: Color::monochrome_u8(220),
+                button_highlight_color: Color::rgb_u8(255, 160, 60),
                 button_hovered_background_color: Color::monochrome_u8(150),
                 button_hovered_foreground_color: Color::monochrome_u8(250),
                 button_height: 20.0,
@@ -346,6 +364,7 @@ impl ThemeDefault for InterfaceTheme {
             field: FieldTheme {
                 background_color: Color::monochrome_u8(100),
                 foreground_color: Color::monochrome_u8(220),
+                highlight_color: Color::rgb_u8(255, 160, 60),
                 height: 20.0,
                 corner_diameter: CornerDiameter::uniform(10.0),
                 font_size: FontSize(14.0),
@@ -356,6 +375,7 @@ impl ThemeDefault for InterfaceTheme {
             tooltip: TooltipTheme {
                 background_color: Color::rgba_u8(15, 15, 15, 200),
                 foreground_color: Color::monochrome_u8(235),
+                highlight_color: Color::rgb_u8(255, 160, 60),
                 font_size: FontSize(14.0),
                 corner_diameter: CornerDiameter::uniform(5.0),
                 border: 4.0,

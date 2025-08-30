@@ -22,6 +22,7 @@ where
     App: Application,
 {
     pub foreground_color: App::Color,
+    pub highlight_color: App::Color,
     pub hovered_foreground_color: App::Color,
     pub background_color: App::Color,
     pub secondary_background_color: App::Color,
@@ -61,8 +62,8 @@ where
     }
 }
 
-impl<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Children> Persistent
-    for Collapsable<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Children>
+impl<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Children> Persistent
+    for Collapsable<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Children>
 {
     type Data = CollapsableData;
 }
@@ -79,31 +80,32 @@ where
     extra_elements: E,
 }
 
-pub struct Collapsable<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Children> {
+pub struct Collapsable<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Children> {
     text_marker: PhantomData<(Text, Tooltip)>,
     text: A,
     tooltip: B,
     foreground_color: C,
-    hovered_foreground_color: D,
-    background_color: E,
-    secondary_background_color: F,
-    icon_color: G,
-    icon_size: H,
-    gaps: I,
-    border: J,
-    corner_diameter: K,
-    title_height: L,
-    font_size: M,
-    horizontal_alignment: N,
-    vertical_alignment: O,
-    overflow_behavior: P,
-    initially_expanded: Q,
-    extra_elements: R,
+    highlight_color: D,
+    hovered_foreground_color: E,
+    background_color: F,
+    secondary_background_color: G,
+    icon_color: H,
+    icon_size: I,
+    gaps: J,
+    border: K,
+    corner_diameter: L,
+    title_height: M,
+    font_size: N,
+    horizontal_alignment: O,
+    vertical_alignment: P,
+    overflow_behavior: Q,
+    initially_expanded: R,
+    extra_elements: S,
     children: Children,
 }
 
-impl<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Children>
-    Collapsable<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Children>
+impl<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Children>
+    Collapsable<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Children>
 {
     /// This function is supposed to be called from a component macro and not
     /// intended to be called manually.
@@ -113,21 +115,22 @@ impl<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Childr
         text: A,
         tooltip: B,
         foreground_color: C,
-        hovered_foreground_color: D,
-        background_color: E,
-        secondary_background_color: F,
-        icon_color: G,
-        icon_size: H,
-        gaps: I,
-        border: J,
-        corner_diameter: K,
-        title_height: L,
-        font_size: M,
-        horizontal_alignment: N,
-        vertical_alignment: O,
-        overflow_behavior: P,
-        initially_expanded: Q,
-        extra_elements: R,
+        highlight_color: D,
+        hovered_foreground_color: E,
+        background_color: F,
+        secondary_background_color: G,
+        icon_color: H,
+        icon_size: I,
+        gaps: J,
+        border: K,
+        corner_diameter: L,
+        title_height: M,
+        font_size: N,
+        horizontal_alignment: O,
+        vertical_alignment: P,
+        overflow_behavior: Q,
+        initially_expanded: R,
+        extra_elements: S,
         children: Children,
     ) -> Self {
         Self {
@@ -135,6 +138,7 @@ impl<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Childr
             text,
             tooltip,
             foreground_color,
+            highlight_color,
             hovered_foreground_color,
             background_color,
             secondary_background_color,
@@ -155,8 +159,8 @@ impl<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Childr
     }
 }
 
-impl<App, Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Children> Element<App>
-    for Collapsable<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Children>
+impl<App, Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Children> Element<App>
+    for Collapsable<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Children>
 where
     App: Application,
     Text: AsRef<str>,
@@ -168,20 +172,21 @@ where
     E: Selector<App, App::Color>,
     F: Selector<App, App::Color>,
     G: Selector<App, App::Color>,
-    H: Selector<App, f32>,
+    H: Selector<App, App::Color>,
     I: Selector<App, f32>,
     J: Selector<App, f32>,
-    K: Selector<App, App::CornerDiameter>,
-    L: Selector<App, f32>,
-    M: Selector<App, App::FontSize>,
-    N: Selector<App, HorizontalAlignment>,
-    O: Selector<App, VerticalAlignment>,
-    P: Selector<App, App::OverflowBehavior>,
-    Q: Selector<App, bool>,
-    R: ElementSet<App>,
+    K: Selector<App, f32>,
+    L: Selector<App, App::CornerDiameter>,
+    M: Selector<App, f32>,
+    N: Selector<App, App::FontSize>,
+    O: Selector<App, HorizontalAlignment>,
+    P: Selector<App, VerticalAlignment>,
+    Q: Selector<App, App::OverflowBehavior>,
+    R: Selector<App, bool>,
+    S: ElementSet<App>,
     Children: ElementSet<App>,
 {
-    type LayoutInfo = CollapseableLayoutInfo<App, Children::LayoutInfo, R::LayoutInfo>;
+    type LayoutInfo = CollapseableLayoutInfo<App, Children::LayoutInfo, S::LayoutInfo>;
 
     fn create_layout_info(
         &mut self,
@@ -194,10 +199,20 @@ where
 
         let text = state.get(&self.text).as_ref();
         let font_size = *state.get(&self.font_size);
+        let foreground_color = *state.get(&self.foreground_color);
+        let highlight_color = *state.get(&self.highlight_color);
+
         let horizontal_alignment = *state.get(&self.horizontal_alignment);
         let overflow_behavior = *state.get(&self.overflow_behavior);
 
-        let (size, font_size) = resolver.get_text_dimensions(text, font_size, horizontal_alignment, overflow_behavior);
+        let (size, font_size) = resolver.get_text_dimensions(
+            text,
+            foreground_color,
+            highlight_color,
+            font_size,
+            horizontal_alignment,
+            overflow_behavior,
+        );
 
         let title_height = state.get(&self.title_height).max(size.height());
 
@@ -326,6 +341,7 @@ where
             state.get(&self.text).as_ref(),
             layout_info.font_size,
             foreground_color,
+            *state.get(&self.highlight_color),
             *state.get(&self.horizontal_alignment),
             *state.get(&self.vertical_alignment),
             *state.get(&self.overflow_behavior),

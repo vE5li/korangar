@@ -59,8 +59,22 @@ where
         let message_heights = chat_messages
             .iter()
             .map(|chat_message| {
+                let color = match chat_message.color {
+                    MessageColor::Rgb { red, green, blue } => Color::rgb_u8(red, green, blue),
+                    // TODO: Make the color right.
+                    MessageColor::Broadcast => Color::monochrome_u8(255),
+                    // TODO: Make the color right.
+                    MessageColor::Server => Color::monochrome_u8(255),
+                    // TODO: Make the color right.
+                    MessageColor::Error => Color::monochrome_u8(255),
+                    // TODO: Make the color right.
+                    MessageColor::Information => Color::monochrome_u8(255),
+                };
+
                 let (size, _) = resolver.get_text_dimensions(
                     &chat_message.text,
+                    color,
+                    Color::rgb_u8(255, 160, 60),
                     // TODO: Theme this.
                     FontSize(14.0),
                     HorizontalAlignment::Left { offset: 5.0, border: 3.0 },
@@ -127,6 +141,7 @@ where
                     // TODO: Theme this.
                     FontSize(14.0),
                     color,
+                    Color::rgb_u8(255, 160, 60),
                     HorizontalAlignment::Left { offset: 5.0, border: 3.0 },
                     VerticalAlignment::Center { offset: 0.0 },
                     OverflowBehavior::LineBreak,

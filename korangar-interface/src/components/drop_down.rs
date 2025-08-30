@@ -44,24 +44,26 @@ impl DropDownItem<Option<NonZeroU32>> for Option<NonZeroU32> {
     }
 }
 
-struct InnerButton<Value, Item, A, B, C, D, E, F, G, H, I, J, K, L> {
+struct InnerButton<Value, Item, A, B, C, D, E, F, G, H, I, J, K, L, M> {
     text_marker: PhantomData<(Value, Item)>,
     options: A,
     option_index: usize,
     event: B,
     foreground_color: C,
     background_color: D,
-    hovered_foreground_color: E,
-    hovered_background_color: F,
-    height: G,
-    corner_diameter: H,
-    font_size: I,
-    horizontal_alignment: J,
-    vertical_alignment: K,
-    overflow_behavior: L,
+    highlight_color: E,
+    hovered_foreground_color: F,
+    hovered_background_color: G,
+    height: H,
+    corner_diameter: I,
+    font_size: J,
+    horizontal_alignment: K,
+    vertical_alignment: L,
+    overflow_behavior: M,
 }
 
-impl<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L> Element<App> for InnerButton<Value, Item, A, B, C, D, E, F, G, H, I, J, K, L>
+impl<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L, M> Element<App>
+    for InnerButton<Value, Item, A, B, C, D, E, F, G, H, I, J, K, L, M>
 where
     App: Application,
     Item: DropDownItem<Value>,
@@ -71,12 +73,13 @@ where
     D: Selector<App, App::Color>,
     E: Selector<App, App::Color>,
     F: Selector<App, App::Color>,
-    G: Selector<App, f32>,
-    H: Selector<App, App::CornerDiameter>,
-    I: Selector<App, App::FontSize>,
-    J: Selector<App, HorizontalAlignment>,
-    K: Selector<App, VerticalAlignment>,
-    L: Selector<App, App::OverflowBehavior>,
+    G: Selector<App, App::Color>,
+    H: Selector<App, f32>,
+    I: Selector<App, App::CornerDiameter>,
+    J: Selector<App, App::FontSize>,
+    K: Selector<App, HorizontalAlignment>,
+    L: Selector<App, VerticalAlignment>,
+    M: Selector<App, App::OverflowBehavior>,
 {
     fn create_layout_info(&mut self, state: &Context<App>, _: ElementStoreMut<'_>, resolver: &mut Resolver<'_, App>) -> Self::LayoutInfo {
         let height = *state.get(&self.height);
@@ -84,10 +87,19 @@ where
 
         let text = option.text();
         let font_size = *state.get(&self.font_size);
+        let foreground_color = *state.get(&self.foreground_color);
+        let highlight_color = *state.get(&self.highlight_color);
         let horizontal_alignment = *state.get(&self.horizontal_alignment);
         let overflow_behavior = *state.get(&self.overflow_behavior);
 
-        let (size, font_size) = resolver.get_text_dimensions(text, font_size, horizontal_alignment, overflow_behavior);
+        let (size, font_size) = resolver.get_text_dimensions(
+            text,
+            foreground_color,
+            highlight_color,
+            font_size,
+            horizontal_alignment,
+            overflow_behavior,
+        );
 
         let area = resolver.with_height(height.max(size.height()));
 
@@ -126,6 +138,7 @@ where
             option.text(),
             layout_info.font_size,
             foreground_color,
+            *state.get(&self.highlight_color),
             *state.get(&self.horizontal_alignment),
             *state.get(&self.vertical_alignment),
             *state.get(&self.overflow_behavior),
@@ -188,6 +201,7 @@ where
                             // may be fine but also may be something that we want to change.
                             foreground_color: theme().drop_down().item_foreground_color(),
                             background_color: theme().drop_down().item_background_color(),
+                            highlight_color: theme().drop_down().item_highlight_color(),
                             hovered_foreground_color: theme().drop_down().item_hovered_foreground_color(),
                             hovered_background_color: theme().drop_down().item_hovered_background_color(),
                             height: theme().drop_down().item_height(),
@@ -319,6 +333,7 @@ where
 {
     pub item_foreground_color: App::Color,
     pub item_background_color: App::Color,
+    pub item_highlight_color: App::Color,
     pub item_hovered_foreground_color: App::Color,
     pub item_hovered_background_color: App::Color,
     pub item_height: f32,
@@ -334,6 +349,7 @@ where
     pub list_maximum_height: f32,
     pub button_foreground_color: App::Color,
     pub button_background_color: App::Color,
+    pub button_highlight_color: App::Color,
     pub button_hovered_foreground_color: App::Color,
     pub button_hovered_background_color: App::Color,
     pub button_height: f32,
@@ -344,7 +360,7 @@ where
     pub button_overflow_behavior: App::OverflowBehavior,
 }
 
-pub struct DropDown<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L>
+pub struct DropDown<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L, M>
 where
     App: Application,
 {
@@ -352,18 +368,19 @@ where
     selected: B,
     foreground_color: C,
     background_color: D,
-    hovered_foreground_color: E,
-    hovered_background_color: F,
-    height: G,
-    corner_diameter: H,
-    font_size: I,
-    horizontal_alignment: J,
-    vertical_alignment: K,
-    overflow_behavior: L,
+    highlight_color: E,
+    hovered_foreground_color: F,
+    hovered_background_color: G,
+    height: H,
+    corner_diameter: I,
+    font_size: J,
+    horizontal_alignment: K,
+    vertical_alignment: L,
+    overflow_behavior: M,
     click_handler: DefaultClickHandler<App, Value, Item, B, A>,
 }
 
-impl<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L> DropDown<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L>
+impl<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L, M> DropDown<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L, M>
 where
     App: Application,
     Value: 'static,
@@ -379,20 +396,22 @@ where
         selected: B,
         foreground_color: C,
         background_color: D,
-        hovered_foreground_color: E,
-        hovered_background_color: F,
-        height: G,
-        corner_diameter: H,
-        font_size: I,
-        horizontal_alignment: J,
-        vertical_alignment: K,
-        overflow_behavior: L,
+        highlight_color: E,
+        hovered_foreground_color: F,
+        hovered_background_color: G,
+        height: H,
+        corner_diameter: I,
+        font_size: J,
+        horizontal_alignment: K,
+        vertical_alignment: L,
+        overflow_behavior: M,
     ) -> Self {
         Self {
             options: options.clone(),
             selected,
             foreground_color,
             background_color,
+            highlight_color,
             hovered_foreground_color,
             hovered_background_color,
             height,
@@ -406,7 +425,8 @@ where
     }
 }
 
-impl<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L> Element<App> for DropDown<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L>
+impl<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L, M> Element<App>
+    for DropDown<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L, M>
 where
     App: Application,
     Value: PartialEq + 'static,
@@ -417,12 +437,13 @@ where
     D: Selector<App, App::Color>,
     E: Selector<App, App::Color>,
     F: Selector<App, App::Color>,
-    G: Selector<App, f32>,
-    H: Selector<App, App::CornerDiameter>,
-    I: Selector<App, App::FontSize>,
-    J: Selector<App, HorizontalAlignment>,
-    K: Selector<App, VerticalAlignment>,
-    L: Selector<App, App::OverflowBehavior>,
+    G: Selector<App, App::Color>,
+    H: Selector<App, f32>,
+    I: Selector<App, App::CornerDiameter>,
+    J: Selector<App, App::FontSize>,
+    K: Selector<App, HorizontalAlignment>,
+    L: Selector<App, VerticalAlignment>,
+    M: Selector<App, App::OverflowBehavior>,
 {
     fn create_layout_info(
         &mut self,
@@ -432,6 +453,8 @@ where
     ) -> Self::LayoutInfo {
         let mut height = *state.get(&self.height);
         let mut font_size = *state.get(&self.font_size);
+        let foreground_color = *state.get(&self.foreground_color);
+        let highlight_color = *state.get(&self.highlight_color);
 
         let selected = state.get(&self.selected);
         if let Some(index) = state.get(&self.options).iter().position(|value| value.value() == *selected)
@@ -441,7 +464,14 @@ where
             let horizontal_alignment = *state.get(&self.horizontal_alignment);
             let overflow_behavior = *state.get(&self.overflow_behavior);
 
-            let (size, new_font_size) = resolver.get_text_dimensions(text, font_size, horizontal_alignment, overflow_behavior);
+            let (size, new_font_size) = resolver.get_text_dimensions(
+                text,
+                foreground_color,
+                highlight_color,
+                font_size,
+                horizontal_alignment,
+                overflow_behavior,
+            );
 
             height = height.max(size.height());
             font_size = new_font_size;
@@ -500,6 +530,7 @@ where
             selected_option.text(),
             layout_info.font_size,
             foreground_color,
+            *state.get(&self.highlight_color),
             *state.get(&self.horizontal_alignment),
             *state.get(&self.vertical_alignment),
             *state.get(&self.overflow_behavior),

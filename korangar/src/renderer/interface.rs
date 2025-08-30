@@ -31,7 +31,6 @@ pub struct InterfaceRenderer {
     window_size: ScreenSize,
     interface_size: ScreenSize,
     high_quality_interface: bool,
-    highlight_color: Color,
     #[cfg(feature = "debug")]
     show_rectangle_instructions: bool,
     #[cfg(feature = "debug")]
@@ -88,8 +87,6 @@ impl InterfaceRenderer {
             window_size,
             interface_size,
             high_quality_interface,
-            // TODO: Init with black and update this at runtime.
-            highlight_color: Color::rgb_u8(255, 160, 60),
             #[cfg(feature = "debug")]
             show_rectangle_instructions,
             #[cfg(feature = "debug")]
@@ -155,6 +152,8 @@ impl InterfaceRenderer {
     pub fn get_text_dimensions(
         &self,
         text: &str,
+        color: Color,
+        highlight_color: Color,
         mut font_size: FontSize,
         mut available_width: f32,
         overflow_behavior: OverflowBehavior,
@@ -166,9 +165,9 @@ impl InterfaceRenderer {
             available_width *= 2.0;
         }
 
-        let (mut size, mut font_size) = self
-            .font_loader
-            .get_text_dimensions(text, font_size, 1.0, available_width, overflow_behavior);
+        let (mut size, mut font_size) =
+            self.font_loader
+                .get_text_dimensions(text, color, highlight_color, font_size, 1.0, available_width, overflow_behavior);
 
         if self.high_quality_interface {
             size = size / 2.0;
@@ -255,6 +254,7 @@ impl InterfaceRenderer {
         mut available_width: f32,
         mut screen_clip: ScreenClip,
         color: Color,
+        highlight_color: Color,
         mut font_size: FontSize,
     ) -> f32 {
         // TODO: Can't we scale after laying out the text? Would cut down on
@@ -271,7 +271,7 @@ impl InterfaceRenderer {
         let mut size = self.font_loader.layout_text(
             text,
             color,
-            self.highlight_color,
+            highlight_color,
             font_size,
             1.0,
             Some(available_width),
@@ -582,8 +582,17 @@ impl RenderLayer<ClientState> for InterfaceRenderer {
         self.render_rectangle(position, size, clip, corner_diameter, color);
     }
 
-    fn render_text(&self, text: &str, position: ScreenPosition, available_width: f32, clip: ScreenClip, color: Color, font_size: FontSize) {
-        self.render_text(text, position, available_width, clip, color, font_size);
+    fn render_text(
+        &self,
+        text: &str,
+        position: ScreenPosition,
+        available_width: f32,
+        clip: ScreenClip,
+        color: Color,
+        highlight_color: Color,
+        font_size: FontSize,
+    ) {
+        self.render_text(text, position, available_width, clip, color, highlight_color, font_size);
     }
 
     fn render_icon(&self, position: ScreenPosition, size: ScreenSize, clip: ScreenClip, icon: Icon<ClientState>, color: Color) {

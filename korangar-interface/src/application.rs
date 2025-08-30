@@ -169,6 +169,7 @@ pub trait RenderLayer<App: Application> {
     );
 
     /// Render a str as text.
+    #[allow(clippy::too_many_arguments)]
     fn render_text(
         &self,
         text: &str,

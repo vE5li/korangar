@@ -136,13 +136,13 @@ where
         let font_size = *state.get(&self.font_size);
         let horizontal_alignment = *state.get(&self.horizontal_alignment);
         let overflow_behavior = *state.get(&self.overflow_behavior);
-        let text_default_color = *state.get(&self.foreground_color);
-        let text_highlight_color = *state.get(&self.background_color);
+        let foreground_color = *state.get(&self.foreground_color);
+        let highlight_color = *state.get(&self.highlight_color);
 
         let (size, font_size) = resolver.get_text_dimensions(
             text,
-            text_default_color,
-            text_highlight_color,
+            foreground_color,
+            highlight_color,
             font_size,
             horizontal_alignment,
             overflow_behavior,

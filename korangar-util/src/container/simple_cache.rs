@@ -1,9 +1,10 @@
 use std::borrow::Borrow;
 use std::collections::VecDeque;
-use std::hash::Hash;
+use std::hash::{BuildHasher, Hash};
 use std::num::{NonZeroU32, NonZeroUsize};
 use std::sync::Arc;
 
+use hashbrown::hash_map::RawEntryMut;
 use hashbrown::{HashMap, HashSet};
 
 /// Something that can be cached.
@@ -265,6 +266,26 @@ impl<K: Clone + Eq + Hash, V: Cacheable> SimpleCache<K, V> {
         Ok(())
     }
 
+    /// Returns a reference of the given cached value. This is a special version
+    /// of get that uses hashbrown's raw entry API to allow to query with
+    /// borrowed data.
+    #[must_use]
+    pub fn get_with<Q, F>(&mut self, key: &Q, mut eq: F) -> Option<&V>
+    where
+        Q: Hash + ?Sized,
+        F: FnMut(&K) -> bool,
+    {
+        let hash = self.values.hasher().hash_one(key);
+        match self.values.raw_entry_mut().from_hash(hash, |k| eq(k)) {
+            RawEntryMut::Vacant(_) => None,
+            RawEntryMut::Occupied(entry) => {
+                let value_entry = entry.into_mut();
+                value_entry.freq = std::cmp::min(value_entry.freq + 1, 3);
+                Some(&value_entry.value)
+            }
+        }
+    }
+
     /// Returns a reference of the given cached value.
     #[must_use]
     pub fn get<Q>(&mut self, key: &Q) -> Option<&V>
@@ -434,7 +455,7 @@ mod tests {
         let mut ghost = GhostList::new(5);
 
         for i in 0..5 {
-            ghost.insert(format!("key{}", i));
+            ghost.insert(format!("key{i}"));
         }
 
         ghost.remove("key1");
@@ -497,7 +518,7 @@ mod tests {
         let mut cache: SimpleCache<String, TestData> = SimpleCache::new(NonZeroU32::new(100).unwrap(), NonZeroUsize::new(10000).unwrap());
 
         for i in 0..50 {
-            let key = format!("key_{}", i);
+            let key = format!("key_{i}");
             let data = TestData::new(100);
             assert!(cache.insert(key.clone(), data).is_ok());
         }
@@ -506,7 +527,7 @@ mod tests {
         assert_eq!(cache.size(), 1000);
 
         for i in 0..10 {
-            let key = format!("key_{}", i);
+            let key = format!("key_{i}");
             let data = TestData::new(100);
             assert!(cache.insert(key.clone(), data).is_ok());
         }
@@ -516,13 +537,13 @@ mod tests {
 
         // Ghosts are promoted to main FIFO.
         for i in 0..10 {
-            let key = format!("key_{}", i);
+            let key = format!("key_{i}");
             assert!(cache.get(&key).is_some(), "Key {key} should be present");
         }
 
-        // The last batch of one hits are still in small FIFI.
+        // The last batch of one hits are still in small FIFO.
         for i in 40..50 {
-            let key = format!("key_{}", i);
+            let key = format!("key_{i}");
             assert!(cache.get(&key).is_some(), "Key {key} should be present");
         }
     }
@@ -532,7 +553,7 @@ mod tests {
         let mut cache: SimpleCache<String, TestData> = SimpleCache::new(NonZeroU32::new(100).unwrap(), NonZeroUsize::new(100000).unwrap());
 
         for i in 0..20 {
-            let key = format!("key_{}", i);
+            let key = format!("key_{i}");
             let data = TestData::new(100);
             assert!(cache.insert(key.clone(), data).is_ok());
         }
@@ -540,7 +561,7 @@ mod tests {
         assert_eq!(cache.count(), 10);
 
         for i in 10..20 {
-            let key = format!("key_{}", i);
+            let key = format!("key_{i}");
             assert!(cache.get(&key).is_some(), "Key {key} should be present");
         }
     }
@@ -550,7 +571,7 @@ mod tests {
         let mut cache: SimpleCache<String, TestData> = SimpleCache::new(NonZeroU32::new(100).unwrap(), NonZeroUsize::new(10000).unwrap());
 
         for i in 0..10 {
-            let key = format!("key_{}", i);
+            let key = format!("key_{i}");
             let data = TestData::new(500);
             assert!(cache.insert(key.clone(), data).is_ok());
         }
@@ -558,7 +579,7 @@ mod tests {
         assert_eq!(cache.size(), 1000);
 
         for i in 8..10 {
-            let key = format!("key_{}", i);
+            let key = format!("key_{i}");
             assert!(cache.get(&key).is_some(), "Key {key} should be present");
         }
     }

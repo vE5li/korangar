@@ -11,7 +11,7 @@ use quick_xml::events::Event;
 use rust_state::RustState;
 use serde::{Deserialize, Serialize};
 
-pub use self::client_info::{ClientInfo, ClientInfoPathExt};
+pub use self::client_info::{ClientInfo, ClientInfoPathExt, PacketVersion};
 use super::GameFileLoader;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, RustState, StateElement)]

@@ -23,7 +23,7 @@ pub use self::font::{FontLoader, FontSize, GlyphInstruction, OverflowBehavior, S
 pub use self::gamefile::*;
 pub use self::map::{GAT_TILE_SIZE, MapLoader};
 pub use self::model::*;
-pub use self::server::{ClientInfo, ClientInfoPathExt, ServiceId, load_client_info};
+pub use self::server::{ClientInfo, ClientInfoPathExt, PacketVersion, ServiceId, load_client_info};
 pub use self::smoothing::{smooth_ground_normals, smooth_model_normals};
 pub use self::sprite::*;
 pub use self::texture::{ImageType, TextureLoader, TextureSetBuilder, TextureSetTexture};

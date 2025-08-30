@@ -17,6 +17,7 @@ const CHILDREN_STORE_ID: u64 = 0;
 const EXTRA_STORE_ID: u64 = 1;
 
 #[derive(RustState)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct CollapsableTheme<App>
 where
     App: Application,

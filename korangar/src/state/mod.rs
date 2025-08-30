@@ -36,14 +36,14 @@ use crate::character_slots::CharacterSlots;
 use crate::graphics::RenderOptions;
 use crate::graphics::{Color, CornerDiameter, ScreenClip, ScreenPosition, ScreenSize, ShadowPadding};
 use crate::input::{InputEvent, MouseInputMode};
-#[cfg(feature = "debug")]
-use crate::interface::windows::ProfilerWindowState;
 use crate::interface::windows::{ChatWindowState, DialogWindowState, FriendListWindowState, LoginWindowState, WindowCache, WindowClass};
+#[cfg(feature = "debug")]
+use crate::interface::windows::{ProfilerWindowState, ThemeInspectorWindowState};
 use crate::inventory::{Hotbar, Inventory, SkillTree};
 use crate::loaders::{ClientInfo, FontLoader, FontSize, GameFileLoader, OverflowBehavior, load_client_info};
 use crate::renderer::InterfaceRenderer;
 use crate::settings::{GraphicsSettingsCapabilities, InterfaceSettings, InterfaceSettingsCapabilities, LoginSettings};
-use crate::state::theme::{GameTheme, ThemeDefault};
+use crate::state::theme::WorldTheme;
 #[cfg(feature = "debug")]
 use crate::world::Object;
 use crate::world::{Entity, Player, ResourceMetadata};
@@ -91,13 +91,13 @@ pub struct ClientState {
     /// Graphics capabilities used in the graphics settings window.
     graphics_settings_capabilities: GraphicsSettingsCapabilities,
 
-    /// The interface theme for the main menu.
+    /// The interface theme for the menu windows.
     menu_theme: InterfaceTheme,
-    /// The interface theme when playing the game.
-    playing_theme: InterfaceTheme,
+    /// The interface theme for in-game windows.
+    in_game_theme: InterfaceTheme,
     /// Theme for themeable elements that don't change between the menu
     /// and playing theme.
-    game_theme: GameTheme,
+    world_theme: WorldTheme,
 
     /// Loaded `sclientinfo.xml`.
     client_info: ClientInfo,
@@ -189,6 +189,9 @@ pub struct ClientState {
     /// Internal state of the profiler window.
     #[cfg(feature = "debug")]
     profiler_window: ProfilerWindowState,
+    /// Internal state of the theme inspector window.
+    #[cfg(feature = "debug")]
+    theme_inspector_window: ThemeInspectorWindowState,
     /// List of packets sent and received for the packet inspector. Also
     /// contains information about which packets to display in the
     /// inspector.
@@ -217,9 +220,9 @@ impl ClientState {
         });
 
         time_phase!("load themes", {
-            let menu_theme = InterfaceTheme::default_menu();
-            let playing_theme = InterfaceTheme::default_playing();
-            let game_theme = GameTheme::default();
+            let menu_theme = InterfaceTheme::load(InterfaceThemeType::Menu, &interface_settings.menu_theme);
+            let in_game_theme = InterfaceTheme::load(InterfaceThemeType::InGame, &interface_settings.in_game_theme);
+            let world_theme = WorldTheme::load(&interface_settings.world_theme);
         });
 
         time_phase!("create login window state", {
@@ -313,6 +316,8 @@ impl ClientState {
 
         #[cfg(feature = "debug")]
         let profiler_window = ProfilerWindowState::default();
+        #[cfg(feature = "debug")]
+        let theme_inspector_window = ThemeInspectorWindowState::default();
 
         #[cfg(feature = "debug")]
         let cache_statistics = CacheStatistics::default();
@@ -329,8 +334,8 @@ impl ClientState {
             graphics_settings,
             graphics_settings_capabilities,
             menu_theme,
-            playing_theme,
-            game_theme,
+            in_game_theme,
+            world_theme,
             client_info,
             login_window,
             chat_window,
@@ -368,6 +373,8 @@ impl ClientState {
             #[cfg(feature = "debug")]
             profiler_window,
             #[cfg(feature = "debug")]
+            theme_inspector_window,
+            #[cfg(feature = "debug")]
             packet_history,
             #[cfg(feature = "debug")]
             cache_statistics,
@@ -377,7 +384,7 @@ impl ClientState {
 
 /// Static used to create a path without arguments that points the the current
 /// theme when creating the layout for a given window.
-static mut CURRENT_THEME: InterfaceThemeType = InterfaceThemeType::Game;
+static mut CURRENT_THEME: InterfaceThemeType = InterfaceThemeType::InGame;
 
 /// Path resolving to the selected theme for the window.
 #[derive(Clone, Copy)]
@@ -387,14 +394,14 @@ impl Path<ClientState, InterfaceTheme> for ThemePath {
     fn follow<'a>(&self, state: &'a ClientState) -> Option<&'a InterfaceTheme> {
         match unsafe { CURRENT_THEME } {
             InterfaceThemeType::Menu => Some(&state.menu_theme),
-            InterfaceThemeType::Game => Some(&state.playing_theme),
+            InterfaceThemeType::InGame => Some(&state.in_game_theme),
         }
     }
 
     fn follow_mut<'a>(&self, state: &'a mut ClientState) -> Option<&'a mut InterfaceTheme> {
         match unsafe { CURRENT_THEME } {
             InterfaceThemeType::Menu => Some(&mut state.menu_theme),
-            InterfaceThemeType::Game => Some(&mut state.playing_theme),
+            InterfaceThemeType::InGame => Some(&mut state.in_game_theme),
         }
     }
 }

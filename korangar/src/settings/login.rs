@@ -82,9 +82,9 @@ impl LoginSettings {
         if let Err(_error) = std::fs::write(Self::FILE_NAME, data) {
             #[cfg(feature = "debug")]
             print_debug!(
-                "failed to save login settings to {}: {}",
+                "failed to save login settings to {}: {:?}",
                 Self::FILE_NAME.magenta(),
-                _error.to_string().red()
+                _error.red()
             );
         }
     }

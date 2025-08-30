@@ -18,11 +18,12 @@ use korangar_debug::logging::Colorize;
 use korangar_debug::logging::print_debug;
 use korangar_interface::application::TextLayouter;
 use korangar_interface::components::drop_down::DropDownItem;
-use korangar_interface::element::ElementDisplay;
+use korangar_interface::element::{ElementDisplay, StateElement};
 use korangar_util::Rectangle;
 #[cfg(feature = "debug")]
 use korangar_util::container::CacheStatistics;
 use korangar_util::container::{Cacheable, SimpleCache};
+use rust_state::RustState;
 use serde::{Deserialize, Serialize};
 
 use self::color_span_iterator::ColorSpanIterator;
@@ -53,7 +54,7 @@ impl Cacheable for CachedLayout {
 #[serde(transparent)]
 pub struct FontSize(pub f32);
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, RustState, StateElement)]
 pub enum OverflowBehavior {
     Shrink,
     LineBreak,

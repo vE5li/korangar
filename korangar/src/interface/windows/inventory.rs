@@ -38,7 +38,7 @@ where
         window! {
             title: client_state().localization().inventory_window_title(),
             class: Self::window_class(),
-            theme: InterfaceThemeType::Game,
+            theme: InterfaceThemeType::InGame,
             closable: true,
             elements: std::array::from_fn::<_, INVENTORY_ROWS, _>(|row| {
                 split! {

@@ -10,6 +10,7 @@ use crate::layout::tooltip::TooltipExt;
 use crate::layout::{Resolver, WindowLayout};
 
 #[derive(RustState)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct FieldTheme<App>
 where
     App: Application + 'static,

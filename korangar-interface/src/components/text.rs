@@ -9,6 +9,7 @@ use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
 use crate::layout::{Resolver, WindowLayout};
 
 #[derive(RustState)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct TextTheme<App>
 where
     App: Application + 'static,

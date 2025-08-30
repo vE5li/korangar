@@ -1,5 +1,5 @@
-mod game;
 mod interface;
+mod world;
 
-pub use game::*;
 pub use interface::*;
+pub use world::*;

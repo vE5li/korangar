@@ -36,6 +36,8 @@ mod sell_cart;
 mod server_selection;
 mod skill_tree;
 #[cfg(feature = "debug")]
+mod theme_inspector;
+#[cfg(feature = "debug")]
 mod time;
 
 use serde::{Deserialize, Serialize};
@@ -78,6 +80,8 @@ pub use self::sell_cart::SellCartWindow;
 pub use self::server_selection::ServerSelectionWindow;
 pub use self::skill_tree::SkillTreeWindow;
 #[cfg(feature = "debug")]
+pub use self::theme_inspector::{ThemeInspectorWindow, ThemeInspectorWindowState};
+#[cfg(feature = "debug")]
 pub use self::time::TimeWindow;
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
@@ -117,6 +121,8 @@ pub enum WindowClass {
     RenderOptions,
     #[cfg(feature = "debug")]
     Commands,
+    #[cfg(feature = "debug")]
+    ThemeInspector,
     #[cfg(feature = "debug")]
     Profiler,
     #[cfg(feature = "debug")]

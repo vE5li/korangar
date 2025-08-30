@@ -199,7 +199,7 @@ where
         window! {
             title: client_state().localization().chat_window_title(),
             class: Self::window_class(),
-            theme: InterfaceThemeType::Game,
+            theme: InterfaceThemeType::InGame,
             background_color: client_theme().chat().window_color(),
             resizable: true,
             border: 3.0,

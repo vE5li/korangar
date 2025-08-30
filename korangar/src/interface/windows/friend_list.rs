@@ -146,7 +146,7 @@ where
         window! {
             title: client_state().localization().friend_list_window_title(),
             class: Self::window_class(),
-            theme: InterfaceThemeType::Game,
+            theme: InterfaceThemeType::InGame,
             closable: true,
             elements: (
                 text_box! {

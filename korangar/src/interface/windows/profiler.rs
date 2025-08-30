@@ -292,7 +292,7 @@ where
         window! {
             title: "Profiler",
             class: Self::window_class(),
-            theme: InterfaceThemeType::Game,
+            theme: InterfaceThemeType::InGame,
             closable: true,
             elements: (
                 split! {

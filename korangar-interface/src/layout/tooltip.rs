@@ -21,6 +21,7 @@ where
 }
 
 #[derive(RustState)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct TooltipTheme<App>
 where
     App: Application + 'static,

@@ -304,7 +304,7 @@ where
         window! {
             title: "Render Options",
             class: Self::window_class(),
-            theme: InterfaceThemeType::Game,
+            theme: InterfaceThemeType::InGame,
             closable: true,
             resizable: true,
             minimum_height: 300.0,

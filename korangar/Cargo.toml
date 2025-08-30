@@ -21,7 +21,7 @@ image = { workspace = true, features = ["bmp", "jpeg", "png", "tga", "rayon"] }
 korangar-audio = { workspace = true }
 korangar-components = { path = "components" }
 korangar-debug = { workspace = true, optional = true }
-korangar-interface = { workspace = true, features = ["serde", "cgmath"] }
+korangar-interface = { workspace = true, features = ["serde", "cgmath", "theme-element"] }
 korangar-networking = { workspace = true, features = ["interface"] }
 korangar-util = { workspace = true, features = ["interface"] }
 korangar-video = { workspace = true }

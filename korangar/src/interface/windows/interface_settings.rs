@@ -59,12 +59,48 @@ where
                     }
                 )
             },
+            split! {
+                children: (
+                    text! {
+                        text: client_state().localization().menu_theme_text(),
+                        overflow_behavior: OverflowBehavior::Shrink,
+                    },
+                    drop_down! {
+                        selected: self.settings_path.menu_theme(),
+                        options: self.capabilities_path.menu_themes(),
+                    }
+                )
+            },
+            split! {
+                children: (
+                    text! {
+                        text: client_state().localization().in_game_theme_text(),
+                        overflow_behavior: OverflowBehavior::Shrink,
+                    },
+                    drop_down! {
+                        selected: self.settings_path.in_game_theme(),
+                        options: self.capabilities_path.in_game_themes(),
+                    }
+                )
+            },
+            split! {
+                children: (
+                    text! {
+                        text: client_state().localization().world_theme_text(),
+                        overflow_behavior: OverflowBehavior::Shrink,
+                    },
+                    drop_down! {
+                        selected: self.settings_path.world_theme(),
+                        options: self.capabilities_path.world_themes(),
+                    }
+                )
+            },
         );
 
         window! {
             title: client_state().localization().interface_settings_window_title(),
             class: Self::window_class(),
-            theme: InterfaceThemeType::Game,
+            theme: InterfaceThemeType::InGame,
             closable: true,
             elements,
         }

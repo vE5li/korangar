@@ -2,6 +2,52 @@ use crate::layout::Icon;
 use crate::theme::ThemePathGetter;
 use crate::window::Anchor;
 
+#[cfg(not(feature = "serde"))]
+mod serde_gate {
+    /// Implementation detail. Only exists to add bounds on types with the
+    /// `serde` feature enabled.
+    pub trait Bound {}
+
+    impl<T> Bound for T {}
+}
+
+#[cfg(feature = "serde")]
+mod serde_gate {
+    /// Implementation detail. Only exists to add bounds on types with the
+    /// `serde` feature enabled.
+    pub trait Bound: serde::Serialize + serde::Deserialize<'static> {}
+
+    impl<T> Bound for T where T: serde::Serialize + serde::Deserialize<'static> {}
+}
+
+#[cfg(not(feature = "theme-element"))]
+mod element_gate {
+    use crate::application::Application;
+
+    /// Implementation detail. Only exists to add bounds on types with the
+    /// `theme-element` feature enabled.
+    pub trait Bound<App: Application> {}
+
+    impl<T, App> Bound<App> for T where App: Application {}
+}
+
+#[cfg(feature = "theme-element")]
+mod element_gate {
+    use crate::application::Application;
+    use crate::element::StateElement;
+
+    /// Implementation detail. Only exists to add bounds on types with the
+    /// `theme-element` feature enabled.
+    pub trait Bound<App: Application> {}
+
+    impl<T, App> Bound<App> for T
+    where
+        T: StateElement<App>,
+        App: Application,
+    {
+    }
+}
+
 /// Glue between [`korangar_interface`] and the application.
 ///
 /// This trait mostly consists of associated types so the application can call
@@ -36,19 +82,19 @@ pub trait Application: Sized + 'static {
     ///
     /// Ideally this should be the same type that the application renderer uses
     /// to represent color.
-    type Color: Copy;
+    type Color: Copy + serde_gate::Bound + element_gate::Bound<Self>;
 
     /// Application corner diameter type.
     ///
     /// Ideally this should be the same type that the application renderer uses
     /// to represent corner diameter.
-    type CornerDiameter: CornerDiameter;
+    type CornerDiameter: CornerDiameter + serde_gate::Bound + element_gate::Bound<Self>;
 
     /// Application font size type.
     ///
     /// Ideally this should be the same type that the application renderer uses
     /// to represent font size.
-    type FontSize: FontSize;
+    type FontSize: FontSize + serde_gate::Bound + element_gate::Bound<Self>;
 
     /// Application 2D position type.
     ///
@@ -62,7 +108,7 @@ pub trait Application: Sized + 'static {
     ///
     /// Ideally this should be the same type that the application renderer uses
     /// to represent 2D sizes.
-    type Size: Size;
+    type Size: Size + serde_gate::Bound + element_gate::Bound<Self>;
 
     /// Application clip type.
     ///
@@ -114,7 +160,7 @@ pub trait Application: Sized + 'static {
     ///
     /// Typically this would include options line inserting a line break and
     /// shrinking the text.
-    type OverflowBehavior: Copy;
+    type OverflowBehavior: Copy + serde_gate::Bound + element_gate::Bound<Self>;
 
     /// Application text layouter.
     type TextLayouter: TextLayouter<Self>;

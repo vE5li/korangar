@@ -484,7 +484,7 @@ impl<'a, App: Application> WindowLayout<'a, App> {
         });
     }
 
-    #[cfg_attr(feature = "debug", korangar_debug::profile("render layout"))]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("render window layout"))]
     pub fn render(&mut self, renderer: &App::Renderer, text_layouter: &App::TextLayouter) {
         // NOTE: For now we scale the clip layers when rendering because we need the
         // unscaled clip for testing mouse interfection with areas. Ideally this

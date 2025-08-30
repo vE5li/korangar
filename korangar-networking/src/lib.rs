@@ -6,17 +6,15 @@ mod event;
 mod hotkey;
 mod items;
 mod message;
+mod packet_versions;
 mod server;
 
-use std::cell::RefCell;
 use std::net::{IpAddr, SocketAddr};
-use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use event::{
     CharacterServerDisconnectedEvent, DisconnectedEvent, LoginServerDisconnectedEvent, MapServerDisconnectedEvent, NetworkEventList,
-    NoNetworkEvents,
 };
 use ragnarok_bytes::encoding::UTF_8;
 use ragnarok_bytes::{ByteReader, ByteWriter, FromBytes};
@@ -34,6 +32,7 @@ pub use self::event::{DisconnectReason, NetworkEvent};
 pub use self::hotkey::HotkeyState;
 pub use self::items::{InventoryItem, InventoryItemDetails, ItemQuantity, NoMetadata, SellItem, ShopItem};
 pub use self::message::MessageColor;
+pub use self::packet_versions::SupportedPacketVersion;
 pub use self::server::{
     CharacterServerLoginData, LoginServerLoginData, NotConnectedError, UnifiedCharacterSelectionFailedReason, UnifiedLoginFailedReason,
 };
@@ -149,13 +148,14 @@ where
                             address,
                             action_receiver,
                             event_sender,
+                            packet_version,
                         } => {
                             if let Some(handle) = login_server_task_handle.take() {
                                 // TODO: Maybe add a timeout here? Maybe handle Result?
                                 let _ = handle.await.unwrap();
                             }
 
-                            let packet_handler = Self::create_login_server_packet_handler(packet_callback.clone()).unwrap();
+                            let packet_handler = Self::create_login_server_packet_handler(packet_callback.clone(), packet_version).unwrap();
                             let handle = local_set.spawn_local(Self::handle_server_connection(
                                 address,
                                 action_receiver,
@@ -173,13 +173,15 @@ where
                             address,
                             action_receiver,
                             event_sender,
+                            packet_version,
                         } => {
                             if let Some(handle) = character_server_task_handle.take() {
                                 // TODO: Maybe add a timeout here? Maybe handle Result?
                                 let _ = handle.await.unwrap();
                             }
 
-                            let packet_handler = Self::create_character_server_packet_handler(packet_callback.clone()).unwrap();
+                            let packet_handler =
+                                Self::create_character_server_packet_handler(packet_callback.clone(), packet_version).unwrap();
                             let handle = local_set.spawn_local(Self::handle_server_connection(
                                 address,
                                 action_receiver,
@@ -197,13 +199,14 @@ where
                             address,
                             action_receiver,
                             event_sender,
+                            packet_version,
                         } => {
                             if let Some(handle) = map_server_task_handle.take() {
                                 // TODO: Maybe add a timeout here? Maybe handle Result?
                                 let _ = handle.await.unwrap();
                             }
 
-                            let packet_handler = Self::create_map_server_packet_handler(packet_callback.clone()).unwrap();
+                            let packet_handler = Self::create_map_server_packet_handler(packet_callback.clone(), packet_version).unwrap();
                             let handle = local_set.spawn_local(Self::handle_server_connection(
                                 address,
                                 action_receiver,
@@ -239,6 +242,7 @@ where
             ServerConnection::Connected {
                 action_sender,
                 mut event_receiver,
+                packet_version,
             } => loop {
                 match event_receiver.try_recv() {
                     Ok(login_event) => {
@@ -248,6 +252,7 @@ where
                         *connection = ServerConnection::Connected {
                             action_sender,
                             event_receiver,
+                            packet_version,
                         };
                         break;
                     }
@@ -381,7 +386,13 @@ where
         }
     }
 
-    pub fn connect_to_login_server(&mut self, address: SocketAddr, username: impl Into<String>, password: impl Into<String>) {
+    pub fn connect_to_login_server(
+        &mut self,
+        packet_version: SupportedPacketVersion,
+        address: SocketAddr,
+        username: impl Into<String>,
+        password: impl Into<String>,
+    ) {
         if !matches!(self.login_server_connection, ServerConnection::Disconnected) {
             return;
         }
@@ -394,6 +405,7 @@ where
                 address,
                 action_receiver,
                 event_sender,
+                packet_version,
             })
             .expect("network thread dropped");
 
@@ -410,10 +422,16 @@ where
         self.login_server_connection = ServerConnection::Connected {
             action_sender,
             event_receiver,
+            packet_version,
         };
     }
 
-    pub fn connect_to_character_server(&mut self, login_data: &LoginServerLoginData, server: CharacterServerInformation) {
+    pub fn connect_to_character_server(
+        &mut self,
+        packet_version: SupportedPacketVersion,
+        login_data: &LoginServerLoginData,
+        server: CharacterServerInformation,
+    ) {
         if !matches!(self.character_server_connection, ServerConnection::Disconnected) {
             return;
         }
@@ -428,6 +446,7 @@ where
                 address,
                 action_receiver,
                 event_sender,
+                packet_version,
             })
             .expect("network thread dropped");
 
@@ -449,11 +468,13 @@ where
         self.character_server_connection = ServerConnection::Connected {
             action_sender,
             event_receiver,
+            packet_version,
         };
     }
 
     pub fn connect_to_map_server(
         &mut self,
+        packet_version: SupportedPacketVersion,
         login_server_login_data: &LoginServerLoginData,
         character_server_login_data: CharacterServerLoginData,
     ) {
@@ -471,6 +492,7 @@ where
                 address,
                 action_receiver,
                 event_sender,
+                packet_version,
             })
             .expect("network thread dropped");
 
@@ -495,6 +517,7 @@ where
         self.map_server_connection = ServerConnection::Connected {
             action_sender,
             event_receiver,
+            packet_version,
         };
     }
 
@@ -522,10 +545,18 @@ where
         matches!(self.map_server_connection, ServerConnection::Connected { .. })
     }
 
-    pub fn send_login_server_packet(&mut self, packet: &impl LoginServerPacket) -> Result<(), NotConnectedError> {
+    pub fn send_login_server_packet<P>(&mut self, f: impl FnOnce(SupportedPacketVersion) -> P) -> Result<(), NotConnectedError>
+    where
+        P: LoginServerPacket,
+    {
         match &mut self.login_server_connection {
-            ServerConnection::Connected { action_sender, .. } => {
-                self.packet_callback.outgoing_packet(packet);
+            ServerConnection::Connected {
+                action_sender,
+                packet_version,
+                ..
+            } => {
+                let packet = f(*packet_version);
+                self.packet_callback.outgoing_packet(&packet);
 
                 // FIX: Don't unwrap.
                 let mut byte_writer = ByteWriter::with_encoding(UTF_8);
@@ -536,10 +567,18 @@ where
         }
     }
 
-    pub fn send_character_server_packet(&mut self, packet: &impl CharacterServerPacket) -> Result<(), NotConnectedError> {
+    pub fn send_character_server_packet<P>(&mut self, f: impl FnOnce(SupportedPacketVersion) -> P) -> Result<(), NotConnectedError>
+    where
+        P: CharacterServerPacket,
+    {
         match &mut self.character_server_connection {
-            ServerConnection::Connected { action_sender, .. } => {
-                self.packet_callback.outgoing_packet(packet);
+            ServerConnection::Connected {
+                action_sender,
+                packet_version,
+                ..
+            } => {
+                let packet = f(*packet_version);
+                self.packet_callback.outgoing_packet(&packet);
 
                 // FIX: Don't unwrap.
                 let mut byte_writer = ByteWriter::with_encoding(UTF_8);
@@ -550,10 +589,18 @@ where
         }
     }
 
-    pub fn send_map_server_packet(&mut self, packet: &impl MapServerPacket) -> Result<(), NotConnectedError> {
+    pub fn send_map_server_packet<P>(&mut self, f: impl FnOnce(SupportedPacketVersion) -> P) -> Result<(), NotConnectedError>
+    where
+        P: MapServerPacket,
+    {
         match &mut self.map_server_connection {
-            ServerConnection::Connected { action_sender, .. } => {
-                self.packet_callback.outgoing_packet(packet);
+            ServerConnection::Connected {
+                action_sender,
+                packet_version,
+                ..
+            } => {
+                let packet = f(*packet_version);
+                self.packet_callback.outgoing_packet(&packet);
 
                 // FIX: Don't unwrap.
                 let mut byte_writer = ByteWriter::with_encoding(UTF_8);
@@ -566,823 +613,53 @@ where
 
     fn create_login_server_packet_handler(
         packet_callback: Callback,
+        packet_version: SupportedPacketVersion,
     ) -> Result<PacketHandler<NetworkEventList, (), Callback>, DuplicateHandlerError> {
         let mut packet_handler = PacketHandler::<NetworkEventList, (), Callback>::with_callback(packet_callback);
 
-        packet_handler.register(|packet: LoginServerLoginSuccessPacket| NetworkEvent::LoginServerConnected {
-            character_servers: packet.character_server_information,
-            login_data: LoginServerLoginData {
-                account_id: packet.account_id,
-                login_id1: packet.login_id1,
-                login_id2: packet.login_id2,
-                sex: packet.sex,
-            },
-        })?;
-        packet_handler.register(|packet: LoginFailedPacket| {
-            let (reason, message) = match packet.reason {
-                LoginFailedReason::ServerClosed => (UnifiedLoginFailedReason::ServerClosed, "Server closed"),
-                LoginFailedReason::AlreadyLoggedIn => (
-                    UnifiedLoginFailedReason::AlreadyLoggedIn,
-                    "Someone has already logged in with this id",
-                ),
-                LoginFailedReason::AlreadyOnline => (UnifiedLoginFailedReason::AlreadyOnline, "Already online"),
-            };
-
-            NetworkEvent::LoginServerConnectionFailed { reason, message }
-        })?;
-        packet_handler.register(|packet: LoginFailedPacket2| {
-            let (reason, message) = match packet.reason {
-                LoginFailedReason2::UnregisteredId => (UnifiedLoginFailedReason::UnregisteredId, "Unregistered id"),
-                LoginFailedReason2::IncorrectPassword => (UnifiedLoginFailedReason::IncorrectPassword, "Incorrect password"),
-                LoginFailedReason2::IdExpired => (UnifiedLoginFailedReason::IdExpired, "Id has expired"),
-                LoginFailedReason2::RejectedFromServer => (UnifiedLoginFailedReason::RejectedFromServer, "Rejected from server"),
-                LoginFailedReason2::BlockedByGMTeam => (UnifiedLoginFailedReason::BlockedByGMTeam, "Blocked by gm team"),
-                LoginFailedReason2::GameOutdated => (UnifiedLoginFailedReason::GameOutdated, "Game outdated"),
-                LoginFailedReason2::LoginProhibitedUntil => (UnifiedLoginFailedReason::LoginProhibitedUntil, "Login prohibited until"),
-                LoginFailedReason2::ServerFull => (UnifiedLoginFailedReason::ServerFull, "Server is full"),
-                LoginFailedReason2::CompanyAccountLimitReached => (
-                    UnifiedLoginFailedReason::CompanyAccountLimitReached,
-                    "Company account limit reached",
-                ),
-            };
-
-            NetworkEvent::LoginServerConnectionFailed { reason, message }
-        })?;
+        match packet_version {
+            SupportedPacketVersion::_20220406 => packet_versions::version_20220406::register_login_server_packets(&mut packet_handler)?,
+        }
 
         Ok(packet_handler)
     }
 
     fn create_character_server_packet_handler(
         packet_callback: Callback,
+        packet_version: SupportedPacketVersion,
     ) -> Result<PacketHandler<NetworkEventList, (), Callback>, DuplicateHandlerError> {
         let mut packet_handler = PacketHandler::<NetworkEventList, (), Callback>::with_callback(packet_callback);
 
-        packet_handler.register(|packet: LoginFailedPacket| {
-            let reason = packet.reason;
-            let message = match reason {
-                LoginFailedReason::ServerClosed => "Server closed",
-                LoginFailedReason::AlreadyLoggedIn => "Someone has already logged in with this id",
-                LoginFailedReason::AlreadyOnline => "Already online",
-            };
-
-            NetworkEvent::CharacterServerConnectionFailed { reason, message }
-        })?;
-        packet_handler.register(
-            |packet: CharacterServerLoginSuccessPacket| NetworkEvent::CharacterServerConnected {
-                normal_slot_count: packet.normal_slot_count as usize,
-            },
-        )?;
-        packet_handler.register(|packet: RequestCharacterListSuccessPacket| NetworkEvent::CharacterList {
-            characters: packet.character_information,
-        })?;
-        packet_handler.register_noop::<CharacterListPacket>()?;
-        packet_handler.register_noop::<CharacterSlotPagePacket>()?;
-        packet_handler.register_noop::<CharacterBanListPacket>()?;
-        packet_handler.register_noop::<LoginPincodePacket>()?;
-        packet_handler.register_noop::<Packet0b18>()?;
-        packet_handler.register(|packet: CharacterSelectionSuccessPacket| {
-            let login_data = CharacterServerLoginData {
-                server_ip: IpAddr::V4(packet.map_server_ip.into()),
-                server_port: packet.map_server_port,
-                character_id: packet.character_id,
-            };
-
-            NetworkEvent::CharacterSelected { login_data }
-        })?;
-        packet_handler.register(|packet: CharacterSelectionFailedPacket| {
-            let (reason, message) = match packet.reason {
-                CharacterSelectionFailedReason::RejectedFromServer => (
-                    UnifiedCharacterSelectionFailedReason::RejectedFromServer,
-                    "Rejected from server",
-                ),
-            };
-
-            NetworkEvent::CharacterSelectionFailed { reason, message }
-        })?;
-        packet_handler.register(|_: MapServerUnavailablePacket| {
-            let reason = UnifiedCharacterSelectionFailedReason::MapServerUnavailable;
-            let message = "Map server currently unavailable";
-
-            NetworkEvent::CharacterSelectionFailed { reason, message }
-        })?;
-        packet_handler.register(|packet: CreateCharacterSuccessPacket| NetworkEvent::CharacterCreated {
-            character_information: packet.character_information,
-        })?;
-        packet_handler.register(|packet: CharacterCreationFailedPacket| {
-            let reason = packet.reason;
-            let message = match reason {
-                CharacterCreationFailedReason::CharacterNameAlreadyUsed => "Character name is already used",
-                CharacterCreationFailedReason::NotOldEnough => "You are not old enough to create a character",
-                CharacterCreationFailedReason::NotAllowedToUseSlot => "You are not allowed to use this character slot",
-                CharacterCreationFailedReason::CharacterCerationFailed => "Character creation failed",
-            };
-
-            NetworkEvent::CharacterCreationFailed { reason, message }
-        })?;
-        packet_handler.register(|_: CharacterDeletionSuccessPacket| NetworkEvent::CharacterDeleted)?;
-        packet_handler.register(|packet: CharacterDeletionFailedPacket| {
-            let reason = packet.reason;
-            let message = match reason {
-                CharacterDeletionFailedReason::NotAllowed => "You are not allowed to delete this character",
-                CharacterDeletionFailedReason::CharacterNotFound => "Character was not found",
-                CharacterDeletionFailedReason::NotEligible => "Character is not eligible for deletion",
-            };
-            NetworkEvent::CharacterDeletionFailed { reason, message }
-        })?;
-        packet_handler.register(|packet: SwitchCharacterSlotResponsePacket| match packet.status {
-            SwitchCharacterSlotResponseStatus::Success => NetworkEvent::CharacterSlotSwitched,
-            SwitchCharacterSlotResponseStatus::Error => NetworkEvent::CharacterSlotSwitchFailed,
-        })?;
+        match packet_version {
+            SupportedPacketVersion::_20220406 => packet_versions::version_20220406::register_character_server_packets(&mut packet_handler)?,
+        }
 
         Ok(packet_handler)
     }
 
     fn create_map_server_packet_handler(
         packet_callback: Callback,
+        packet_version: SupportedPacketVersion,
     ) -> Result<PacketHandler<NetworkEventList, (), Callback>, DuplicateHandlerError> {
         let mut packet_handler = PacketHandler::<NetworkEventList, (), Callback>::with_callback(packet_callback);
 
-        // This is a bit of a workaround for the way that the inventory is
-        // sent. There is a single packet to start the inventory list,
-        // followed by an arbitary number of item packets, and in the
-        // end a sinle packet to mark the list as complete.
-        //
-        // This variable provides some transient storage shared by all the inventory
-        // handlers.
-        let inventory_items: Rc<RefCell<Option<Vec<InventoryItem<NoMetadata>>>>> = Rc::new(RefCell::new(None));
-
-        packet_handler.register(|_: MapServerPingPacket| NoNetworkEvents)?;
-        packet_handler.register(|packet: BroadcastMessagePacket| NetworkEvent::ChatMessage {
-            text: packet.message,
-            color: MessageColor::Broadcast,
-        })?;
-        packet_handler.register(|packet: Broadcast2MessagePacket| {
-            // Drop the alpha channel because it might be 0.
-            let color = MessageColor::Rgb {
-                red: packet.font_color.red,
-                green: packet.font_color.green,
-                blue: packet.font_color.blue,
-            };
-            NetworkEvent::ChatMessage {
-                text: packet.message,
-                color,
-            }
-        })?;
-        packet_handler.register(|packet: OverheadMessagePacket| {
-            // FIX: This should be a different event.
-            NetworkEvent::ChatMessage {
-                text: packet.message,
-                color: MessageColor::Broadcast,
-            }
-        })?;
-        packet_handler.register(|packet: ServerMessagePacket| NetworkEvent::ChatMessage {
-            text: packet.message,
-            color: MessageColor::Server,
-        })?;
-        packet_handler.register(|packet: EntityMessagePacket| {
-            // Drop the alpha channel because it might be 0.
-            let color = MessageColor::Rgb {
-                red: packet.color.red,
-                green: packet.color.green,
-                blue: packet.color.blue,
-            };
-            NetworkEvent::ChatMessage {
-                text: packet.message,
-                color,
-            }
-        })?;
-        packet_handler.register_noop::<DisplayEmotionPacket>()?;
-        packet_handler.register(|packet: EntityMovePacket| {
-            let EntityMovePacket {
-                entity_id,
-                from_to,
-                starting_timestamp,
-            } = packet;
-
-            let (origin, destination) = from_to.to_origin_destination();
-
-            NetworkEvent::EntityMove {
-                entity_id,
-                origin,
-                destination,
-                starting_timestamp,
-            }
-        })?;
-        packet_handler.register_noop::<EntityStopMovePacket>()?;
-        packet_handler.register(|packet: PlayerMovePacket| {
-            let PlayerMovePacket {
-                starting_timestamp,
-                from_to,
-            } = packet;
-
-            let (origin, destination) = from_to.to_origin_destination();
-
-            NetworkEvent::PlayerMove {
-                origin,
-                destination,
-                starting_timestamp,
-            }
-        })?;
-        packet_handler.register(|packet: ChangeMapPacket| {
-            let ChangeMapPacket { map_name, position } = packet;
-
-            let map_name = map_name.replace(".gat", "");
-
-            NetworkEvent::ChangeMap { map_name, position }
-        })?;
-        packet_handler.register(|packet: ResurrectionPacket| NetworkEvent::ResurrectPlayer {
-            entity_id: packet.entity_id,
-        })?;
-        packet_handler.register(|packet: EntityAppearedPacket| NetworkEvent::AddEntity {
-            entity_data: packet.into(),
-        })?;
-        packet_handler.register(|packet: EntityAppeared2Packet| NetworkEvent::AddEntity {
-            entity_data: packet.into(),
-        })?;
-        packet_handler.register(|packet: MovingEntityAppearedPacket| NetworkEvent::AddEntity {
-            entity_data: packet.into(),
-        })?;
-        packet_handler.register(|packet: EntityDisappearedPacket| NetworkEvent::RemoveEntity {
-            entity_id: packet.entity_id,
-            reason: packet.reason,
-        })?;
-        packet_handler.register(|packet: UpdateStatusPacket| {
-            let UpdateStatusPacket { status_type } = packet;
-            NetworkEvent::UpdateStatus { status_type }
-        })?;
-        packet_handler.register(|packet: UpdateStatusPacket1| {
-            let UpdateStatusPacket1 { status_type } = packet;
-            NetworkEvent::UpdateStatus { status_type }
-        })?;
-        packet_handler.register(|packet: UpdateStatusPacket2| {
-            let UpdateStatusPacket2 { status_type } = packet;
-            NetworkEvent::UpdateStatus { status_type }
-        })?;
-        packet_handler.register(|packet: UpdateStatusPacket3| {
-            let UpdateStatusPacket3 { status_type } = packet;
-            NetworkEvent::UpdateStatus { status_type }
-        })?;
-        packet_handler.register_noop::<UpdateAttackRangePacket>()?;
-        packet_handler.register_noop::<NewMailStatusPacket>()?;
-        packet_handler.register_noop::<AchievementUpdatePacket>()?;
-        packet_handler.register_noop::<AchievementListPacket>()?;
-        packet_handler.register_noop::<CriticalWeightUpdatePacket>()?;
-        packet_handler.register(|packet: SpriteChangePacket| match packet.sprite_type {
-            SpriteChangeType::Base => Some(NetworkEvent::ChangeJob {
-                account_id: packet.account_id,
-                job_id: packet.value,
-            }),
-            SpriteChangeType::Hair => Some(NetworkEvent::ChangeHair {
-                account_id: packet.account_id,
-                hair_id: packet.value,
-            }),
-            _ => None,
-        })?;
-        packet_handler.register({
-            let inventory_items = inventory_items.clone();
-
-            move |_: InventoyStartPacket| {
-                *inventory_items.borrow_mut() = Some(Vec::new());
-                NoNetworkEvents
-            }
-        })?;
-        packet_handler.register({
-            let inventory_items = inventory_items.clone();
-
-            move |packet: RegularItemListPacket| {
-                inventory_items.borrow_mut().as_mut().expect("Unexpected inventory packet").extend(
-                    packet.item_information.into_iter().map(|item_information| {
-                        let RegularItemInformation {
-                            index,
-                            item_id,
-                            item_type,
-                            amount,
-                            equipped_position,
-                            slot,
-                            hire_expiration_date,
-                            flags,
-                        } = item_information;
-
-                        InventoryItem {
-                            index,
-                            metadata: NoMetadata,
-                            item_id,
-                            item_type,
-                            slot,
-                            hire_expiration_date,
-                            details: InventoryItemDetails::Regular {
-                                amount,
-                                equipped_position,
-                                flags,
-                            },
-                        }
-                    }),
-                );
-                NoNetworkEvents
-            }
-        })?;
-        packet_handler.register({
-            let inventory_items = inventory_items.clone();
-
-            move |packet: EquippableItemListPacket| {
-                inventory_items.borrow_mut().as_mut().expect("Unexpected inventory packet").extend(
-                    packet.item_information.into_iter().map(|item| {
-                        let EquippableItemInformation {
-                            index,
-                            item_id,
-                            item_type,
-                            equip_position,
-                            equipped_position,
-                            slot,
-                            hire_expiration_date,
-                            bind_on_equip_type,
-                            w_item_sprite_number,
-                            option_count,
-                            option_data,
-                            refinement_level,
-                            enchantment_level,
-                            flags,
-                        } = item;
-
-                        InventoryItem {
-                            index,
-                            metadata: NoMetadata,
-                            item_id,
-                            item_type,
-                            slot,
-                            hire_expiration_date,
-                            details: InventoryItemDetails::Equippable {
-                                equip_position,
-                                equipped_position,
-                                bind_on_equip_type,
-                                w_item_sprite_number,
-                                option_count,
-                                option_data,
-                                refinement_level,
-                                enchantment_level,
-                                flags,
-                            },
-                        }
-                    }),
-                );
-                NoNetworkEvents
-            }
-        })?;
-        packet_handler.register({
-            let inventory_items = inventory_items.clone();
-
-            move |_: InventoyEndPacket| {
-                let items = inventory_items.borrow_mut().take().expect("Unexpected inventory end packet");
-                NetworkEvent::SetInventory { items }
-            }
-        })?;
-        packet_handler.register_noop::<EquippableSwitchItemListPacket>()?;
-        packet_handler.register_noop::<MapTypePacket>()?;
-        packet_handler.register(|packet: UpdateSkillTreePacket| {
-            let UpdateSkillTreePacket { skill_information } = packet;
-            NetworkEvent::SkillTree { skill_information }
-        })?;
-        packet_handler.register(|packet: UpdateHotkeysPacket| NetworkEvent::SetHotkeyData {
-            tab: packet.tab,
-            hotkeys: packet
-                .hotkeys
-                .into_iter()
-                .map(|hotkey_data| match hotkey_data == HotkeyData::UNBOUND {
-                    true => HotkeyState::Unbound,
-                    false => HotkeyState::Bound(hotkey_data),
-                })
-                .collect(),
-        })?;
-        packet_handler.register_noop::<InitialStatusPacket>()?;
-        packet_handler.register_noop::<UpdatePartyInvitationStatePacket>()?;
-        packet_handler.register_noop::<UpdateShowEquipPacket>()?;
-        packet_handler.register_noop::<UpdateConfigurationPacket>()?;
-        packet_handler.register_noop::<NavigateToMonsterPacket>()?;
-        packet_handler.register_noop::<MarkMinimapPositionPacket>()?;
-        packet_handler.register(|packet: NextButtonPacket| {
-            let NextButtonPacket { npc_id } = packet;
-
-            NetworkEvent::AddNextButton { npc_id }
-        })?;
-        packet_handler.register(|packet: CloseButtonPacket| {
-            let CloseButtonPacket { npc_id } = packet;
-
-            NetworkEvent::AddCloseButton { npc_id }
-        })?;
-        packet_handler.register(|packet: DialogMenuPacket| {
-            let DialogMenuPacket { npc_id, message } = packet;
-
-            let choices = message.split(':').map(String::from).filter(|text| !text.is_empty()).collect();
-
-            NetworkEvent::AddChoiceButtons { choices, npc_id }
-        })?;
-        packet_handler.register_noop::<DisplaySpecialEffectPacket>()?;
-        packet_handler.register_noop::<DisplaySkillCooldownPacket>()?;
-        packet_handler.register_noop::<DisplaySkillEffectAndDamagePacket>()?;
-        packet_handler.register(|packet: DisplaySkillEffectNoDamagePacket| NetworkEvent::HealEffect {
-            entity_id: packet.destination_entity_id,
-            heal_amount: packet.heal_amount as usize,
-        })?;
-        packet_handler.register_noop::<DisplayPlayerHealEffect>()?;
-        packet_handler.register_noop::<StatusChangePacket>()?;
-        packet_handler.register_noop::<QuestNotificationPacket1>()?;
-        packet_handler.register_noop::<HuntingQuestNotificationPacket>()?;
-        packet_handler.register_noop::<HuntingQuestUpdateObjectivePacket>()?;
-        packet_handler.register_noop::<QuestRemovedPacket>()?;
-        packet_handler.register_noop::<QuestListPacket>()?;
-        packet_handler.register(|packet: VisualEffectPacket| {
-            let VisualEffectPacket { entity_id, effect } = packet;
-
-            let effect_path = match effect {
-                VisualEffect::BaseLevelUp => "angel.str",
-                VisualEffect::JobLevelUp => "joblvup.str",
-                VisualEffect::RefineFailure => "bs_refinefailed.str",
-                VisualEffect::RefineSuccess => "bs_refinesuccess.str",
-                VisualEffect::GameOver => "help_angel\\help_angel\\help_angel.str",
-                VisualEffect::PharmacySuccess => "p_success.str",
-                VisualEffect::PharmacyFailure => "p_failed.str",
-                VisualEffect::BaseLevelUpSuperNovice => "help_angel\\help_angel\\help_angel.str",
-                VisualEffect::JobLevelUpSuperNovice => "help_angel\\help_angel\\help_angel.str",
-                VisualEffect::BaseLevelUpTaekwon => "help_angel\\help_angel\\help_angel.str",
-            };
-
-            NetworkEvent::VisualEffect { effect_path, entity_id }
-        })?;
-        packet_handler.register_noop::<DisplayGainedExperiencePacket>()?;
-        packet_handler.register_noop::<DisplayImagePacket>()?;
-        packet_handler.register_noop::<StateChangePacket>()?;
-
-        packet_handler.register(|packet: QuestEffectPacket| match packet.effect {
-            QuestEffect::None => NetworkEvent::RemoveQuestEffect {
-                entity_id: packet.entity_id,
-            },
-            _ => NetworkEvent::AddQuestEffect { quest_effect: packet },
-        })?;
-        packet_handler.register(|packet: ItemPickupPacket| {
-            let ItemPickupPacket {
-                index,
-                count,
-                item_id,
-                is_identified,
-                is_broken,
-                cards,
-                equip_position,
-                item_type,
-                result,
-                hire_expiration_date,
-                bind_on_equip_type,
-                option_data,
-                favorite,
-                look,
-                refinement_level,
-                enchantment_level,
-            } = packet;
-
-            if result != ItemPickupResult::Success {
-                todo!();
-            }
-
-            // TODO: Not sure where to store these, since the *InventoryItem packets are not
-            // sending these either. We will certainly use them at some point though.
-            let _ = (favorite, look);
-
-            let details = match equip_position.is_empty() {
-                true => InventoryItemDetails::Regular {
-                    amount: count,
-                    equipped_position: equip_position,
-                    flags: {
-                        let mut flags = RegularItemFlags::empty();
-                        flags.set(RegularItemFlags::IDENTIFIED, is_identified != 0);
-                        flags
-                    },
-                },
-                false => InventoryItemDetails::Equippable {
-                    equip_position,
-                    equipped_position: EquipPosition::empty(),
-                    bind_on_equip_type,
-                    w_item_sprite_number: 0,
-                    option_count: option_data.len() as u8,
-                    option_data,
-                    refinement_level,
-                    enchantment_level,
-                    flags: {
-                        let mut flags = EquippableItemFlags::empty();
-                        flags.set(EquippableItemFlags::IDENTIFIED, is_identified != 0);
-                        flags.set(EquippableItemFlags::IS_BROKEN, is_broken != 0);
-                        flags
-                    },
-                },
-            };
-
-            let item = InventoryItem {
-                metadata: NoMetadata,
-                index,
-                item_id,
-                item_type,
-                slot: cards,
-                hire_expiration_date,
-                details,
-            };
-
-            NetworkEvent::IventoryItemAdded { item }
-        })?;
-        packet_handler.register(|packet: RemoveItemFromInventoryPacket| NetworkEvent::InventoryItemRemoved {
-            reason: packet.remove_reason,
-            index: packet.index,
-            amount: packet.amount,
-        })?;
-        packet_handler.register(|packet: ServerTickPacket| NetworkEvent::UpdateClientTick {
-            client_tick: packet.client_tick,
-            received_at: Instant::now(),
-        })?;
-        packet_handler.register(|packet: RequestPlayerDetailsSuccessPacket| NetworkEvent::UpdateEntityDetails {
-            entity_id: EntityId(packet.character_id.0),
-            name: packet.name,
-        })?;
-        packet_handler.register(|packet: RequestEntityDetailsSuccessPacket| NetworkEvent::UpdateEntityDetails {
-            entity_id: packet.entity_id,
-            name: packet.name,
-        })?;
-        packet_handler.register(|packet: UpdateEntityHealthPointsPacket| {
-            let UpdateEntityHealthPointsPacket {
-                entity_id,
-                health_points,
-                maximum_health_points,
-            } = packet;
-
-            NetworkEvent::UpdateEntityHealth {
-                entity_id,
-                health_points: health_points as usize,
-                maximum_health_points: maximum_health_points as usize,
-            }
-        })?;
-        packet_handler.register_noop::<RequestPlayerAttackFailedPacket>()?;
-        packet_handler.register(|packet: DamagePacket1| match packet.damage_type {
-            DamageType::Damage => Some(NetworkEvent::DamageEffect {
-                entity_id: packet.destination_entity_id,
-                damage_amount: packet.damage_amount as usize,
-            }),
-            DamageType::StandUp => Some(NetworkEvent::PlayerStandUp {
-                entity_id: packet.destination_entity_id,
-            }),
-            _ => None,
-        })?;
-        packet_handler.register(|packet: DamagePacket3| match packet.damage_type {
-            DamageType::Damage => Some(NetworkEvent::DamageEffect {
-                entity_id: packet.destination_entity_id,
-                damage_amount: packet.damage_amount as usize,
-            }),
-            DamageType::StandUp => Some(NetworkEvent::PlayerStandUp {
-                entity_id: packet.destination_entity_id,
-            }),
-            _ => None,
-        })?;
-        packet_handler.register(|packet: NpcDialogPacket| {
-            let NpcDialogPacket { npc_id, text } = packet;
-
-            NetworkEvent::OpenDialog { text, npc_id }
-        })?;
-        packet_handler.register(|packet: RequestEquipItemStatusPacket| match packet.result {
-            RequestEquipItemStatus::Success => Some(NetworkEvent::UpdateEquippedPosition {
-                index: packet.inventory_index,
-                equipped_position: packet.equipped_position,
-            }),
-            _ => None,
-        })?;
-        packet_handler.register(|packet: RequestUnequipItemStatusPacket| match packet.result {
-            RequestUnequipItemStatus::Success => Some(NetworkEvent::UpdateEquippedPosition {
-                index: packet.inventory_index,
-                equipped_position: EquipPosition::NONE,
-            }),
-            _ => None,
-        })?;
-        packet_handler.register_noop::<Packet8302>()?;
-        packet_handler.register_noop::<Packet0b18>()?;
-        packet_handler.register(|packet: MapServerLoginSuccessPacket| NetworkEvent::UpdateClientTick {
-            client_tick: packet.client_tick,
-            received_at: Instant::now(),
-        })?;
-        packet_handler.register(|packet: RestartResponsePacket| match packet.result {
-            RestartResponseStatus::Ok => NetworkEvent::LoggedOut,
-            RestartResponseStatus::Nothing => NetworkEvent::ChatMessage {
-                text: "Failed to log out.".to_string(),
-                color: MessageColor::Error,
-            },
-        })?;
-        packet_handler.register(|packet: DisconnectResponsePacket| match packet.result {
-            DisconnectResponseStatus::Ok => NetworkEvent::LoggedOut,
-            DisconnectResponseStatus::Wait10Seconds => NetworkEvent::ChatMessage {
-                text: "Please wait 10 seconds before trying to log out.".to_string(),
-                color: MessageColor::Error,
-            },
-        })?;
-        packet_handler.register_noop::<UseSkillSuccessPacket>()?;
-        packet_handler.register_noop::<ToUseSkillSuccessPacket>()?;
-        packet_handler.register(|packet: NotifySkillUnitPacket| {
-            let NotifySkillUnitPacket {
-                entity_id,
-                position,
-                unit_id,
-                ..
-            } = packet;
-
-            NetworkEvent::AddSkillUnit {
-                entity_id,
-                unit_id,
-                position,
-            }
-        })?;
-        packet_handler.register(|packet: SkillUnitDisappearPacket| {
-            let SkillUnitDisappearPacket { entity_id } = packet;
-            NetworkEvent::RemoveSkillUnit { entity_id }
-        })?;
-        packet_handler.register_noop::<NotifyGroundSkillPacket>()?;
-        packet_handler.register(|packet: FriendListPacket| NetworkEvent::SetFriendList {
-            friend_list: packet.friend_list,
-        })?;
-        packet_handler.register_noop::<FriendOnlineStatusPacket>()?;
-        packet_handler.register(|packet: FriendRequestPacket| NetworkEvent::FriendRequest {
-            requestee: packet.requestee,
-        })?;
-        packet_handler.register(|packet: FriendRequestResultPacket| {
-            let text = match packet.result {
-                FriendRequestResult::Accepted => format!("You have become friends with {}.", packet.friend.name),
-                FriendRequestResult::Rejected => format!("{} does not want to be friends with you.", packet.friend.name),
-                FriendRequestResult::OwnFriendListFull => "Your Friend List is full.".to_owned(),
-                FriendRequestResult::OtherFriendListFull => format!("{}'s Friend List is full.", packet.friend.name),
-            };
-
-            let mut events = vec![NetworkEvent::ChatMessage {
-                text,
-                color: MessageColor::Information,
-            }];
-
-            if matches!(packet.result, FriendRequestResult::Accepted) {
-                events.push(NetworkEvent::FriendAdded { friend: packet.friend });
-            }
-
-            events
-        })?;
-        packet_handler.register(|packet: NotifyFriendRemovedPacket| NetworkEvent::FriendRemoved {
-            account_id: packet.account_id,
-            character_id: packet.character_id,
-        })?;
-        packet_handler.register_noop::<PartyInvitePacket>()?;
-        packet_handler.register_noop::<StatusChangeSequencePacket>()?;
-        packet_handler.register_noop::<ReputationPacket>()?;
-        packet_handler.register_noop::<ClanInfoPacket>()?;
-        packet_handler.register_noop::<ClanOnlineCountPacket>()?;
-        packet_handler.register_noop::<ChangeMapCellPacket>()?;
-        packet_handler.register_noop::<OpenMarketPacket>()?;
-        packet_handler.register(|packet: BuyOrSellPacket| NetworkEvent::AskBuyOrSell { shop_id: packet.shop_id })?;
-        packet_handler.register(|packet: ShopItemListPacket| {
-            let items = packet
-                .items
-                .into_iter()
-                .map(|item| ShopItem {
-                    metadata: NoMetadata,
-                    item_id: item.item_id,
-                    item_type: item.item_type,
-                    price: item.price,
-                    quantity: items::ItemQuantity::Infinite,
-                    weight: 0,
-                    location: item.location,
-                })
-                .collect();
-
-            NetworkEvent::OpenShop { items }
-        })?;
-        packet_handler.register(|packet: BuyShopItemsResultPacket| NetworkEvent::BuyingCompleted { result: packet.result })?;
-        packet_handler.register_noop::<ParameterChangePacket>()?;
-        packet_handler.register(|packet: SellListPacket| NetworkEvent::SellItemList { items: packet.items })?;
-        packet_handler.register(|packet: SellItemsResultPacket| NetworkEvent::SellingCompleted { result: packet.result })?;
+        match packet_version {
+            SupportedPacketVersion::_20220406 => packet_versions::version_20220406::register_map_server_packets(&mut packet_handler)?,
+        }
 
         Ok(packet_handler)
     }
 
     pub fn request_character_list(&mut self) -> Result<(), NotConnectedError> {
-        self.send_character_server_packet(&RequestCharacterListPacket::default())
+        self.send_character_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => RequestCharacterListPacket::default(),
+        })
     }
 
     pub fn select_character(&mut self, character_slot: usize) -> Result<(), NotConnectedError> {
-        self.send_character_server_packet(&SelectCharacterPacket::new(character_slot as u8))
-    }
-
-    pub fn map_loaded(&mut self) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&MapLoadedPacket::default())
-    }
-
-    pub fn request_client_tick(&mut self) -> Result<(), NotConnectedError> {
-        let client_tick = self
-            .time_synchronization
-            .lock()
-            .map(|time_synchronization| time_synchronization.client_tick as u32)
-            .unwrap_or(100);
-        self.send_map_server_packet(&RequestServerTickPacket::new(ClientTick(client_tick)))
-    }
-
-    pub fn respawn(&mut self) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&RestartPacket::new(RestartType::Respawn))
-    }
-
-    pub fn log_out(&mut self) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&RestartPacket::new(RestartType::Disconnect))
-    }
-
-    pub fn player_move(&mut self, position: WorldPosition) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&RequestPlayerMovePacket::new(position))
-    }
-
-    pub fn warp_to_map(&mut self, map_name: String, position: TilePosition) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&RequestWarpToMapPacket::new(map_name, position))
-    }
-
-    pub fn entity_details(&mut self, entity_id: EntityId) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&RequestDetailsPacket::new(entity_id))
-    }
-
-    pub fn player_attack(&mut self, entity_id: EntityId) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&RequestActionPacket::new(entity_id, Action::Attack))
-    }
-
-    pub fn send_chat_message(&mut self, player_name: &str, text: &str) -> Result<(), NotConnectedError> {
-        let message = format!("{} : {}", player_name, text);
-
-        self.send_map_server_packet(&GlobalMessagePacket::new(message))
-    }
-
-    pub fn start_dialog(&mut self, npc_id: EntityId) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&StartDialogPacket::new(npc_id))
-    }
-
-    pub fn next_dialog(&mut self, npc_id: EntityId) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&NextDialogPacket::new(npc_id))
-    }
-
-    pub fn close_dialog(&mut self, npc_id: EntityId) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&CloseDialogPacket::new(npc_id))
-    }
-
-    pub fn choose_dialog_option(&mut self, npc_id: EntityId, option: i8) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&ChooseDialogOptionPacket::new(npc_id, option))
-    }
-
-    pub fn request_item_equip(&mut self, item_index: InventoryIndex, equip_position: EquipPosition) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&RequestEquipItemPacket::new(item_index, equip_position))
-    }
-
-    pub fn request_item_unequip(&mut self, item_index: InventoryIndex) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&RequestUnequipItemPacket::new(item_index))
-    }
-
-    pub fn cast_skill(&mut self, skill_id: SkillId, skill_level: SkillLevel, entity_id: EntityId) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&UseSkillAtIdPacket::new(skill_level, skill_id, entity_id))
-    }
-
-    pub fn cast_ground_skill(
-        &mut self,
-        skill_id: SkillId,
-        skill_level: SkillLevel,
-        target_position: TilePosition,
-    ) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&UseSkillOnGroundPacket::new(skill_level, skill_id, target_position))
-    }
-
-    pub fn cast_channeling_skill(
-        &mut self,
-        skill_id: SkillId,
-        skill_level: SkillLevel,
-        entity_id: EntityId,
-    ) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&StartUseSkillPacket::new(skill_id, skill_level, entity_id))
-    }
-
-    pub fn stop_channeling_skill(&mut self, skill_id: SkillId) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&EndUseSkillPacket::new(skill_id))
-    }
-
-    pub fn add_friend(&mut self, name: String) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&AddFriendPacket::new(name))
-    }
-
-    pub fn remove_friend(&mut self, account_id: AccountId, character_id: CharacterId) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&RemoveFriendPacket::new(account_id, character_id))
-    }
-
-    pub fn reject_friend_request(&mut self, account_id: AccountId, character_id: CharacterId) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&FriendRequestResponsePacket::new(
-            account_id,
-            character_id,
-            FriendRequestResponse::Reject,
-        ))
-    }
-
-    pub fn accept_friend_request(&mut self, account_id: AccountId, character_id: CharacterId) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&FriendRequestResponsePacket::new(
-            account_id,
-            character_id,
-            FriendRequestResponse::Accept,
-        ))
+        self.send_character_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => SelectCharacterPacket::new(character_slot as u8),
+        })
     }
 
     pub fn create_character(&mut self, slot: usize, name: String) -> Result<(), NotConnectedError> {
@@ -1391,27 +668,191 @@ where
         let start_job = 0;
         let sex = Sex::Male;
 
-        self.send_character_server_packet(&CreateCharacterPacket::new(
-            name, slot as u8, hair_color, hair_style, start_job, sex,
-        ))
+        self.send_character_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => CreateCharacterPacket::new(name, slot as u8, hair_color, hair_style, start_job, sex),
+        })
     }
 
     pub fn delete_character(&mut self, character_id: CharacterId) -> Result<(), NotConnectedError> {
         let email = "a@a.com".to_string();
 
-        self.send_character_server_packet(&DeleteCharacterPacket::new(character_id, email))
+        self.send_character_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => DeleteCharacterPacket::new(character_id, email),
+        })
     }
 
     pub fn switch_character_slot(&mut self, origin_slot: usize, destination_slot: usize) -> Result<(), NotConnectedError> {
-        self.send_character_server_packet(&SwitchCharacterSlotPacket::new(origin_slot as u16, destination_slot as u16))
+        self.send_character_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => SwitchCharacterSlotPacket::new(origin_slot as u16, destination_slot as u16),
+        })
+    }
+
+    pub fn map_loaded(&mut self) -> Result<(), NotConnectedError> {
+        self.send_map_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => MapLoadedPacket::default(),
+        })
+    }
+
+    pub fn request_client_tick(&mut self) -> Result<(), NotConnectedError> {
+        let client_tick = self
+            .time_synchronization
+            .lock()
+            .map(|time_synchronization| time_synchronization.client_tick as u32)
+            .unwrap_or(100);
+
+        self.send_map_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => RequestServerTickPacket::new(ClientTick(client_tick)),
+        })
+    }
+
+    pub fn respawn(&mut self) -> Result<(), NotConnectedError> {
+        self.send_map_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => RestartPacket::new(RestartType::Respawn),
+        })
+    }
+
+    pub fn log_out(&mut self) -> Result<(), NotConnectedError> {
+        self.send_map_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => RestartPacket::new(RestartType::Disconnect),
+        })
+    }
+
+    pub fn player_move(&mut self, position: WorldPosition) -> Result<(), NotConnectedError> {
+        self.send_map_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => RequestPlayerMovePacket::new(position),
+        })
+    }
+
+    pub fn warp_to_map(&mut self, map_name: String, position: TilePosition) -> Result<(), NotConnectedError> {
+        self.send_map_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => RequestWarpToMapPacket::new(map_name, position),
+        })
+    }
+
+    pub fn entity_details(&mut self, entity_id: EntityId) -> Result<(), NotConnectedError> {
+        self.send_map_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => RequestDetailsPacket::new(entity_id),
+        })
+    }
+
+    pub fn player_attack(&mut self, entity_id: EntityId) -> Result<(), NotConnectedError> {
+        self.send_map_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => RequestActionPacket::new(entity_id, Action::Attack),
+        })
+    }
+
+    pub fn send_chat_message(&mut self, player_name: &str, text: &str) -> Result<(), NotConnectedError> {
+        let message = format!("{} : {}", player_name, text);
+
+        self.send_map_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => GlobalMessagePacket::new(message),
+        })
+    }
+
+    pub fn start_dialog(&mut self, npc_id: EntityId) -> Result<(), NotConnectedError> {
+        self.send_map_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => StartDialogPacket::new(npc_id),
+        })
+    }
+
+    pub fn next_dialog(&mut self, npc_id: EntityId) -> Result<(), NotConnectedError> {
+        self.send_map_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => NextDialogPacket::new(npc_id),
+        })
+    }
+
+    pub fn close_dialog(&mut self, npc_id: EntityId) -> Result<(), NotConnectedError> {
+        self.send_map_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => CloseDialogPacket::new(npc_id),
+        })
+    }
+
+    pub fn choose_dialog_option(&mut self, npc_id: EntityId, option: i8) -> Result<(), NotConnectedError> {
+        self.send_map_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => ChooseDialogOptionPacket::new(npc_id, option),
+        })
+    }
+
+    pub fn request_item_equip(&mut self, item_index: InventoryIndex, equip_position: EquipPosition) -> Result<(), NotConnectedError> {
+        self.send_map_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => RequestEquipItemPacket::new(item_index, equip_position),
+        })
+    }
+
+    pub fn request_item_unequip(&mut self, item_index: InventoryIndex) -> Result<(), NotConnectedError> {
+        self.send_map_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => RequestUnequipItemPacket::new(item_index),
+        })
+    }
+
+    pub fn cast_skill(&mut self, skill_id: SkillId, skill_level: SkillLevel, entity_id: EntityId) -> Result<(), NotConnectedError> {
+        self.send_map_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => UseSkillAtIdPacket::new(skill_level, skill_id, entity_id),
+        })
+    }
+
+    pub fn cast_ground_skill(
+        &mut self,
+        skill_id: SkillId,
+        skill_level: SkillLevel,
+        target_position: TilePosition,
+    ) -> Result<(), NotConnectedError> {
+        self.send_map_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => UseSkillOnGroundPacket::new(skill_level, skill_id, target_position),
+        })
+    }
+
+    pub fn cast_channeling_skill(
+        &mut self,
+        skill_id: SkillId,
+        skill_level: SkillLevel,
+        entity_id: EntityId,
+    ) -> Result<(), NotConnectedError> {
+        self.send_map_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => StartUseSkillPacket::new(skill_id, skill_level, entity_id),
+        })
+    }
+
+    pub fn stop_channeling_skill(&mut self, skill_id: SkillId) -> Result<(), NotConnectedError> {
+        self.send_map_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => EndUseSkillPacket::new(skill_id),
+        })
+    }
+
+    pub fn add_friend(&mut self, name: String) -> Result<(), NotConnectedError> {
+        self.send_map_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => AddFriendPacket::new(name),
+        })
+    }
+
+    pub fn remove_friend(&mut self, account_id: AccountId, character_id: CharacterId) -> Result<(), NotConnectedError> {
+        self.send_map_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => RemoveFriendPacket::new(account_id, character_id),
+        })
+    }
+
+    pub fn reject_friend_request(&mut self, account_id: AccountId, character_id: CharacterId) -> Result<(), NotConnectedError> {
+        self.send_map_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => FriendRequestResponsePacket::new(account_id, character_id, FriendRequestResponse::Reject),
+        })
+    }
+
+    pub fn accept_friend_request(&mut self, account_id: AccountId, character_id: CharacterId) -> Result<(), NotConnectedError> {
+        self.send_map_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => FriendRequestResponsePacket::new(account_id, character_id, FriendRequestResponse::Accept),
+        })
     }
 
     pub fn set_hotkey_data(&mut self, tab: HotbarTab, index: HotbarSlot, hotkey_data: HotkeyData) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&SetHotkeyData2Packet::new(tab, index, hotkey_data))
+        self.send_map_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => SetHotkeyData2Packet::new(tab, index, hotkey_data),
+        })
     }
 
     pub fn select_buy_or_sell(&mut self, shop_id: ShopId, buy_or_sell: BuyOrSellOption) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&SelectBuyOrSellPacket::new(shop_id, buy_or_sell))
+        self.send_map_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => SelectBuyOrSellPacket::new(shop_id, buy_or_sell),
+        })
     }
 
     pub fn purchase_items(&mut self, items: Vec<ShopItem<u32>>) -> Result<(), NotConnectedError> {
@@ -1423,15 +864,21 @@ where
             })
             .collect();
 
-        self.send_map_server_packet(&BuyShopItemsPacket::new(item_information))
+        self.send_map_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => BuyShopItemsPacket::new(item_information),
+        })
     }
 
     pub fn close_shop(&mut self) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&CloseShopPacket::new())
+        self.send_map_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => CloseShopPacket::new(),
+        })
     }
 
     pub fn sell_items(&mut self, items: Vec<SoldItemInformation>) -> Result<(), NotConnectedError> {
-        self.send_map_server_packet(&SellItemsPacket { items })
+        self.send_map_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => SellItemsPacket { items },
+        })
     }
 }
 
@@ -1439,23 +886,23 @@ where
 mod packet_handlers {
     use ragnarok_packets::handler::NoPacketCallback;
 
-    use crate::NetworkingSystem;
+    use crate::{NetworkingSystem, SupportedPacketVersion};
 
     #[test]
     fn login_server() {
-        let result = NetworkingSystem::create_login_server_packet_handler(NoPacketCallback);
+        let result = NetworkingSystem::create_login_server_packet_handler(NoPacketCallback, SupportedPacketVersion::_20220406);
         assert!(result.is_ok());
     }
 
     #[test]
     fn character_server() {
-        let result = NetworkingSystem::create_character_server_packet_handler(NoPacketCallback);
+        let result = NetworkingSystem::create_character_server_packet_handler(NoPacketCallback, SupportedPacketVersion::_20220406);
         assert!(result.is_ok());
     }
 
     #[test]
     fn map_server() {
-        let result = NetworkingSystem::create_map_server_packet_handler(NoPacketCallback);
+        let result = NetworkingSystem::create_map_server_packet_handler(NoPacketCallback, SupportedPacketVersion::_20220406);
         assert!(result.is_ok());
     }
 }

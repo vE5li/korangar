@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use clap::Parser;
 use korangar_debug::logging::Colorize;
-use korangar_networking::{DisconnectReason, NetworkEvent, NetworkingSystem};
+use korangar_networking::{DisconnectReason, NetworkEvent, NetworkingSystem, SupportedPacketVersion};
 use ragnarok_packets::TilePosition;
 
 #[derive(Parser, Debug)]
@@ -26,6 +26,7 @@ struct Arguments {
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> ExitCode {
+    const PACKET_VERSION: SupportedPacketVersion = SupportedPacketVersion::_20220406;
     const SERVER_ADDR: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(49, 12, 109, 207)), 6900);
     const SAFE_MAP: &str = "geffen";
     const SAFE_POSITION: TilePosition = TilePosition { x: 119, y: 59 };
@@ -39,7 +40,7 @@ async fn main() -> ExitCode {
     let mut saved_login_data = None;
 
     // Kick of the login flow by connecting to the login server.
-    networking_system.connect_to_login_server(SERVER_ADDR, arguments.username, arguments.password);
+    networking_system.connect_to_login_server(PACKET_VERSION, SERVER_ADDR, arguments.username, arguments.password);
 
     loop {
         networking_system.get_events(&mut network_event_buffer);
@@ -53,7 +54,7 @@ async fn main() -> ExitCode {
                     println!("[{}] Successfully connected to login server", "Setup".green());
 
                     networking_system.disconnect_from_login_server();
-                    networking_system.connect_to_character_server(&login_data, character_servers[0].clone());
+                    networking_system.connect_to_character_server(PACKET_VERSION, &login_data, character_servers[0].clone());
 
                     saved_login_data = Some(login_data);
                 }
@@ -116,7 +117,7 @@ async fn main() -> ExitCode {
                     let login_login_data = saved_login_data.as_ref().unwrap();
 
                     networking_system.disconnect_from_character_server();
-                    networking_system.connect_to_map_server(login_login_data, login_data);
+                    networking_system.connect_to_map_server(PACKET_VERSION, login_login_data, login_data);
 
                     networking_system.map_loaded().expect("Map server disconnected");
 

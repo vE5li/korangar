@@ -4,7 +4,7 @@ use std::thread::sleep;
 use std::time::Duration;
 
 use korangar_debug::logging::Colorize;
-use korangar_networking::{DisconnectReason, NetworkEvent, NetworkingSystem};
+use korangar_networking::{DisconnectReason, NetworkEvent, NetworkingSystem, SupportedPacketVersion};
 use reqwest::StatusCode;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -62,6 +62,7 @@ impl MessageHistory {
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     // Chat bot settings.
+    const PACKET_VERSION: SupportedPacketVersion = SupportedPacketVersion::_20220406;
     const SOCKET_ADDR: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(49, 12, 109, 207)), 6900);
     const OLLAMA_ENDPOINT: &str = "http://127.0.0.1:11434/api/chat";
     const OLLAMA_MODEL: &str = "llama2:13b";
@@ -78,7 +79,7 @@ async fn main() {
     let mut message_history = MessageHistory { hash_map: HashMap::new() };
 
     // Kick of the bot by connecting to the login server.
-    networking_system.connect_to_login_server(SOCKET_ADDR, USERNAME.to_owned(), PASSWORD.to_owned());
+    networking_system.connect_to_login_server(PACKET_VERSION, SOCKET_ADDR, USERNAME.to_owned(), PASSWORD.to_owned());
 
     loop {
         networking_system.get_events(&mut network_event_buffer);
@@ -92,7 +93,7 @@ async fn main() {
                     println!("[{}] Successfully connected to login server", "Setup".green());
 
                     networking_system.disconnect_from_login_server();
-                    networking_system.connect_to_character_server(&login_data, character_servers[0].clone());
+                    networking_system.connect_to_character_server(PACKET_VERSION, &login_data, character_servers[0].clone());
 
                     saved_login_data = Some(login_data);
                 }
@@ -142,7 +143,7 @@ async fn main() {
                     let login_login_data = saved_login_data.as_ref().unwrap();
 
                     networking_system.disconnect_from_character_server();
-                    networking_system.connect_to_map_server(login_login_data, login_data);
+                    networking_system.connect_to_map_server(PACKET_VERSION, login_login_data, login_data);
 
                     networking_system.map_loaded().expect("Map server disconnected");
                 }

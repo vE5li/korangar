@@ -4,14 +4,15 @@ use std::time::Duration;
 use korangar_debug::profiling::{FrameMeasurement, Measurement};
 use korangar_interface::element::store::{ElementStore, ElementStoreMut};
 use korangar_interface::element::{BaseLayoutInfo, Element};
+use korangar_interface::event::EventQueue;
 use korangar_interface::layout::area::Area;
 use korangar_interface::layout::tooltip::TooltipExt;
-use korangar_interface::layout::{Resolver, WindowLayout};
+use korangar_interface::layout::{Resolver, ScrollHandler, WindowLayout};
 use korangar_interface::prelude::{HorizontalAlignment, VerticalAlignment};
 use korangar_interface::window::{CustomWindow, Window};
 use rust_state::Context;
 
-use crate::graphics::{Color, CornerDiameter};
+use crate::graphics::{Color, CornerDiameter, ScreenPosition};
 use crate::interface::windows::profiler::color_lookup::ColorLookup;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
@@ -21,21 +22,31 @@ use crate::{FontSize, OverflowBehavior};
 struct FrameInspectorTooltip;
 
 const VISIBILITY_THRESHHOLD: f32 = 0.01;
-// HACK: Currently there is not ScrollHandler and this is the work around for
-// using scroll areas.
-const BASE_SCROLL: f32 = 1000.0;
 
 struct MeasurementDetails {
     duration: String,
 }
 
+struct Inner {
+    start_offset: Duration,
+    end_offset: Duration,
+    side_bias: f32,
+}
+
+impl Default for Inner {
+    fn default() -> Self {
+        Self {
+            start_offset: Default::default(),
+            end_offset: Default::default(),
+            side_bias: 0.5,
+        }
+    }
+}
+
 struct FrameInspectorView {
     measurement: FrameMeasurement,
     measurement_details: Vec<MeasurementDetails>,
-    start_offset: Duration,
-    end_offset: Duration,
-    scroll: RefCell<f32>,
-    side_bias: RefCell<f32>,
+    inner: RefCell<Inner>,
 }
 
 impl FrameInspectorView {
@@ -50,10 +61,7 @@ impl FrameInspectorView {
         Self {
             measurement,
             measurement_details,
-            start_offset: Duration::default(),
-            end_offset: Duration::default(),
-            scroll: RefCell::new(BASE_SCROLL),
-            side_bias: RefCell::new(0.5),
+            inner: Default::default(),
         }
     }
 }
@@ -205,30 +213,6 @@ impl Element<ClientState> for FrameInspectorView {
         _: ElementStoreMut<'_>,
         resolver: &mut Resolver<'_, ClientState>,
     ) -> Self::LayoutInfo {
-        const ZOOM_SPEED: f32 = 0.004;
-
-        let mut delta = self.scroll.borrow_mut();
-
-        if *delta != BASE_SCROLL {
-            // HACK: This entire block is just hacked together.
-            let actual_delta = *delta - BASE_SCROLL;
-
-            let root_measurement = self.measurement.root_measurement();
-            let viewed_duration = root_measurement.total_time_taken() - (self.start_offset + self.end_offset);
-            let side_bias = *self.side_bias.borrow();
-            let total_offset = viewed_duration.mul_f32(actual_delta.abs() * ZOOM_SPEED);
-
-            if actual_delta.is_sign_negative() {
-                self.end_offset = self.end_offset.saturating_sub(total_offset.mul_f32(side_bias));
-                self.start_offset = self.start_offset.saturating_sub(total_offset.mul_f32(1.0 - side_bias));
-            } else {
-                self.end_offset += total_offset.mul_f32(1.0 - side_bias);
-                self.start_offset += total_offset.mul_f32(side_bias);
-            }
-
-            *delta = BASE_SCROLL;
-        }
-
         let area = resolver.with_height(400.0);
 
         Self::LayoutInfo { area }
@@ -244,21 +228,24 @@ impl Element<ClientState> for FrameInspectorView {
         layout.add_rectangle(layout_info.area, CornerDiameter::uniform(6.0), Color::monochrome_u8(60));
 
         if layout_info.area.check().dont_mark().run(layout) {
+            let mut inner = self.inner.borrow_mut();
+
             // Technically side_bias should never be negative using this equation but since
             // a negative value results in an instant crash we make sure with a
             // `f32::abs`.
-            *self.side_bias.borrow_mut() =
-                f32::abs((1.0 / layout_info.area.width) * (layout.get_mouse_position().left - layout_info.area.left));
+            inner.side_bias = f32::abs((1.0 / layout_info.area.width) * (layout.get_mouse_position().left - layout_info.area.left));
 
-            // TODO: Fix max scroll.
-            layout.add_scroll_area(layout_info.area, f32::MAX, &self.scroll);
+            layout.add_scroll_area(layout_info.area, self);
         }
 
         let mut colors = ColorLookup::default();
 
         let root_measurement = self.measurement.root_measurement();
-        let start_time = root_measurement.start_time + self.start_offset;
-        let end_time = root_measurement.end_time - self.end_offset;
+
+        let inner = self.inner.borrow();
+
+        let start_time = root_measurement.start_time + inner.start_offset;
+        let end_time = root_measurement.end_time - inner.end_offset;
         let viewed_duration = end_time - start_time;
 
         // We only ever want to display a single unit, so we render from smallest to
@@ -275,7 +262,7 @@ impl Element<ClientState> for FrameInspectorView {
 
                     if visibility > VISIBILITY_THRESHHOLD {
                         let distance = $duration.div_duration_f32(viewed_duration) * layout_info.area.width;
-                        let offset = ((self.start_offset.$div_function() as f32 / $divider) * -distance) % distance;
+                        let offset = ((inner.start_offset.$div_function() as f32 / $divider) * -distance) % distance;
                         let show_numbers = !numbers_shown;
 
                         #[allow(unused_assignments)]
@@ -312,6 +299,29 @@ impl Element<ClientState> for FrameInspectorView {
         if layout_info.area.check().run(layout) {
             layout.add_tooltip("<none>", FrameInspectorTooltip.tooltip_id());
         }
+    }
+}
+
+impl ScrollHandler<ClientState> for FrameInspectorView {
+    fn handle_scroll(&self, _: &Context<ClientState>, _: &mut EventQueue<ClientState>, _: ScreenPosition, delta: f32) -> bool {
+        const ZOOM_SPEED: f32 = 0.004;
+
+        let mut inner = self.inner.borrow_mut();
+
+        let root_measurement = self.measurement.root_measurement();
+        let viewed_duration = root_measurement.total_time_taken() - (inner.start_offset + inner.end_offset);
+        let total_offset = viewed_duration.mul_f32(delta.abs() * ZOOM_SPEED);
+        let side_bias = inner.side_bias;
+
+        if delta.is_sign_negative() {
+            inner.end_offset = inner.end_offset.saturating_sub(total_offset.mul_f32(side_bias));
+            inner.start_offset = inner.start_offset.saturating_sub(total_offset.mul_f32(1.0 - side_bias));
+        } else {
+            inner.end_offset += total_offset.mul_f32(1.0 - side_bias);
+            inner.start_offset += total_offset.mul_f32(side_bias);
+        }
+
+        true
     }
 }
 

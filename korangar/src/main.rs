@@ -2727,7 +2727,7 @@ impl Client {
 
                     if let Some(delta) = input_report.scroll {
                         if is_interface_hovered {
-                            interface_frame.scroll(input_report.mouse_position, delta);
+                            interface_frame.scroll(&self.client_state, input_report.mouse_position, delta);
                         } else {
                             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(!render_options.use_debug_camera))]
                             self.input_event_buffer.push(InputEvent::ZoomCamera { zoom_factor: delta });

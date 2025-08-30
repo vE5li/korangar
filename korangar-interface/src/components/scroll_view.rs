@@ -1,23 +1,47 @@
 use std::cell::RefCell;
 
+use num::Signed;
 use rust_state::Context;
 
 use crate::application::Application;
 use crate::element::store::{ElementStore, ElementStoreMut, Persistent, PersistentExt};
 use crate::element::{Element, ElementSet};
 use crate::layout::area::Area;
-use crate::layout::{Resolver, WindowLayout};
+use crate::layout::{Resolver, ScrollHandler, WindowLayout};
+use crate::prelude::EventQueue;
+
+#[derive(Default)]
+struct PersistentDataInner {
+    scroll: f32,
+    max_scroll: f32,
+}
 
 #[derive(Default)]
 pub struct PersistentData {
-    scroll: RefCell<f32>,
-    // animation_state: AnimationState,
+    inner: RefCell<PersistentDataInner>,
+}
+
+impl<App> ScrollHandler<App> for PersistentData
+where
+    App: Application,
+{
+    fn handle_scroll(&self, _: &Context<App>, _: &mut EventQueue<App>, _: <App as Application>::Position, delta: f32) -> bool {
+        let mut inner = self.inner.borrow_mut();
+
+        // Don't try to scroll if its already at the minimum or maximum scroll value.
+        if delta.is_negative() && inner.scroll >= inner.max_scroll || delta.is_positive() && inner.scroll <= 0.0 {
+            return false;
+        }
+
+        inner.scroll = (inner.scroll - delta).max(0.0).min(inner.max_scroll);
+
+        true
+    }
 }
 
 pub struct ScrollViewLayoutInfo<L> {
     area: Area,
     children: L,
-    max_scroll: f32,
 }
 
 pub struct ScrollView<Children> {
@@ -52,10 +76,10 @@ where
     ) -> Self::LayoutInfo {
         loop {
             let persistent = self.get_persistent_data(&store, ());
-            let current_scroll = *persistent.scroll.borrow();
+            let scroll = persistent.inner.borrow().scroll;
 
             // In case that we need to resolve twice we don't want to start with the same
-            // resolver state as the first iteration, so we clone it here and assing it back
+            // resolver state as the first iteration, so we clone it here and adding it back
             // as soon as a correct layout was found. This is a little bit
             // ugly and might be improved in the future.
             let mut cloned_resolver = resolver.clone();
@@ -65,32 +89,33 @@ where
             // elegantly.
             let child_store = store.child_store(0);
 
-            let (area, children_height, layout_info) = cloned_resolver.with_derived_scrolled(current_scroll, |resolver| {
+            let (area, children_height, layout_info) = cloned_resolver.with_derived_scrolled(scroll, |resolver| {
                 self.children.create_layout_info(state, child_store, resolver)
             });
 
             let persistent = self.get_persistent_data(&store, ());
-            let mut current_scroll = persistent.scroll.borrow_mut();
+            let mut inner = persistent.inner.borrow_mut();
 
             let max_scroll = (children_height - area.height).max(0.0);
 
             // Check if the scroll is in bounds. If it is, we can just return, otherwise we
             // need to adjust it and create the layout again.
-            if *current_scroll > max_scroll {
-                *current_scroll = max_scroll;
+            if inner.scroll > max_scroll {
+                inner.scroll = max_scroll;
                 continue;
-            } else if *current_scroll < 0.0 {
-                *current_scroll = 0.0;
+            } else if inner.scroll < 0.0 {
+                inner.scroll = 0.0;
 
                 continue;
             }
+
+            inner.max_scroll = max_scroll;
 
             *resolver = cloned_resolver;
 
             return ScrollViewLayoutInfo {
                 area,
                 children: layout_info,
-                max_scroll,
             };
         }
     }
@@ -105,7 +130,7 @@ where
         let persistent = self.get_persistent_data(&store, ());
 
         if layout_info.area.check().dont_mark().run(layout) {
-            layout.add_scroll_area(layout_info.area, layout_info.max_scroll, &persistent.scroll);
+            layout.add_scroll_area(layout_info.area, persistent);
         }
 
         layout.with_clip_layer(layout_info.area, |layout| {

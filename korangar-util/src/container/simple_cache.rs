@@ -310,13 +310,16 @@ impl<K: Clone + Eq + Hash, V: Cacheable> SimpleCache<K, V> {
 
             if tail.freq > 1 {
                 let size = tail.size;
+
+                while self.main_count >= self.max_main_count || self.main_size.saturating_add(size) > self.max_main_size {
+                    self.evict_m();
+                }
+
                 self.main_fifo.push_back(tail_key);
                 self.main_count += 1;
                 self.main_size += size;
 
-                while self.main_count > self.max_main_count || self.main_size > self.max_main_size {
-                    self.evict_m();
-                }
+                return;
             } else {
                 let _ = self.values.remove(&tail_key).unwrap();
 

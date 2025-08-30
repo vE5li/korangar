@@ -130,7 +130,8 @@ pub struct AnimationData {
 
 impl Cacheable for AnimationData {
     fn size(&self) -> usize {
-        size_of_val(self)
+        // We cache animations only by count.
+        0
     }
 }
 

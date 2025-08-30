@@ -227,12 +227,15 @@ impl<F: FileLoader> AudioEngine<F> {
         let sound_effect_key = context.sound_effect_paths.insert(path.to_string()).expect("Mapping slab is full");
         context.lookup.insert(path.to_string(), sound_effect_key);
 
-        spawn_async_load(
-            context.game_file_loader.clone(),
-            context.async_response_sender.clone(),
-            path.to_string(),
-            sound_effect_key,
-        );
+        if !context.loading_sound_effect.contains(&sound_effect_key) {
+            context.loading_sound_effect.insert(sound_effect_key);
+            spawn_async_load(
+                context.game_file_loader.clone(),
+                context.async_response_sender.clone(),
+                path.to_string(),
+                sound_effect_key,
+            );
+        }
 
         sound_effect_key
     }
@@ -399,71 +402,77 @@ impl<F: FileLoader> EngineContext<F> {
     }
 
     fn play_sound_effect(&mut self, sound_effect_key: SoundEffectKey) {
-        if let Some(data) = self
+        match self
             .cache
             .get(&sound_effect_key)
             .map(|cached_sound_effect| cached_sound_effect.0.clone())
         {
-            if let Err(_error) = self.sound_effect_track.play(data.clone()) {
-                #[cfg(feature = "debug")]
-                print_debug!("[{}] can't play sound effect: {:?}", "error".red(), _error);
+            Some(data) => {
+                if let Err(_error) = self.sound_effect_track.play(data.clone()) {
+                    #[cfg(feature = "debug")]
+                    print_debug!("[{}] can't play sound effect: {:?}", "error".red(), _error);
+                }
             }
-
-            return;
+            None => {
+                queue_sound_effect_playback(
+                    self.game_file_loader.clone(),
+                    self.async_response_sender.clone(),
+                    &self.sound_effect_paths,
+                    &mut self.queued_sound_effect,
+                    &mut self.loading_sound_effect,
+                    sound_effect_key,
+                    QueuedSoundEffectType::Sound,
+                );
+            }
         }
-
-        queue_sound_effect_playback(
-            self.game_file_loader.clone(),
-            self.async_response_sender.clone(),
-            &self.sound_effect_paths,
-            &mut self.queued_sound_effect,
-            sound_effect_key,
-            QueuedSoundEffectType::Sound,
-        );
     }
 
     fn play_spatial_sound_effect(&mut self, sound_effect_key: SoundEffectKey, position: Point3<f32>, range: f32) {
         // Kira uses a RH coordinate system, so we need to convert our LH vectors.
         let position = Vector3::new(position.x, position.y, -position.z);
 
-        if let Some(data) = self
+        match self
             .cache
             .get(&sound_effect_key)
             .map(|cached_sound_effect| cached_sound_effect.0.clone())
         {
-            let spatial_track = SpatialTrackBuilder::new()
-                .persist_until_sounds_finish(true)
-                .distances(SpatialTrackDistances {
-                    min_distance: 5.0,
-                    max_distance: range,
-                })
-                .attenuation_function(Easing::Linear);
+            Some(data) => {
+                let spatial_track = SpatialTrackBuilder::new()
+                    .persist_until_sounds_finish(true)
+                    .distances(SpatialTrackDistances {
+                        min_distance: 5.0,
+                        max_distance: range,
+                    })
+                    .attenuation_function(Easing::Linear);
 
-            match self
-                .spatial_sound_effect_track
-                .add_spatial_sub_track(&self.spatial_listener, position, spatial_track)
-            {
-                Ok(mut spatial_track_handle) => {
-                    if let Err(_error) = spatial_track_handle.play(data) {
-                        #[cfg(feature = "debug")]
-                        print_debug!("[{}] can't play sound effect: {:?}", "error".red(), _error);
+                match self
+                    .spatial_sound_effect_track
+                    .add_spatial_sub_track(&self.spatial_listener, position, spatial_track)
+                {
+                    Ok(mut spatial_track_handle) => {
+                        if let Err(_error) = spatial_track_handle.play(data) {
+                            #[cfg(feature = "debug")]
+                            print_debug!("[{}] can't play sound effect: {:?}", "error".red(), _error);
+                        }
                     }
-                }
-                Err(_error) => {
-                    #[cfg(feature = "debug")]
-                    print_debug!("[{}] can't add spatial sound track: {:?}", "error".red(), _error);
-                }
-            };
+                    Err(_error) => {
+                        #[cfg(feature = "debug")]
+                        print_debug!("[{}] can't add spatial sound track: {:?}", "error".red(), _error);
+                    }
+                };
+            }
+            None => {
+                queue_sound_effect_playback(
+                    self.game_file_loader.clone(),
+                    self.async_response_sender.clone(),
+                    &self.sound_effect_paths,
+                    &mut self.queued_sound_effect,
+                    &mut self.loading_sound_effect,
+                    sound_effect_key,
+                    QueuedSoundEffectType::SpatialSound { position, range },
+                );
+            }
         }
-
-        queue_sound_effect_playback(
-            self.game_file_loader.clone(),
-            self.async_response_sender.clone(),
-            &self.sound_effect_paths,
-            &mut self.queued_sound_effect,
-            sound_effect_key,
-            QueuedSoundEffectType::SpatialSound { position, range },
-        );
     }
 
     fn set_spatial_listener(&mut self, position: Point3<f32>, view_direction: Vector3<f32>, look_up: Vector3<f32>) {
@@ -534,12 +543,13 @@ impl<F: FileLoader> EngineContext<F> {
                         }
                     }
                 }
-                _ => {
+                None => {
                     queue_sound_effect_playback(
                         self.game_file_loader.clone(),
                         self.async_response_sender.clone(),
                         &self.sound_effect_paths,
                         &mut self.queued_sound_effect,
+                        &mut self.loading_sound_effect,
                         sound_effect_key,
                         QueuedSoundEffectType::AmbientSound { ambient_key },
                     );
@@ -638,7 +648,6 @@ impl<F: FileLoader> EngineContext<F> {
                 } => {
                     self.loading_sound_effect.remove(&key);
 
-                    // TODO: NHA On load of maps we seem to do double loads for some sound effects.
                     if let Err(_error) = self.cache.insert(key, CachedSoundEffect(*sound_effect)) {
                         #[cfg(feature = "debug")]
                         print_debug!(
@@ -823,6 +832,7 @@ fn queue_sound_effect_playback(
     async_response_sender: Sender<AsyncLoadResult>,
     sound_effect_paths: &GenerationalSlab<SoundEffectKey, String>,
     queued_sound_effect: &mut Vec<QueuedSoundEffect>,
+    loading_sound_effect: &mut HashSet<SoundEffectKey>,
     sound_effect_key: SoundEffectKey,
     queued_sound_effect_type: QueuedSoundEffectType,
 ) -> bool {
@@ -837,7 +847,11 @@ fn queue_sound_effect_playback(
         queued_time: Instant::now(),
     });
 
-    spawn_async_load(game_file_loader, async_response_sender, path, sound_effect_key);
+    if !loading_sound_effect.contains(&sound_effect_key) {
+        loading_sound_effect.insert(sound_effect_key);
+        spawn_async_load(game_file_loader, async_response_sender, path, sound_effect_key);
+    }
+
     false
 }
 

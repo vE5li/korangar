@@ -62,6 +62,7 @@ use korangar_interface::Interface;
 use korangar_interface::layout::MouseButton;
 use korangar_networking::{
     DisconnectReason, HotkeyState, LoginServerLoginData, MessageColor, NetworkEvent, NetworkEventBuffer, NetworkingSystem, SellItem,
+    SupportedPacketVersion,
 };
 use korangar_util::pathing::PathFinder;
 #[cfg(feature = "debug")]
@@ -941,8 +942,12 @@ impl Client {
                         print_debug!("Disconnection from the character server with error");
 
                         let socket_address = self.saved_login_server_address.unwrap();
-                        self.networking_system
-                            .connect_to_login_server(socket_address, &self.saved_username, &self.saved_password);
+                        self.networking_system.connect_to_login_server(
+                            SupportedPacketVersion::_20220406,
+                            socket_address,
+                            &self.saved_username,
+                            &self.saved_password,
+                        );
                     }
                 }
                 NetworkEvent::CharacterServerConnected { normal_slot_count } => {
@@ -964,7 +969,8 @@ impl Client {
 
                         let login_data = self.saved_login_data.as_ref().unwrap();
                         let server = self.saved_character_server.clone().unwrap();
-                        self.networking_system.connect_to_character_server(login_data, server);
+                        self.networking_system
+                            .connect_to_character_server(SupportedPacketVersion::_20220406, login_data, server);
                     } else if !self.networking_system.is_map_server_connected() {
                         #[cfg(not(feature = "debug"))]
                         self.interface.close_all_windows();
@@ -988,7 +994,8 @@ impl Client {
 
                     let login_data = self.saved_login_data.as_ref().unwrap();
                     let server = self.saved_character_server.clone().unwrap();
-                    self.networking_system.connect_to_character_server(login_data, server);
+                    self.networking_system
+                        .connect_to_character_server(SupportedPacketVersion::_20220406, login_data, server);
 
                     self.map = None;
 
@@ -1071,7 +1078,8 @@ impl Client {
 
                     let saved_login_data = self.saved_login_data.as_ref().unwrap();
                     self.networking_system.disconnect_from_character_server();
-                    self.networking_system.connect_to_map_server(saved_login_data, login_data);
+                    self.networking_system
+                        .connect_to_map_server(SupportedPacketVersion::_20220406, saved_login_data, login_data);
                     // Ask for the client tick right away, so that the player isn't de-synced when
                     // they spawn on the map.
                     let _ = self.networking_system.request_client_tick();
@@ -1699,7 +1707,8 @@ impl Client {
                     self.saved_username = username.clone();
                     self.saved_password = password.clone();
 
-                    self.networking_system.connect_to_login_server(socket_address, username, password);
+                    self.networking_system
+                        .connect_to_login_server(SupportedPacketVersion::_20220406, socket_address, username, password);
                 }
                 InputEvent::SelectServer {
                     character_server_information,
@@ -1712,8 +1721,11 @@ impl Client {
                     // server before it logged in to the login server, so it's fine to
                     // unwrap here.
                     let login_data = self.saved_login_data.as_ref().unwrap();
-                    self.networking_system
-                        .connect_to_character_server(login_data, character_server_information);
+                    self.networking_system.connect_to_character_server(
+                        SupportedPacketVersion::_20220406,
+                        login_data,
+                        character_server_information,
+                    );
                 }
                 InputEvent::Respawn => {
                     let _ = self.networking_system.respawn();

@@ -3,6 +3,7 @@ use std::net::{IpAddr, SocketAddr};
 use ragnarok_packets::{AccountId, CharacterId, Sex};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
+use crate::SupportedPacketVersion;
 use crate::event::NetworkEvent;
 
 #[derive(Debug, Clone, Copy)]
@@ -47,16 +48,19 @@ pub(crate) enum ServerConnectCommand {
         address: SocketAddr,
         action_receiver: UnboundedReceiver<Vec<u8>>,
         event_sender: UnboundedSender<NetworkEvent>,
+        packet_version: SupportedPacketVersion,
     },
     Character {
         address: SocketAddr,
         action_receiver: UnboundedReceiver<Vec<u8>>,
         event_sender: UnboundedSender<NetworkEvent>,
+        packet_version: SupportedPacketVersion,
     },
     Map {
         address: SocketAddr,
         action_receiver: UnboundedReceiver<Vec<u8>>,
         event_sender: UnboundedSender<NetworkEvent>,
+        packet_version: SupportedPacketVersion,
     },
 }
 
@@ -73,6 +77,7 @@ pub(crate) enum ServerConnection {
     Connected {
         action_sender: UnboundedSender<Vec<u8>>,
         event_receiver: UnboundedReceiver<NetworkEvent>,
+        packet_version: SupportedPacketVersion,
     },
     ClosingManually,
     Disconnected,

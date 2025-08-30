@@ -131,6 +131,7 @@ const INITIAL_SCREEN_SIZE: ScreenSize = ScreenSize {
 };
 
 const INITIAL_SCALING_FACTOR: Scaling = Scaling::new(1.0);
+const FALLBACK_PACKET_VERSION: SupportedPacketVersion = SupportedPacketVersion::_20220406;
 
 static ICON_DATA: &[u8] = include_bytes!("../archive/data/icon.png");
 
@@ -397,6 +398,8 @@ struct Client {
     saved_password: String,
     // TODO: Move or remove this.
     saved_username: String,
+    // TODO: Move or remove this.
+    saved_packet_version: SupportedPacketVersion,
 
     particle_holder: ParticleHolder,
     point_light_manager: PointLightManager,
@@ -653,6 +656,7 @@ impl Client {
         let saved_login_server_address = None;
         let saved_password = String::new();
         let saved_username = String::new();
+        let saved_packet_version = FALLBACK_PACKET_VERSION;
 
         time_phase!("initialize networking", {
             #[cfg(not(feature = "debug"))]
@@ -787,6 +791,7 @@ impl Client {
             saved_login_server_address,
             saved_password,
             saved_username,
+            saved_packet_version,
             particle_holder,
             point_light_manager,
             effect_holder,
@@ -943,7 +948,7 @@ impl Client {
 
                         let socket_address = self.saved_login_server_address.unwrap();
                         self.networking_system.connect_to_login_server(
-                            SupportedPacketVersion::_20220406,
+                            self.saved_packet_version,
                             socket_address,
                             &self.saved_username,
                             &self.saved_password,
@@ -970,7 +975,7 @@ impl Client {
                         let login_data = self.saved_login_data.as_ref().unwrap();
                         let server = self.saved_character_server.clone().unwrap();
                         self.networking_system
-                            .connect_to_character_server(SupportedPacketVersion::_20220406, login_data, server);
+                            .connect_to_character_server(self.saved_packet_version, login_data, server);
                     } else if !self.networking_system.is_map_server_connected() {
                         #[cfg(not(feature = "debug"))]
                         self.interface.close_all_windows();
@@ -995,7 +1000,7 @@ impl Client {
                     let login_data = self.saved_login_data.as_ref().unwrap();
                     let server = self.saved_character_server.clone().unwrap();
                     self.networking_system
-                        .connect_to_character_server(SupportedPacketVersion::_20220406, login_data, server);
+                        .connect_to_character_server(self.saved_packet_version, login_data, server);
 
                     self.map = None;
 
@@ -1079,7 +1084,7 @@ impl Client {
                     let saved_login_data = self.saved_login_data.as_ref().unwrap();
                     self.networking_system.disconnect_from_character_server();
                     self.networking_system
-                        .connect_to_map_server(SupportedPacketVersion::_20220406, saved_login_data, login_data);
+                        .connect_to_map_server(self.saved_packet_version, saved_login_data, login_data);
                     // Ask for the client tick right away, so that the player isn't de-synced when
                     // they spawn on the map.
                     let _ = self.networking_system.request_client_tick();
@@ -1703,12 +1708,26 @@ impl Client {
                         .next()
                         .expect("ill formatted service IP");
 
+                    let packet_version = match service.packet_version {
+                        Some(packet_version) => match packet_version {
+                            PacketVersion::_20220406 => SupportedPacketVersion::_20220406,
+                            PacketVersion::Unsupported(packet_version) => {
+                                self.interface.open_window(ErrorWindow::new(format!(
+                                    "Selected server has an unsupported package version: {packet_version}"
+                                )));
+                                continue;
+                            }
+                        },
+                        None => FALLBACK_PACKET_VERSION,
+                    };
+
                     self.saved_login_server_address = Some(socket_address);
                     self.saved_username = username.clone();
                     self.saved_password = password.clone();
+                    self.saved_packet_version = packet_version;
 
                     self.networking_system
-                        .connect_to_login_server(SupportedPacketVersion::_20220406, socket_address, username, password);
+                        .connect_to_login_server(packet_version, socket_address, username, password);
                 }
                 InputEvent::SelectServer {
                     character_server_information,
@@ -1721,11 +1740,8 @@ impl Client {
                     // server before it logged in to the login server, so it's fine to
                     // unwrap here.
                     let login_data = self.saved_login_data.as_ref().unwrap();
-                    self.networking_system.connect_to_character_server(
-                        SupportedPacketVersion::_20220406,
-                        login_data,
-                        character_server_information,
-                    );
+                    self.networking_system
+                        .connect_to_character_server(self.saved_packet_version, login_data, character_server_information);
                 }
                 InputEvent::Respawn => {
                     let _ = self.networking_system.respawn();

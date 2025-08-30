@@ -118,6 +118,13 @@ pub struct Service {
     /// Define each loading screen in the path `/data/texture/À¯ÀúÀÎÅÍÆäÀÌ½º/`
     #[serde(default, alias = "loading")]
     pub loading_images: Option<Vec<LoadingImage>>,
+
+    /// Packet version (`PACKET_VER`) used by the server.
+    ///
+    /// This is a Korangar specific field and not accepted by the official
+    /// client.
+    #[serde(default, deserialize_with = "packet_version_from_number")]
+    pub packet_version: Option<PacketVersion>,
 }
 
 impl Service {
@@ -287,6 +294,24 @@ impl ServerType {
             "pk" => ServerType::Pk,
             _ => ServerType::Unknown,
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, StateElement)]
+pub enum PacketVersion {
+    _20220406,
+    Unsupported(u64),
+}
+
+fn packet_version_from_number<'de, D>(deserializer: D) -> Result<Option<PacketVersion>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let version = Deserialize::deserialize(deserializer)?;
+
+    match version {
+        20220406 => Ok(Some(PacketVersion::_20220406)),
+        _ => Ok(Some(PacketVersion::Unsupported(version))),
     }
 }
 

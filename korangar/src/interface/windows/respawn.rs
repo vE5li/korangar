@@ -20,7 +20,7 @@ impl CustomWindow<ClientState> for RespawnWindow {
         window! {
             title: client_state().localization().respawn_window_title(),
             class: Self::window_class(),
-            theme: InterfaceThemeType::Game,
+            theme: InterfaceThemeType::InGame,
             elements: (
                 button! {
                     text: client_state().localization().respawn_button_text(),

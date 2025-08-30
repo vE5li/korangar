@@ -1,4 +1,5 @@
 #[derive(Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum HorizontalAlignment {
     Left { offset: f32, border: f32 },
     Center { offset: f32, border: f32 },
@@ -25,6 +26,7 @@ impl HorizontalAlignment {
 }
 
 #[derive(Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum VerticalAlignment {
     Top { offset: f32 },
     Center { offset: f32 },

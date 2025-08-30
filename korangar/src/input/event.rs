@@ -75,12 +75,6 @@ pub enum InputEvent {
     CloseTopWindow,
     /// Toggle if the user interface should be rendered or not.
     ToggleShowInterface,
-    // SaveTheme {
-    //     theme_kind: InternalThemeKind,
-    // },
-    // ReloadTheme {
-    //     theme_kind: InternalThemeKind,
-    // },
     /// Select a character to start playing.
     SelectCharacter {
         /// Slot that the selected character is in.
@@ -262,7 +256,7 @@ pub enum InputEvent {
     },
     /// Open the theme inspector window.
     #[cfg(feature = "debug")]
-    OpenThemeInspectorWindow,
+    ToggleThemeInspectorWindow,
     /// Open or close the profiler window.
     #[cfg(feature = "debug")]
     ToggleProfilerWindow,

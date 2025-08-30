@@ -32,7 +32,7 @@ where
         window! {
             title: client_state().localization().audio_settings_window_title(),
             class: Self::window_class(),
-            theme: InterfaceThemeType::Game,
+            theme: InterfaceThemeType::InGame,
             closable: true,
             elements: (
                 state_button! {

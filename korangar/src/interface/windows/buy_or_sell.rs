@@ -27,7 +27,7 @@ impl CustomWindow<ClientState> for BuyOrSellWindow {
         window! {
             title: "Buy or sell",
             class: Self::window_class(),
-            theme: InterfaceThemeType::Game,
+            theme: InterfaceThemeType::InGame,
             elements: (
                 button! {
                     text: "Buy",

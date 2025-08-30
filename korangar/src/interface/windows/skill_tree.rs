@@ -37,7 +37,7 @@ where
         window! {
             title: client_state().localization().skill_tree_window_title(),
             class: Self::window_class(),
-            theme: InterfaceThemeType::Game,
+            theme: InterfaceThemeType::InGame,
             closable: true,
             elements: std::array::from_fn::<_, SKILL_TREE_ROWS, _>(|row| {
                 split! {

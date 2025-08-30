@@ -367,7 +367,7 @@ impl CustomWindow<ClientState> for FrameInspectorWindow {
 
         window! {
             title: "Frame Inspector",
-            theme: InterfaceThemeType::Game,
+            theme: InterfaceThemeType::InGame,
             closable: true,
             minimum_width: 500.0,
             maximum_width: 2000.0,

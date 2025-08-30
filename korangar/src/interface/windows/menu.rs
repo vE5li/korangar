@@ -24,7 +24,7 @@ impl CustomWindow<ClientState> for MenuWindow {
         window! {
             title: client_state().localization().menu_window_title(),
             class: Self::window_class(),
-            theme: InterfaceThemeType::Game,
+            theme: InterfaceThemeType::InGame,
             closable: true,
             elements: (
                 button! {
@@ -91,7 +91,7 @@ impl CustomWindow<ClientState> for MenuWindow {
                 button! {
                     text: "Theme inspector",
                     tooltip: "Inspect and edit the theme (^000001only available in debug mode^000000)",
-                    event: InputEvent::OpenThemeInspectorWindow,
+                    event: InputEvent::ToggleThemeInspectorWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
                     hovered_background_color: client_theme().debug_button().hovered_background_color(),
                 },

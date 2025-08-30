@@ -1,3 +1,5 @@
+#[cfg(feature = "debug")]
+use korangar_debug::logging::{Colorize, Timer, print_debug};
 use korangar_interface::components::button::ButtonTheme;
 use korangar_interface::components::collapsable::CollapsableTheme;
 use korangar_interface::components::drop_down::DropDownTheme;
@@ -10,24 +12,33 @@ use korangar_interface::layout::tooltip::TooltipTheme;
 use korangar_interface::prelude::{HorizontalAlignment, VerticalAlignment};
 use korangar_interface::window::{StateWindow, WindowTheme};
 use rust_state::RustState;
+use serde::{Deserialize, Serialize};
 
 use crate::graphics::{Color, CornerDiameter, ScreenSize, ShadowPadding};
 use crate::loaders::{FontSize, OverflowBehavior};
+use crate::settings::{IN_GAME_THEMES_PATH, MENU_THEMES_PATH};
 use crate::state::ClientState;
 
-#[derive(RustState, StateElement)]
+#[derive(Default, Debug, Clone, Copy)]
+pub enum InterfaceThemeType {
+    #[default]
+    InGame,
+    Menu,
+}
+
+#[derive(Serialize, Deserialize, RustState, StateElement)]
 pub struct DebugButtonTheme {
     foreground_color: Color,
     hovered_background_color: Color,
 }
 
-#[derive(RustState, StateElement)]
+#[derive(Serialize, Deserialize, RustState, StateElement)]
 pub struct ChatTheme {
     window_color: Color,
     text_box_background_color: Color,
 }
 
-#[derive(RustState, StateElement, StateWindow)]
+#[derive(Serialize, Deserialize, RustState, StateElement, StateWindow)]
 #[window_title("Theme Inspector")]
 pub struct InterfaceTheme {
     #[hidden_element]
@@ -52,20 +63,63 @@ pub struct InterfaceTheme {
     pub chat: ChatTheme,
 }
 
-#[derive(Default, Debug, Clone, Copy)]
-pub enum InterfaceThemeType {
-    Menu,
-    #[default]
-    Game,
-}
+impl InterfaceTheme {
+    pub fn load(theme_type: InterfaceThemeType, name: &str) -> Self {
+        #[cfg(feature = "debug")]
+        let timer = Timer::new("Load theme");
 
-pub trait ThemeDefault {
-    fn default_menu() -> Self;
+        let path = match theme_type {
+            InterfaceThemeType::InGame => format!("{IN_GAME_THEMES_PATH}/{name}.ron"),
+            InterfaceThemeType::Menu => format!("{MENU_THEMES_PATH}/{name}.ron"),
+        };
 
-    fn default_playing() -> Self;
-}
+        #[cfg(feature = "debug")]
+        print_debug!("loading theme from file {}", path.magenta());
 
-impl ThemeDefault for InterfaceTheme {
+        let theme = std::fs::read_to_string(&path)
+            .ok()
+            .and_then(|data| ron::from_str(&data).ok())
+            .unwrap_or_else(|| {
+                #[cfg(feature = "debug")]
+                print_debug!("[{}] failed to load theme {}", "error".red(), name.magenta());
+
+                match theme_type {
+                    InterfaceThemeType::Menu => Self::default_menu(),
+                    InterfaceThemeType::InGame => Self::default_in_game(),
+                }
+            });
+
+        #[cfg(feature = "debug")]
+        timer.stop();
+
+        theme
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn save(&self, theme_type: InterfaceThemeType, name: &str) {
+        let timer = Timer::new("Save theme");
+
+        let path = match theme_type {
+            InterfaceThemeType::InGame => format!("{IN_GAME_THEMES_PATH}/{name}.ron"),
+            InterfaceThemeType::Menu => format!("{MENU_THEMES_PATH}/{name}.ron"),
+        };
+
+        print_debug!("saving theme to file {}", path.magenta());
+
+        let data = ron::ser::to_string_pretty(self, ron::ser::PrettyConfig::new()).unwrap();
+
+        if let Err(error) = std::fs::write(path, data) {
+            print_debug!(
+                "[{}] failed to save theme to {}: {:?}",
+                "error".red(),
+                name.magenta(),
+                error.red()
+            );
+        }
+
+        timer.stop();
+    }
+
     fn default_menu() -> Self {
         Self {
             window: WindowTheme {
@@ -250,7 +304,7 @@ impl ThemeDefault for InterfaceTheme {
         }
     }
 
-    fn default_playing() -> Self {
+    fn default_in_game() -> Self {
         Self {
             window: WindowTheme {
                 title_color: Color::rgb_u8(185, 155, 155),

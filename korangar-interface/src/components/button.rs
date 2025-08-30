@@ -11,6 +11,7 @@ use crate::layout::tooltip::TooltipExt;
 use crate::layout::{MouseButton, Resolver, WindowLayout};
 
 #[derive(RustState)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct ButtonTheme<App>
 where
     App: Application + 'static,

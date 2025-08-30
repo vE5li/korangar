@@ -20,6 +20,16 @@ pub trait DropDownItem<T> {
     fn value(&self) -> T;
 }
 
+impl DropDownItem<String> for String {
+    fn text(&self) -> &str {
+        self
+    }
+
+    fn value(&self) -> String {
+        self.clone()
+    }
+}
+
 // TODO: Having this here is not very clean. We should instead have
 // show_point_shadow_map wrapped in a new type and implement for that. Ideally,
 // that would be an enum only covering the possible cases.
@@ -341,6 +351,7 @@ where
 }
 
 #[derive(RustState)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct DropDownTheme<App>
 where
     App: Application + 'static,

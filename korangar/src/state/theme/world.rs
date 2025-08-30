@@ -1,3 +1,5 @@
+#[cfg(feature = "debug")]
+use korangar_debug::logging::{Colorize, Timer, print_debug};
 use korangar_interface::element::StateElement;
 use rust_state::RustState;
 use serde::{Deserialize, Serialize};
@@ -86,9 +88,61 @@ impl Default for CursorTheme {
 }
 
 #[derive(Default, Serialize, Deserialize, RustState, StateElement)]
-pub struct GameTheme {
+pub struct WorldTheme {
     pub overlay: OverlayTheme,
     pub status_bar: StatusBarTheme,
     pub indicator: IndicatorTheme,
     pub cursor: CursorTheme,
+}
+
+impl WorldTheme {
+    pub fn load(name: &str) -> Self {
+        use crate::settings::WORLD_THEMES_PATH;
+
+        #[cfg(feature = "debug")]
+        let timer = Timer::new("Load theme");
+
+        let path = format!("{WORLD_THEMES_PATH}/{name}.ron");
+
+        #[cfg(feature = "debug")]
+        print_debug!("loading theme from file {}", path.magenta());
+
+        let theme = std::fs::read_to_string(&path)
+            .ok()
+            .and_then(|data| ron::from_str(&data).ok())
+            .unwrap_or_else(|| {
+                #[cfg(feature = "debug")]
+                print_debug!("[{}] failed to load theme {}", "error".red(), name.magenta());
+                WorldTheme::default()
+            });
+
+        #[cfg(feature = "debug")]
+        timer.stop();
+
+        theme
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn save(&self, name: &str) {
+        use crate::settings::WORLD_THEMES_PATH;
+
+        let timer = Timer::new("Save theme");
+
+        let path = format!("{WORLD_THEMES_PATH}/{name}.ron");
+
+        print_debug!("saving theme to file {}", path.magenta());
+
+        let data = ron::ser::to_string_pretty(self, ron::ser::PrettyConfig::new()).unwrap();
+
+        if let Err(error) = std::fs::write(path, data) {
+            print_debug!(
+                "[{}] failed to save theme to {}: {:?}",
+                "error".red(),
+                name.magenta(),
+                error.red()
+            );
+        }
+
+        timer.stop();
+    }
 }

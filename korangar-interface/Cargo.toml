@@ -19,3 +19,4 @@ serde = { workspace = true, features = ["derive"], optional = true }
 cgmath = ["dep:cgmath"]
 debug = ["korangar-debug"]
 serde = ["dep:serde"]
+theme-element = []

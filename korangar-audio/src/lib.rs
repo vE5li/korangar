@@ -620,6 +620,11 @@ impl<F: FileLoader> EngineContext<F> {
         self.ambient_sound.clear();
         self.active_spatial_tracks.clear();
         self.cycling_ambient.clear();
+
+        self.queued_sound_effect
+            .retain(|queued| !matches!(queued.sound_type, QueuedSoundEffectType::AmbientSound { .. }));
+
+        self.object_kdtree = KDTree::empty();
     }
 
     fn prepare_ambient_sound_world(&mut self) {

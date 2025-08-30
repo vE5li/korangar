@@ -118,6 +118,7 @@ impl Actions {
 
 impl Cacheable for Actions {
     fn size(&self) -> usize {
-        size_of_val(&self.actions)
+        // We cache actions only by count.
+        0
     }
 }

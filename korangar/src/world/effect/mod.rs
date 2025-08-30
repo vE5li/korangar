@@ -109,7 +109,8 @@ impl Effect {
 
 impl Cacheable for Effect {
     fn size(&self) -> usize {
-        size_of_val(self)
+        // We cache effects only by count.
+        0
     }
 }
 

@@ -32,7 +32,7 @@ create_generational_key!(SoundEffectKey, "The key for a cached sound effect");
 create_simple_key!(AmbientKey, "The key for a ambient sound");
 
 const MAX_QUEUE_TIME_SECONDS: f32 = 1.0;
-const MAX_CACHE_COUNT: u32 = 1000;
+const MAX_CACHE_COUNT: u32 = 4096;
 const MAX_CACHE_SIZE: usize = 64 << 20; // 64 MiB
 const SOUND_EFFECT_BASE_PATH: &str = "data\\wav";
 const BACKGROUND_MUSIC_MAPPING_FILE: &str = "data\\mp3NameTable.txt";

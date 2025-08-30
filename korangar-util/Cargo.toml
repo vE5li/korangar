@@ -7,12 +7,10 @@ edition = "2024"
 cgmath = { workspace = true }
 fast-srgb8 = { workspace = true }
 hashbrown = { workspace = true }
-image = { workspace = true }
 rust-state = { workspace = true, optional = true }
 korangar-interface = { workspace = true, optional = true }
 
 [dev-dependencies]
-rand_aes = { workspace = true }
 
 [features]
 interface = ["korangar-interface", "rust-state"]

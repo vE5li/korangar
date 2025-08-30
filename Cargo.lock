@@ -1970,9 +1970,7 @@ dependencies = [
  "cgmath",
  "fast-srgb8",
  "hashbrown",
- "image",
  "korangar-interface",
- "rand_aes",
  "rust-state",
 ]
 

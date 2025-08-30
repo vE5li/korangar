@@ -38,6 +38,7 @@ impl<T, A, B, C, D, E, F, G, H> Text<T, A, B, C, D, E, F, G, H> {
     /// This function is supposed to be called from a component macro and not
     /// intended to be called manually.
     #[inline(always)]
+    #[allow(clippy::too_many_arguments)]
     pub fn component_new(
         text: A,
         color: B,

@@ -1,7 +1,10 @@
 mod color_span_iterator;
 mod font_file;
 mod font_map_descriptor;
+mod layout_key;
 
+use std::hash::Hash;
+use std::num::{NonZeroU32, NonZeroUsize};
 use std::sync::{Arc, Mutex};
 
 use cgmath::{Point2, Vector2};
@@ -17,19 +20,37 @@ use korangar_interface::application::TextLayouter;
 use korangar_interface::components::drop_down::DropDownItem;
 use korangar_interface::element::ElementDisplay;
 use korangar_util::Rectangle;
+use korangar_util::container::{Cacheable, SimpleCache};
 use serde::{Deserialize, Serialize};
 
 use self::color_span_iterator::ColorSpanIterator;
 use super::{GameFileLoader, TextureLoader};
 use crate::graphics::{Color, MAX_TEXTURE_SIZE, ScreenSize, Texture};
 use crate::loaders::font::font_file::FontFile;
+use crate::loaders::font::layout_key::{LayoutKey, LayoutKeyRef};
 use crate::state::ClientState;
+
+const MAX_CACHE_COUNT: u32 = 512;
+// We cache layouts only by count.
+const MAX_CACHE_SIZE: usize = usize::MAX;
+
+struct CachedLayout {
+    glyphs: Vec<GlyphInstruction>,
+    size: Vector2<f32>,
+}
+
+impl Cacheable for CachedLayout {
+    fn size(&self) -> usize {
+        // We cache layouts only by count.
+        0
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct FontSize(pub f32);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum OverflowBehavior {
     Shrink,
     LineBreak,
@@ -106,6 +127,7 @@ impl Scaling {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct GlyphInstruction {
     pub position: Rectangle<f32>,
     pub texture_coordinate: Rectangle<f32>,
@@ -126,6 +148,7 @@ pub struct FontLoader {
     primary_font_family: String,
     font_map: Arc<Texture>,
     glyph_cache: HashMap<ID, Arc<HashMap<u16, GlyphCoordinate>>>,
+    layout_cache: Mutex<SimpleCache<LayoutKey, CachedLayout>>,
 }
 
 impl FontLoader {
@@ -145,11 +168,17 @@ impl FontLoader {
 
         let font_map = texture_loader.create_msdf("font map", font_map_image_data);
 
+        let layout_cache = SimpleCache::new(
+            NonZeroU32::new(MAX_CACHE_COUNT).unwrap(),
+            NonZeroUsize::new(MAX_CACHE_SIZE).unwrap(),
+        );
+
         Self {
             font_system: Mutex::new(font_system),
             primary_font_family,
             font_map,
             glyph_cache,
+            layout_cache: Mutex::new(layout_cache),
         }
     }
 
@@ -288,10 +317,6 @@ impl FontLoader {
         )
     }
 
-    // TODO: NHA cosmic_text could help us to render text in boxes.
-    //       But that would need us to re-evaluate on how we render test in general.
-    //       We also don't really use the "line_height_scale", which would provide
-    //       an easy way to handle "line height".
     /// Writes the text layout for the given text into the `glyphs` buffer and
     /// returns the size of the text in pixels.
     ///
@@ -304,8 +329,72 @@ impl FontLoader {
         font_size: FontSize,
         line_height_scale: f32,
         available_width: Option<f32>,
-        mut glyphs: Option<&mut Vec<GlyphInstruction>>,
+        glyphs: Option<&mut Vec<GlyphInstruction>>,
     ) -> Vector2<f32> {
+        // TODO: NHA We currently call get_text_dimensions() with different
+        //       "available_width" and "overflow_behavior" then when we call
+        //       layout_text() for with the resulting available_width.
+        //       This results us caching two instead of one layout.
+        let key = LayoutKeyRef {
+            text,
+            default_color: default_color.into(),
+            highlight_color: highlight_color.into(),
+            font_size,
+            line_height_scale,
+            layout_width: available_width.unwrap_or(f32::INFINITY),
+        };
+
+        if let Some(layout) = self.layout_cache.lock().unwrap().get_with(&key, |k| k == &key) {
+            if let Some(glyphs) = glyphs {
+                glyphs.extend(layout.glyphs.iter().copied())
+            }
+            return layout.size;
+        }
+
+        let (size, rendered_glyphs) = self.render_layout(
+            text,
+            default_color,
+            highlight_color,
+            font_size,
+            line_height_scale,
+            available_width,
+        );
+
+        if let Some(glyphs) = glyphs {
+            glyphs.extend(rendered_glyphs.iter().copied());
+        }
+
+        let _result = self.layout_cache.lock().unwrap().insert(key.to_owned(), CachedLayout {
+            glyphs: rendered_glyphs,
+            size,
+        });
+
+        #[cfg(feature = "debug")]
+        if let Err(error) = _result {
+            print_debug!(
+                "[{}] layout could not be added to cache. Text: '{}': {:?}",
+                "error".red(),
+                text,
+                error
+            );
+        }
+
+        size
+    }
+
+    // TODO: NHA cosmic_text could help us to render text in boxes.
+    //       But that would need us to re-evaluate on how we render test in general.
+    //       We also don't really use the "line_height_scale", which would provide
+    //       an easy way to handle "line height".
+    fn render_layout(
+        &self,
+        text: &str,
+        default_color: Color,
+        highlight_color: Color,
+        font_size: FontSize,
+        line_height_scale: f32,
+        available_width: Option<f32>,
+    ) -> (Vector2<f32>, Vec<GlyphInstruction>) {
         let mut text_width = 0f32;
         let mut text_height = 0f32;
 
@@ -329,11 +418,11 @@ impl FontLoader {
             buffer
         };
 
+        let mut rendered_glyphs = Vec::new();
+
         for run in buffer.layout_runs() {
             text_width = text_width.max(run.line_w);
             text_height += run.line_height;
-
-            let Some(glyphs) = glyphs.as_mut() else { continue };
 
             for layout_glyph in run.glyphs.iter() {
                 let physical_glyph = layout_glyph.physical((0.0, 0.0), 1.0);
@@ -358,7 +447,7 @@ impl FontLoader {
                 let position = Rectangle::new(Point2::new(x, y), Point2::new(x + width, y + height));
                 let color = layout_glyph.color_opt.map(|color| color.into()).unwrap_or(default_color);
 
-                glyphs.push(GlyphInstruction {
+                rendered_glyphs.push(GlyphInstruction {
                     position,
                     texture_coordinate: glyph_coordinate.texture_coordinate,
                     color,
@@ -366,7 +455,7 @@ impl FontLoader {
             }
         }
 
-        Vector2::new(text_width, text_height)
+        (Vector2::new(text_width, text_height), rendered_glyphs)
     }
 
     /// The texture of the static font map.

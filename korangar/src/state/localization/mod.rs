@@ -234,3 +234,27 @@ impl Localization {
         localization
     }
 }
+
+#[cfg(test)]
+mod languages {
+    use crate::state::localization::{Language, Localization};
+
+    #[test]
+    fn language_files_are_valid() {
+        // Please extend this when adding a language.
+        let languages = [Language::English, Language::German];
+
+        for language in languages {
+            // Used match here so the test fails if somebody forgets to adjust the test
+            // after adding a language.
+            match language {
+                Language::English | Language::German => {
+                    let locale_code = language.to_locale_code();
+                    let file_name = format!("archive/data/languages/{locale_code}.ron");
+                    let file_content = std::fs::read_to_string(file_name).expect("language file should exist");
+                    let _: Localization = ron::de::from_str(&file_content).expect("language file should be valid");
+                }
+            }
+        }
+    }
+}

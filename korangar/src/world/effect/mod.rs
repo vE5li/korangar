@@ -1,5 +1,3 @@
-mod lookup;
-
 use std::sync::Arc;
 
 use cgmath::{Point3, Rad, Vector2, Vector3};

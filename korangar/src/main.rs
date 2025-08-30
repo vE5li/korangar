@@ -166,6 +166,8 @@ mod character_slots {
         slots: Vec<Option<CharacterInformation>>,
     }
 
+    impl Foo {}
+
     impl CharacterSlots {
         pub fn set_slot_count(&mut self, slot_count: usize) {
             self.slots.resize(slot_count, None);

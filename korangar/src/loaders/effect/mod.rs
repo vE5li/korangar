@@ -149,7 +149,17 @@ impl EffectLoader {
                 .collect(),
         ));
 
-        self.cache.lock().unwrap().insert(path.to_string(), effect.clone()).unwrap();
+        let _result = self.cache.lock().unwrap().insert(path.to_string(), effect.clone());
+
+        #[cfg(feature = "debug")]
+        if let Err(error) = _result {
+            print_debug!(
+                "[{}] effect could not be added to cache. Path: '{}': {:?}",
+                "error".red(),
+                &path,
+                error
+            );
+        }
 
         #[cfg(feature = "debug")]
         timer.stop();

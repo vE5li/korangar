@@ -100,7 +100,17 @@ impl ActionLoader {
             actions_data: saved_actions_data,
         });
 
-        self.cache.lock().unwrap().insert(path.to_string(), sprite.clone()).unwrap();
+        let _result = self.cache.lock().unwrap().insert(path.to_string(), sprite.clone());
+
+        #[cfg(feature = "debug")]
+        if let Err(error) = _result {
+            print_debug!(
+                "[{}] action could not be added to cache. Path: '{}': {:?}",
+                "error".red(),
+                &path,
+                error
+            );
+        }
 
         #[cfg(feature = "debug")]
         timer.stop();

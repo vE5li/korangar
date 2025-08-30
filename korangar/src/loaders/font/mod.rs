@@ -30,7 +30,7 @@ use crate::loaders::font::font_file::FontFile;
 use crate::loaders::font::layout_key::{LayoutKey, LayoutKeyRef};
 use crate::state::ClientState;
 
-const MAX_CACHE_COUNT: u32 = 512;
+const MAX_CACHE_COUNT: u32 = 2048;
 // We cache layouts only by count.
 const MAX_CACHE_SIZE: usize = usize::MAX;
 

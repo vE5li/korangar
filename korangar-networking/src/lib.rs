@@ -545,29 +545,7 @@ where
         matches!(self.map_server_connection, ServerConnection::Connected { .. })
     }
 
-    pub fn send_login_server_packet<P>(&mut self, f: impl FnOnce(SupportedPacketVersion) -> P) -> Result<(), NotConnectedError>
-    where
-        P: LoginServerPacket,
-    {
-        match &mut self.login_server_connection {
-            ServerConnection::Connected {
-                action_sender,
-                packet_version,
-                ..
-            } => {
-                let packet = f(*packet_version);
-                self.packet_callback.outgoing_packet(&packet);
-
-                // FIX: Don't unwrap.
-                let mut byte_writer = ByteWriter::with_encoding(UTF_8);
-                packet.packet_to_bytes(&mut byte_writer).unwrap();
-                action_sender.send(byte_writer.into_inner()).map_err(|_| NotConnectedError)
-            }
-            _ => Err(NotConnectedError),
-        }
-    }
-
-    pub fn send_character_server_packet<P>(&mut self, f: impl FnOnce(SupportedPacketVersion) -> P) -> Result<(), NotConnectedError>
+    fn send_character_server_packet<P>(&mut self, f: impl FnOnce(SupportedPacketVersion) -> P) -> Result<(), NotConnectedError>
     where
         P: CharacterServerPacket,
     {
@@ -589,7 +567,7 @@ where
         }
     }
 
-    pub fn send_map_server_packet<P>(&mut self, f: impl FnOnce(SupportedPacketVersion) -> P) -> Result<(), NotConnectedError>
+    fn send_map_server_packet<P>(&mut self, f: impl FnOnce(SupportedPacketVersion) -> P) -> Result<(), NotConnectedError>
     where
         P: MapServerPacket,
     {

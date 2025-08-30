@@ -176,6 +176,7 @@ pub trait RenderLayer<App: Application> {
         available_width: f32,
         clip: App::Clip,
         color: App::Color,
+        highlight_color: App::Color,
         font_size: App::FontSize,
     );
 
@@ -195,6 +196,8 @@ pub trait TextLayouter<App: Application>: Clone {
     fn get_text_dimensions(
         &self,
         text: &str,
+        default_color: App::Color,
+        highlight_color: App::Color,
         font_size: App::FontSize,
         available_width: f32,
         overflow_behavior: App::OverflowBehavior,

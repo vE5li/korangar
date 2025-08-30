@@ -58,10 +58,19 @@ where
         }
 
         let font_size = *state.get(&theme().text().font_size());
+        let color = *state.get(&theme().text().color());
+        let highlight_color = *state.get(&theme().text().highlight_color());
         let horizontal_alignment = *state.get(&theme().text().horizontal_alignment());
         let overflow_behavior = *state.get(&theme().text().overflow_behavior());
 
-        let (size, font_size) = resolver.get_text_dimensions(&self.text, font_size, horizontal_alignment, overflow_behavior);
+        let (size, font_size) = resolver.get_text_dimensions(
+            &self.text,
+            color,
+            highlight_color,
+            font_size,
+            horizontal_alignment,
+            overflow_behavior,
+        );
         let area = resolver.with_height(height.max(size.height()));
 
         Self::LayoutInfo { area, font_size }
@@ -79,6 +88,7 @@ where
             &self.text,
             layout_info.font_size,
             *state.get(&theme().text().color()),
+            *state.get(&theme().text().highlight_color()),
             // TODO: Check if we really want it like this.
             *state.get(&theme().text().horizontal_alignment()),
             // TODO: Check if we really want it like this.
@@ -125,10 +135,19 @@ where
         }
 
         let font_size = *state.get(&theme().text().font_size());
+        let color = *state.get(&theme().text().color());
+        let highlight_color = *state.get(&theme().text().highlight_color());
         let horizontal_alignment = *state.get(&theme().text().horizontal_alignment());
         let overflow_behavior = *state.get(&theme().text().overflow_behavior());
 
-        let (size, font_size) = resolver.get_text_dimensions(&self.text, font_size, horizontal_alignment, overflow_behavior);
+        let (size, font_size) = resolver.get_text_dimensions(
+            &self.text,
+            color,
+            highlight_color,
+            font_size,
+            horizontal_alignment,
+            overflow_behavior,
+        );
         let area = resolver.with_height(height.max(size.height()));
 
         Self::LayoutInfo { area, font_size }
@@ -146,6 +165,7 @@ where
             &self.text,
             layout_info.font_size,
             *state.get(&theme().text().color()),
+            *state.get(&theme().text().highlight_color()),
             // TODO: Check if we really want it like this.
             *state.get(&theme().text().horizontal_alignment()),
             // TODO: Check if we really want it like this.

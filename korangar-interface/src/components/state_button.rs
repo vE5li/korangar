@@ -18,6 +18,7 @@ where
 {
     pub foreground_color: App::Color,
     pub background_color: App::Color,
+    pub highlight_color: App::Color,
     pub hovered_foreground_color: App::Color,
     pub hovered_background_color: App::Color,
     pub disabled_foreground_color: App::Color,
@@ -33,7 +34,7 @@ where
     pub overflow_behavior: App::OverflowBehavior,
 }
 
-pub struct StateButton<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U> {
+pub struct StateButton<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V> {
     text_marker: PhantomData<(Text, Tooltip, DisabledTooltip)>,
     text: A,
     tooltip: B,
@@ -43,23 +44,24 @@ pub struct StateButton<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I
     disabled_tooltip: F,
     foreground_color: G,
     background_color: H,
-    hovered_foreground_color: I,
-    hovered_background_color: J,
-    disabled_foreground_color: K,
-    disabled_background_color: L,
-    checkbox_color: M,
-    hovered_checkbox_color: N,
-    disabled_checkbox_color: O,
-    height: P,
-    corner_diameter: Q,
-    font_size: R,
-    horizontal_alignment: S,
-    vertical_alignment: T,
-    overflow_behavior: U,
+    highlight_color: I,
+    hovered_foreground_color: J,
+    hovered_background_color: K,
+    disabled_foreground_color: L,
+    disabled_background_color: M,
+    checkbox_color: N,
+    hovered_checkbox_color: O,
+    disabled_checkbox_color: P,
+    height: Q,
+    corner_diameter: R,
+    font_size: S,
+    horizontal_alignment: T,
+    vertical_alignment: U,
+    overflow_behavior: V,
 }
 
-impl<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U>
-    StateButton<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U>
+impl<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V>
+    StateButton<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V>
 {
     /// This function is supposed to be called from a component macro and not
     /// intended to be called manually.
@@ -74,19 +76,20 @@ impl<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O
         disabled_tooltip: F,
         foreground_color: G,
         background_color: H,
-        hovered_foreground_color: I,
-        hovered_background_color: J,
-        disabled_foreground_color: K,
-        disabled_background_color: L,
-        checkbox_color: M,
-        hovered_checkbox_color: N,
-        disabled_checkbox_color: O,
-        height: P,
-        corner_diameter: Q,
-        font_size: R,
-        horizontal_alignment: S,
-        vertical_alignment: T,
-        overflow_behavior: U,
+        highlight_color: I,
+        hovered_foreground_color: J,
+        hovered_background_color: K,
+        disabled_foreground_color: L,
+        disabled_background_color: M,
+        checkbox_color: N,
+        hovered_checkbox_color: O,
+        disabled_checkbox_color: P,
+        height: Q,
+        corner_diameter: R,
+        font_size: S,
+        horizontal_alignment: T,
+        vertical_alignment: U,
+        overflow_behavior: V,
     ) -> Self {
         Self {
             text_marker: PhantomData,
@@ -98,6 +101,7 @@ impl<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O
             disabled_tooltip,
             foreground_color,
             background_color,
+            highlight_color,
             hovered_foreground_color,
             hovered_background_color,
             disabled_foreground_color,
@@ -115,8 +119,8 @@ impl<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O
     }
 }
 
-impl<App, Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U> Element<App>
-    for StateButton<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U>
+impl<App, Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V> Element<App>
+    for StateButton<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V>
 where
     App: Application,
     Text: AsRef<str> + 'static,
@@ -137,22 +141,32 @@ where
     M: Selector<App, App::Color>,
     N: Selector<App, App::Color>,
     O: Selector<App, App::Color>,
-    P: Selector<App, f32>,
-    Q: Selector<App, App::CornerDiameter>,
-    R: Selector<App, App::FontSize>,
-    S: Selector<App, HorizontalAlignment>,
-    T: Selector<App, VerticalAlignment>,
-    U: Selector<App, App::OverflowBehavior>,
+    P: Selector<App, App::Color>,
+    Q: Selector<App, f32>,
+    R: Selector<App, App::CornerDiameter>,
+    S: Selector<App, App::FontSize>,
+    T: Selector<App, HorizontalAlignment>,
+    U: Selector<App, VerticalAlignment>,
+    V: Selector<App, App::OverflowBehavior>,
 {
     fn create_layout_info(&mut self, state: &Context<App>, _: ElementStoreMut<'_>, resolver: &mut Resolver<'_, App>) -> Self::LayoutInfo {
         let height = *state.get(&self.height);
 
         let text = state.get(&self.text).as_ref();
+        let font_color = *state.get(&self.foreground_color);
+        let highlight_color = *state.get(&self.highlight_color);
         let font_size = *state.get(&self.font_size);
         let horizontal_alignment = *state.get(&self.horizontal_alignment);
         let overflow_behavior = *state.get(&self.overflow_behavior);
 
-        let (size, font_size) = resolver.get_text_dimensions(text, font_size, horizontal_alignment, overflow_behavior);
+        let (size, font_size) = resolver.get_text_dimensions(
+            text,
+            font_color,
+            highlight_color,
+            font_size,
+            horizontal_alignment,
+            overflow_behavior,
+        );
 
         let area = resolver.with_height(height.max(size.height()));
 
@@ -206,6 +220,7 @@ where
             state.get(&self.text).as_ref(),
             layout_info.font_size,
             foreground_color,
+            *state.get(&self.highlight_color),
             *state.get(&self.horizontal_alignment),
             *state.get(&self.vertical_alignment),
             *state.get(&self.overflow_behavior),

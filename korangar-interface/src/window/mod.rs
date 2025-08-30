@@ -107,6 +107,7 @@ where
     pub title_color: App::Color,
     pub hovered_title_color: App::Color,
     pub background_color: App::Color,
+    pub highlight_color: App::Color,
     pub gaps: f32,
     pub border: f32,
     pub corner_diameter: App::CornerDiameter,
@@ -207,7 +208,7 @@ impl<App: Application> ClickHandler<App> for CloseClickHandler {
     }
 }
 
-pub struct WindowInternal<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Elements>
+pub struct WindowInternal<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Elements>
 where
     App: Application,
     Elements: ElementSet<App>,
@@ -215,22 +216,23 @@ where
     title_marker: PhantomData<Title>,
     title: A,
     title_color: B,
-    hovered_title_color: C,
-    background_color: D,
-    title_height: E,
-    title_gap: F,
-    font_size: G,
-    gaps: H,
-    border: I,
-    corner_diameter: J,
-    closable: K,
-    resizable: L,
-    close_button_size: M,
-    close_button_corner_diameter: N,
-    minimum_width: O,
-    maximum_width: P,
-    minimum_height: Q,
-    maximum_height: R,
+    highlight_color: C,
+    hovered_title_color: D,
+    background_color: E,
+    title_height: F,
+    title_gap: G,
+    font_size: H,
+    gaps: I,
+    border: J,
+    corner_diameter: K,
+    closable: L,
+    resizable: M,
+    close_button_size: N,
+    close_button_corner_diameter: O,
+    minimum_width: P,
+    maximum_width: Q,
+    minimum_height: R,
+    maximum_height: S,
     theme: App::ThemeType,
     class: Option<App::WindowClass>,
     elements: Elements,
@@ -244,8 +246,8 @@ where
     layout_info: Option<WindowLayoutInfoSet<<Elements as ElementSet<App>>::LayoutInfo>>,
 }
 
-impl<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Elements>
-    WindowInternal<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Elements>
+impl<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Elements>
+    WindowInternal<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Elements>
 where
     App: Application,
     Elements: ElementSet<App>,
@@ -254,22 +256,23 @@ where
     pub fn component_new(
         title: A,
         title_color: B,
-        hovered_title_color: C,
-        background_color: D,
-        title_height: E,
-        title_gap: F,
-        font_size: G,
-        gaps: H,
-        border: I,
-        corner_diameter: J,
-        closable: K,
-        resizable: L,
-        close_button_size: M,
-        close_button_corner_diameter: N,
-        minimum_width: O,
-        maximum_width: P,
-        minimum_height: Q,
-        maximum_height: R,
+        highlight_color: C,
+        hovered_title_color: D,
+        background_color: E,
+        title_height: F,
+        title_gap: G,
+        font_size: H,
+        gaps: I,
+        border: J,
+        corner_diameter: K,
+        closable: L,
+        resizable: M,
+        close_button_size: N,
+        close_button_corner_diameter: O,
+        minimum_width: P,
+        maximum_width: Q,
+        minimum_height: R,
+        maximum_height: S,
         theme: App::ThemeType,
         class: Option<App::WindowClass>,
         elements: Elements,
@@ -278,6 +281,7 @@ where
             title_marker: PhantomData,
             title,
             title_color,
+            highlight_color,
             hovered_title_color,
             background_color,
             title_height,
@@ -307,16 +311,16 @@ where
     }
 }
 
-impl<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Elements> private::Sealed
-    for WindowInternal<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Elements>
+impl<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Elements> private::Sealed
+    for WindowInternal<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Elements>
 where
     App: Application,
     Elements: ElementSet<App>,
 {
 }
 
-impl<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Elements> Window<App>
-    for WindowInternal<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Elements>
+impl<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Elements> Window<App>
+    for WindowInternal<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Elements>
 where
     App: Application,
     Title: AsRef<str>,
@@ -324,20 +328,21 @@ where
     B: Selector<App, App::Color>,
     C: Selector<App, App::Color>,
     D: Selector<App, App::Color>,
-    E: Selector<App, f32>,
+    E: Selector<App, App::Color>,
     F: Selector<App, f32>,
-    G: Selector<App, App::FontSize>,
-    H: Selector<App, f32>,
+    G: Selector<App, f32>,
+    H: Selector<App, App::FontSize>,
     I: Selector<App, f32>,
-    J: Selector<App, App::CornerDiameter>,
-    K: Selector<App, bool>,
+    J: Selector<App, f32>,
+    K: Selector<App, App::CornerDiameter>,
     L: Selector<App, bool>,
-    M: Selector<App, App::Size>,
-    N: Selector<App, App::CornerDiameter>,
-    O: Selector<App, f32>,
+    M: Selector<App, bool>,
+    N: Selector<App, App::Size>,
+    O: Selector<App, App::CornerDiameter>,
     P: Selector<App, f32>,
     Q: Selector<App, f32>,
     R: Selector<App, f32>,
+    S: Selector<App, f32>,
     Elements: ElementSet<App>,
     <Elements as ElementSet<App>>::LayoutInfo: 'static,
 {
@@ -544,6 +549,7 @@ where
             state.get(&self.title).as_ref(),
             *state.get(&self.font_size),
             title_color,
+            *state.get(&self.highlight_color),
             // TODO: Make this configurable in the window.
             *state.get(&theme().window().horizontal_alignment()),
             *state.get(&theme().window().vertical_alignment()),
@@ -604,6 +610,7 @@ where
                 "X",
                 *state.get(&self.font_size),
                 *state.get(&self.background_color),
+                *state.get(&self.highlight_color),
                 HorizontalAlignment::Center { offset: 0.0, border: 0.0 },
                 VerticalAlignment::Center { offset: 0.0 },
                 // TODO: This shouldn't matter at all.

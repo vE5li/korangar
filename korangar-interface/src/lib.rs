@@ -797,6 +797,7 @@ impl<App: Application> InterfaceFrame<'_, App> {
     ) {
         let background_color = tooltip_theme.background_color;
         let foreground_color = tooltip_theme.foreground_color;
+        let highlight_color = tooltip_theme.highlight_color;
         let font_size = tooltip_theme.font_size.scaled(self.interface_scaling);
         let corner_diameter = tooltip_theme.corner_diameter.scaled(self.interface_scaling);
         let border = tooltip_theme.border * self.interface_scaling;
@@ -820,9 +821,14 @@ impl<App: Application> InterfaceFrame<'_, App> {
         };
 
         for tooltip in iterator {
-            let (text_dimensions, font_size) =
-                self.text_layouter
-                    .get_text_dimensions(tooltip, font_size, available_width, tooltip_theme.overflow_behavior);
+            let (text_dimensions, font_size) = self.text_layouter.get_text_dimensions(
+                tooltip,
+                foreground_color,
+                highlight_color,
+                font_size,
+                available_width,
+                tooltip_theme.overflow_behavior,
+            );
 
             let tooltip_left = match mouse_position.left() > half_window_size.width() {
                 true => mouse_position.left() - text_dimensions.width() - total_offset,
@@ -852,6 +858,7 @@ impl<App: Application> InterfaceFrame<'_, App> {
                 available_width,
                 App::Clip::unbound(),
                 foreground_color,
+                highlight_color,
                 font_size,
             );
         }

@@ -20,6 +20,7 @@ where
 {
     pub foreground_color: App::Color,
     pub background_color: App::Color,
+    pub highlight_color: App::Color,
     pub hovered_foreground_color: App::Color,
     pub hovered_background_color: App::Color,
     pub focused_foreground_color: App::Color,
@@ -82,7 +83,7 @@ where
     }
 }
 
-pub struct TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Id> {
+pub struct TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, Id> {
     text_marker: PhantomData<Text>,
     ghost_text: A,
     state: B,
@@ -90,25 +91,26 @@ pub struct TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S
     hidable: D,
     foreground_color: E,
     background_color: F,
-    hovered_foreground_color: G,
-    hovered_background_color: H,
-    focused_foreground_color: I,
-    focused_background_color: J,
-    ghost_foreground_color: K,
-    hide_icon_color: L,
-    hovered_hide_icon_color: M,
-    height: N,
-    corner_diameter: O,
-    font_size: P,
-    horizontal_alignment: Q,
-    vertical_alignment: R,
-    overflow_behavior: S,
+    highlight_color: G,
+    hovered_foreground_color: H,
+    hovered_background_color: I,
+    focused_foreground_color: J,
+    focused_background_color: K,
+    ghost_foreground_color: L,
+    hide_icon_color: M,
+    hovered_hide_icon_color: N,
+    height: O,
+    corner_diameter: P,
+    font_size: Q,
+    horizontal_alignment: R,
+    vertical_alignment: S,
+    overflow_behavior: T,
     focus_id: Id,
     focus_click: FocusClick,
 }
 
-impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Id>
-    TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Id>
+impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, Id>
+    TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, Id>
 {
     /// This function is supposed to be called from a component macro and not
     /// intended to be called manually.
@@ -121,19 +123,20 @@ impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Id>
         hidable: D,
         foreground_color: E,
         background_color: F,
-        hovered_foreground_color: G,
-        hovered_background_color: H,
-        focused_foreground_color: I,
-        focused_background_color: J,
-        ghost_foreground_color: K,
-        hide_icon_color: L,
-        hovered_hide_icon_color: M,
-        height: N,
-        corner_diameter: O,
-        font_size: P,
-        horizontal_alignment: Q,
-        vertical_alignment: R,
-        overflow_behavior: S,
+        highlight_color: G,
+        hovered_foreground_color: H,
+        hovered_background_color: I,
+        focused_foreground_color: J,
+        focused_background_color: K,
+        ghost_foreground_color: L,
+        hide_icon_color: M,
+        hovered_hide_icon_color: N,
+        height: O,
+        corner_diameter: P,
+        font_size: Q,
+        horizontal_alignment: R,
+        vertical_alignment: S,
+        overflow_behavior: T,
         focus_id: Id,
     ) -> Self {
         Self {
@@ -144,6 +147,7 @@ impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Id>
             hidable,
             foreground_color,
             background_color,
+            highlight_color,
             hovered_foreground_color,
             hovered_background_color,
             focused_foreground_color,
@@ -163,14 +167,14 @@ impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Id>
     }
 }
 
-impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Id> Persistent
-    for TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Id>
+impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, Id> Persistent
+    for TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, Id>
 {
     type Data = TextBoxData;
 }
 
-impl<App, Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Id> Element<App>
-    for TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Id>
+impl<App, Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, Id> Element<App>
+    for TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, Id>
 where
     App: Application,
     Text: AsRef<str> + 'static,
@@ -187,12 +191,13 @@ where
     K: Selector<App, App::Color>,
     L: Selector<App, App::Color>,
     M: Selector<App, App::Color>,
-    N: Selector<App, f32>,
-    O: Selector<App, App::CornerDiameter>,
-    P: Selector<App, App::FontSize>,
-    Q: Selector<App, HorizontalAlignment>,
-    R: Selector<App, VerticalAlignment>,
-    S: Selector<App, App::OverflowBehavior>,
+    N: Selector<App, App::Color>,
+    O: Selector<App, f32>,
+    P: Selector<App, App::CornerDiameter>,
+    Q: Selector<App, App::FontSize>,
+    R: Selector<App, HorizontalAlignment>,
+    S: Selector<App, VerticalAlignment>,
+    T: Selector<App, App::OverflowBehavior>,
     Id: Any,
 {
     fn create_layout_info(
@@ -233,6 +238,8 @@ where
 
         let (size, font_size) = resolver.get_text_dimensions(
             display_text,
+            *state.get(&self.foreground_color),
+            *state.get(&self.highlight_color),
             *state.get(&self.font_size),
             *state.get(&self.horizontal_alignment),
             *state.get(&self.overflow_behavior),
@@ -351,6 +358,7 @@ where
             display_text,
             layout_info.font_size,
             foreground_color,
+            *state.get(&self.highlight_color),
             *state.get(&self.horizontal_alignment),
             *state.get(&self.vertical_alignment),
             *state.get(&self.overflow_behavior),

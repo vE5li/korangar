@@ -247,6 +247,8 @@ impl FontLoader {
     pub fn get_text_dimensions(
         &self,
         text: &str,
+        default_color: Color,
+        highlight_color: Color,
         mut font_size: FontSize,
         line_height_scale: f32,
         available_width: f32,
@@ -262,8 +264,8 @@ impl FontLoader {
 
         let mut size = self.layout_text(
             text,
-            Color::BLACK,
-            Color::BLACK,
+            default_color,
+            highlight_color,
             font_size,
             line_height_scale,
             layout_width,
@@ -377,13 +379,21 @@ impl TextLayouter<ClientState> for Arc<FontLoader> {
     fn get_text_dimensions(
         &self,
         text: &str,
+        default_color: Color,
+        highlight_color: Color,
         font_size: FontSize,
         available_width: f32,
         overflow_behavior: OverflowBehavior,
     ) -> (ScreenSize, FontSize) {
-        let (size, font_size) = self
-            .as_ref()
-            .get_text_dimensions(text, font_size, 1.0, available_width, overflow_behavior);
+        let (size, font_size) = self.as_ref().get_text_dimensions(
+            text,
+            default_color,
+            highlight_color,
+            font_size,
+            1.0,
+            available_width,
+            overflow_behavior,
+        );
 
         (size, font_size)
     }

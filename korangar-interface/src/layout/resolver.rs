@@ -76,6 +76,8 @@ where
     pub fn get_text_dimensions(
         &self,
         text: &str,
+        default_color: App::Color,
+        highlight_color: App::Color,
         font_size: App::FontSize,
         horizontal_alignment: HorizontalAlignment,
         overflow_behavior: App::OverflowBehavior,
@@ -86,8 +88,14 @@ where
             HorizontalAlignment::Right { offset, border } => offset + border,
         };
 
-        self.text_layouter
-            .get_text_dimensions(text, font_size, self.available_area.width - offset, overflow_behavior)
+        self.text_layouter.get_text_dimensions(
+            text,
+            default_color,
+            highlight_color,
+            font_size,
+            self.available_area.width - offset,
+            overflow_behavior,
+        )
     }
 
     pub fn get_text_layouter(&self) -> &App::TextLayouter {

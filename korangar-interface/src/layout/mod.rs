@@ -75,6 +75,7 @@ struct TextInstruction<'a, App: Application> {
     text: &'a str,
     font_size: App::FontSize,
     color: App::Color,
+    highlight_color: App::Color,
     horizontal_alignment: HorizontalAlignment,
     vertical_alignment: VerticalAlignment,
     overflow_behavior: App::OverflowBehavior,
@@ -498,6 +499,7 @@ impl<'a, App: Application> WindowLayout<'a, App> {
         text: &'a str,
         font_size: App::FontSize,
         color: App::Color,
+        highlight_color: App::Color,
         horizontal_alignment: HorizontalAlignment,
         vertical_alignment: VerticalAlignment,
         overflow_behavior: App::OverflowBehavior,
@@ -514,6 +516,7 @@ impl<'a, App: Application> WindowLayout<'a, App> {
             text,
             font_size,
             color,
+            highlight_color,
             horizontal_alignment,
             vertical_alignment,
             overflow_behavior,
@@ -690,6 +693,7 @@ impl<'a, App: Application> WindowLayout<'a, App> {
                      text,
                      font_size,
                      color,
+                     highlight_color,
                      horizontal_alignment,
                      vertical_alignment,
                      overflow_behavior,
@@ -705,7 +709,8 @@ impl<'a, App: Application> WindowLayout<'a, App> {
                         HorizontalAlignment::Right { offset, border } => area.width - offset - border,
                     };
 
-                    let (text_size, font_size) = text_layouter.get_text_dimensions(text, font_size, available_width, overflow_behavior);
+                    let (text_size, font_size) =
+                        text_layouter.get_text_dimensions(text, color, highlight_color, font_size, available_width, overflow_behavior);
 
                     let top_offset = match vertical_alignment {
                         VerticalAlignment::Top { offset } => offset,
@@ -737,6 +742,7 @@ impl<'a, App: Application> WindowLayout<'a, App> {
                         available_width,
                         clip,
                         color,
+                        highlight_color,
                         font_size,
                     );
                 },

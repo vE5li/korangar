@@ -185,6 +185,8 @@ where
                 // TODO: Put this in the theme
                 Color::rgb_u8(255, 200, 255),
                 // TODO: Put this in the theme
+                Color::rgb_u8(255, 160, 60),
+                // TODO: Put this in the theme
                 HorizontalAlignment::Right { offset: 3.0, border: 3.0 },
                 // TODO: Put this in the theme
                 VerticalAlignment::Bottom { offset: 3.0 },

@@ -30,11 +30,13 @@ mod packet_inspector;
 mod profiler;
 #[cfg(feature = "debug")]
 mod render_options;
+// TODO: Make debug only
 mod respawn;
 mod sell;
 mod sell_cart;
 mod server_selection;
 mod skill_tree;
+mod theme_inspector;
 #[cfg(feature = "debug")]
 mod time;
 
@@ -77,6 +79,8 @@ pub use self::sell::SellWindow;
 pub use self::sell_cart::SellCartWindow;
 pub use self::server_selection::ServerSelectionWindow;
 pub use self::skill_tree::SkillTreeWindow;
+// TODO: Make debug only
+pub use self::theme_inspector::{ThemeInspectorWindow, ThemeInspectorWindowState};
 #[cfg(feature = "debug")]
 pub use self::time::TimeWindow;
 
@@ -117,6 +121,8 @@ pub enum WindowClass {
     RenderOptions,
     #[cfg(feature = "debug")]
     Commands,
+    #[cfg(feature = "debug")]
+    ThemeInspector,
     #[cfg(feature = "debug")]
     Profiler,
     #[cfg(feature = "debug")]

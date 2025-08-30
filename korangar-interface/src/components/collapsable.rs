@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::marker::PhantomData;
 
 use rust_state::{Context, RustState, Selector};
+use serde::{Deserialize, Serialize};
 
 use crate::application::{Application, Size};
 use crate::element::store::{ElementStore, ElementStoreMut, Persistent, PersistentData, PersistentExt};
@@ -16,7 +17,7 @@ use crate::prelude::EventQueue;
 const CHILDREN_STORE_ID: u64 = 0;
 const EXTRA_STORE_ID: u64 = 1;
 
-#[derive(RustState)]
+#[derive(Serialize, Deserialize, RustState)]
 pub struct CollapsableTheme<App>
 where
     App: Application,

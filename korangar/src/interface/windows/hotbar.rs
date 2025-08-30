@@ -34,7 +34,7 @@ where
         window! {
             title: client_state().localization().hotbar_window_title(),
             class: Self::window_class(),
-            theme: InterfaceThemeType::Game,
+            theme: InterfaceThemeType::InGame,
             elements: (
                 split! {
                     gaps: theme().window().gaps(),

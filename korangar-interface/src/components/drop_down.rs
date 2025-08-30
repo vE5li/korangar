@@ -4,6 +4,7 @@ use std::num::NonZeroU32;
 
 use interface_components::scroll_view;
 use rust_state::{Context, Path, RustState, Selector};
+use serde::{Deserialize, Serialize};
 
 use crate::application::{Application, Position, Size};
 use crate::element::store::{ElementStore, ElementStoreMut};
@@ -18,6 +19,16 @@ pub trait DropDownItem<T> {
     fn text(&self) -> &str;
 
     fn value(&self) -> T;
+}
+
+impl DropDownItem<String> for String {
+    fn text(&self) -> &str {
+        self
+    }
+
+    fn value(&self) -> String {
+        self.clone()
+    }
 }
 
 // TODO: Having this here is not very clean. We should instead have
@@ -326,7 +337,7 @@ where
     }
 }
 
-#[derive(RustState)]
+#[derive(Serialize, Deserialize, RustState)]
 pub struct DropDownTheme<App>
 where
     App: Application + 'static,

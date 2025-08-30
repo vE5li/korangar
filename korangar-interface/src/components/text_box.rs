@@ -3,6 +3,7 @@ use std::cell::{RefCell, UnsafeCell};
 use std::marker::PhantomData;
 
 use rust_state::{Context, Path, RustState, Selector};
+use serde::{Deserialize, Serialize};
 
 use crate::application::{Application, Size};
 use crate::element::Element;
@@ -13,7 +14,7 @@ use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
 use crate::layout::area::Area;
 use crate::layout::{Icon, InputHandler, MouseButton, Resolver, WindowLayout};
 
-#[derive(RustState)]
+#[derive(Serialize, Deserialize, RustState)]
 pub struct TextBoxTheme<App>
 where
     App: Application,

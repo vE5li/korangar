@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use crate::layout::{ClipLayer, Icon};
 use crate::theme::ThemePathGetter;
 use crate::window::Anchor;
@@ -36,19 +38,19 @@ pub trait Application: Sized + 'static {
     ///
     /// Ideally this should be the same type that the application renderer uses
     /// to represent color.
-    type Color: Copy;
+    type Color: Copy + Serialize + Deserialize<'static>;
 
     /// Application corner diameter type.
     ///
     /// Ideally this should be the same type that the application renderer uses
     /// to represent corner diameter.
-    type CornerDiameter: CornerDiameter;
+    type CornerDiameter: CornerDiameter + Serialize + Deserialize<'static>;
 
     /// Application font size type.
     ///
     /// Ideally this should be the same type that the application renderer uses
     /// to represent font size.
-    type FontSize: FontSize;
+    type FontSize: FontSize + Serialize + Deserialize<'static>;
 
     /// Application 2D position type.
     ///
@@ -62,7 +64,7 @@ pub trait Application: Sized + 'static {
     ///
     /// Ideally this should be the same type that the application renderer uses
     /// to represent 2D sizes.
-    type Size: Size;
+    type Size: Size + Serialize + Deserialize<'static>;
 
     /// Application clip type.
     ///
@@ -106,7 +108,7 @@ pub trait Application: Sized + 'static {
     ///
     /// Typically this would include options line inserting a line break and
     /// shrinking the text.
-    type OverflowBehavior: Copy;
+    type OverflowBehavior: Copy + Serialize + Deserialize<'static>;
 
     /// Application text layouter.
     type TextLayouter: TextLayouter<Self>;

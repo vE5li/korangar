@@ -1,3 +1,5 @@
+#[cfg(feature = "debug")]
+use korangar_debug::logging::{Colorize, Timer, print_debug};
 use korangar_interface::components::button::ButtonTheme;
 use korangar_interface::components::collapsable::CollapsableTheme;
 use korangar_interface::components::drop_down::DropDownTheme;
@@ -10,24 +12,32 @@ use korangar_interface::layout::tooltip::TooltipTheme;
 use korangar_interface::prelude::{HorizontalAlignment, VerticalAlignment};
 use korangar_interface::window::{StateWindow, WindowTheme};
 use rust_state::RustState;
+use serde::{Deserialize, Serialize};
 
 use crate::graphics::{Color, CornerDiameter, ScreenSize};
 use crate::loaders::{FontSize, OverflowBehavior};
 use crate::state::ClientState;
 
-#[derive(RustState, StateElement)]
+#[derive(Default, Debug, Clone, Copy)]
+pub enum InterfaceThemeType {
+    #[default]
+    InGame,
+    Menu,
+}
+
+#[derive(Serialize, Deserialize, RustState, StateElement)]
 pub struct DebugButtonTheme {
     foreground_color: Color,
     hovered_background_color: Color,
 }
 
-#[derive(RustState, StateElement)]
+#[derive(Serialize, Deserialize, RustState, StateElement)]
 pub struct ChatTheme {
     window_color: Color,
     text_box_background_color: Color,
 }
 
-#[derive(RustState, StateElement, StateWindow)]
+#[derive(Serialize, Deserialize, RustState, StateElement, StateWindow)]
 #[window_title("Theme Inspector")]
 pub struct InterfaceTheme {
     #[hidden_element]
@@ -52,21 +62,58 @@ pub struct InterfaceTheme {
     pub chat: ChatTheme,
 }
 
-#[derive(Default, Debug, Clone, Copy)]
-pub enum InterfaceThemeType {
-    Menu,
-    #[default]
-    Game,
-}
+impl InterfaceTheme {
+    pub fn load(name: &str, default: impl FnOnce() -> Self) -> Self {
+        use crate::settings::INTERFACE_THEMES_PATH;
 
-pub trait ThemeDefault {
-    fn default_menu() -> Self;
+        #[cfg(feature = "debug")]
+        let timer = Timer::new("Load theme");
 
-    fn default_playing() -> Self;
-}
+        let path = format!("{INTERFACE_THEMES_PATH}/{name}.ron");
 
-impl ThemeDefault for InterfaceTheme {
-    fn default_menu() -> Self {
+        #[cfg(feature = "debug")]
+        print_debug!("loading theme from file {}", path.magenta());
+
+        let theme = std::fs::read_to_string(&path)
+            .ok()
+            .and_then(|data| ron::from_str(&data).ok())
+            .unwrap_or_else(|| {
+                #[cfg(feature = "debug")]
+                print_debug!("[{}] failed to load theme {}", "error".red(), name.magenta());
+                default()
+            });
+
+        #[cfg(feature = "debug")]
+        timer.stop();
+
+        theme
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn save(&self, name: &str) {
+        use crate::settings::INTERFACE_THEMES_PATH;
+
+        let timer = Timer::new("Save theme");
+
+        let path = format!("{INTERFACE_THEMES_PATH}/{name}.ron");
+
+        print_debug!("saving theme to file {}", path.magenta());
+
+        let data = ron::ser::to_string_pretty(self, ron::ser::PrettyConfig::new()).unwrap();
+
+        if let Err(error) = std::fs::write(path, data) {
+            print_debug!(
+                "[{}] failed to save theme to {}: {:?}",
+                "error".red(),
+                name.magenta(),
+                error.red()
+            );
+        }
+
+        timer.stop();
+    }
+
+    pub fn default_menu() -> Self {
         Self {
             window: WindowTheme {
                 title_color: Color::rgb_u8(200, 150, 150),
@@ -230,7 +277,7 @@ impl ThemeDefault for InterfaceTheme {
         }
     }
 
-    fn default_playing() -> Self {
+    pub fn default_playing() -> Self {
         Self {
             window: WindowTheme {
                 title_color: Color::rgb_u8(185, 155, 155),

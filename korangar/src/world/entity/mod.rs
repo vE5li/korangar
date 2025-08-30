@@ -27,7 +27,7 @@ use crate::renderer::GameInterfaceRenderer;
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
 use crate::state::ClientState;
-use crate::state::theme::{GameTheme, InterfaceThemeType};
+use crate::state::theme::{InterfaceThemeType, WorldTheme};
 use crate::world::{ActionEvent, AnimationActionType, AnimationData, AnimationState, Camera, Library, Map};
 #[cfg(feature = "debug")]
 use crate::world::{MarkerIdentifier, SubMesh};
@@ -878,7 +878,7 @@ impl Player {
         }
     }
 
-    pub fn render_status(&self, renderer: &GameInterfaceRenderer, camera: &dyn Camera, theme: &GameTheme, window_size: ScreenSize) {
+    pub fn render_status(&self, renderer: &GameInterfaceRenderer, camera: &dyn Camera, theme: &WorldTheme, window_size: ScreenSize) {
         let clip_space_position = camera.view_projection_matrix() * self.common.position.to_homogeneous();
         let screen_position = camera.clip_to_screen_space(clip_space_position);
         let final_position = ScreenPosition {
@@ -976,7 +976,7 @@ impl Npc {
         &mut self.common
     }
 
-    pub fn render_status(&self, renderer: &GameInterfaceRenderer, camera: &dyn Camera, theme: &GameTheme, window_size: ScreenSize) {
+    pub fn render_status(&self, renderer: &GameInterfaceRenderer, camera: &dyn Camera, theme: &WorldTheme, window_size: ScreenSize) {
         if self.common.entity_type != EntityType::Monster {
             return;
         }
@@ -1157,7 +1157,7 @@ impl Entity {
         self.get_common().render_marker(renderer, camera, marker_identifier, hovered);
     }
 
-    pub fn render_status(&self, renderer: &GameInterfaceRenderer, camera: &dyn Camera, theme: &GameTheme, window_size: ScreenSize) {
+    pub fn render_status(&self, renderer: &GameInterfaceRenderer, camera: &dyn Camera, theme: &WorldTheme, window_size: ScreenSize) {
         match self {
             Self::Player(player) => player.render_status(renderer, camera, theme, window_size),
             Self::Npc(npc) => npc.render_status(renderer, camera, theme, window_size),
@@ -1180,7 +1180,7 @@ impl StateWindow<ClientState> for Entity {
 
         window! {
             title: "Entity",
-            theme: InterfaceThemeType::Game,
+            theme: InterfaceThemeType::InGame,
             closable: true,
             // TODO: This is gonna be a bit hacky but we want to have this save path possibly be
             // None and dispaly a message if the entity disappeared.
@@ -1193,7 +1193,7 @@ impl StateWindow<ClientState> for Entity {
 
         window! {
             title: "Entity",
-            theme: InterfaceThemeType::Game,
+            theme: InterfaceThemeType::InGame,
             closable: true,
             // TODO: This is gonna be a bit hacky but we want to have this save path possibly be
             // None and dispaly a message if the entity disappeared.

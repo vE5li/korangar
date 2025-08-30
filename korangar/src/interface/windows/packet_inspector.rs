@@ -83,7 +83,7 @@ where
         window! {
             title: "Packet Inspector",
             class: Self::window_class(),
-            theme: InterfaceThemeType::Game,
+            theme: InterfaceThemeType::InGame,
             minimum_height: 200.0,
             closable: true,
             resizable: true,

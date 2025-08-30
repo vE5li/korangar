@@ -48,4 +48,7 @@
     interface_settings_window_title: "Interface Settings",
     language_text: "Language",
     scaling_text: "Scaling",
+    menu_theme_text: "Menu theme",
+    in_game_theme_text: "In-game theme",
+    world_theme_text: "World theme",
 )

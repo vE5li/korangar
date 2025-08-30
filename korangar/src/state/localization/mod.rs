@@ -182,6 +182,9 @@ pub struct Localization {
     interface_settings_window_title: String,
     language_text: String,
     scaling_text: String,
+    menu_theme_text: String,
+    in_game_theme_text: String,
+    world_theme_text: String,
 }
 
 impl Localization {
@@ -203,11 +206,7 @@ impl Localization {
 
         if let Err(_error) = std::fs::write(&file_name, data) {
             #[cfg(feature = "debug")]
-            print_debug!(
-                "failed to save language to {}: {}",
-                file_name.magenta(),
-                _error.to_string().red()
-            );
+            print_debug!("failed to save language to {}: {:?}", file_name.magenta(), _error.red());
         }
 
         #[cfg(feature = "debug")]

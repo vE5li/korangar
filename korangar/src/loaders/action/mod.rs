@@ -5,6 +5,8 @@ use korangar_audio::AudioEngine;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, Timer, print_debug};
 use korangar_util::FileLoader;
+#[cfg(feature = "debug")]
+use korangar_util::container::CacheStatistics;
 use korangar_util::container::SimpleCache;
 use ragnarok_bytes::{ByteReader, FromBytes};
 use ragnarok_formats::action::ActionsData;
@@ -34,6 +36,11 @@ impl ActionLoader {
                 NonZeroUsize::new(MAX_CACHE_SIZE).unwrap(),
             )),
         }
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn cache_statistics(&self) -> CacheStatistics {
+        self.cache.lock().unwrap().statistics()
     }
 
     fn load(&self, path: &str) -> Result<Arc<Actions>, LoadError> {

@@ -20,6 +20,8 @@ use korangar_interface::application::TextLayouter;
 use korangar_interface::components::drop_down::DropDownItem;
 use korangar_interface::element::ElementDisplay;
 use korangar_util::Rectangle;
+#[cfg(feature = "debug")]
+use korangar_util::container::CacheStatistics;
 use korangar_util::container::{Cacheable, SimpleCache};
 use serde::{Deserialize, Serialize};
 
@@ -31,8 +33,7 @@ use crate::loaders::font::layout_key::{LayoutKey, LayoutKeyRef};
 use crate::state::ClientState;
 
 const MAX_CACHE_COUNT: u32 = 2048;
-// We cache layouts only by count.
-const MAX_CACHE_SIZE: usize = usize::MAX;
+const MAX_CACHE_SIZE: usize = 32 << 20;
 
 struct CachedLayout {
     glyphs: Vec<GlyphInstruction>,
@@ -41,8 +42,10 @@ struct CachedLayout {
 
 impl Cacheable for CachedLayout {
     fn size(&self) -> usize {
-        // We cache layouts only by count.
-        0
+        size_of::<Vector2<f32>>() +
+        size_of::<GlyphInstruction>() * self.glyphs.len() +
+        // Approximation for the text that is saved as a key in the lookup table and the FIFO.
+        2 * self.glyphs.len()
     }
 }
 
@@ -180,6 +183,11 @@ impl FontLoader {
             glyph_cache,
             layout_cache: Mutex::new(layout_cache),
         }
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn cache_statistics(&self) -> CacheStatistics {
+        self.layout_cache.lock().unwrap().statistics()
     }
 
     fn system_locale() -> String {

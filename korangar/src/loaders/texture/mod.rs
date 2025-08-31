@@ -10,6 +10,8 @@ use image::{GrayImage, ImageBuffer, ImageFormat, ImageReader, Rgba, RgbaImage};
 use korangar_debug::logging::{Colorize, Timer, print_debug};
 use korangar_util::FileLoader;
 use korangar_util::color::contains_transparent_pixel;
+#[cfg(feature = "debug")]
+use korangar_util::container::CacheStatistics;
 use korangar_util::container::SimpleCache;
 use wgpu::{
     Buffer, BufferDescriptor, BufferUsages, CommandEncoderDescriptor, ComputePassDescriptor, Device, Extent3d, MapMode, PollError,
@@ -70,6 +72,11 @@ impl TextureLoader {
             supports_texture_compression: capabilities.supports_texture_compression(),
             max_texture_binding_array_count: capabilities.get_max_texture_binding_array_count(),
         }
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn cache_statistics(&self) -> CacheStatistics {
+        self.cache.lock().unwrap().statistics()
     }
 
     pub fn create_raw(

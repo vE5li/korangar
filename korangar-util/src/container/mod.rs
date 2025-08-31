@@ -58,5 +58,5 @@ mod simple_cache;
 mod simple_slab;
 
 pub use generational_slab::{GenerationalIter, GenerationalKey, GenerationalSlab, SecondaryGenerationalSlab};
-pub use simple_cache::{CacheError, Cacheable, SimpleCache};
+pub use simple_cache::{CacheError, CacheStatistics, Cacheable, SimpleCache};
 pub use simple_slab::{SecondarySimpleSlab, SimpleIterator, SimpleKey, SimpleSlab};

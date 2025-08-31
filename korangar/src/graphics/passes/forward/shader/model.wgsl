@@ -81,12 +81,12 @@ override ALPHA_TO_COVERAGE_ACTIVATED: bool;
 
 @vertex
 fn vs_main(
+    @builtin(instance_index) instance_id: u32,
     @location(0) position: vec3<f32>,
     @location(1) normal: vec3<f32>,
     @location(2) texture_coordinates: vec2<f32>,
     @location(3) color: vec3<f32>,
     @location(5) wind_affinity: f32,
-    @location(6) instance_id: u32
 ) -> VertexOutput {
     let instance = instance_data[instance_id];
 

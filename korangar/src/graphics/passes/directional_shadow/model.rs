@@ -6,8 +6,7 @@ use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
     BufferAddress, BufferBindingType, BufferUsages, CommandEncoder, CompareFunction, DepthBiasState, DepthStencilState, Device,
     FragmentState, IndexFormat, MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass,
-    RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderStages, StencilState, VertexAttribute, VertexBufferLayout,
-    VertexFormat, VertexState, VertexStepMode, include_wgsl,
+    RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderStages, StencilState, VertexState, include_wgsl,
 };
 
 use crate::graphics::passes::{
@@ -31,13 +30,11 @@ pub(crate) struct DirectionalShadowModelDrawer {
     multi_draw_indirect_support: bool,
     bindless_support: BindlessSupport,
     instance_data_buffer: Buffer<InstanceData>,
-    instance_index_vertex_buffer: Buffer<u32>,
     command_buffer: Buffer<DrawIndexedIndirectArgs>,
     bind_group_layout: BindGroupLayout,
     bind_group: BindGroup,
     pipeline: RenderPipeline,
     instance_data: Vec<InstanceData>,
-    instance_indices: Vec<u32>,
     draw_commands: Vec<DrawIndexedIndirectArgs>,
 }
 
@@ -63,24 +60,6 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
             BufferUsages::COPY_DST | BufferUsages::STORAGE,
             (size_of::<InstanceData>() * INITIAL_INSTRUCTION_SIZE) as _,
         );
-
-        // TODO: NHA This instance index vertex buffer is only needed until this issue is fixed for DX12: https://github.com/gfx-rs/wgpu/issues/7955
-        let instance_index_vertex_buffer = Buffer::with_capacity(
-            device,
-            format!("{DRAWER_NAME} index vertex data"),
-            BufferUsages::COPY_DST | BufferUsages::VERTEX,
-            (size_of::<u32>() * INITIAL_INSTRUCTION_SIZE) as _,
-        );
-
-        let instance_index_buffer_layout = VertexBufferLayout {
-            array_stride: size_of::<u32>() as BufferAddress,
-            step_mode: VertexStepMode::Instance,
-            attributes: &[VertexAttribute {
-                format: VertexFormat::Uint32,
-                offset: 0,
-                shader_location: 6,
-            }],
-        };
 
         let command_buffer = Buffer::with_capacity(
             device,
@@ -130,7 +109,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
                 module: &shader_module,
                 entry_point: Some("vs_main"),
                 compilation_options: PipelineCompilationOptions::default(),
-                buffers: &[ModelVertex::buffer_layout(), instance_index_buffer_layout],
+                buffers: &[ModelVertex::buffer_layout()],
             },
             fragment: Some(FragmentState {
                 module: &shader_module,
@@ -155,13 +134,11 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
             multi_draw_indirect_support: capabilities.supports_multidraw_indirect(),
             bindless_support: capabilities.bindless_support(),
             instance_data_buffer,
-            instance_index_vertex_buffer,
             command_buffer,
             bind_group_layout,
             bind_group,
             pipeline,
             instance_data: Vec::default(),
-            instance_indices: Vec::default(),
             draw_commands: Vec::default(),
         }
     }
@@ -184,7 +161,6 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
                     pass.set_bind_group(3, batch.texture_set.get_bind_group().unwrap(), &[]);
                     pass.set_index_buffer(batch.index_buffer.slice(..), IndexFormat::Uint32);
                     pass.set_vertex_buffer(0, batch.vertex_buffer.slice(..));
-                    pass.set_vertex_buffer(1, self.instance_index_vertex_buffer.slice(..));
 
                     if self.multi_draw_indirect_support {
                         pass.multi_draw_indexed_indirect(
@@ -218,7 +194,6 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
 
                     pass.set_index_buffer(batch.index_buffer.slice(..), IndexFormat::Uint32);
                     pass.set_vertex_buffer(0, batch.vertex_buffer.slice(..));
-                    pass.set_vertex_buffer(1, self.instance_index_vertex_buffer.slice(..));
 
                     let start = batch.offset;
                     let end = start + batch.count;
@@ -251,7 +226,6 @@ impl Prepare for DirectionalShadowModelDrawer {
         }
 
         self.instance_data.clear();
-        self.instance_indices.clear();
         self.draw_commands.clear();
 
         for instruction in instructions.directional_shadow_models.iter() {
@@ -260,8 +234,6 @@ impl Prepare for DirectionalShadowModelDrawer {
             self.instance_data.push(InstanceData {
                 world: instruction.model_matrix.into(),
             });
-
-            self.instance_indices.push(instance_index as u32);
 
             self.draw_commands.push(DrawIndexedIndirectArgs {
                 index_count: instruction.index_count,
@@ -277,8 +249,6 @@ impl Prepare for DirectionalShadowModelDrawer {
         let recreated = self
             .instance_data_buffer
             .write(device, staging_belt, command_encoder, &self.instance_data);
-        self.instance_index_vertex_buffer
-            .write(device, staging_belt, command_encoder, &self.instance_indices);
         self.command_buffer
             .write(device, staging_belt, command_encoder, &self.draw_commands);
 

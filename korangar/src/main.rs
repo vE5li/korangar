@@ -140,6 +140,7 @@ pub static SHUTDOWN_SIGNAL: LazyLock<AtomicBool> = LazyLock::new(|| AtomicBool::
 
 #[cfg(feature = "debug")]
 const DEBUG_WINDOWS: &[WindowClass] = &[
+    WindowClass::CacheStatistics,
     WindowClass::ClientStateInspector,
     WindowClass::PacketInspector,
     WindowClass::Profiler,
@@ -2166,7 +2167,10 @@ impl Client {
                         .open_window(PacketInspectorWindow::new(client_state().packet_history())),
                 },
                 #[cfg(feature = "debug")]
-                InputEvent::OpenCacheStatisticsWindow => self.interface.open_state_window(client_state().cache_statistics()),
+                InputEvent::ToggleCacheStatisticsWindow => match self.interface.is_window_with_class_open(WindowClass::CacheStatistics) {
+                    true => self.interface.close_window_with_class(WindowClass::CacheStatistics),
+                    false => self.interface.open_state_window(client_state().cache_statistics()),
+                },
                 #[cfg(feature = "debug")]
                 InputEvent::CameraLookAround { offset } => self.debug_camera.look_around(offset),
                 #[cfg(feature = "debug")]

@@ -1,3 +1,5 @@
+#[cfg(feature = "debug")]
+pub mod cache_statistics;
 pub mod localization;
 pub mod theme;
 
@@ -25,6 +27,8 @@ use rust_state::{ManuallyAssertExt, VecIndexExt};
 use rust_state::{Path, RustState, Selector};
 use theme::{InterfaceTheme, InterfaceThemePathExt, InterfaceThemeType};
 
+#[cfg(feature = "debug")]
+use self::cache_statistics::CacheStatistics;
 #[cfg(feature = "debug")]
 use crate::PacketHistory;
 use crate::character_slots::CharacterSlots;
@@ -190,6 +194,9 @@ pub struct ClientState {
     /// inspector.
     #[cfg(feature = "debug")]
     packet_history: PacketHistory,
+    /// Statistics of all caches of the loaders.
+    #[cfg(feature = "debug")]
+    cache_statistics: CacheStatistics,
 }
 
 impl ClientState {
@@ -308,6 +315,9 @@ impl ClientState {
         let profiler_window = ProfilerWindowState::default();
 
         #[cfg(feature = "debug")]
+        let cache_statistics = CacheStatistics::default();
+
+        #[cfg(feature = "debug")]
         debug_timer.stop();
 
         ClientState {
@@ -359,6 +369,8 @@ impl ClientState {
             profiler_window,
             #[cfg(feature = "debug")]
             packet_history,
+            #[cfg(feature = "debug")]
+            cache_statistics,
         }
     }
 }

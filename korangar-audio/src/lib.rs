@@ -24,7 +24,7 @@ use kira::{AudioManager, AudioManagerSettings, Capacities, Decibels, Easing, Fra
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, print_debug};
 use korangar_util::collision::{KDTree, Sphere};
-use korangar_util::container::{Cacheable, GenerationalSlab, SimpleCache, SimpleSlab};
+use korangar_util::container::{CacheStatistics, Cacheable, GenerationalSlab, SimpleCache, SimpleSlab};
 use korangar_util::{FileLoader, create_generational_key, create_simple_key};
 use rayon::spawn;
 
@@ -191,6 +191,12 @@ impl<F: FileLoader> AudioEngine<F> {
             sound_effect_track,
         });
         AudioEngine { engine_context }
+    }
+
+    /// The statistics of the sound effect cache.
+    pub fn cache_statistics(&self) -> CacheStatistics {
+        let context = self.engine_context.lock().unwrap();
+        context.cache.statistics()
     }
 
     /// Mutes or unmutes the audio.

@@ -6,6 +6,23 @@ use std::sync::Arc;
 
 use hashbrown::hash_map::RawEntryMut;
 use hashbrown::{HashMap, HashSet};
+use korangar_interface::element::StateElement;
+use rust_state::RustState;
+
+use crate::HumanReadableBytes;
+
+/// Statistics about the cache.
+#[derive(Clone, Copy, PartialEq, Eq, Default, RustState, StateElement)]
+pub struct CacheStatistics {
+    /// The current count of cached values.
+    pub count: u32,
+    /// The maximal count of cached values.
+    pub max_count: u32,
+    /// The current size of cached values.
+    pub size: HumanReadableBytes,
+    /// The maximal size of cached values.
+    pub max_size: HumanReadableBytes,
+}
 
 /// Something that can be cached.
 pub trait Cacheable {
@@ -195,6 +212,16 @@ impl<K: Clone + Eq + Hash, V: Cacheable> SimpleCache<K, V> {
             max_main_size: max_size - max_small_size,
             max_count,
             max_size,
+        }
+    }
+
+    /// Returns the statistics of the cache.
+    pub fn statistics(&self) -> CacheStatistics {
+        CacheStatistics {
+            count: self.count(),
+            max_count: self.max_count(),
+            size: HumanReadableBytes(self.size()),
+            max_size: HumanReadableBytes(self.max_size()),
         }
     }
 

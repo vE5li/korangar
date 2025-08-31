@@ -340,6 +340,8 @@ fn initialize_shutdown_signal() {
 struct Client {
     game_file_loader: Arc<GameFileLoader>,
     action_loader: Arc<ActionLoader>,
+    #[cfg(feature = "debug")]
+    animation_loader: Arc<AnimationLoader>,
     async_loader: Arc<AsyncLoader>,
     effect_loader: Arc<EffectLoader>,
     font_loader: Arc<FontLoader>,
@@ -743,6 +745,8 @@ impl Client {
         Some(Self {
             game_file_loader,
             action_loader,
+            #[cfg(feature = "debug")]
+            animation_loader,
             async_loader,
             effect_loader,
             font_loader,
@@ -2162,6 +2166,8 @@ impl Client {
                         .open_window(PacketInspectorWindow::new(client_state().packet_history())),
                 },
                 #[cfg(feature = "debug")]
+                InputEvent::OpenCacheStatisticsWindow => self.interface.open_state_window(client_state().cache_statistics()),
+                #[cfg(feature = "debug")]
                 InputEvent::CameraLookAround { offset } => self.debug_camera.look_around(offset),
                 #[cfg(feature = "debug")]
                 InputEvent::CameraMoveForward => self.debug_camera.move_forward(delta_time as f32),
@@ -2272,6 +2278,22 @@ impl Client {
             self.client_state
                 .follow_mut(client_state().packet_history())
                 .update(is_packet_inspector_open);
+        }
+
+        #[cfg(feature = "debug")]
+        {
+            profile_block!("update cache statistics");
+
+            self.client_state.follow_mut(client_state().cache_statistics()).update(
+                delta_time,
+                &self.texture_loader,
+                &self.sprite_loader,
+                &self.font_loader,
+                &self.audio_engine,
+                &self.action_loader,
+                &self.animation_loader,
+                &self.effect_loader,
+            );
         }
 
         // Main map update and render loop

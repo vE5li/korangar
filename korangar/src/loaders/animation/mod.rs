@@ -7,6 +7,8 @@ use cgmath::SquareMatrix;
 use cgmath::{Array, Matrix4, Rad, Vector2};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, print_debug};
+#[cfg(feature = "debug")]
+use korangar_util::container::CacheStatistics;
 use korangar_util::container::SimpleCache;
 use num::Zero;
 
@@ -31,6 +33,11 @@ impl AnimationLoader {
                 NonZeroUsize::new(MAX_CACHE_SIZE).unwrap(),
             )),
         }
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn cache_statistics(&self) -> CacheStatistics {
+        self.cache.lock().unwrap().statistics()
     }
 
     pub fn load(

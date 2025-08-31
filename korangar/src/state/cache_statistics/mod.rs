@@ -4,9 +4,11 @@ use korangar_interface::window::StateWindow;
 use korangar_util::container;
 use rust_state::RustState;
 
+use crate::interface::windows::WindowClass;
 use crate::loaders::{ActionLoader, AnimationLoader, EffectLoader, FontLoader, GameFileLoader, SpriteLoader, TextureLoader};
 
 #[derive(Clone, Copy, PartialEq, Default, RustState, StateElement, StateWindow)]
+#[window_class(WindowClass::CacheStatistics)]
 #[window_title("Cache Statistics")]
 pub struct CacheStatistics {
     texture_cache: container::CacheStatistics,

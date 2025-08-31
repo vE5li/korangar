@@ -271,7 +271,7 @@ pub enum InputEvent {
     TogglePacketInspectorWindow,
     /// Open the cache statistics window.
     #[cfg(feature = "debug")]
-    OpenCacheStatisticsWindow,
+    ToggleCacheStatisticsWindow,
     /// Move the view direction of the debug camera.
     #[cfg(feature = "debug")]
     CameraLookAround {

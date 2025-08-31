@@ -115,7 +115,7 @@ impl CustomWindow<ClientState> for MenuWindow {
                 button! {
                     text: "Cache statistics",
                     tooltip: "Shows statistics of the caches used by the client (^000001only available in debug mode^000000)",
-                    event: InputEvent::OpenCacheStatisticsWindow,
+                    event: InputEvent::ToggleCacheStatisticsWindow,
                     foreground_color: client_theme().debug_button().foreground_color(),
                     hovered_background_color: client_theme().debug_button().hovered_background_color(),
                 },

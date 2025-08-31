@@ -119,4 +119,6 @@ pub enum WindowClass {
     Commands,
     #[cfg(feature = "debug")]
     Profiler,
+    #[cfg(feature = "debug")]
+    CacheStatistics,
 }

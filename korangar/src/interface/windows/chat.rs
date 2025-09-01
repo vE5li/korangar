@@ -215,10 +215,9 @@ where
                     background_color: client_theme().chat().text_box_background_color(),
                     focused_background_color: Color::rgba(0.0, 0.0, 0.0, 0.8),
                     focus_id: ChatTextBox,
-                    // TODO:
-                    // follow: true,
                 },
                 scroll_view! {
+                    follow: true,
                     children: (
                         ChatElement::new(self.chat_messages_path),
                     ),

@@ -115,6 +115,7 @@ where
                     ),
                 },
                 scroll_view! {
+                    follow: true,
                     children: (
                         BufferWrapper {
                             packet_history_path: self.packet_history_path,

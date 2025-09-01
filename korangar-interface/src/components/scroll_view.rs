@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 
 use num::Signed;
-use rust_state::Context;
+use rust_state::{Context, Selector};
 
 use crate::application::Application;
 use crate::element::store::{ElementStore, ElementStoreMut, Persistent, PersistentExt};
@@ -10,10 +10,24 @@ use crate::layout::area::Area;
 use crate::layout::{Resolver, ScrollHandler, WindowLayout};
 use crate::prelude::EventQueue;
 
-#[derive(Default)]
+/// If the current scroll is this far away from the maximum scroll the scroll
+/// view will start following.
+const FOLLOW_THRESHOLD: f32 = 0.5;
+
 struct PersistentDataInner {
     scroll: f32,
-    max_scroll: f32,
+    maximum_scroll: f32,
+    actively_following: bool,
+}
+
+impl Default for PersistentDataInner {
+    fn default() -> Self {
+        Self {
+            scroll: 0.0,
+            maximum_scroll: 0.0,
+            actively_following: true,
+        }
+    }
 }
 
 #[derive(Default)]
@@ -29,11 +43,17 @@ where
         let mut inner = self.inner.borrow_mut();
 
         // Don't try to scroll if its already at the minimum or maximum scroll value.
-        if delta.is_negative() && inner.scroll >= inner.max_scroll || delta.is_positive() && inner.scroll <= 0.0 {
+        if delta.is_negative() && inner.scroll >= inner.maximum_scroll || delta.is_positive() && inner.scroll <= 0.0 {
             return false;
         }
 
-        inner.scroll = (inner.scroll - delta).max(0.0).min(inner.max_scroll);
+        inner.scroll = (inner.scroll - delta).max(0.0).min(inner.maximum_scroll);
+
+        if delta.is_positive() && inner.scroll <= inner.maximum_scroll - FOLLOW_THRESHOLD {
+            inner.actively_following = false;
+        } else if delta.is_negative() && inner.scroll >= inner.maximum_scroll - FOLLOW_THRESHOLD {
+            inner.actively_following = true;
+        }
 
         true
     }
@@ -44,25 +64,27 @@ pub struct ScrollViewLayoutInfo<L> {
     children: L,
 }
 
-pub struct ScrollView<Children> {
+pub struct ScrollView<A, Children> {
+    follow: A,
     children: Children,
 }
 
-impl<Children> ScrollView<Children> {
+impl<A, Children> ScrollView<A, Children> {
     /// This function is supposed to be called from a component macro and not
     /// intended to be called manually.
     #[inline(always)]
-    pub fn component_new(children: Children) -> Self {
-        Self { children }
+    pub fn component_new(follow: A, children: Children) -> Self {
+        Self { follow, children }
     }
 }
 
-impl<Children> Persistent for ScrollView<Children> {
+impl<A, Children> Persistent for ScrollView<A, Children> {
     type Data = PersistentData;
 }
 
-impl<App, Children> Element<App> for ScrollView<Children>
+impl<App, A, Children> Element<App> for ScrollView<A, Children>
 where
+    A: Selector<App, bool>,
     App: Application,
     Children: ElementSet<App>,
 {
@@ -96,20 +118,22 @@ where
             let persistent = self.get_persistent_data(&store, ());
             let mut inner = persistent.inner.borrow_mut();
 
-            let max_scroll = (children_height - area.height).max(0.0);
+            let maximum_scroll = (children_height - area.height).max(0.0);
 
             // Check if the scroll is in bounds. If it is, we can just return, otherwise we
             // need to adjust it and create the layout again.
-            if inner.scroll > max_scroll {
-                inner.scroll = max_scroll;
+            if inner.scroll > maximum_scroll {
+                inner.scroll = maximum_scroll;
                 continue;
             } else if inner.scroll < 0.0 {
                 inner.scroll = 0.0;
-
+                continue;
+            } else if *state.get(&self.follow) && inner.actively_following && inner.scroll <= maximum_scroll - FOLLOW_THRESHOLD {
+                inner.scroll = maximum_scroll;
                 continue;
             }
 
-            inner.max_scroll = max_scroll;
+            inner.maximum_scroll = maximum_scroll;
 
             *resolver = cloned_resolver;
 

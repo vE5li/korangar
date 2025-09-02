@@ -933,7 +933,13 @@ impl Player {
     /// This function creates the player entity free-floating in the
     /// "void". When a new map is loaded on map change, the server sends
     /// the correct position we need to position the player to.
-    pub fn new(library: &Library, account_id: AccountId, character_information: &CharacterInformation, client_tick: ClientTick) -> Self {
+    pub fn new(
+        library: &Library,
+        account_id: AccountId,
+        character_information: &CharacterInformation,
+        client_tick: ClientTick,
+        account_sex: Sex,
+    ) -> Self {
         let hair_id = character_information.head as usize;
         let spell_points = character_information.spell_points as usize;
         let activity_points = 0;
@@ -943,7 +949,7 @@ impl Player {
         let job_level = character_information.job_level as usize;
         let stat_points = character_information.stat_points as u32;
 
-        let entity_data = EntityData::from_character(account_id, character_information, WorldPosition::origin());
+        let entity_data = EntityData::from_character(account_id, character_information, WorldPosition::origin(), account_sex);
         let tile_position = TilePosition::new(0, 0);
         let position = Point3::origin();
 

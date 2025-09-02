@@ -1042,7 +1042,7 @@ impl Client {
                         .connect_to_map_server(self.saved_packet_version, saved_login_data, login_data);
                     // Ask for the client tick right away, so that the player isn't de-synced when
                     // they spawn on the map.
-                    let _ = self.networking_system.request_client_tick();
+                    let _ = self.networking_system.request_client_tick(self.saved_packet_version);
 
                     let character_information = self
                         .client_state
@@ -1056,6 +1056,7 @@ impl Client {
                         saved_login_data.account_id,
                         &character_information,
                         client_tick,
+                        saved_login_data.sex,
                     ));
 
                     *self.client_state.follow_mut(client_state().player_name()) = character_information.name;
@@ -1914,6 +1915,7 @@ impl Client {
                     let packet_version = match service.packet_version {
                         Some(packet_version) => match packet_version {
                             PacketVersion::_20220406 => SupportedPacketVersion::_20220406,
+                            PacketVersion::_20120307 => SupportedPacketVersion::_20120307,
                             PacketVersion::Unsupported(packet_version) => {
                                 self.interface.open_window(ErrorWindow::new(format!(
                                     "Selected server has an unsupported package version: {packet_version}"

@@ -45,7 +45,7 @@ ragnarok-formats = { path = "ragnarok-formats" }
 ragnarok-macros = { path = "ragnarok-macros" }
 ragnarok-packets = { path = "ragnarok-packets" }
 rand_aes = { version = "0.5", default-features = false }
-rav1d = "1"
+rav1d = { version = "1", git = "https://github.com/memorysafety/rav1d.git", rev = "c8019327ff0aa4c097475fa5f679561ea3abd983" }
 rayon = "1"
 reqwest = "0.12"
 ron = "0.10"

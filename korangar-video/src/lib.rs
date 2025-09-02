@@ -19,8 +19,8 @@ use rav1d::include::dav1d::data::*;
 use rav1d::include::dav1d::dav1d::*;
 pub use rav1d::include::dav1d::headers;
 use rav1d::include::dav1d::picture::*;
-use rav1d::src::lib::*;
-use rav1d::src::send_sync_non_null::SendSyncNonNull;
+use rav1d::send_sync_non_null::SendSyncNonNull;
+use rav1d::*;
 
 const fn dav1d_err(errno: c_int) -> c_int {
     if libc::EPERM < 0 { errno } else { -errno }

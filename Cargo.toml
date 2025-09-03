@@ -17,10 +17,10 @@ cpal = "0.15"
 ctrlc = "3"
 ddsfile = "0.5"
 encoding_rs = "0.8"
-etherparse = "0.18"
+etherparse = "0.19"
 fast-srgb8 = "1"
 flate2 = { version = "1", default-features = false }
-hashbrown = "0.15"
+hashbrown = "0.16"
 heck = "0.5.0"
 image = { version = "0.25", default-features = false }
 kira = { version = "0.10", default-features = false }
@@ -32,7 +32,7 @@ korangar-util = { path = "korangar-util" }
 korangar-video = { path = "korangar-video" }
 libc = "0.2"
 lunify = "1"
-mlua = "0.10"
+mlua = "0.11"
 num = "0.4"
 option-ext = "0.2"
 pcap = "2"
@@ -48,7 +48,7 @@ rand_aes = { version = "0.5", default-features = false }
 rav1d = { version = "1", git = "https://github.com/memorysafety/rav1d.git", rev = "c8019327ff0aa4c097475fa5f679561ea3abd983" }
 rayon = "1"
 reqwest = "0.12"
-ron = "0.10"
+ron = "0.11"
 rust-state = { git = "https://github.com/vE5li/rust-state" }
 serde = "1"
 sevenz-rust2 = { version = "0.18", default-features = false }

@@ -1,6 +1,7 @@
 use std::any::{Any, TypeId};
 
 use rust_state::RustState;
+use serde::{Deserialize, Serialize};
 
 use crate::application::Application;
 
@@ -20,7 +21,7 @@ where
     }
 }
 
-#[derive(RustState)]
+#[derive(Serialize, Deserialize, RustState)]
 pub struct TooltipTheme<App>
 where
     App: Application + 'static,

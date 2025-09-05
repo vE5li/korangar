@@ -145,7 +145,7 @@ where
         window! {
             title: "Equipment",
             class: Self::window_class(),
-            theme: InterfaceThemeType::Game,
+            theme: InterfaceThemeType::InGame,
             closable: true,
             elements: [
                 equip_box(self.items_path, EquipPosition::HEAD_TOP),

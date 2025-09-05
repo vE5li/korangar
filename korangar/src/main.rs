@@ -81,7 +81,7 @@ use settings::{
     AudioSettings, AudioSettingsPathExt, GraphicsSettingsCapabilities, GraphicsSettingsPathExt, InterfaceSettings, InterfaceSettingsPathExt,
 };
 use state::localization::Localization;
-use state::theme::{CursorThemePathExt, GameThemePathExt, IndicatorThemePathExt, InterfaceThemePathExt};
+use state::theme::{CursorThemePathExt, IndicatorThemePathExt, InterfaceThemePathExt, WorldThemePathExt};
 use state::{ChatMessage, ClientState, ClientStatePathExt, ClientStateRootExt, client_state, this_entity, this_player};
 #[cfg(feature = "debug")]
 use wgpu::Device;
@@ -108,7 +108,8 @@ use crate::renderer::DebugMarkerRenderer;
 #[cfg(feature = "debug")]
 use crate::renderer::InterfaceFrameExt;
 use crate::renderer::{AlignHorizontal, EffectRenderer, GameInterfaceRenderer};
-use crate::settings::{GraphicsSettings, LightingMode};
+use crate::settings::{GraphicsSettings, INTERFACE_THEMES_PATH, LightingMode, WORLD_THEMES_PATH};
+use crate::state::theme::{InterfaceTheme, WorldTheme};
 use crate::system::GameTimer;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
@@ -518,7 +519,8 @@ impl Client {
         });
 
         time_phase!("create resource managers", {
-            std::fs::create_dir_all("client/themes").unwrap();
+            std::fs::create_dir_all(INTERFACE_THEMES_PATH).unwrap();
+            std::fs::create_dir_all(WORLD_THEMES_PATH).unwrap();
 
             let model_loader = Arc::new(ModelLoader::new(game_file_loader.clone(), capabilities.bindless_support()));
             let texture_loader = Arc::new(TextureLoader::new(
@@ -1830,8 +1832,6 @@ impl Client {
                 }
                 InputEvent::CloseTopWindow => self.interface.close_top_window(&self.client_state),
                 InputEvent::ToggleShowInterface => self.show_interface = !self.show_interface,
-                // InputEvent::SaveTheme { theme_kind } => self.client_state.save_theme(theme_kind),
-                // InputEvent::ReloadTheme { theme_kind } => self.client_state.reload_theme(theme_kind),
                 InputEvent::SelectCharacter { slot } => {
                     let _ = self.networking_system.select_character(slot);
                 }
@@ -2036,6 +2036,38 @@ impl Client {
                     let _ = self.networking_system.sell_items(items);
                 }
                 #[cfg(feature = "debug")]
+                InputEvent::SaveInterfaceTheme { theme_type, name } => {
+                    use crate::state::theme::InterfaceThemeType;
+
+                    let theme = match theme_type {
+                        InterfaceThemeType::Menu => self.client_state.follow(client_state().menu_theme()),
+                        InterfaceThemeType::InGame => self.client_state.follow(client_state().in_game_theme()),
+                    };
+
+                    theme.save(&name);
+                }
+                #[cfg(feature = "debug")]
+                InputEvent::ReloadInterfaceTheme { theme_type, name } => {
+                    use crate::state::theme::InterfaceThemeType;
+
+                    match theme_type {
+                        InterfaceThemeType::Menu => {
+                            *self.client_state.follow_mut(client_state().menu_theme()) =
+                                InterfaceTheme::load(&name, InterfaceTheme::default_menu);
+                        }
+                        InterfaceThemeType::InGame => {
+                            *self.client_state.follow_mut(client_state().in_game_theme()) =
+                                InterfaceTheme::load(&name, InterfaceTheme::default_playing);
+                        }
+                    }
+                }
+                #[cfg(feature = "debug")]
+                InputEvent::SaveWorldTheme { name } => self.client_state.follow(client_state().world_theme()).save(&name),
+                #[cfg(feature = "debug")]
+                InputEvent::ReloadWorldTheme { name } => {
+                    *self.client_state.follow_mut(client_state().world_theme()) = WorldTheme::load(&name)
+                }
+                #[cfg(feature = "debug")]
                 InputEvent::ReloadLanguage => {
                     let language = *self.client_state.follow(client_state().interface_settings().language());
                     *self.client_state.follow_mut(client_state().localization()) =
@@ -2150,10 +2182,15 @@ impl Client {
                 #[cfg(feature = "debug")]
                 InputEvent::SetTime { day_seconds } => self.game_timer.set_day_timer(day_seconds),
                 #[cfg(feature = "debug")]
-                InputEvent::OpenThemeInspectorWindow => {
-                    // TODO: Temporary value
-                    self.interface.open_state_window(client_state().menu_theme())
-                }
+                InputEvent::ToggleThemeInspectorWindow => match self.interface.is_window_with_class_open(WindowClass::ThemeInspector) {
+                    true => self.interface.close_window_with_class(WindowClass::ThemeInspector),
+                    false => self.interface.open_window(ThemeInspectorWindow::new(
+                        client_state().theme_inspector_window(),
+                        client_state().menu_theme(),
+                        client_state().in_game_theme(),
+                        client_state().world_theme(),
+                    )),
+                },
                 #[cfg(feature = "debug")]
                 InputEvent::ToggleProfilerWindow => match self.interface.is_window_with_class_open(WindowClass::Profiler) {
                     true => self.interface.close_window_with_class(WindowClass::Profiler),
@@ -2434,7 +2471,7 @@ impl Client {
 
             self.mouse_cursor.update(client_tick);
 
-            let walk_indicator_color = *self.client_state.follow(client_state().game_theme().indicator().walking());
+            let walk_indicator_color = *self.client_state.follow(client_state().world_theme().indicator().walking());
 
             #[cfg(feature = "debug")]
             let hovered_marker_identifier = match input_report.mouse_target {
@@ -2688,7 +2725,7 @@ impl Client {
                     player.render_status(
                         &self.middle_interface_renderer,
                         current_camera,
-                        self.client_state.follow(client_state().game_theme()),
+                        self.client_state.follow(client_state().world_theme()),
                         screen_size,
                     );
                 }
@@ -2828,7 +2865,7 @@ impl Client {
                                 entity.render_status(
                                     &self.middle_interface_renderer,
                                     current_camera,
-                                    self.client_state.follow(client_state().game_theme()),
+                                    self.client_state.follow(client_state().world_theme()),
                                     screen_size,
                                 );
 
@@ -2854,10 +2891,10 @@ impl Client {
                     _ => {}
                 }
 
-                let playing_theme_path = client_state().playing_theme().tooltip();
+                let in_game_theme_path = client_state().in_game_theme().tooltip();
                 let menu_theme_path = client_state().menu_theme().tooltip();
                 let tooltip_theme = match currently_playing {
-                    true => self.client_state.get(&playing_theme_path),
+                    true => self.client_state.get(&in_game_theme_path),
                     false => self.client_state.get(&menu_theme_path),
                 };
 
@@ -2883,13 +2920,13 @@ impl Client {
 
                 #[cfg(feature = "debug")]
                 if render_options.show_frames_per_second {
-                    let game_theme = self.client_state.follow(client_state().game_theme());
+                    let world_theme = self.client_state.follow(client_state().world_theme());
 
                     self.top_interface_renderer.render_text(
                         &self.game_timer.last_frames_per_second().to_string(),
-                        game_theme.overlay.text_offset,
-                        game_theme.overlay.foreground_color,
-                        game_theme.overlay.font_size,
+                        world_theme.overlay.text_offset,
+                        world_theme.overlay.foreground_color,
+                        world_theme.overlay.font_size,
                         AlignHorizontal::Left,
                     );
                 }
@@ -2899,7 +2936,7 @@ impl Client {
                         &self.top_interface_renderer,
                         input_report.mouse_position,
                         self.interface.get_mouse_mode().grabbed(),
-                        *self.client_state.follow(client_state().game_theme().cursor().color()),
+                        *self.client_state.follow(client_state().world_theme().cursor().color()),
                         self.client_state.follow(client_state().interface_settings().scaling()).get_factor(),
                     );
                 }
@@ -3043,6 +3080,33 @@ impl Client {
         if self.active_interface_settings.language != language {
             *self.client_state.follow_mut(client_state().localization()) = Localization::load_language(&self.game_file_loader, language);
             self.active_interface_settings.language = language;
+        }
+
+        let interface_settings = self.client_state.follow_mut(client_state().interface_settings());
+
+        if self.active_interface_settings.menu_theme != interface_settings.menu_theme {
+            let menu_theme = interface_settings.menu_theme.clone();
+            let theme = InterfaceTheme::load(&menu_theme, InterfaceTheme::default_menu);
+            *self.client_state.follow_mut(client_state().menu_theme()) = theme;
+            self.active_interface_settings.menu_theme = menu_theme;
+        }
+
+        let interface_settings = self.client_state.follow(client_state().interface_settings());
+
+        if self.active_interface_settings.in_game_theme != interface_settings.in_game_theme {
+            let in_game_theme = interface_settings.in_game_theme.clone();
+            let theme = InterfaceTheme::load(&in_game_theme, InterfaceTheme::default_playing);
+            *self.client_state.follow_mut(client_state().in_game_theme()) = theme;
+            self.active_interface_settings.in_game_theme = in_game_theme;
+        }
+
+        let interface_settings = self.client_state.follow(client_state().interface_settings());
+
+        if self.active_interface_settings.world_theme != interface_settings.world_theme {
+            let world_theme = interface_settings.world_theme.clone();
+            let theme = WorldTheme::load(&world_theme);
+            *self.client_state.follow_mut(client_state().world_theme()) = theme;
+            self.active_interface_settings.world_theme = world_theme;
         }
     }
 }

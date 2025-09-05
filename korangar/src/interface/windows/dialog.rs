@@ -252,7 +252,7 @@ where
         window! {
             title: client_state().localization().dialog_window_title(),
             class: Self::window_class(),
-            theme: InterfaceThemeType::Game,
+            theme: InterfaceThemeType::InGame,
             elements: (
                 InnerElement {
                     dialog_elements_path: self.window_state_path.elements(),

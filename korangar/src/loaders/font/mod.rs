@@ -53,7 +53,7 @@ impl Cacheable for CachedLayout {
 #[serde(transparent)]
 pub struct FontSize(pub f32);
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum OverflowBehavior {
     Shrink,
     LineBreak,

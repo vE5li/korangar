@@ -41,7 +41,7 @@ where
         window! {
             title: client_state().localization().character_overview_window_title(),
             class: Self::window_class(),
-            theme: InterfaceThemeType::Game,
+            theme: InterfaceThemeType::InGame,
             minimum_width: 300.0,
             maximum_width: 300.0,
             elements: (

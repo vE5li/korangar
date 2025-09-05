@@ -1,6 +1,7 @@
 use std::marker::PhantomData;
 
 use rust_state::{Context, RustState, Selector};
+use serde::{Deserialize, Serialize};
 
 use crate::application::{Application, Size};
 use crate::element::Element;
@@ -11,7 +12,7 @@ use crate::layout::area::Area;
 use crate::layout::tooltip::TooltipExt;
 use crate::layout::{Icon, MouseButton, Resolver, WindowLayout};
 
-#[derive(RustState)]
+#[derive(Serialize, Deserialize, RustState)]
 pub struct StateButtonTheme<App>
 where
     App: Application,

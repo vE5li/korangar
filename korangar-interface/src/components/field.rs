@@ -1,6 +1,7 @@
 use std::marker::PhantomData;
 
 use rust_state::{Context, RustState, Selector};
+use serde::{Deserialize, Serialize};
 
 use crate::application::{Application, Size};
 use crate::element::Element;
@@ -9,7 +10,7 @@ use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
 use crate::layout::tooltip::TooltipExt;
 use crate::layout::{Resolver, WindowLayout};
 
-#[derive(RustState)]
+#[derive(Serialize, Deserialize, RustState)]
 pub struct FieldTheme<App>
 where
     App: Application + 'static,

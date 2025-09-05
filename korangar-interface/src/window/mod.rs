@@ -6,6 +6,7 @@ use std::marker::PhantomData;
 pub use anchor::{Anchor, AnchorPoint};
 pub use interface_macros::StateWindow;
 use rust_state::{Context, Path, RustState, Selector};
+use serde::{Deserialize, Serialize};
 use store::WindowStore;
 
 use crate::MouseMode;
@@ -99,7 +100,7 @@ where
     fn to_window_mut<'a>(self_path: impl Path<App, Self>) -> impl Window<App> + 'a;
 }
 
-#[derive(RustState)]
+#[derive(Deserialize, Serialize, RustState)]
 pub struct WindowTheme<App>
 where
     App: Application,

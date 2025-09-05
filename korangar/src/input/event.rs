@@ -14,6 +14,7 @@ use crate::interface::resource::{ItemSource, SkillSource};
 use crate::inventory::Skill;
 use crate::loaders::ServiceId;
 use crate::state::ClientState;
+use crate::state::theme::InterfaceThemeType;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 use crate::world::ResourceMetadata;
@@ -75,12 +76,6 @@ pub enum InputEvent {
     CloseTopWindow,
     /// Toggle if the user interface should be rendered or not.
     ToggleShowInterface,
-    // SaveTheme {
-    //     theme_kind: InternalThemeKind,
-    // },
-    // ReloadTheme {
-    //     theme_kind: InternalThemeKind,
-    // },
     /// Select a character to start playing.
     SelectCharacter {
         /// Slot that the selected character is in.
@@ -216,6 +211,18 @@ pub enum InputEvent {
         /// Items to sell.
         items: Vec<SoldItemInformation>,
     },
+    /// Save interface theme to a file.
+    #[cfg(feature = "debug")]
+    SaveInterfaceTheme { theme_type: InterfaceThemeType, name: String },
+    /// Reload interface theme from a file.
+    #[cfg(feature = "debug")]
+    ReloadInterfaceTheme { theme_type: InterfaceThemeType, name: String },
+    /// Save world theme to a file.
+    #[cfg(feature = "debug")]
+    SaveWorldTheme { name: String },
+    /// Reload world theme from a file.
+    #[cfg(feature = "debug")]
+    ReloadWorldTheme { name: String },
     /// Reload the language from disk.
     #[cfg(feature = "debug")]
     ReloadLanguage,
@@ -262,7 +269,7 @@ pub enum InputEvent {
     },
     /// Open the theme inspector window.
     #[cfg(feature = "debug")]
-    OpenThemeInspectorWindow,
+    ToggleThemeInspectorWindow,
     /// Open or close the profiler window.
     #[cfg(feature = "debug")]
     ToggleProfilerWindow,

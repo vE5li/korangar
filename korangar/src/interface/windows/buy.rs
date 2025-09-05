@@ -376,7 +376,7 @@ where
         window! {
             title: "Buy",
             class: Self::window_class(),
-            theme: InterfaceThemeType::Game,
+            theme: InterfaceThemeType::InGame,
             resizable: true,
             elements: (
                 scroll_view! {

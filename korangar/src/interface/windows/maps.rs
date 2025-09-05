@@ -46,7 +46,7 @@ impl CustomWindow<ClientState> for MapsWindow {
         window! {
             title: "Maps",
             class: Self::window_class(),
-            theme: InterfaceThemeType::Game,
+            theme: InterfaceThemeType::InGame,
             closable: true,
             elements: std::array::from_fn::<_, MAP_COUNT, _>(|index| {
                 let warp = MAP_WARPS[index];

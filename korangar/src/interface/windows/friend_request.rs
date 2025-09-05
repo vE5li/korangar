@@ -23,7 +23,7 @@ impl CustomWindow<ClientState> for FriendRequestWindow {
         window! {
             title: "Friend request",
             class: Some(WindowClass::FriendRequest),
-            theme: InterfaceThemeType::Game,
+            theme: InterfaceThemeType::InGame,
             closable: true,
             elements: (
                 text! {

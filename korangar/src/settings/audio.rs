@@ -44,9 +44,9 @@ impl AudioSettings {
         if let Err(_error) = std::fs::write(Self::FILE_NAME, data) {
             #[cfg(feature = "debug")]
             print_debug!(
-                "failed to save audio settings to {}: {}",
+                "failed to save audio settings to {}: {:?}",
                 Self::FILE_NAME.magenta(),
-                _error.to_string().red()
+                _error.red()
             );
         }
     }

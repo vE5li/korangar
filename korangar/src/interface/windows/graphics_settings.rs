@@ -153,7 +153,7 @@ where
         window! {
             title: "Graphics Settings",
             class: Self::window_class(),
-            theme: InterfaceThemeType::Game,
+            theme: InterfaceThemeType::InGame,
             closable: true,
             elements,
         }

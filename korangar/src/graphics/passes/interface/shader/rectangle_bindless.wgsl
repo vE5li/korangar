@@ -22,11 +22,11 @@ struct InstanceData {
     color: vec4<f32>,
     corner_diameter: vec4<f32>,
     screen_clip: vec4<f32>,
+    shadow_padding: vec4<f32>,
     screen_position: vec2<f32>,
     screen_size: vec2<f32>,
     texture_position: vec2<f32>,
     texture_size: vec2<f32>,
-    shadow_offset: vec2<f32>,
     rectangle_type: u32,
     texture_index: i32,
 }
@@ -66,18 +66,34 @@ fn vs_main(
 
     let pixel_size = vec2<f32>(1.0 / f32(global_uniforms.interface_size.x), 1.0 / f32(global_uniforms.interface_size.y));
     let size_adjustment = select(vec2<f32>(0.0), (BREATHING_ROOM * 2.0) * pixel_size, any(instance.corner_diameter != vec4<f32>(0.0)));
-    let shadow_offset = instance.shadow_offset * pixel_size;
+    let shadow_padding = vec4<f32>(
+        instance.shadow_padding.x * pixel_size.x,  // left padding
+        instance.shadow_padding.y * pixel_size.x,  // right padding
+        instance.shadow_padding.z * pixel_size.y,  // top padding
+        instance.shadow_padding.w * pixel_size.y   // bottom padding
+    );
 
     var adjusted_size = instance.screen_size + size_adjustment;
 
+    // Only shift the quad for positive padding values (shadow extending outward).
+    let position_offset = vec2<f32>(
+        -max(0.0, shadow_padding.x),
+        -max(0.0, shadow_padding.z)
+    );
+
+    // Expand the vertex bounds based on shadow padding.
+    // For positive left/top padding: we shifted, so need to compensate on right/bottom.
+    // For negative left/top padding: no shift, so just use the absolute values.
     let shadow_expansion = vec2<f32>(
-        select(0.0, abs(shadow_offset.x), (instance.shadow_offset.x > 0.0 && vertex.x > 0.5) || (instance.shadow_offset.x < 0.0 && vertex.x < 0.5)),
-        select(0.0, abs(shadow_offset.y), (instance.shadow_offset.y > 0.0 && vertex.y < -0.5) || (instance.shadow_offset.y < 0.0 && vertex.y > -0.5))
+        select(0.0, max(0.0, shadow_padding.x), vertex.x < 0.5) +
+        select(0.0, shadow_padding.y + max(0.0, shadow_padding.x), vertex.x > 0.5),
+        select(0.0, max(0.0, shadow_padding.z), vertex.y > -0.5) +
+        select(0.0, shadow_padding.w + max(0.0, shadow_padding.z), vertex.y < -0.5)
     );
     adjusted_size += shadow_expansion;
 
     let clip_size = adjusted_size * 2.0;
-    let position = screen_to_clip_space(instance.screen_position) + vertex.xy * clip_size;
+    let position = screen_to_clip_space(instance.screen_position + position_offset) + vertex.xy * clip_size;
 
     var output: VertexOutput;
     output.position = vec4<f32>(position, 0.0, 1.0);
@@ -126,7 +142,7 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
         default: {}
     }
 
-    if (instance.rectangle_type == 0u && any(instance.shadow_offset != vec2<f32>(0.0))) {
+    if (instance.rectangle_type == 0u && any(instance.shadow_padding != vec4<f32>(0.0))) {
         // Solid rectangle with shadow.
         return render_rectangle_with_shadow(
             instance.corner_diameter,
@@ -134,7 +150,7 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
             instance.screen_size,
             input.fragment_position,
             color,
-            instance.shadow_offset,
+            instance.shadow_padding,
         );
     } else {
         // All other shadowless rectangles.
@@ -208,7 +224,7 @@ fn render_rectangle_with_shadow(
     screen_size: vec2<f32>,
     fragment_position: vec2<f32>,
     color: vec4<f32>,
-    shadow_offset: vec2<f32>,
+    shadow_padding: vec4<f32>,
 ) -> vec4<f32> {
     let interface_size = vec2<f32>(global_uniforms.interface_size);
     let pixel_position = fragment_position * interface_size;
@@ -223,14 +239,19 @@ fn render_rectangle_with_shadow(
         corner_radii
     );
 
-
     if (main_alpha >= 1.0) {
         // If fully inside main rectangle.
         return color;
     }
 
-    let shadow_origin = (screen_position * interface_size) + shadow_offset - vec2<f32>(BREATHING_ROOM);
-    let shadow_size = (screen_size * interface_size) + vec2<f32>(BREATHING_ROOM * 2.0);
+    let shadow_origin = vec2<f32>(
+        main_origin.x - shadow_padding.x,
+        main_origin.y - shadow_padding.z
+    );
+    let shadow_size = vec2<f32>(
+        main_size.x + shadow_padding.x + shadow_padding.y,
+        main_size.y + shadow_padding.z + shadow_padding.w
+    );
 
     let shadow_alpha = calculate_rounded_rectangle_alpha(
         pixel_position,

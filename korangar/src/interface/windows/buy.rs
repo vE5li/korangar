@@ -12,7 +12,7 @@ use korangar_networking::{ItemQuantity, ShopItem};
 use rust_state::{Context, ManuallyAssertExt, Path, Selector, VecIndexExt};
 
 use super::WindowClass;
-use crate::graphics::{Color, CornerDiameter};
+use crate::graphics::{Color, CornerDiameter, ShadowPadding};
 use crate::loaders::{FontSize, OverflowBehavior};
 use crate::renderer::LayoutExt;
 use crate::state::ClientState;
@@ -132,7 +132,13 @@ where
     ) {
         let item = state.get(&self.item_path);
 
-        layout.add_rectangle(layout_info.area, CornerDiameter::uniform(4.0), Color::rgb_u8(80, 80, 80));
+        layout.add_rectangle(
+            layout_info.area,
+            CornerDiameter::uniform(4.0),
+            Color::rgb_u8(80, 80, 80),
+            Color::rgba_u8(0, 0, 0, 100),
+            ShadowPadding::diagonal(2.0, 5.0),
+        );
 
         if let Some(texture) = &item.metadata.texture {
             layout.add_texture(layout_info.texture_area, texture.clone(), Color::WHITE, false);

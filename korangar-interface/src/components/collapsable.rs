@@ -28,6 +28,8 @@ where
     pub secondary_background_color: App::Color,
     pub icon_color: App::Color,
     pub icon_size: f32,
+    pub shadow_color: App::Color,
+    pub shadow_padding: App::ShadowPadding,
     pub gaps: f32,
     pub border: f32,
     pub corner_diameter: App::CornerDiameter,
@@ -62,8 +64,8 @@ where
     }
 }
 
-impl<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Children> Persistent
-    for Collapsable<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Children>
+impl<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, Children> Persistent
+    for Collapsable<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, Children>
 {
     type Data = CollapsableData;
 }
@@ -80,7 +82,7 @@ where
     extra_elements: E,
 }
 
-pub struct Collapsable<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Children> {
+pub struct Collapsable<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, Children> {
     text_marker: PhantomData<(Text, Tooltip)>,
     text: A,
     tooltip: B,
@@ -91,21 +93,23 @@ pub struct Collapsable<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, 
     secondary_background_color: G,
     icon_color: H,
     icon_size: I,
-    gaps: J,
-    border: K,
-    corner_diameter: L,
-    title_height: M,
-    font_size: N,
-    horizontal_alignment: O,
-    vertical_alignment: P,
-    overflow_behavior: Q,
-    initially_expanded: R,
-    extra_elements: S,
+    shadow_color: J,
+    shadow_padding: K,
+    gaps: L,
+    border: M,
+    corner_diameter: N,
+    title_height: O,
+    font_size: P,
+    horizontal_alignment: Q,
+    vertical_alignment: R,
+    overflow_behavior: S,
+    initially_expanded: T,
+    extra_elements: U,
     children: Children,
 }
 
-impl<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Children>
-    Collapsable<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Children>
+impl<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, Children>
+    Collapsable<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, Children>
 {
     /// This function is supposed to be called from a component macro and not
     /// intended to be called manually.
@@ -121,16 +125,18 @@ impl<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Chi
         secondary_background_color: G,
         icon_color: H,
         icon_size: I,
-        gaps: J,
-        border: K,
-        corner_diameter: L,
-        title_height: M,
-        font_size: N,
-        horizontal_alignment: O,
-        vertical_alignment: P,
-        overflow_behavior: Q,
-        initially_expanded: R,
-        extra_elements: S,
+        shadow_color: J,
+        shadow_padding: K,
+        gaps: L,
+        border: M,
+        corner_diameter: N,
+        title_height: O,
+        font_size: P,
+        horizontal_alignment: Q,
+        vertical_alignment: R,
+        overflow_behavior: S,
+        initially_expanded: T,
+        extra_elements: U,
         children: Children,
     ) -> Self {
         Self {
@@ -144,6 +150,8 @@ impl<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Chi
             secondary_background_color,
             icon_color,
             icon_size,
+            shadow_color,
+            shadow_padding,
             gaps,
             border,
             corner_diameter,
@@ -159,8 +167,8 @@ impl<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Chi
     }
 }
 
-impl<App, Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Children> Element<App>
-    for Collapsable<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Children>
+impl<App, Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, Children> Element<App>
+    for Collapsable<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, Children>
 where
     App: Application,
     Text: AsRef<str>,
@@ -174,19 +182,21 @@ where
     G: Selector<App, App::Color>,
     H: Selector<App, App::Color>,
     I: Selector<App, f32>,
-    J: Selector<App, f32>,
-    K: Selector<App, f32>,
-    L: Selector<App, App::CornerDiameter>,
+    J: Selector<App, App::Color>,
+    K: Selector<App, App::ShadowPadding>,
+    L: Selector<App, f32>,
     M: Selector<App, f32>,
-    N: Selector<App, App::FontSize>,
-    O: Selector<App, HorizontalAlignment>,
-    P: Selector<App, VerticalAlignment>,
-    Q: Selector<App, App::OverflowBehavior>,
-    R: Selector<App, bool>,
-    S: ElementSet<App>,
+    N: Selector<App, App::CornerDiameter>,
+    O: Selector<App, f32>,
+    P: Selector<App, App::FontSize>,
+    Q: Selector<App, HorizontalAlignment>,
+    R: Selector<App, VerticalAlignment>,
+    S: Selector<App, App::OverflowBehavior>,
+    T: Selector<App, bool>,
+    U: ElementSet<App>,
     Children: ElementSet<App>,
 {
-    type LayoutInfo = CollapseableLayoutInfo<App, Children::LayoutInfo, S::LayoutInfo>;
+    type LayoutInfo = CollapseableLayoutInfo<App, Children::LayoutInfo, U::LayoutInfo>;
 
     fn create_layout_info(
         &mut self,
@@ -284,7 +294,13 @@ where
             false => *state.get(&self.background_color),
         };
 
-        layout.add_rectangle(layout_info.area, *state.get(&self.corner_diameter), background_color);
+        layout.add_rectangle(
+            layout_info.area,
+            *state.get(&self.corner_diameter),
+            background_color,
+            *state.get(&self.shadow_color),
+            *state.get(&self.shadow_padding),
+        );
 
         let icon_size = *state.get(&self.icon_size);
         let icon_spacing = (title_area.height - icon_size) / 2.0;

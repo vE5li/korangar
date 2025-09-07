@@ -17,6 +17,8 @@ where
     pub foreground_color: App::Color,
     pub background_color: App::Color,
     pub highlight_color: App::Color,
+    pub shadow_color: App::Color,
+    pub shadow_padding: App::ShadowPadding,
     pub height: f32,
     pub corner_diameter: App::CornerDiameter,
     pub font_size: App::FontSize,
@@ -25,22 +27,24 @@ where
     pub overflow_behavior: App::OverflowBehavior,
 }
 
-pub struct Field<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K> {
+pub struct Field<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M> {
     text_marker: PhantomData<(Text, Tooltip)>,
     text: A,
     tooltip: B,
     foreground_color: C,
     background_color: D,
     highlight_color: E,
-    height: F,
-    corner_diameter: G,
-    font_size: H,
-    horizontal_alignment: I,
-    vertical_alignment: J,
-    overflow_behavior: K,
+    shadow_color: F,
+    shadow_padding: G,
+    height: H,
+    corner_diameter: I,
+    font_size: J,
+    horizontal_alignment: K,
+    vertical_alignment: L,
+    overflow_behavior: M,
 }
 
-impl<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K> Field<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K> {
+impl<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M> Field<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M> {
     /// This function is supposed to be called from a component macro and not
     /// intended to be called manually.
     #[inline(always)]
@@ -51,12 +55,14 @@ impl<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K> Field<Text, Tooltip, A, B, 
         foreground_color: C,
         background_color: D,
         highlight_color: E,
-        height: F,
-        corner_diameter: G,
-        font_size: H,
-        horizontal_alignment: I,
-        vertical_alignment: J,
-        overflow_behavior: K,
+        shadow_color: F,
+        shadow_padding: G,
+        height: H,
+        corner_diameter: I,
+        font_size: J,
+        horizontal_alignment: K,
+        vertical_alignment: L,
+        overflow_behavior: M,
     ) -> Self {
         Self {
             text_marker: PhantomData,
@@ -65,6 +71,8 @@ impl<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K> Field<Text, Tooltip, A, B, 
             foreground_color,
             background_color,
             highlight_color,
+            shadow_color,
+            shadow_padding,
             height,
             corner_diameter,
             font_size,
@@ -75,7 +83,7 @@ impl<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K> Field<Text, Tooltip, A, B, 
     }
 }
 
-impl<App, Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K> Element<App> for Field<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K>
+impl<App, Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M> Element<App> for Field<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M>
 where
     App: Application,
     Text: AsRef<str> + 'static,
@@ -85,12 +93,14 @@ where
     C: Selector<App, App::Color>,
     D: Selector<App, App::Color>,
     E: Selector<App, App::Color>,
-    F: Selector<App, f32>,
-    G: Selector<App, App::CornerDiameter>,
-    H: Selector<App, App::FontSize>,
-    I: Selector<App, HorizontalAlignment>,
-    J: Selector<App, VerticalAlignment>,
-    K: Selector<App, App::OverflowBehavior>,
+    F: Selector<App, App::Color>,
+    G: Selector<App, App::ShadowPadding>,
+    H: Selector<App, f32>,
+    I: Selector<App, App::CornerDiameter>,
+    J: Selector<App, App::FontSize>,
+    K: Selector<App, HorizontalAlignment>,
+    L: Selector<App, VerticalAlignment>,
+    M: Selector<App, App::OverflowBehavior>,
 {
     fn create_layout_info(&mut self, state: &Context<App>, _: ElementStoreMut<'_>, resolver: &mut Resolver<'_, App>) -> Self::LayoutInfo {
         let height = *state.get(&self.height);
@@ -134,6 +144,8 @@ where
             layout_info.area,
             *state.get(&self.corner_diameter),
             *state.get(&self.background_color),
+            *state.get(&self.shadow_color),
+            *state.get(&self.shadow_padding),
         );
         layout.add_text(
             layout_info.area,

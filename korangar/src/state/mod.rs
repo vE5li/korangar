@@ -34,7 +34,7 @@ use crate::PacketHistory;
 use crate::character_slots::CharacterSlots;
 #[cfg(feature = "debug")]
 use crate::graphics::RenderOptions;
-use crate::graphics::{Color, CornerDiameter, ScreenClip, ScreenPosition, ScreenSize};
+use crate::graphics::{Color, CornerDiameter, ScreenClip, ScreenPosition, ScreenSize, ShadowPadding};
 use crate::input::{InputEvent, MouseInputMode};
 #[cfg(feature = "debug")]
 use crate::interface::windows::ProfilerWindowState;
@@ -462,6 +462,7 @@ impl Application for ClientState {
     type OverflowBehavior = OverflowBehavior;
     type Position = ScreenPosition;
     type Renderer = InterfaceRenderer;
+    type ShadowPadding = ShadowPadding;
     type Size = ScreenSize;
     type TextLayouter = Arc<FontLoader>;
     type ThemeGetter = ClientThemeGetter;

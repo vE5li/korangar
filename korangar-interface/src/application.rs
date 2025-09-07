@@ -73,6 +73,14 @@ pub trait Application: Sized + 'static {
     /// to represent clips.
     type Clip: Clip;
 
+    /// Application shadow padding.
+    ///
+    /// Defines the padding of rectangle shadows in pixels.
+    ///
+    /// Ideally this should be the same type that the application renderer uses
+    /// to represent shadows.
+    type ShadowPadding: ShadowPadding;
+
     /// Renderer of the application.
     type Renderer: RenderLayer<Self>;
 
@@ -159,6 +167,7 @@ pub trait RenderLayer<App: Application> {
     type CustomIcon: Clone + Copy;
 
     /// Render a rectangle.
+    #[allow(clippy::too_many_arguments)]
     fn render_rectangle(
         &self,
         position: App::Position,
@@ -166,6 +175,8 @@ pub trait RenderLayer<App: Application> {
         clip: App::Clip,
         corner_diameter: App::CornerDiameter,
         color: App::Color,
+        shadow_color: App::Color,
+        shadow_padding: App::ShadowPadding,
     );
 
     /// Render a str as text.
@@ -284,4 +295,13 @@ pub trait Clip: Copy {
     /// Get the bottom boundary. No pixel with a y coordinate larger that this
     /// will be rendered.
     fn bottom(&self) -> f32;
+}
+
+/// The amount of shadows added to the sides of the rectangle.
+pub trait ShadowPadding: Copy {
+    /// No shadows at all.
+    fn none() -> Self;
+
+    /// Scale the shadows.
+    fn scaled(&self, scaling: f32) -> Self;
 }

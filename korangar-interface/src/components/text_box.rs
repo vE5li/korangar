@@ -28,6 +28,8 @@ where
     pub ghost_foreground_color: App::Color,
     pub hide_icon_color: App::Color,
     pub hovered_hide_icon_color: App::Color,
+    pub shadow_color: App::Color,
+    pub shadow_padding: App::ShadowPadding,
     pub height: f32,
     pub corner_diameter: App::CornerDiameter,
     pub font_size: App::FontSize,
@@ -83,7 +85,7 @@ where
     }
 }
 
-pub struct TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, Id> {
+pub struct TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, Id> {
     text_marker: PhantomData<Text>,
     ghost_text: A,
     state: B,
@@ -99,18 +101,20 @@ pub struct TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S
     ghost_foreground_color: L,
     hide_icon_color: M,
     hovered_hide_icon_color: N,
-    height: O,
-    corner_diameter: P,
-    font_size: Q,
-    horizontal_alignment: R,
-    vertical_alignment: S,
-    overflow_behavior: T,
+    shadow_color: O,
+    shadow_padding: P,
+    height: Q,
+    corner_diameter: R,
+    font_size: S,
+    horizontal_alignment: T,
+    vertical_alignment: U,
+    overflow_behavior: V,
     focus_id: Id,
     focus_click: FocusClick,
 }
 
-impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, Id>
-    TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, Id>
+impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, Id>
+    TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, Id>
 {
     /// This function is supposed to be called from a component macro and not
     /// intended to be called manually.
@@ -131,12 +135,14 @@ impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, Id>
         ghost_foreground_color: L,
         hide_icon_color: M,
         hovered_hide_icon_color: N,
-        height: O,
-        corner_diameter: P,
-        font_size: Q,
-        horizontal_alignment: R,
-        vertical_alignment: S,
-        overflow_behavior: T,
+        shadow_color: O,
+        shadow_padding: P,
+        height: Q,
+        corner_diameter: R,
+        font_size: S,
+        horizontal_alignment: T,
+        vertical_alignment: U,
+        overflow_behavior: V,
         focus_id: Id,
     ) -> Self {
         Self {
@@ -155,6 +161,8 @@ impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, Id>
             ghost_foreground_color,
             hide_icon_color,
             hovered_hide_icon_color,
+            shadow_color,
+            shadow_padding,
             height,
             corner_diameter,
             font_size,
@@ -167,14 +175,14 @@ impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, Id>
     }
 }
 
-impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, Id> Persistent
-    for TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, Id>
+impl<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, Id> Persistent
+    for TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, Id>
 {
     type Data = TextBoxData;
 }
 
-impl<App, Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, Id> Element<App>
-    for TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, Id>
+impl<App, Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, Id> Element<App>
+    for TextBox<Text, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, Id>
 where
     App: Application,
     Text: AsRef<str> + 'static,
@@ -192,12 +200,14 @@ where
     L: Selector<App, App::Color>,
     M: Selector<App, App::Color>,
     N: Selector<App, App::Color>,
-    O: Selector<App, f32>,
-    P: Selector<App, App::CornerDiameter>,
-    Q: Selector<App, App::FontSize>,
-    R: Selector<App, HorizontalAlignment>,
-    S: Selector<App, VerticalAlignment>,
-    T: Selector<App, App::OverflowBehavior>,
+    O: Selector<App, App::Color>,
+    P: Selector<App, App::ShadowPadding>,
+    Q: Selector<App, f32>,
+    R: Selector<App, App::CornerDiameter>,
+    S: Selector<App, App::FontSize>,
+    T: Selector<App, HorizontalAlignment>,
+    U: Selector<App, VerticalAlignment>,
+    V: Selector<App, App::OverflowBehavior>,
     Id: Any,
 {
     fn create_layout_info(
@@ -304,7 +314,13 @@ where
 
         let corner_diameter = *state.get(&self.corner_diameter);
 
-        layout.add_rectangle(layout_info.area, corner_diameter, background_color);
+        layout.add_rectangle(
+            layout_info.area,
+            corner_diameter,
+            background_color,
+            *state.get(&self.shadow_color),
+            *state.get(&self.shadow_padding),
+        );
 
         let mut display_text = state.get(&self.state).as_str();
 

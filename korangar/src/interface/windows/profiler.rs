@@ -11,7 +11,7 @@ use korangar_interface::prelude::EventQueue;
 use korangar_interface::window::{CustomWindow, Window};
 use rust_state::{Context, Path, RustState};
 
-use crate::graphics::{Color, CornerDiameter};
+use crate::graphics::{Color, CornerDiameter, ShadowPadding};
 use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
 use crate::state::ClientState;
@@ -165,7 +165,13 @@ where
         let mut x_position = layout_info.area.left;
         let mut color_lookup = color_lookup::ColorLookup::default();
 
-        layout.add_rectangle(layout_info.area, CornerDiameter::uniform(2.0), Color::monochrome_u8(40));
+        layout.add_rectangle(
+            layout_info.area,
+            CornerDiameter::uniform(2.0),
+            Color::monochrome_u8(40),
+            Color::rgba_u8(0, 0, 0, 100),
+            ShadowPadding::diagonal(2.0, 5.0),
+        );
 
         for (index, entry) in entries.iter().enumerate() {
             let mut y_position = layout_info.area.top + layout_info.area.height;
@@ -185,7 +191,13 @@ where
                 height: bar_height,
             };
 
-            layout.add_rectangle(bar_area, CornerDiameter::default(), Color::monochrome_u8(80));
+            layout.add_rectangle(
+                bar_area,
+                CornerDiameter::default(),
+                Color::monochrome_u8(80),
+                Color::TRANSPARENT,
+                ShadowPadding::uniform(0.0),
+            );
 
             for (name, duration) in &entry.frame_times {
                 let color = color_lookup.get_color(name);
@@ -199,11 +211,23 @@ where
                     height: bar_height,
                 };
 
-                layout.add_rectangle(bar_area, CornerDiameter::default(), color);
+                layout.add_rectangle(
+                    bar_area,
+                    CornerDiameter::default(),
+                    color,
+                    Color::TRANSPARENT,
+                    ShadowPadding::uniform(0.0),
+                );
             }
 
             if area.check().run(layout) {
-                layout.add_rectangle(bar_area, CornerDiameter::default(), Color::rgba_u8(255, 80, 0, 150));
+                layout.add_rectangle(
+                    bar_area,
+                    CornerDiameter::default(),
+                    Color::rgba_u8(255, 80, 0, 150),
+                    Color::TRANSPARENT,
+                    ShadowPadding::uniform(0.0),
+                );
 
                 self.click_handler.update(visible_thread, index);
                 layout.add_click_area(area, MouseButton::Left, &self.click_handler);
@@ -231,14 +255,12 @@ impl DropDownItem<crate::threads::Enum> for crate::threads::Enum {
 #[derive(RustState, StateElement)]
 pub struct ProfilerWindowState {
     visible_thread: crate::threads::Enum,
-    halted: bool,
 }
 
 impl Default for ProfilerWindowState {
     fn default() -> Self {
         Self {
             visible_thread: crate::threads::Enum::Main,
-            halted: false,
         }
     }
 }

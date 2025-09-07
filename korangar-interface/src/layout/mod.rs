@@ -14,7 +14,7 @@ use tooltip::{Tooltip, TooltipId};
 
 pub use self::resolver::{Resolver, ResolverSet};
 use crate::MouseMode;
-use crate::application::{Application, Clip, CornerDiameter, FontSize, Position, RenderLayer, Size, TextLayouter};
+use crate::application::{Application, Clip, CornerDiameter, FontSize, Position, RenderLayer, ShadowPadding, Size, TextLayouter};
 use crate::element::id::{ElementId, FocusId};
 use crate::event::{ClickHandler, EventQueue};
 
@@ -60,6 +60,8 @@ struct RectangleInstruction<App: Application> {
     area: Area,
     corner_diameter: App::CornerDiameter,
     color: App::Color,
+    shadow_color: App::Color,
+    shadow_padding: App::ShadowPadding,
 }
 
 struct IconInstruction<App: Application> {
@@ -479,16 +481,26 @@ impl<'a, App: Application> WindowLayout<'a, App> {
         self.layers[self.current_layer].input_handlers.push(input_handler);
     }
 
-    pub fn add_rectangle(&mut self, area: Area, corner_diameter: App::CornerDiameter, color: App::Color) {
+    pub fn add_rectangle(
+        &mut self,
+        area: Area,
+        corner_diameter: App::CornerDiameter,
+        color: App::Color,
+        shadow_color: App::Color,
+        shadow_padding: App::ShadowPadding,
+    ) {
         let clip_layer = self.get_active_clip_layer();
         let area = self.scale_area(area);
         let corner_diameter = corner_diameter.scaled(self.interface_scaling);
+        let shadow_padding = shadow_padding.scaled(self.interface_scaling);
 
         self.layers[self.current_layer].rectangle_instructions.push(RectangleInstruction {
             clip_layer,
             area,
             corner_diameter,
             color,
+            shadow_color,
+            shadow_padding,
         });
     }
 
@@ -574,7 +586,13 @@ impl<'a, App: Application> WindowLayout<'a, App> {
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_click_areas(&self, renderer: &App::Renderer, color: App::Color) {
+    pub fn render_click_areas(
+        &self,
+        renderer: &App::Renderer,
+        color: App::Color,
+        shadow_color: App::Color,
+        shadow_padding: App::ShadowPadding,
+    ) {
         self.layers.iter().for_each(|layer| {
             layer.click_areas.iter().for_each(|click_area| {
                 renderer.render_rectangle(
@@ -583,13 +601,21 @@ impl<'a, App: Application> WindowLayout<'a, App> {
                     App::Clip::unbound(),
                     App::CornerDiameter::new(0.0, 0.0, 0.0, 0.0),
                     color,
+                    shadow_color,
+                    shadow_padding,
                 );
             });
         });
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_drop_areas(&self, renderer: &App::Renderer, color: App::Color) {
+    pub fn render_drop_areas(
+        &self,
+        renderer: &App::Renderer,
+        color: App::Color,
+        shadow_color: App::Color,
+        shadow_padding: App::ShadowPadding,
+    ) {
         self.layers.iter().for_each(|layer| {
             layer.drop_areas.iter().for_each(|drop_area| {
                 renderer.render_rectangle(
@@ -598,13 +624,21 @@ impl<'a, App: Application> WindowLayout<'a, App> {
                     App::Clip::unbound(),
                     App::CornerDiameter::new(0.0, 0.0, 0.0, 0.0),
                     color,
+                    shadow_color,
+                    shadow_padding,
                 );
             });
         });
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_scroll_areas(&self, renderer: &App::Renderer, color: App::Color) {
+    pub fn render_scroll_areas(
+        &self,
+        renderer: &App::Renderer,
+        color: App::Color,
+        shadow_color: App::Color,
+        shadow_padding: App::ShadowPadding,
+    ) {
         self.layers.iter().for_each(|layer| {
             layer.scroll_areas.iter().for_each(|scroll_area| {
                 renderer.render_rectangle(
@@ -613,6 +647,8 @@ impl<'a, App: Application> WindowLayout<'a, App> {
                     App::Clip::unbound(),
                     App::CornerDiameter::new(0.0, 0.0, 0.0, 0.0),
                     color,
+                    shadow_color,
+                    shadow_padding,
                 );
             });
         });
@@ -641,6 +677,8 @@ impl<'a, App: Application> WindowLayout<'a, App> {
                      area,
                      corner_diameter,
                      color,
+                     shadow_color,
+                     shadow_padding,
                  }: RectangleInstruction<App>| {
                     #[cfg(feature = "debug")]
                     korangar_debug::profile_block!("rectangle instruction");
@@ -653,6 +691,8 @@ impl<'a, App: Application> WindowLayout<'a, App> {
                         clip,
                         corner_diameter,
                         color,
+                        shadow_color,
+                        shadow_padding,
                     );
                 },
             );

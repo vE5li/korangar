@@ -4,7 +4,7 @@ use korangar_interface::element::id::FocusIdExt;
 use korangar_interface::window::{CustomWindow, Window};
 use rust_state::{Context, Path, RustState, Selector};
 
-use crate::graphics::Color;
+use crate::graphics::{Color, ShadowPadding};
 use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
 use crate::loaders::{ClientInfo, ClientInfoPathExt, OverflowBehavior, ServiceId};
@@ -243,6 +243,7 @@ where
                             event: Toggle(remember_username_path),
                             background_color: Color::TRANSPARENT,
                             hovered_background_color: Color::TRANSPARENT,
+                            shadow_padding: ShadowPadding::default(),
                         },
                         state_button! {
                             text: client_state().localization().remember_password_text(),
@@ -250,6 +251,7 @@ where
                             event: Toggle(remember_password_path),
                             background_color: Color::TRANSPARENT,
                             hovered_background_color: Color::TRANSPARENT,
+                            shadow_padding: ShadowPadding::default(),
                         },
                     ),
                 },

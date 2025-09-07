@@ -37,6 +37,7 @@ use theme::ThemePathGetter;
 use window::store::WindowStore;
 use window::{Anchor, CustomWindow, DisplayInformation, StateWindow, Window, WindowData, WindowThemePathExt};
 
+use crate::application::ShadowPadding;
 use crate::element::id::FocusIdExt;
 
 pub mod prelude {
@@ -687,35 +688,53 @@ impl<App: Application> InterfaceFrame<'_, App> {
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_click_areas(&self, renderer: &App::Renderer, color: App::Color) {
+    pub fn render_click_areas(
+        &self,
+        renderer: &App::Renderer,
+        color: App::Color,
+        shadow_color: App::Color,
+        shadow_padding: App::ShadowPadding,
+    ) {
         self.window_layouts
             .values()
-            .for_each(|layout| layout.render_click_areas(renderer, color));
+            .for_each(|layout| layout.render_click_areas(renderer, color, shadow_color, shadow_padding));
 
         if let Some(overlay_layout) = &self.overlay_layout {
-            overlay_layout.render_click_areas(renderer, color);
+            overlay_layout.render_click_areas(renderer, color, shadow_color, shadow_padding);
         }
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_drop_areas(&self, renderer: &App::Renderer, color: App::Color) {
+    pub fn render_drop_areas(
+        &self,
+        renderer: &App::Renderer,
+        color: App::Color,
+        shadow_color: App::Color,
+        shadow_padding: App::ShadowPadding,
+    ) {
         self.window_layouts
             .values()
-            .for_each(|layout| layout.render_drop_areas(renderer, color));
+            .for_each(|layout| layout.render_drop_areas(renderer, color, shadow_color, shadow_padding));
 
         if let Some(overlay_layout) = &self.overlay_layout {
-            overlay_layout.render_drop_areas(renderer, color);
+            overlay_layout.render_drop_areas(renderer, color, shadow_color, shadow_padding);
         }
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_scroll_areas(&self, renderer: &App::Renderer, color: App::Color) {
+    pub fn render_scroll_areas(
+        &self,
+        renderer: &App::Renderer,
+        color: App::Color,
+        shadow_color: App::Color,
+        shadow_padding: App::ShadowPadding,
+    ) {
         self.window_layouts
             .values()
-            .for_each(|layout| layout.render_scroll_areas(renderer, color));
+            .for_each(|layout| layout.render_scroll_areas(renderer, color, shadow_color, shadow_padding));
 
         if let Some(overlay_layout) = &self.overlay_layout {
-            overlay_layout.render_scroll_areas(renderer, color);
+            overlay_layout.render_scroll_areas(renderer, color, shadow_color, shadow_padding);
         }
     }
 
@@ -757,11 +776,15 @@ impl<App: Application> InterfaceFrame<'_, App> {
 
             let anchor_color = *state.get(&theme::theme().window().anchor_color());
             let closest_anchor_color = *state.get(&theme::theme().window().closest_anchor_color());
+            let shadow_color = *state.get(&theme::theme().window().background_color());
+            let shadow_padding = App::ShadowPadding::none();
 
             wrapper.data.anchor.render_screen_anchors(
                 renderer,
                 anchor_color,
                 closest_anchor_color,
+                shadow_color,
+                shadow_padding,
                 self.window_size,
                 self.interface_scaling,
             );
@@ -780,6 +803,8 @@ impl<App: Application> InterfaceFrame<'_, App> {
                 renderer,
                 anchor_color,
                 closest_anchor_color,
+                shadow_color,
+                shadow_padding,
                 position,
                 window_display_size,
                 self.interface_scaling,
@@ -798,6 +823,8 @@ impl<App: Application> InterfaceFrame<'_, App> {
         let background_color = tooltip_theme.background_color;
         let foreground_color = tooltip_theme.foreground_color;
         let highlight_color = tooltip_theme.highlight_color;
+        let shadow_color = tooltip_theme.shadow_color;
+        let shadow_padding = tooltip_theme.shadow_padding;
         let font_size = tooltip_theme.font_size.scaled(self.interface_scaling);
         let corner_diameter = tooltip_theme.corner_diameter.scaled(self.interface_scaling);
         let border = tooltip_theme.border * self.interface_scaling;
@@ -850,6 +877,8 @@ impl<App: Application> InterfaceFrame<'_, App> {
                 App::Clip::unbound(),
                 corner_diameter,
                 background_color,
+                shadow_color,
+                shadow_padding,
             );
 
             renderer.render_text(

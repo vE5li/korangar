@@ -44,7 +44,7 @@ impl DropDownItem<Option<NonZeroU32>> for Option<NonZeroU32> {
     }
 }
 
-struct InnerButton<Value, Item, A, B, C, D, E, F, G, H, I, J, K, L, M> {
+struct InnerButton<Value, Item, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O> {
     text_marker: PhantomData<(Value, Item)>,
     options: A,
     option_index: usize,
@@ -54,16 +54,18 @@ struct InnerButton<Value, Item, A, B, C, D, E, F, G, H, I, J, K, L, M> {
     highlight_color: E,
     hovered_foreground_color: F,
     hovered_background_color: G,
-    height: H,
-    corner_diameter: I,
-    font_size: J,
-    horizontal_alignment: K,
-    vertical_alignment: L,
-    overflow_behavior: M,
+    shadow_color: H,
+    shadow_padding: I,
+    height: J,
+    corner_diameter: K,
+    font_size: L,
+    horizontal_alignment: M,
+    vertical_alignment: N,
+    overflow_behavior: O,
 }
 
-impl<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L, M> Element<App>
-    for InnerButton<Value, Item, A, B, C, D, E, F, G, H, I, J, K, L, M>
+impl<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O> Element<App>
+    for InnerButton<Value, Item, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O>
 where
     App: Application,
     Item: DropDownItem<Value>,
@@ -74,12 +76,14 @@ where
     E: Selector<App, App::Color>,
     F: Selector<App, App::Color>,
     G: Selector<App, App::Color>,
-    H: Selector<App, f32>,
-    I: Selector<App, App::CornerDiameter>,
-    J: Selector<App, App::FontSize>,
-    K: Selector<App, HorizontalAlignment>,
-    L: Selector<App, VerticalAlignment>,
-    M: Selector<App, App::OverflowBehavior>,
+    H: Selector<App, App::Color>,
+    I: Selector<App, App::ShadowPadding>,
+    J: Selector<App, f32>,
+    K: Selector<App, App::CornerDiameter>,
+    L: Selector<App, App::FontSize>,
+    M: Selector<App, HorizontalAlignment>,
+    N: Selector<App, VerticalAlignment>,
+    O: Selector<App, App::OverflowBehavior>,
 {
     fn create_layout_info(&mut self, state: &Context<App>, _: ElementStoreMut<'_>, resolver: &mut Resolver<'_, App>) -> Self::LayoutInfo {
         let height = *state.get(&self.height);
@@ -124,7 +128,13 @@ where
             false => *state.get(&self.background_color),
         };
 
-        layout.add_rectangle(layout_info.area, *state.get(&self.corner_diameter), background_color);
+        layout.add_rectangle(
+            layout_info.area,
+            *state.get(&self.corner_diameter),
+            background_color,
+            *state.get(&self.shadow_color),
+            *state.get(&self.shadow_padding),
+        );
 
         let foreground_color = match is_hoverered {
             true => *state.get(&self.hovered_foreground_color),
@@ -204,6 +214,8 @@ where
                             highlight_color: theme().drop_down().item_highlight_color(),
                             hovered_foreground_color: theme().drop_down().item_hovered_foreground_color(),
                             hovered_background_color: theme().drop_down().item_hovered_background_color(),
+                            shadow_color: theme().drop_down().item_shadow_color(),
+                            shadow_padding: theme().drop_down().item_shadow_padding(),
                             height: theme().drop_down().item_height(),
                             corner_diameter: theme().drop_down().item_corner_diameter(),
                             font_size: theme().drop_down().item_font_size(),
@@ -243,6 +255,8 @@ where
             layout_info.0,
             *state.get(&theme().drop_down().list_corner_diameter()),
             *state.get(&theme().drop_down().list_background_color()),
+            *state.get(&theme().drop_down().list_shadow_color()),
+            *state.get(&theme().drop_down().list_shadow_padding()),
         );
 
         for (index, item_box) in self.item_boxes.iter().enumerate() {
@@ -336,6 +350,8 @@ where
     pub item_highlight_color: App::Color,
     pub item_hovered_foreground_color: App::Color,
     pub item_hovered_background_color: App::Color,
+    pub item_shadow_color: App::Color,
+    pub item_shadow_padding: App::ShadowPadding,
     pub item_height: f32,
     pub item_corner_diameter: App::CornerDiameter,
     pub item_font_size: App::FontSize,
@@ -344,6 +360,8 @@ where
     pub item_overflow_behavior: App::OverflowBehavior,
     pub list_corner_diameter: App::CornerDiameter,
     pub list_background_color: App::Color,
+    pub list_shadow_color: App::Color,
+    pub list_shadow_padding: App::ShadowPadding,
     pub list_gaps: f32,
     pub list_border: f32,
     pub list_maximum_height: f32,
@@ -352,6 +370,8 @@ where
     pub button_highlight_color: App::Color,
     pub button_hovered_foreground_color: App::Color,
     pub button_hovered_background_color: App::Color,
+    pub button_shadow_color: App::Color,
+    pub button_shadow_padding: App::ShadowPadding,
     pub button_height: f32,
     pub button_corner_diameter: App::CornerDiameter,
     pub button_font_size: App::FontSize,
@@ -360,7 +380,7 @@ where
     pub button_overflow_behavior: App::OverflowBehavior,
 }
 
-pub struct DropDown<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L, M>
+pub struct DropDown<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O>
 where
     App: Application,
 {
@@ -371,16 +391,18 @@ where
     highlight_color: E,
     hovered_foreground_color: F,
     hovered_background_color: G,
-    height: H,
-    corner_diameter: I,
-    font_size: J,
-    horizontal_alignment: K,
-    vertical_alignment: L,
-    overflow_behavior: M,
+    shadow_color: H,
+    shadow_padding: I,
+    height: J,
+    corner_diameter: K,
+    font_size: L,
+    horizontal_alignment: M,
+    vertical_alignment: N,
+    overflow_behavior: O,
     click_handler: DefaultClickHandler<App, Value, Item, B, A>,
 }
 
-impl<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L, M> DropDown<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L, M>
+impl<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O> DropDown<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O>
 where
     App: Application,
     Value: 'static,
@@ -399,12 +421,14 @@ where
         highlight_color: E,
         hovered_foreground_color: F,
         hovered_background_color: G,
-        height: H,
-        corner_diameter: I,
-        font_size: J,
-        horizontal_alignment: K,
-        vertical_alignment: L,
-        overflow_behavior: M,
+        shadow_color: H,
+        shadow_padding: I,
+        height: J,
+        corner_diameter: K,
+        font_size: L,
+        horizontal_alignment: M,
+        vertical_alignment: N,
+        overflow_behavior: O,
     ) -> Self {
         Self {
             options: options.clone(),
@@ -414,6 +438,8 @@ where
             highlight_color,
             hovered_foreground_color,
             hovered_background_color,
+            shadow_color,
+            shadow_padding,
             height,
             corner_diameter,
             font_size,
@@ -425,8 +451,8 @@ where
     }
 }
 
-impl<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L, M> Element<App>
-    for DropDown<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L, M>
+impl<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O> Element<App>
+    for DropDown<App, Value, Item, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O>
 where
     App: Application,
     Value: PartialEq + 'static,
@@ -438,12 +464,14 @@ where
     E: Selector<App, App::Color>,
     F: Selector<App, App::Color>,
     G: Selector<App, App::Color>,
-    H: Selector<App, f32>,
-    I: Selector<App, App::CornerDiameter>,
-    J: Selector<App, App::FontSize>,
-    K: Selector<App, HorizontalAlignment>,
-    L: Selector<App, VerticalAlignment>,
-    M: Selector<App, App::OverflowBehavior>,
+    H: Selector<App, App::Color>,
+    I: Selector<App, App::ShadowPadding>,
+    J: Selector<App, f32>,
+    K: Selector<App, App::CornerDiameter>,
+    L: Selector<App, App::FontSize>,
+    M: Selector<App, HorizontalAlignment>,
+    N: Selector<App, VerticalAlignment>,
+    O: Selector<App, App::OverflowBehavior>,
 {
     fn create_layout_info(
         &mut self,
@@ -509,7 +537,13 @@ where
             false => *state.get(&self.background_color),
         };
 
-        layout.add_rectangle(layout_info.area, *state.get(&self.corner_diameter), background_color);
+        layout.add_rectangle(
+            layout_info.area,
+            *state.get(&self.corner_diameter),
+            background_color,
+            *state.get(&self.shadow_color),
+            *state.get(&self.shadow_padding),
+        );
 
         let foreground_color = match is_hoverered {
             true => *state.get(&self.hovered_foreground_color),

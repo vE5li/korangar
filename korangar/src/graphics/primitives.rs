@@ -318,6 +318,53 @@ impl std::ops::Mul<f32> for ScreenClip {
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+pub struct ShadowPadding {
+    pub left: f32,
+    pub right: f32,
+    pub top: f32,
+    pub bottom: f32,
+}
+
+impl ShadowPadding {
+    pub fn uniform(value: f32) -> Self {
+        Self {
+            left: value,
+            right: value,
+            top: value,
+            bottom: value,
+        }
+    }
+
+    pub fn diagonal(left_and_top: f32, right_and_bottom: f32) -> Self {
+        Self {
+            left: left_and_top,
+            right: right_and_bottom,
+            top: left_and_top,
+            bottom: right_and_bottom,
+        }
+    }
+
+    pub fn components(&self) -> [f32; 4] {
+        [self.left, self.right, self.top, self.bottom]
+    }
+}
+
+impl korangar_interface::application::ShadowPadding for ShadowPadding {
+    fn none() -> Self {
+        Self::uniform(0.0)
+    }
+
+    fn scaled(&self, scaling: f32) -> Self {
+        Self {
+            left: self.left * scaling,
+            right: self.right * scaling,
+            top: self.top * scaling,
+            bottom: self.bottom * scaling,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 pub struct CornerDiameter {
     pub top_left: f32,
     pub top_right: f32,

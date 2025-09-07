@@ -314,7 +314,7 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (TokenStream, Vec<Tok
         ///
         /// NOTE: The filled fields will *NOT* be updated, so keep that in mind when making
         /// changes to the struct afterwards.
-        #[allow(too_many_arguments)]
+        #[allow(clippy::too_many_arguments)]
         pub fn new(#(#new_arguments),*) -> Self {
             #new_implementation_inner
         }

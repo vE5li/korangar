@@ -26,6 +26,8 @@ where
     pub checkbox_color: App::Color,
     pub hovered_checkbox_color: App::Color,
     pub disabled_checkbox_color: App::Color,
+    pub shadow_color: App::Color,
+    pub shadow_padding: App::ShadowPadding,
     pub height: f32,
     pub corner_diameter: App::CornerDiameter,
     pub font_size: App::FontSize,
@@ -34,7 +36,7 @@ where
     pub overflow_behavior: App::OverflowBehavior,
 }
 
-pub struct StateButton<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V> {
+pub struct StateButton<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X> {
     text_marker: PhantomData<(Text, Tooltip, DisabledTooltip)>,
     text: A,
     tooltip: B,
@@ -52,16 +54,18 @@ pub struct StateButton<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I
     checkbox_color: N,
     hovered_checkbox_color: O,
     disabled_checkbox_color: P,
-    height: Q,
-    corner_diameter: R,
-    font_size: S,
-    horizontal_alignment: T,
-    vertical_alignment: U,
-    overflow_behavior: V,
+    shadow_color: Q,
+    shadow_padding: R,
+    height: S,
+    corner_diameter: T,
+    font_size: U,
+    horizontal_alignment: V,
+    vertical_alignment: W,
+    overflow_behavior: X,
 }
 
-impl<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V>
-    StateButton<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V>
+impl<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X>
+    StateButton<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X>
 {
     /// This function is supposed to be called from a component macro and not
     /// intended to be called manually.
@@ -84,12 +88,14 @@ impl<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O
         checkbox_color: N,
         hovered_checkbox_color: O,
         disabled_checkbox_color: P,
-        height: Q,
-        corner_diameter: R,
-        font_size: S,
-        horizontal_alignment: T,
-        vertical_alignment: U,
-        overflow_behavior: V,
+        shadow_color: Q,
+        shadow_padding: R,
+        height: S,
+        corner_diameter: T,
+        font_size: U,
+        horizontal_alignment: V,
+        vertical_alignment: W,
+        overflow_behavior: X,
     ) -> Self {
         Self {
             text_marker: PhantomData,
@@ -109,6 +115,8 @@ impl<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O
             checkbox_color,
             hovered_checkbox_color,
             disabled_checkbox_color,
+            shadow_color,
+            shadow_padding,
             height,
             corner_diameter,
             font_size,
@@ -119,8 +127,8 @@ impl<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O
     }
 }
 
-impl<App, Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V> Element<App>
-    for StateButton<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V>
+impl<App, Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X> Element<App>
+    for StateButton<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X>
 where
     App: Application,
     Text: AsRef<str> + 'static,
@@ -142,12 +150,14 @@ where
     N: Selector<App, App::Color>,
     O: Selector<App, App::Color>,
     P: Selector<App, App::Color>,
-    Q: Selector<App, f32>,
-    R: Selector<App, App::CornerDiameter>,
-    S: Selector<App, App::FontSize>,
-    T: Selector<App, HorizontalAlignment>,
-    U: Selector<App, VerticalAlignment>,
-    V: Selector<App, App::OverflowBehavior>,
+    Q: Selector<App, App::Color>,
+    R: Selector<App, App::ShadowPadding>,
+    S: Selector<App, f32>,
+    T: Selector<App, App::CornerDiameter>,
+    U: Selector<App, App::FontSize>,
+    V: Selector<App, HorizontalAlignment>,
+    W: Selector<App, VerticalAlignment>,
+    X: Selector<App, App::OverflowBehavior>,
 {
     fn create_layout_info(&mut self, state: &Context<App>, _: ElementStoreMut<'_>, resolver: &mut Resolver<'_, App>) -> Self::LayoutInfo {
         let height = *state.get(&self.height);
@@ -207,7 +217,13 @@ where
             false => *state.get(&self.background_color),
         };
 
-        layout.add_rectangle(layout_info.area, *state.get(&self.corner_diameter), background_color);
+        layout.add_rectangle(
+            layout_info.area,
+            *state.get(&self.corner_diameter),
+            background_color,
+            *state.get(&self.shadow_color),
+            *state.get(&self.shadow_padding),
+        );
 
         let foreground_color = match is_hoverered {
             _ if is_disabled => *state.get(&self.disabled_foreground_color),

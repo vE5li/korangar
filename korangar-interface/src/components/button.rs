@@ -22,6 +22,8 @@ where
     pub hovered_background_color: App::Color,
     pub disabled_foreground_color: App::Color,
     pub disabled_background_color: App::Color,
+    pub shadow_color: App::Color,
+    pub shadow_padding: App::ShadowPadding,
     pub height: f32,
     pub corner_diameter: App::CornerDiameter,
     pub font_size: App::FontSize,
@@ -30,7 +32,7 @@ where
     pub overflow_behavior: App::OverflowBehavior,
 }
 
-pub struct Button<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R> {
+pub struct Button<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T> {
     text_marker: PhantomData<(Text, Tooltip, DisabledTooltip)>,
     text: A,
     tooltip: B,
@@ -44,16 +46,18 @@ pub struct Button<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, 
     hovered_background_color: J,
     disabled_foreground_color: K,
     disabled_background_color: L,
-    height: M,
-    corner_diameter: N,
-    font_size: O,
-    horizontal_alignment: P,
-    vertical_alignment: Q,
-    overflow_behavior: R,
+    shadow_color: M,
+    shadow_padding: N,
+    height: O,
+    corner_diameter: P,
+    font_size: Q,
+    horizontal_alignment: R,
+    vertical_alignment: S,
+    overflow_behavior: T,
 }
 
-impl<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R>
-    Button<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R>
+impl<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T>
+    Button<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T>
 {
     /// This function is supposed to be called from a component macro and not
     /// intended to be called manually.
@@ -72,12 +76,14 @@ impl<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O
         hovered_background_color: J,
         disabled_foreground_color: K,
         disabled_background_color: L,
-        height: M,
-        corner_diameter: N,
-        font_size: O,
-        horizontal_alignment: P,
-        vertical_alignment: Q,
-        overflow_behavior: R,
+        shadow_color: M,
+        shadow_padding: N,
+        height: O,
+        corner_diameter: P,
+        font_size: Q,
+        horizontal_alignment: R,
+        vertical_alignment: S,
+        overflow_behavior: T,
     ) -> Self {
         Self {
             text_marker: PhantomData,
@@ -93,6 +99,8 @@ impl<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O
             hovered_background_color,
             disabled_foreground_color,
             disabled_background_color,
+            shadow_color,
+            shadow_padding,
             height,
             corner_diameter,
             font_size,
@@ -103,8 +111,8 @@ impl<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O
     }
 }
 
-impl<App, Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R> Element<App>
-    for Button<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R>
+impl<App, Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T> Element<App>
+    for Button<Text, Tooltip, DisabledTooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T>
 where
     App: Application,
     Text: AsRef<str> + 'static,
@@ -122,12 +130,14 @@ where
     J: Selector<App, App::Color>,
     K: Selector<App, App::Color>,
     L: Selector<App, App::Color>,
-    M: Selector<App, f32>,
-    N: Selector<App, App::CornerDiameter>,
-    O: Selector<App, App::FontSize>,
-    P: Selector<App, HorizontalAlignment>,
-    Q: Selector<App, VerticalAlignment>,
-    R: Selector<App, App::OverflowBehavior>,
+    M: Selector<App, App::Color>,
+    N: Selector<App, App::ShadowPadding>,
+    O: Selector<App, f32>,
+    P: Selector<App, App::CornerDiameter>,
+    Q: Selector<App, App::FontSize>,
+    R: Selector<App, HorizontalAlignment>,
+    S: Selector<App, VerticalAlignment>,
+    T: Selector<App, App::OverflowBehavior>,
 {
     fn create_layout_info(&mut self, state: &Context<App>, _: ElementStoreMut<'_>, resolver: &mut Resolver<'_, App>) -> Self::LayoutInfo {
         let height = *state.get(&self.height);
@@ -186,7 +196,13 @@ where
             false => *state.get(&self.background_color),
         };
 
-        layout.add_rectangle(layout_info.area, *state.get(&self.corner_diameter), background_color);
+        layout.add_rectangle(
+            layout_info.area,
+            *state.get(&self.corner_diameter),
+            background_color,
+            *state.get(&self.shadow_color),
+            *state.get(&self.shadow_padding),
+        );
 
         let foreground_color = match is_hoverered {
             _ if is_disabled => *state.get(&self.disabled_foreground_color),

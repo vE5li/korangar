@@ -26,6 +26,7 @@ struct InstanceData {
     screen_size: vec2<f32>,
     texture_position: vec2<f32>,
     texture_size: vec2<f32>,
+    shadow_offset: vec2<f32>,
     rectangle_type: u32,
     texture_index: i32,
 }
@@ -52,18 +53,29 @@ const EDGE_VALUE: f32 = 0.5;
 /// We use a pxrange of 6 px when creating MSDFs.
 const PXRANGE: f32 = 6.0;
 
+const SHADOW_ALPHA: f32 = 0.75;
+const SHADOW_COLOR: vec3<f32> = vec3<f32>(0.0, 0.0, 0.0);
+
 @vertex
 fn vs_main(
     @builtin(vertex_index) vertex_index: u32,
     @builtin(instance_index) instance_index: u32,
 ) -> VertexOutput {
     let instance = instance_data[instance_index];
-    let vertex = vertex_data(vertex_index);
+    var vertex = vertex_data(vertex_index);
 
     let pixel_size = vec2<f32>(1.0 / f32(global_uniforms.interface_size.x), 1.0 / f32(global_uniforms.interface_size.y));
     let size_adjustment = select(vec2<f32>(0.0), (BREATHING_ROOM * 2.0) * pixel_size, any(instance.corner_diameter != vec4<f32>(0.0)));
+    let shadow_offset = instance.shadow_offset * pixel_size;
 
-    let adjusted_size = instance.screen_size + size_adjustment;
+    var adjusted_size = instance.screen_size + size_adjustment;
+
+    let shadow_expansion = vec2<f32>(
+        select(0.0, abs(shadow_offset.x), (instance.shadow_offset.x > 0.0 && vertex.x > 0.5) || (instance.shadow_offset.x < 0.0 && vertex.x < 0.5)),
+        select(0.0, abs(shadow_offset.y), (instance.shadow_offset.y > 0.0 && vertex.y < -0.5) || (instance.shadow_offset.y < 0.0 && vertex.y > -0.5))
+    );
+    adjusted_size += shadow_expansion;
+
     let clip_size = adjusted_size * 2.0;
     let position = screen_to_clip_space(instance.screen_position) + vertex.xy * clip_size;
 
@@ -113,13 +125,26 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
         default: {}
     }
 
-    return rectangle_with_rounded_edges(
-        instance.corner_diameter,
-        instance.screen_position,
-        instance.screen_size,
-        input.fragment_position,
-        color
-    );
+    if (instance.rectangle_type == 0u && any(instance.shadow_offset != vec2<f32>(0.0))) {
+        // Solid rectangle with shadow.
+        return render_rectangle_with_shadow(
+            instance.corner_diameter,
+            instance.screen_position,
+            instance.screen_size,
+            input.fragment_position,
+            color,
+            instance.shadow_offset,
+        );
+    } else {
+        // All other shadowless rectangles.
+        return rectangle_with_rounded_edges(
+            instance.corner_diameter,
+            instance.screen_position,
+            instance.screen_size,
+            input.fragment_position,
+            color,
+        );
+    }
 }
 
 fn calculate_msdf(
@@ -135,6 +160,97 @@ fn calculate_msdf(
     return color * saturate(distance * screen_px_range + EDGE_VALUE);
 }
 
+fn calculate_rounded_rectangle_alpha(
+    pixel_position: vec2<f32>,
+    rectangle_origin: vec2<f32>,
+    rectangle_size: vec2<f32>,
+    corner_radii: vec4<f32>
+) -> f32 {
+    // Calculate position relative to rectangle center.
+    let half_size = rectangle_size * 0.5;
+    let rectangle_center = rectangle_origin + half_size;
+    let relative_position = pixel_position - rectangle_center;
+
+    // Determine which corner diameter to use based on the quadrant this fragment is in.
+    let is_right = relative_position.x > 0.0;
+    let is_bottom = relative_position.y > 0.0;
+    let radii_pair = select(corner_radii.xy, corner_radii.zw, is_bottom);
+    let corner_diameter = select(radii_pair.x, radii_pair.y, is_right);
+
+    if (corner_diameter == 0.0) {
+        // No rounded corners - simple bounds check.
+        return f32(abs(relative_position.x) <= half_size.x &&
+                   abs(relative_position.y) <= half_size.y);
+    }
+
+    // Calculate SDF distance for rounded corners.
+    let distance = rectangle_sdf(relative_position, half_size, corner_diameter);
+    var alpha = step(0.0, -distance);
+
+    // Multi-sample for anti-aliasing at edges.
+    if (abs(distance) <= BORDER_THRESHOLD) {
+        var total = alpha;
+        for (var index = 0u; index < 8u; index++) {
+            let offset = SAMPLE_OFFSETS[index];
+            let sample_distance = rectangle_sdf(relative_position + offset, half_size, corner_diameter);
+            total += step(0.0, -sample_distance);
+        }
+        alpha = total * (1.0 / 9.0);
+    }
+
+    return alpha;
+}
+
+fn render_rectangle_with_shadow(
+    corner_radii: vec4<f32>,
+    screen_position: vec2<f32>,
+    screen_size: vec2<f32>,
+    fragment_position: vec2<f32>,
+    color: vec4<f32>,
+    shadow_offset: vec2<f32>,
+) -> vec4<f32> {
+    let interface_size = vec2<f32>(global_uniforms.interface_size);
+    let pixel_position = fragment_position * interface_size;
+
+    let main_origin = (screen_position * interface_size) - vec2<f32>(BREATHING_ROOM);
+    let main_size = (screen_size * interface_size) + vec2<f32>(BREATHING_ROOM * 2.0);
+
+    let main_alpha = calculate_rounded_rectangle_alpha(
+        pixel_position,
+        main_origin,
+        main_size,
+        corner_radii
+    );
+
+
+    if (main_alpha >= 1.0) {
+        // If fully inside main rectangle.
+        return color;
+    }
+
+    let shadow_origin = (screen_position * interface_size) + shadow_offset - vec2<f32>(BREATHING_ROOM);
+    let shadow_size = (screen_size * interface_size) + vec2<f32>(BREATHING_ROOM * 2.0);
+
+    let shadow_alpha = calculate_rounded_rectangle_alpha(
+        pixel_position,
+        shadow_origin,
+        shadow_size,
+        corner_radii
+    );
+
+    let shadow_color = vec4<f32>(SHADOW_COLOR, SHADOW_ALPHA * shadow_alpha);
+
+    if (main_alpha > 0.0) {
+        // Main rectangle partially or fully covers this pixel.
+        let main_contrib = color * main_alpha;
+        let shadow_contrib = shadow_color * (1.0 - main_alpha);
+        return main_contrib + shadow_contrib;
+    } else {
+        // Only shadow visible at this pixel.
+        return shadow_color;
+    }
+}
+
 fn rectangle_with_rounded_edges(
     corner_radii: vec4<f32>,
     screen_position: vec2<f32>,
@@ -148,39 +264,16 @@ fn rectangle_with_rounded_edges(
 
     // Convert normalized screen space coordinates to pixel space.
     let interface_size = vec2<f32>(global_uniforms.interface_size);
-    let position = fragment_position * interface_size;
+    let pixel_position = fragment_position * interface_size;
     let origin = (screen_position * interface_size) - vec2<f32>(BREATHING_ROOM);
     let size = (screen_size * interface_size) + vec2<f32>(BREATHING_ROOM * 2.0);
 
-    // Calculate position relative to rectangle center.
-    let half_size = size * 0.5;
-    let rectangle_center = origin + half_size;
-    let relative_position = position - rectangle_center;
-
-    // Determine which corner diameter to use based on the quadrant this fragment is in.
-    let is_right = relative_position.x > 0.0;
-    let is_bottom = relative_position.y > 0.0;
-    let radii_pair = select(corner_radii.xy, corner_radii.zw, is_bottom);
-    let corner_diameter = select(radii_pair.x, radii_pair.y, is_right);
-
-    if (corner_diameter == 0.0) {
-        return color;
-    }
-
-    // We multi-sample the edges of a rectangle to get the best possible anti-aliasing.
-    let distance = rectangle_sdf(relative_position, half_size, corner_diameter);
-
-    var alpha: f32 = step(0.0, -distance);
-
-    if (abs(distance) <= BORDER_THRESHOLD) {
-        var total = alpha;
-        for (var index = 0u; index < 8u; index++) {
-            let offset = SAMPLE_OFFSETS[index];
-            let sample_distance = rectangle_sdf(relative_position + offset, half_size, corner_diameter);
-            total += step(0.0, -sample_distance);
-        }
-        alpha = total * (1.0 / 9.0);
-    }
+    let alpha = calculate_rounded_rectangle_alpha(
+        pixel_position,
+        origin,
+        size,
+        corner_radii
+    );
 
     return color * alpha;
 }

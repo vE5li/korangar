@@ -1,7 +1,7 @@
 use std::cell::{Ref, RefCell};
 use std::sync::Arc;
 
-use cgmath::EuclideanSpace;
+use cgmath::{EuclideanSpace, Vector2, Zero};
 #[cfg(feature = "debug")]
 use korangar_interface::InterfaceFrame;
 #[cfg(feature = "debug")]
@@ -204,15 +204,21 @@ impl InterfaceRenderer {
                     screen_clip: ScreenClip::unbound(),
                     color: Color::rgba_u8(255, 0, 0, 90),
                     corner_diameter: CornerDiameter::default(),
+                    shadow_offset: Vector2::zero(),
                 });
             }
 
             return;
         }
 
+        // TODO: Let the interface define this offset.
+        //let mut shadow_offset = Vector2::new(10.0, 10.0);
+        let mut shadow_offset = Vector2::new(0.0, 0.0);
+
         if self.high_quality_interface {
             screen_clip = screen_clip * 2.0;
             corner_diameter = corner_diameter * 2.0;
+            shadow_offset *= 2.0;
         }
 
         let screen_position = position / self.window_size;
@@ -230,6 +236,7 @@ impl InterfaceRenderer {
                 screen_clip,
                 color: Color::rgba(1.0 - brightness, 1.0 - brightness, 1.0 - brightness, 0.6),
                 corner_diameter: CornerDiameter::default(),
+                shadow_offset,
             });
 
             return;
@@ -243,6 +250,7 @@ impl InterfaceRenderer {
             screen_clip,
             color,
             corner_diameter,
+            shadow_offset,
         });
     }
 
@@ -315,6 +323,7 @@ impl InterfaceRenderer {
                             screen_clip: ScreenClip::unbound(),
                             color: Color::rgba_u8(255, 0, 0, 150),
                             corner_diameter: CornerDiameter::default(),
+                            shadow_offset: Vector2::zero(),
                         });
                     }
 
@@ -339,6 +348,7 @@ impl InterfaceRenderer {
                         screen_clip: ScreenClip::unbound(),
                         color: Color::rgba_u8(0, 255, 255, 150),
                         corner_diameter: CornerDiameter::default(),
+                        shadow_offset: Vector2::zero(),
                     });
 
                     return;
@@ -429,6 +439,7 @@ impl SpriteRenderer for InterfaceRenderer {
                     screen_clip: ScreenClip::unbound(),
                     color: Color::rgba_u8(255, 0, 0, 150),
                     corner_diameter: CornerDiameter::default(),
+                    shadow_offset: Vector2::zero(),
                 });
             }
 
@@ -451,6 +462,7 @@ impl SpriteRenderer for InterfaceRenderer {
                 screen_clip: ScreenClip::unbound(),
                 color: Color::rgba_u8(255, 0, 255, 100),
                 corner_diameter: CornerDiameter::default(),
+                shadow_offset: Vector2::zero(),
             });
 
             return;
@@ -488,6 +500,7 @@ impl SpriteRenderer for InterfaceRenderer {
                     screen_clip: ScreenClip::unbound(),
                     color: Color::rgba_u8(255, 0, 0, 100),
                     corner_diameter: CornerDiameter::default(),
+                    shadow_offset: Vector2::zero(),
                 });
             }
 
@@ -510,6 +523,7 @@ impl SpriteRenderer for InterfaceRenderer {
                 screen_clip: ScreenClip::unbound(),
                 color: Color::rgba_u8(255, 255, 0, 150),
                 corner_diameter: CornerDiameter::default(),
+                shadow_offset: Vector2::zero(),
             });
 
             return;

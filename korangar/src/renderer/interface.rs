@@ -6,11 +6,13 @@ use cgmath::EuclideanSpace;
 use korangar_interface::InterfaceFrame;
 #[cfg(feature = "debug")]
 use korangar_interface::application::Clip;
-use korangar_interface::application::RenderLayer;
+use korangar_interface::application::{RenderLayer, ShadowPadding as _};
 use korangar_interface::layout::area::Area;
 use korangar_interface::layout::{ClipLayer, ClipLayerId, Icon, WindowLayout};
 
-use crate::graphics::{Color, CornerDiameter, InterfaceRectangleInstruction, ScreenClip, ScreenPosition, ScreenSize, Texture};
+use crate::graphics::{
+    Color, CornerDiameter, InterfaceRectangleInstruction, ScreenClip, ScreenPosition, ScreenSize, ShadowPadding, Texture,
+};
 use crate::loaders::{FontLoader, FontSize, GlyphInstruction, ImageType, OverflowBehavior, Sprite, TextureLoader};
 use crate::renderer::SpriteRenderer;
 use crate::state::ClientState;
@@ -185,6 +187,8 @@ impl InterfaceRenderer {
         mut screen_clip: ScreenClip,
         mut corner_diameter: CornerDiameter,
         color: Color,
+        shadow_color: Color,
+        mut shadow_padding: ShadowPadding,
     ) {
         // If the rectangle is not even within the bounds of the clip, discard it early
         // saving GPU resources.
@@ -202,8 +206,10 @@ impl InterfaceRenderer {
                     screen_position,
                     screen_size,
                     screen_clip: ScreenClip::unbound(),
-                    color: Color::rgba_u8(255, 0, 0, 90),
+                    color: Color::rgba_u8(255, 0, 0, 40),
                     corner_diameter: CornerDiameter::default(),
+                    shadow_color: Color::rgba_u8(255, 50, 0, 180),
+                    shadow_padding: ShadowPadding::uniform(5.0),
                 });
             }
 
@@ -213,6 +219,7 @@ impl InterfaceRenderer {
         if self.high_quality_interface {
             screen_clip = screen_clip * 2.0;
             corner_diameter = corner_diameter * 2.0;
+            shadow_padding = shadow_padding.scaled(2.0);
         }
 
         let screen_position = position / self.window_size;
@@ -228,8 +235,10 @@ impl InterfaceRenderer {
                 screen_position,
                 screen_size,
                 screen_clip,
-                color: Color::rgba(1.0 - brightness, 1.0 - brightness, 1.0 - brightness, 0.6),
+                color: Color::rgba(1.0 - brightness, 1.0 - brightness, 1.0 - brightness, 0.4),
                 corner_diameter: CornerDiameter::default(),
+                shadow_color: Color::rgba_u8(200, 200, 200, 180),
+                shadow_padding: ShadowPadding::uniform(5.0),
             });
 
             return;
@@ -243,6 +252,8 @@ impl InterfaceRenderer {
             screen_clip,
             color,
             corner_diameter,
+            shadow_color,
+            shadow_padding,
         });
     }
 
@@ -313,8 +324,10 @@ impl InterfaceRenderer {
                             screen_position,
                             screen_size,
                             screen_clip: ScreenClip::unbound(),
-                            color: Color::rgba_u8(255, 0, 0, 150),
+                            color: Color::rgba_u8(255, 0, 0, 40),
                             corner_diameter: CornerDiameter::default(),
+                            shadow_color: Color::rgba_u8(255, 50, 0, 180),
+                            shadow_padding: ShadowPadding::uniform(0.0),
                         });
                     }
 
@@ -337,8 +350,10 @@ impl InterfaceRenderer {
                         screen_position,
                         screen_size,
                         screen_clip: ScreenClip::unbound(),
-                        color: Color::rgba_u8(0, 255, 255, 150),
+                        color: Color::rgba_u8(0, 255, 255, 40),
                         corner_diameter: CornerDiameter::default(),
+                        shadow_color: Color::rgba_u8(0, 255, 255, 180),
+                        shadow_padding: ShadowPadding::uniform(0.0),
                     });
 
                     return;
@@ -427,8 +442,10 @@ impl SpriteRenderer for InterfaceRenderer {
                     screen_position,
                     screen_size,
                     screen_clip: ScreenClip::unbound(),
-                    color: Color::rgba_u8(255, 0, 0, 150),
+                    color: Color::rgba_u8(255, 0, 0, 40),
                     corner_diameter: CornerDiameter::default(),
+                    shadow_color: Color::rgba_u8(255, 50, 0, 180),
+                    shadow_padding: ShadowPadding::uniform(5.0),
                 });
             }
 
@@ -449,8 +466,10 @@ impl SpriteRenderer for InterfaceRenderer {
                 screen_position,
                 screen_size,
                 screen_clip: ScreenClip::unbound(),
-                color: Color::rgba_u8(255, 0, 255, 100),
+                color: Color::rgba_u8(255, 0, 255, 40),
                 corner_diameter: CornerDiameter::default(),
+                shadow_color: Color::rgba_u8(255, 0, 255, 180),
+                shadow_padding: ShadowPadding::uniform(5.0),
             });
 
             return;
@@ -486,8 +505,10 @@ impl SpriteRenderer for InterfaceRenderer {
                     screen_position,
                     screen_size,
                     screen_clip: ScreenClip::unbound(),
-                    color: Color::rgba_u8(255, 0, 0, 100),
+                    color: Color::rgba_u8(255, 0, 0, 40),
                     corner_diameter: CornerDiameter::default(),
+                    shadow_color: Color::rgba_u8(255, 50, 0, 180),
+                    shadow_padding: ShadowPadding::uniform(5.0),
                 });
             }
 
@@ -508,8 +529,10 @@ impl SpriteRenderer for InterfaceRenderer {
                 screen_position,
                 screen_size,
                 screen_clip: ScreenClip::unbound(),
-                color: Color::rgba_u8(255, 255, 0, 150),
+                color: Color::rgba_u8(255, 255, 0, 40),
                 corner_diameter: CornerDiameter::default(),
+                shadow_color: Color::rgba_u8(255, 255, 0, 180),
+                shadow_padding: ShadowPadding::uniform(5.0),
             });
 
             return;
@@ -578,8 +601,10 @@ impl RenderLayer<ClientState> for InterfaceRenderer {
         clip: ScreenClip,
         corner_diameter: CornerDiameter,
         color: Color,
+        shadow_color: Color,
+        shadow_padding: ShadowPadding,
     ) {
-        self.render_rectangle(position, size, clip, corner_diameter, color);
+        self.render_rectangle(position, size, clip, corner_diameter, color, shadow_color, shadow_padding);
     }
 
     fn render_text(
@@ -704,16 +729,33 @@ pub trait InterfaceFrameExt {
 #[cfg(feature = "debug")]
 impl InterfaceFrameExt for InterfaceFrame<'_, ClientState> {
     fn render_areas(&self, renderer: &InterfaceRenderer, render_options: &crate::RenderOptions) {
+        let shadow_padding = ShadowPadding::uniform(5.0);
+
         if render_options.show_click_areas {
-            self.render_click_areas(renderer, Color::rgba_u8(255, 166, 0, 150));
+            self.render_click_areas(
+                renderer,
+                Color::rgba_u8(255, 166, 0, 150),
+                Color::rgba_u8(255, 166, 0, 150),
+                shadow_padding,
+            );
         }
 
         if render_options.show_drop_areas {
-            self.render_drop_areas(renderer, Color::rgba_u8(140, 255, 0, 150));
+            self.render_drop_areas(
+                renderer,
+                Color::rgba_u8(140, 255, 0, 150),
+                Color::rgba_u8(140, 255, 0, 150),
+                shadow_padding,
+            );
         }
 
         if render_options.show_scroll_areas {
-            self.render_scroll_areas(renderer, Color::rgba_u8(166, 0, 255, 100));
+            self.render_scroll_areas(
+                renderer,
+                Color::rgba_u8(100, 0, 255, 100),
+                Color::rgba_u8(166, 0, 255, 100),
+                shadow_padding,
+            );
         }
     }
 }

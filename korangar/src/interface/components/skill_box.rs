@@ -7,7 +7,7 @@ use korangar_interface::prelude::{HorizontalAlignment, VerticalAlignment};
 use ragnarok_packets::SkillLevel;
 use rust_state::{Context, Path};
 
-use crate::graphics::{Color, CornerDiameter};
+use crate::graphics::{Color, CornerDiameter, ShadowPadding};
 use crate::input::{InputEvent, MouseInputMode};
 use crate::interface::resource::SkillSource;
 use crate::inventory::Skill;
@@ -158,7 +158,13 @@ where
             },
         };
 
-        layout.add_rectangle(layout_info.area, CornerDiameter::uniform(20.0), background_color);
+        layout.add_rectangle(
+            layout_info.area,
+            CornerDiameter::uniform(20.0),
+            background_color,
+            Color::rgba_u8(0, 0, 0, 100),
+            ShadowPadding::diagonal(2.0, 5.0),
+        );
 
         if is_hovered {
             layout.add_drop_area(layout_info.area, &self.handler);

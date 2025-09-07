@@ -9,7 +9,7 @@ use super::color::Color;
 use super::settings::RenderOptions;
 use super::vertices::ModelVertex;
 use super::{Buffer, ShadowQuality, Texture, TextureSet, TileVertex, WaterVertex};
-use crate::graphics::{CornerDiameter, ScreenClip, ScreenPosition, ScreenSize};
+use crate::graphics::{CornerDiameter, ScreenClip, ScreenPosition, ScreenSize, ShadowPadding};
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 
@@ -182,6 +182,8 @@ pub enum InterfaceRectangleInstruction {
         screen_clip: ScreenClip,
         color: Color,
         corner_diameter: CornerDiameter,
+        shadow_color: Color,
+        shadow_padding: ShadowPadding,
     },
     Sprite {
         screen_position: ScreenPosition,

@@ -12,7 +12,7 @@ use korangar_interface::prelude::{HorizontalAlignment, VerticalAlignment};
 use korangar_interface::window::{CustomWindow, Window};
 use rust_state::Context;
 
-use crate::graphics::{Color, CornerDiameter, ScreenPosition};
+use crate::graphics::{Color, CornerDiameter, ScreenPosition, ShadowPadding};
 use crate::interface::windows::profiler::color_lookup::ColorLookup;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
@@ -104,7 +104,13 @@ impl FrameInspectorView {
                 height: layout_info.area.height,
             };
 
-            layout.add_rectangle(line_area, CornerDiameter::uniform(0.0), color);
+            layout.add_rectangle(
+                line_area,
+                CornerDiameter::uniform(0.0),
+                color,
+                Color::TRANSPARENT,
+                ShadowPadding::uniform(0.0),
+            );
 
             if render_numbers {
                 let text_area = Area {
@@ -165,10 +171,22 @@ impl FrameInspectorView {
             height: y_size,
         };
 
-        layout.add_rectangle(block_area, CornerDiameter::uniform(4.0), color.multiply_alpha(alpha));
+        layout.add_rectangle(
+            block_area,
+            CornerDiameter::uniform(4.0),
+            color.multiply_alpha(alpha),
+            Color::TRANSPARENT,
+            ShadowPadding::uniform(0.0),
+        );
 
         if block_area.check().run(layout) {
-            layout.add_rectangle(block_area, CornerDiameter::uniform(4.0), Color::rgba_u8(255, 255, 255, 100));
+            layout.add_rectangle(
+                block_area,
+                CornerDiameter::uniform(4.0),
+                Color::rgba_u8(255, 255, 255, 100),
+                Color::TRANSPARENT,
+                ShadowPadding::uniform(0.0),
+            );
 
             layout.add_tooltip(measurement.name, FrameInspectorTooltip.tooltip_id());
             layout.add_tooltip(&measurement_details.duration, FrameInspectorTooltip.tooltip_id());
@@ -227,7 +245,13 @@ impl Element<ClientState> for FrameInspectorView {
         layout_info: &'a Self::LayoutInfo,
         layout: &mut WindowLayout<'a, ClientState>,
     ) {
-        layout.add_rectangle(layout_info.area, CornerDiameter::uniform(6.0), Color::monochrome_u8(60));
+        layout.add_rectangle(
+            layout_info.area,
+            CornerDiameter::uniform(6.0),
+            Color::monochrome_u8(60),
+            Color::rgba_u8(0, 0, 0, 100),
+            ShadowPadding::diagonal(2.0, 5.0),
+        );
 
         if layout_info.area.check().dont_mark().run(layout) {
             let mut inner = self.inner.borrow_mut();

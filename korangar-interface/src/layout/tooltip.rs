@@ -28,6 +28,8 @@ where
     pub background_color: App::Color,
     pub foreground_color: App::Color,
     pub highlight_color: App::Color,
+    pub shadow_color: App::Color,
+    pub shadow_padding: App::ShadowPadding,
     pub font_size: App::FontSize,
     pub overflow_behavior: App::OverflowBehavior,
     pub corner_diameter: App::CornerDiameter,

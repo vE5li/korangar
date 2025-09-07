@@ -9,7 +9,7 @@ use rust_state::{Context, Path, RustState, Selector};
 use store::WindowStore;
 
 use crate::MouseMode;
-use crate::application::{Application, CornerDiameter, Position, Size};
+use crate::application::{Application, CornerDiameter, Position, ShadowPadding, Size};
 use crate::element::ElementSet;
 use crate::element::id::ElementIdGenerator;
 use crate::element::store::ElementStore;
@@ -108,6 +108,8 @@ where
     pub hovered_title_color: App::Color,
     pub background_color: App::Color,
     pub highlight_color: App::Color,
+    pub shadow_color: App::Color,
+    pub shadow_padding: App::ShadowPadding,
     pub gaps: f32,
     pub border: f32,
     pub corner_diameter: App::CornerDiameter,
@@ -208,7 +210,7 @@ impl<App: Application> ClickHandler<App> for CloseClickHandler {
     }
 }
 
-pub struct WindowInternal<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Elements>
+pub struct WindowInternal<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, Elements>
 where
     App: Application,
     Elements: ElementSet<App>,
@@ -219,20 +221,22 @@ where
     hovered_title_color: C,
     background_color: D,
     highlight_color: E,
-    title_height: F,
-    title_gap: G,
-    font_size: H,
-    gaps: I,
-    border: J,
-    corner_diameter: K,
-    closable: L,
-    resizable: M,
-    close_button_size: N,
-    close_button_corner_diameter: O,
-    minimum_width: P,
-    maximum_width: Q,
-    minimum_height: R,
-    maximum_height: S,
+    shadow_color: F,
+    shadow_padding: G,
+    title_height: H,
+    title_gap: I,
+    font_size: J,
+    gaps: K,
+    border: L,
+    corner_diameter: M,
+    closable: N,
+    resizable: O,
+    close_button_size: P,
+    close_button_corner_diameter: Q,
+    minimum_width: R,
+    maximum_width: S,
+    minimum_height: T,
+    maximum_height: U,
     theme: App::ThemeType,
     class: Option<App::WindowClass>,
     elements: Elements,
@@ -246,8 +250,8 @@ where
     layout_info: Option<WindowLayoutInfoSet<<Elements as ElementSet<App>>::LayoutInfo>>,
 }
 
-impl<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Elements>
-    WindowInternal<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Elements>
+impl<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, Elements>
+    WindowInternal<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, Elements>
 where
     App: Application,
     Elements: ElementSet<App>,
@@ -259,20 +263,22 @@ where
         hovered_title_color: C,
         background_color: D,
         highlight_color: E,
-        title_height: F,
-        title_gap: G,
-        font_size: H,
-        gaps: I,
-        border: J,
-        corner_diameter: K,
-        closable: L,
-        resizable: M,
-        close_button_size: N,
-        close_button_corner_diameter: O,
-        minimum_width: P,
-        maximum_width: Q,
-        minimum_height: R,
-        maximum_height: S,
+        shadow_color: F,
+        shadow_padding: G,
+        title_height: H,
+        title_gap: I,
+        font_size: J,
+        gaps: K,
+        border: L,
+        corner_diameter: M,
+        closable: N,
+        resizable: O,
+        close_button_size: P,
+        close_button_corner_diameter: Q,
+        minimum_width: R,
+        maximum_width: S,
+        minimum_height: T,
+        maximum_height: U,
         theme: App::ThemeType,
         class: Option<App::WindowClass>,
         elements: Elements,
@@ -284,6 +290,8 @@ where
             hovered_title_color,
             background_color,
             highlight_color,
+            shadow_color,
+            shadow_padding,
             title_height,
             title_gap,
             font_size,
@@ -311,16 +319,16 @@ where
     }
 }
 
-impl<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Elements> private::Sealed
-    for WindowInternal<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Elements>
+impl<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, Elements> private::Sealed
+    for WindowInternal<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, Elements>
 where
     App: Application,
     Elements: ElementSet<App>,
 {
 }
 
-impl<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Elements> Window<App>
-    for WindowInternal<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, Elements>
+impl<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, Elements> Window<App>
+    for WindowInternal<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, Elements>
 where
     App: Application,
     Title: AsRef<str>,
@@ -329,20 +337,22 @@ where
     C: Selector<App, App::Color>,
     D: Selector<App, App::Color>,
     E: Selector<App, App::Color>,
-    F: Selector<App, f32>,
-    G: Selector<App, f32>,
-    H: Selector<App, App::FontSize>,
+    F: Selector<App, App::Color>,
+    G: Selector<App, App::ShadowPadding>,
+    H: Selector<App, f32>,
     I: Selector<App, f32>,
-    J: Selector<App, f32>,
-    K: Selector<App, App::CornerDiameter>,
-    L: Selector<App, bool>,
-    M: Selector<App, bool>,
-    N: Selector<App, App::Size>,
-    O: Selector<App, App::CornerDiameter>,
-    P: Selector<App, f32>,
-    Q: Selector<App, f32>,
+    J: Selector<App, App::FontSize>,
+    K: Selector<App, f32>,
+    L: Selector<App, f32>,
+    M: Selector<App, App::CornerDiameter>,
+    N: Selector<App, bool>,
+    O: Selector<App, bool>,
+    P: Selector<App, App::Size>,
+    Q: Selector<App, App::CornerDiameter>,
     R: Selector<App, f32>,
     S: Selector<App, f32>,
+    T: Selector<App, f32>,
+    U: Selector<App, f32>,
     Elements: ElementSet<App>,
     <Elements as ElementSet<App>>::LayoutInfo: 'static,
 {
@@ -560,6 +570,8 @@ where
             layout_info.area,
             *state.get(&self.corner_diameter),
             *state.get(&self.background_color),
+            *state.get(&self.shadow_color),
+            *state.get(&self.shadow_padding),
         );
 
         if horizontal_resize_hovered && horizontal_resize_available
@@ -572,6 +584,9 @@ where
                 horizontal_resize_area,
                 App::CornerDiameter::new(6.0, 6.0, 6.0, 6.0),
                 *state.get(&theme().window().closest_anchor_color()),
+                // TODO: Properly theme
+                *state.get(&theme().window().closest_anchor_color()),
+                App::ShadowPadding::none(),
             );
         } else if vertical_resize_hovered && vertical_resize_availabe
             || matches!(layout.get_mouse_mode(), MouseMode::ResizingWindow {
@@ -583,6 +598,9 @@ where
                 vertical_resize_area,
                 App::CornerDiameter::new(6.0, 6.0, 6.0, 6.0),
                 *state.get(&theme().window().closest_anchor_color()),
+                // TODO: Properly theme
+                *state.get(&theme().window().closest_anchor_color()),
+                App::ShadowPadding::none(),
             );
         } else if resize_hovered && horizontal_resize_available && vertical_resize_availabe
             || matches!(layout.get_mouse_mode(), MouseMode::ResizingWindow {
@@ -594,6 +612,9 @@ where
                 resize_area,
                 App::CornerDiameter::new(12.0, 12.0, 12.0, 12.0),
                 *state.get(&theme().window().closest_anchor_color()),
+                // TODO: Properly theme
+                *state.get(&theme().window().closest_anchor_color()),
+                App::ShadowPadding::none(),
             );
         }
 
@@ -602,6 +623,9 @@ where
                 close_button_area,
                 *state.get(&self.close_button_corner_diameter),
                 close_button_color,
+                // TODO: Properly theme
+                close_button_color,
+                App::ShadowPadding::none(),
             );
 
             // TODO: Use own values

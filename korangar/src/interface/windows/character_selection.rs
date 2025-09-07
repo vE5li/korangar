@@ -25,7 +25,7 @@ mod character_slot_preview {
     use ragnarok_packets::{CharacterInformation, CharacterInformationPathExt};
     use rust_state::{Context, ManuallyAssertExt, Path};
 
-    use crate::graphics::{Color, CornerDiameter, ScreenPosition, ScreenSize};
+    use crate::graphics::{Color, CornerDiameter, ScreenPosition, ScreenSize, ShadowPadding};
     use crate::input::InputEvent;
     use crate::loaders::{FontSize, OverflowBehavior};
     use crate::state::ClientState;
@@ -71,6 +71,7 @@ mod character_slot_preview {
             let character_information_path = self.character_information_path;
 
             let element = ErasedElement::new(fragment! {
+                gaps: 4.0,
                 children: (
                     button! {
                         text: "Delete",
@@ -186,7 +187,13 @@ mod character_slot_preview {
                     true => Color::monochrome_u8(80),
                     false => Color::monochrome_u8(60),
                 };
-                layout.add_rectangle(layout_info.area, CornerDiameter::uniform(25.0), background_color);
+                layout.add_rectangle(
+                    layout_info.area,
+                    CornerDiameter::uniform(25.0),
+                    background_color,
+                    Color::rgba_u8(0, 0, 0, 100),
+                    ShadowPadding::diagonal(2.0, 5.0),
+                );
 
                 if *switch_request == self.slot {
                     layout.add_text(
@@ -230,7 +237,13 @@ mod character_slot_preview {
                     true => Color::monochrome_u8(110),
                     false => Color::monochrome_u8(90),
                 };
-                layout.add_rectangle(layout_info.area, CornerDiameter::uniform(25.0), background_color);
+                layout.add_rectangle(
+                    layout_info.area,
+                    CornerDiameter::uniform(25.0),
+                    background_color,
+                    Color::rgba_u8(0, 0, 0, 100),
+                    ShadowPadding::diagonal(2.0, 5.0),
+                );
 
                 layout.add_text(
                     layout_info.area,
@@ -333,7 +346,13 @@ mod character_slot_preview {
                     true => Color::monochrome_u8(55),
                     false => Color::monochrome_u8(40),
                 };
-                layout.add_rectangle(layout_info.area, CornerDiameter::uniform(25.0), background_color);
+                layout.add_rectangle(
+                    layout_info.area,
+                    CornerDiameter::uniform(25.0),
+                    background_color,
+                    Color::rgba_u8(0, 0, 0, 100),
+                    ShadowPadding::diagonal(2.0, 5.0),
+                );
 
                 layout.add_text(
                     layout_info.area,

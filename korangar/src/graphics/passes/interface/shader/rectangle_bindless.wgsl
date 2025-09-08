@@ -55,6 +55,7 @@ const PXRANGE: f32 = 6.0;
 
 const SHADOW_ALPHA: f32 = 0.75;
 const SHADOW_COLOR: vec3<f32> = vec3<f32>(0.0, 0.0, 0.0);
+const SHADOW_PENUMBRA_WIDTH_PIXELS: f32 = 64.0;
 
 @vertex
 fn vs_main(
@@ -181,7 +182,8 @@ fn calculate_rounded_rectangle_alpha(
     pixel_position: vec2<f32>,
     rectangle_origin: vec2<f32>,
     rectangle_size: vec2<f32>,
-    corner_radii: vec4<f32>
+    corner_radii: vec4<f32>,
+    penumbra_width_pixels: f32,
 ) -> f32 {
     // Calculate position relative to rectangle center.
     let half_size = rectangle_size * 0.5;
@@ -194,7 +196,7 @@ fn calculate_rounded_rectangle_alpha(
     let radii_pair = select(corner_radii.xy, corner_radii.zw, is_bottom);
     let corner_diameter = select(radii_pair.x, radii_pair.y, is_right);
 
-    if (corner_diameter == 0.0) {
+    if (corner_diameter == 0.0 && penumbra_width_pixels == 0.0) {
         // No rounded corners - simple bounds check.
         return f32(abs(relative_position.x) <= half_size.x &&
                    abs(relative_position.y) <= half_size.y);
@@ -202,20 +204,24 @@ fn calculate_rounded_rectangle_alpha(
 
     // Calculate SDF distance for rounded corners.
     let distance = rectangle_sdf(relative_position, half_size, corner_diameter);
-    var alpha = step(0.0, -distance);
 
-    // Multi-sample for anti-aliasing at edges.
-    if (abs(distance) <= BORDER_THRESHOLD) {
-        var total = alpha;
-        for (var index = 0u; index < 8u; index++) {
-            let offset = SAMPLE_OFFSETS[index];
-            let sample_distance = rectangle_sdf(relative_position + offset, half_size, corner_diameter);
-            total += step(0.0, -sample_distance);
+    if (penumbra_width_pixels > 0.0) {
+        return 1.0 - smoothstep(-penumbra_width_pixels * 0.5, penumbra_width_pixels * 0.5, distance);
+    } else {
+        // Multi-sample for anti-aliasing at edges.
+        var alpha = step(0.0, -distance);
+
+        if (abs(distance) <= BORDER_THRESHOLD) {
+            var total = alpha;
+            for (var index = 0u; index < 8u; index++) {
+                let offset = SAMPLE_OFFSETS[index];
+                let sample_distance = rectangle_sdf(relative_position + offset, half_size, corner_diameter);
+                total += step(0.0, -sample_distance);
+            }
+            alpha = total * (1.0 / 9.0);
         }
-        alpha = total * (1.0 / 9.0);
+        return alpha;
     }
-
-    return alpha;
 }
 
 fn render_rectangle_with_shadow(
@@ -236,7 +242,8 @@ fn render_rectangle_with_shadow(
         pixel_position,
         main_origin,
         main_size,
-        corner_radii
+        corner_radii,
+        0.0 // No penumbra for the main rectangle
     );
 
     if (main_alpha >= 1.0) {
@@ -253,14 +260,15 @@ fn render_rectangle_with_shadow(
         main_size.y + shadow_padding.z + shadow_padding.w
     );
 
-    let shadow_alpha = calculate_rounded_rectangle_alpha(
+    let shadow_raw_alpha = calculate_rounded_rectangle_alpha(
         pixel_position,
         shadow_origin,
         shadow_size,
-        corner_radii
+        corner_radii,
+        SHADOW_PENUMBRA_WIDTH_PIXELS // Apply penumbra to the shadow
     );
 
-    let shadow_color = vec4<f32>(SHADOW_COLOR, SHADOW_ALPHA * shadow_alpha);
+    let shadow_color = vec4<f32>(SHADOW_COLOR, SHADOW_ALPHA * shadow_raw_alpha);
 
     if (main_alpha > 0.0) {
         // Main rectangle partially or fully covers this pixel.
@@ -294,7 +302,8 @@ fn rectangle_with_rounded_edges(
         pixel_position,
         origin,
         size,
-        corner_radii
+        corner_radii,
+        0.0 // No penumbra for regular rectangles
     );
 
     return color * alpha;

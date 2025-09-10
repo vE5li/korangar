@@ -34,7 +34,7 @@ quick-xml = { workspace = true, features = ["serde", "serialize"] }
 ragnarok-bytes = { workspace = true, features = ["derive", "cgmath"] }
 ragnarok-formats = { workspace = true, features = ["interface"] }
 ragnarok-packets = { workspace = true, features = ["derive", "interface", "packet-to-state-element"] }
-rand_aes = { workspace = true, features = ["tls", "tls_aes128_ctr128"] }
+rand_aes = { workspace = true, features = ["std", "tls"] }
 rayon = { workspace = true }
 ron = { workspace = true }
 rust-state = { workspace = true }

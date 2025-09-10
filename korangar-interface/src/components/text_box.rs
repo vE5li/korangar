@@ -8,10 +8,10 @@ use crate::application::{Application, Size};
 use crate::element::Element;
 use crate::element::id::{ElementId, FocusIdExt};
 use crate::element::store::{ElementStore, ElementStoreMut, Persistent, PersistentData, PersistentExt};
-use crate::event::{ClickHandler, Event, EventQueue};
+use crate::event::{ClickHandler, Event, EventQueue, InputHandler};
 use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
 use crate::layout::area::Area;
-use crate::layout::{Icon, InputHandler, MouseButton, Resolver, WindowLayout};
+use crate::layout::{Icon, MouseButton, Resolver, WindowLayout};
 
 #[derive(RustState)]
 pub struct TextBoxTheme<App>
@@ -58,7 +58,7 @@ impl<App> ClickHandler<App> for TextBoxData
 where
     App: Application,
 {
-    fn execute(&self, _: &Context<App>, _: &mut EventQueue<App>) {
+    fn handle_click(&self, _: &Context<App>, _: &mut EventQueue<App>) {
         let mut is_hidden = self.is_hidden.borrow_mut();
         *is_hidden = !*is_hidden;
     }
@@ -79,7 +79,7 @@ impl<App> ClickHandler<App> for FocusClick
 where
     App: Application,
 {
-    fn execute(&self, _: &Context<App>, queue: &mut EventQueue<App>) {
+    fn handle_click(&self, _: &Context<App>, queue: &mut EventQueue<App>) {
         let element_id = *self.element_id.as_ref().unwrap();
         queue.queue(Event::FocusElementPost { element_id });
     }
@@ -283,13 +283,13 @@ where
             let persistent_data = self.get_persistent_data(&store, true);
 
             if is_hoverered {
-                layout.add_click_area(button_area, MouseButton::Left, persistent_data);
+                layout.register_click_handler(MouseButton::Left, persistent_data);
 
                 // If the text field is already focused, we don't want to unfocus it when
                 // clicking the hide button. So we add another click area to
                 // re-focus if the button is clicked.
                 if is_focused {
-                    layout.add_click_area(button_area, MouseButton::Left, &self.focus_click);
+                    layout.register_click_handler(MouseButton::Left, &self.focus_click);
                 }
             }
 
@@ -299,11 +299,11 @@ where
         let is_hovered = layout_info.area.check().run(layout);
 
         if is_hovered {
-            layout.add_click_area(layout_info.area, MouseButton::Left, &self.focus_click);
+            layout.register_click_handler(MouseButton::Left, &self.focus_click);
         }
 
         if is_focused {
-            layout.add_input_handler(&self.input_handler);
+            layout.register_input_handler(&self.input_handler);
         }
 
         let background_color = match is_hovered {
@@ -404,7 +404,7 @@ where
     fn handle_character(&self, state: &Context<App>, queue: &mut EventQueue<App>, character: char) {
         if character == '\x09' || character == '\x0d' {
             // On tab or enter
-            self.action.execute(state, queue);
+            self.action.handle_click(state, queue);
         } else if character == '\x1b' {
             // On escape
             queue.queue(Event::Unfocus);

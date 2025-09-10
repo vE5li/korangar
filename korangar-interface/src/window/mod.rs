@@ -165,7 +165,7 @@ impl ResizeClickHandler {
 }
 
 impl<App: Application> ClickHandler<App> for ResizeClickHandler {
-    fn execute(&self, _: &Context<App>, queue: &mut EventQueue<App>) {
+    fn handle_click(&self, _: &Context<App>, queue: &mut EventQueue<App>) {
         let Self { window_id, resize_mode } = *self;
 
         queue.queue(Event::SetMouseMode {
@@ -186,7 +186,7 @@ impl MoveClickHandler {
 }
 
 impl<App: Application> ClickHandler<App> for MoveClickHandler {
-    fn execute(&self, _: &Context<App>, queue: &mut EventQueue<App>) {
+    fn handle_click(&self, _: &Context<App>, queue: &mut EventQueue<App>) {
         queue.queue(Event::SetMouseMode {
             mouse_mode: MouseMode::MovingWindow { window_id: self.window_id },
         });
@@ -205,7 +205,7 @@ impl CloseClickHandler {
 }
 
 impl<App: Application> ClickHandler<App> for CloseClickHandler {
-    fn execute(&self, _: &Context<App>, queue: &mut EventQueue<App>) {
+    fn handle_click(&self, _: &Context<App>, queue: &mut EventQueue<App>) {
         queue.queue(Event::CloseWindow { window_id: self.window_id });
     }
 }
@@ -483,7 +483,7 @@ where
 
             let close_button_color = match close_button_area.check().run(layout) {
                 true => {
-                    layout.add_click_area(close_button_area, MouseButton::Left, &self.close_click_action);
+                    layout.register_click_handler(MouseButton::Left, &self.close_click_action);
 
                     *state.get(&self.hovered_title_color)
                 }
@@ -498,7 +498,7 @@ where
         let is_title_hovered = layout_info.title_area.check().run(layout);
 
         if is_title_hovered {
-            layout.add_click_area(layout_info.title_area, MouseButton::Left, &self.move_click_action);
+            layout.register_click_handler(MouseButton::Left, &self.move_click_action);
         }
 
         let corner_diameter = *state.get(&self.corner_diameter);
@@ -532,13 +532,13 @@ where
         let vertical_resize_availabe = *state.get(&self.resizable);
 
         if horizontal_resize_hovered && horizontal_resize_available {
-            layout.add_click_area(horizontal_resize_area, MouseButton::Left, &self.horizontal_resize_click_action);
+            layout.register_click_handler(MouseButton::Left, &self.horizontal_resize_click_action);
             layout.set_hovered();
         } else if vertical_resize_hovered && vertical_resize_availabe {
-            layout.add_click_area(vertical_resize_area, MouseButton::Left, &self.vertical_resize_click_action);
+            layout.register_click_handler(MouseButton::Left, &self.vertical_resize_click_action);
             layout.set_hovered();
         } else if resize_hovered && horizontal_resize_available && vertical_resize_availabe {
-            layout.add_click_area(resize_area, MouseButton::Left, &self.resize_click_action);
+            layout.register_click_handler(MouseButton::Left, &self.resize_click_action);
             layout.set_hovered();
         }
 

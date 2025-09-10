@@ -311,7 +311,7 @@ impl From<InputEvent> for Event<ClientState> {
 }
 
 impl ClickHandler<ClientState> for InputEvent {
-    fn execute(&self, _: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
+    fn handle_click(&self, _: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
         queue.queue(self.clone());
     }
 }

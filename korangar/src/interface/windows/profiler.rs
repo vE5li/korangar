@@ -107,7 +107,7 @@ impl DefaultClickHandler {
 }
 
 impl ClickHandler<ClientState> for DefaultClickHandler {
-    fn execute(&self, _: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
+    fn handle_click(&self, _: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
         let (visible_thread, frame_index) = *self.inner.borrow();
 
         let measurement = korangar_debug::profiling::get_frame_by_index(visible_thread, frame_index);
@@ -230,7 +230,7 @@ where
                 );
 
                 self.click_handler.update(visible_thread, index);
-                layout.add_click_area(area, MouseButton::Left, &self.click_handler);
+                layout.register_click_handler(MouseButton::Left, &self.click_handler);
             }
 
             x_position += bar_width + gap_width;

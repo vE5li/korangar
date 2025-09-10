@@ -1,8 +1,8 @@
 use korangar_interface::MouseMode;
 use korangar_interface::element::store::{ElementStore, ElementStoreMut};
 use korangar_interface::element::{BaseLayoutInfo, Element};
-use korangar_interface::event::{ClickHandler, Event, EventQueue};
-use korangar_interface::layout::{DropHandler, MouseButton, Resolver, WindowLayout};
+use korangar_interface::event::{ClickHandler, DropHandler, Event, EventQueue};
+use korangar_interface::layout::{MouseButton, Resolver, WindowLayout};
 use korangar_interface::prelude::{HorizontalAlignment, VerticalAlignment};
 use ragnarok_packets::SkillLevel;
 use rust_state::{Context, Path};
@@ -53,7 +53,7 @@ impl<P> ClickHandler<ClientState> for SkillBoxHandler<P>
 where
     P: Path<ClientState, Skill, false>,
 {
-    fn execute(&self, state: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
+    fn handle_click(&self, state: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
         // SAFETY:
         //
         // Unwrapping here is fine since we only register the handler if the slot has a
@@ -167,7 +167,7 @@ where
         );
 
         if is_hovered {
-            layout.add_drop_area(layout_info.area, &self.handler);
+            layout.register_drop_handler(&self.handler);
         }
 
         if let Some(skill) = state.try_get(&self.skill_path) {
@@ -180,7 +180,7 @@ where
             );
 
             if is_hovered {
-                layout.add_click_area(layout_info.area, MouseButton::Left, &self.handler);
+                layout.register_click_handler(MouseButton::Left, &self.handler);
             }
 
             layout.add_text(

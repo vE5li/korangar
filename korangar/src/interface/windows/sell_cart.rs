@@ -254,7 +254,7 @@ where
                         A: Path<ClientState, SellItem<(ResourceMetadata, u16)>>,
                         B: Path<ClientState, Vec<SellItem<(ResourceMetadata, u16)>>>,
                     {
-                        fn execute(&self, state: &Context<ClientState>, _: &mut EventQueue<ClientState>) {
+                        fn handle_click(&self, state: &Context<ClientState>, _: &mut EventQueue<ClientState>) {
                             let inventory_index = state.get(&self.item_path).inventory_index;
                             let amount = self.amount;
 

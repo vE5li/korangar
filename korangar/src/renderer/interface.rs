@@ -3,8 +3,6 @@ use std::sync::Arc;
 
 use cgmath::EuclideanSpace;
 #[cfg(feature = "debug")]
-use korangar_interface::InterfaceFrame;
-#[cfg(feature = "debug")]
 use korangar_interface::application::Clip;
 use korangar_interface::application::{RenderLayer, ShadowPadding as _};
 use korangar_interface::layout::area::Area;
@@ -717,45 +715,5 @@ impl<'a> LayoutExt<'a> for WindowLayout<'a, ClientState> {
             color,
             scaling,
         }));
-    }
-}
-
-/// Extesion trait for the [`InterfaceFrame`].
-#[cfg(feature = "debug")]
-pub trait InterfaceFrameExt {
-    fn render_areas(&self, renderer: &InterfaceRenderer, render_options: &crate::RenderOptions);
-}
-
-#[cfg(feature = "debug")]
-impl InterfaceFrameExt for InterfaceFrame<'_, ClientState> {
-    fn render_areas(&self, renderer: &InterfaceRenderer, render_options: &crate::RenderOptions) {
-        let shadow_padding = ShadowPadding::uniform(5.0);
-
-        if render_options.show_click_areas {
-            self.render_click_areas(
-                renderer,
-                Color::rgba_u8(255, 166, 0, 150),
-                Color::rgba_u8(255, 166, 0, 150),
-                shadow_padding,
-            );
-        }
-
-        if render_options.show_drop_areas {
-            self.render_drop_areas(
-                renderer,
-                Color::rgba_u8(140, 255, 0, 150),
-                Color::rgba_u8(140, 255, 0, 150),
-                shadow_padding,
-            );
-        }
-
-        if render_options.show_scroll_areas {
-            self.render_scroll_areas(
-                renderer,
-                Color::rgba_u8(100, 0, 255, 100),
-                Color::rgba_u8(166, 0, 255, 100),
-                shadow_padding,
-            );
-        }
     }
 }

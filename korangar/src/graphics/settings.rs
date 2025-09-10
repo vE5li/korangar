@@ -315,9 +315,6 @@ pub struct RenderOptions {
     pub show_glyph_instructions: bool,
     pub show_sprite_instructions: bool,
     pub show_sdf_instructions: bool,
-    pub show_click_areas: bool,
-    pub show_drop_areas: bool,
-    pub show_scroll_areas: bool,
 }
 
 #[cfg(feature = "debug")]
@@ -358,9 +355,6 @@ impl RenderOptions {
             show_glyph_instructions: false,
             show_sprite_instructions: false,
             show_sdf_instructions: false,
-            show_click_areas: false,
-            show_drop_areas: false,
-            show_scroll_areas: false,
         }
     }
 }
@@ -373,9 +367,5 @@ impl RenderOptions {
             || self.show_point_shadow_map.is_some()
             || self.show_light_culling_count_buffer
             || self.show_font_map
-    }
-
-    pub fn show_areas(&self) -> bool {
-        self.show_click_areas || self.show_drop_areas || self.show_scroll_areas
     }
 }

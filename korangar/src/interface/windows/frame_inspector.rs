@@ -4,15 +4,15 @@ use std::time::Duration;
 use korangar_debug::profiling::{FrameMeasurement, Measurement};
 use korangar_interface::element::store::{ElementStore, ElementStoreMut};
 use korangar_interface::element::{BaseLayoutInfo, Element};
-use korangar_interface::event::EventQueue;
+use korangar_interface::event::{EventQueue, ScrollHandler};
 use korangar_interface::layout::area::Area;
 use korangar_interface::layout::tooltip::TooltipExt;
-use korangar_interface::layout::{Resolver, ScrollHandler, WindowLayout};
+use korangar_interface::layout::{Resolver, WindowLayout};
 use korangar_interface::prelude::{HorizontalAlignment, VerticalAlignment};
 use korangar_interface::window::{CustomWindow, Window};
 use rust_state::Context;
 
-use crate::graphics::{Color, CornerDiameter, ScreenPosition, ShadowPadding};
+use crate::graphics::{Color, CornerDiameter, ShadowPadding};
 use crate::interface::windows::profiler::color_lookup::ColorLookup;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
@@ -261,7 +261,7 @@ impl Element<ClientState> for FrameInspectorView {
             // `f32::abs`.
             inner.side_bias = f32::abs((1.0 / layout_info.area.width) * (layout.get_mouse_position().left - layout_info.area.left));
 
-            layout.add_scroll_area(layout_info.area, self);
+            layout.register_scroll_handler(self);
         }
 
         let mut colors = ColorLookup::default();
@@ -329,7 +329,7 @@ impl Element<ClientState> for FrameInspectorView {
 }
 
 impl ScrollHandler<ClientState> for FrameInspectorView {
-    fn handle_scroll(&self, _: &Context<ClientState>, _: &mut EventQueue<ClientState>, _: ScreenPosition, delta: f32) -> bool {
+    fn handle_scroll(&self, _: &Context<ClientState>, _: &mut EventQueue<ClientState>, delta: f32) -> bool {
         const ZOOM_SPEED: f32 = 0.004;
 
         let mut inner = self.inner.borrow_mut();

@@ -16,7 +16,7 @@ pub use self::resolver::{Resolver, ResolverSet};
 use crate::MouseMode;
 use crate::application::{Application, Clip, CornerDiameter, FontSize, Position, RenderLayer, ShadowPadding, Size, TextLayouter};
 use crate::element::id::{ElementId, FocusId};
-use crate::event::{ClickHandler, EventQueue};
+use crate::event::{ClickHandler, DropHandler, EventQueue, InputHandler, ScrollHandler};
 
 // Rename this to ButtonPress or something.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -83,48 +83,14 @@ struct TextInstruction<'a, App: Application> {
     overflow_behavior: App::OverflowBehavior,
 }
 
-struct ClickArea<'a, App> {
-    clip_id: ClipId,
-    area: Area,
-    mouse_button: MouseButton,
-    handler: &'a dyn ClickHandler<App>,
-}
-
-struct DropArea<'a, App> {
-    clip_id: ClipId,
-    area: Area,
-    handler: &'a dyn DropHandler<App>,
-}
-
-struct ScrollArea<'a, App> {
-    clip_id: ClipId,
-    area: Area,
-    handler: &'a dyn ScrollHandler<App>,
-}
-
-/// Handler for dropping a resource.
-pub trait DropHandler<App: Application> {
-    fn handle_drop(&self, state: &Context<App>, queue: &mut EventQueue<App>, mouse_mode: &MouseMode<App>);
-}
-
-/// Handler for scroll input.
-pub trait ScrollHandler<App: Application> {
-    fn handle_scroll(&self, state: &Context<App>, queue: &mut EventQueue<App>, mouse_position: App::Position, delta: f32) -> bool;
-}
-
-/// Handler for receiving keyboard input.
-pub trait InputHandler<App: Application> {
-    fn handle_character(&self, state: &Context<App>, queue: &mut EventQueue<App>, character: char);
-}
-
 struct LayoutLayer<'a, App: Application> {
     rectangle_instructions: Vec<RectangleInstruction<App>>,
     text_instructions: Vec<TextInstruction<'a, App>>,
     icon_instructions: Vec<IconInstruction<App>>,
     custom_instructions: Vec<<App::Renderer as RenderLayer<App>>::CustomInstruction<'a>>,
-    click_areas: Vec<ClickArea<'a, App>>,
-    drop_areas: Vec<DropArea<'a, App>>,
-    scroll_areas: Vec<ScrollArea<'a, App>>,
+    click_handlers: Vec<(MouseButton, &'a dyn ClickHandler<App>)>,
+    drop_handlers: Vec<&'a dyn DropHandler<App>>,
+    scroll_handlers: Vec<&'a dyn ScrollHandler<App>>,
     input_handlers: Vec<&'a dyn InputHandler<App>>,
 }
 
@@ -134,9 +100,9 @@ impl<App: Application> LayoutLayer<'_, App> {
         self.text_instructions.clear();
         self.icon_instructions.clear();
         self.custom_instructions.clear();
-        self.click_areas.clear();
-        self.drop_areas.clear();
-        self.scroll_areas.clear();
+        self.click_handlers.clear();
+        self.drop_handlers.clear();
+        self.scroll_handlers.clear();
         self.input_handlers.clear();
     }
 }
@@ -148,9 +114,9 @@ impl<App: Application> Default for LayoutLayer<'_, App> {
             text_instructions: Default::default(),
             icon_instructions: Default::default(),
             custom_instructions: Default::default(),
-            click_areas: Default::default(),
-            drop_areas: Default::default(),
-            scroll_areas: Default::default(),
+            click_handlers: Default::default(),
+            drop_handlers: Default::default(),
+            scroll_handlers: Default::default(),
             input_handlers: Default::default(),
         }
     }
@@ -208,16 +174,6 @@ impl HoverCheck {
 
         is_hovered
     }
-}
-
-/// Internal helper for bounding an area to a clip.
-fn apply_clip<T: Clip>(clip: T, area: Area) -> T {
-    T::new(
-        area.left.max(clip.left()),
-        area.top.max(clip.top()),
-        (area.left + area.width).min(clip.right()),
-        (area.top + area.height).min(clip.bottom()),
-    )
 }
 
 /// Internal helper for combining two clip.
@@ -408,35 +364,19 @@ impl<'a, App: Application> WindowLayout<'a, App> {
         previous
     }
 
-    pub fn add_click_area(&mut self, area: Area, button: MouseButton, handler: &'a dyn ClickHandler<App>) {
-        let clip_id = self.get_active_clip_id();
-        let area = self.scale_area(area);
-
-        self.layers[self.current_layer].click_areas.push(ClickArea {
-            clip_id,
-            area,
-            mouse_button: button,
-            handler,
-        });
+    pub fn register_click_handler(&mut self, button: MouseButton, handler: &'a dyn ClickHandler<App>) {
+        self.layers[self.current_layer].click_handlers.push((button, handler));
     }
 
-    pub fn add_drop_area(&mut self, area: Area, handler: &'a dyn DropHandler<App>) {
-        let clip_id = self.get_active_clip_id();
-        let area = self.scale_area(area);
-
-        self.layers[self.current_layer].drop_areas.push(DropArea { clip_id, area, handler });
+    pub fn register_drop_handler(&mut self, handler: &'a dyn DropHandler<App>) {
+        self.layers[self.current_layer].drop_handlers.push(handler);
     }
 
-    pub fn add_scroll_area(&mut self, area: Area, handler: &'a dyn ScrollHandler<App>) {
-        let clip_id = self.get_active_clip_id();
-        let area = self.scale_area(area);
-
-        self.layers[self.current_layer]
-            .scroll_areas
-            .push(ScrollArea { clip_id, area, handler });
+    pub fn register_scroll_handler(&mut self, handler: &'a dyn ScrollHandler<App>) {
+        self.layers[self.current_layer].scroll_handlers.push(handler);
     }
 
-    pub fn add_input_handler(&mut self, input_handler: &'a dyn InputHandler<App>) {
+    pub fn register_input_handler(&mut self, input_handler: &'a dyn InputHandler<App>) {
         self.layers[self.current_layer].input_handlers.push(input_handler);
     }
 
@@ -541,75 +481,6 @@ impl<'a, App: Application> WindowLayout<'a, App> {
             });
 
             found
-        });
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn render_click_areas(
-        &self,
-        renderer: &App::Renderer,
-        color: App::Color,
-        shadow_color: App::Color,
-        shadow_padding: App::ShadowPadding,
-    ) {
-        self.layers.iter().for_each(|layer| {
-            layer.click_areas.iter().for_each(|click_area| {
-                renderer.render_rectangle(
-                    App::Position::new(click_area.area.left, click_area.area.top),
-                    App::Size::new(click_area.area.width, click_area.area.height),
-                    App::Clip::unbound(),
-                    App::CornerDiameter::new(0.0, 0.0, 0.0, 0.0),
-                    color,
-                    shadow_color,
-                    shadow_padding,
-                );
-            });
-        });
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn render_drop_areas(
-        &self,
-        renderer: &App::Renderer,
-        color: App::Color,
-        shadow_color: App::Color,
-        shadow_padding: App::ShadowPadding,
-    ) {
-        self.layers.iter().for_each(|layer| {
-            layer.drop_areas.iter().for_each(|drop_area| {
-                renderer.render_rectangle(
-                    App::Position::new(drop_area.area.left, drop_area.area.top),
-                    App::Size::new(drop_area.area.width, drop_area.area.height),
-                    App::Clip::unbound(),
-                    App::CornerDiameter::new(0.0, 0.0, 0.0, 0.0),
-                    color,
-                    shadow_color,
-                    shadow_padding,
-                );
-            });
-        });
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn render_scroll_areas(
-        &self,
-        renderer: &App::Renderer,
-        color: App::Color,
-        shadow_color: App::Color,
-        shadow_padding: App::ShadowPadding,
-    ) {
-        self.layers.iter().for_each(|layer| {
-            layer.scroll_areas.iter().for_each(|scroll_area| {
-                renderer.render_rectangle(
-                    App::Position::new(scroll_area.area.left, scroll_area.area.top),
-                    App::Size::new(scroll_area.area.width, scroll_area.area.height),
-                    App::Clip::unbound(),
-                    App::CornerDiameter::new(0.0, 0.0, 0.0, 0.0),
-                    color,
-                    shadow_color,
-                    shadow_padding,
-                );
-            });
         });
     }
 
@@ -750,81 +621,32 @@ impl<'a, App: Application> WindowLayout<'a, App> {
         }
     }
 
-    pub fn handle_click(
-        &self,
-        state: &Context<App>,
-        queue: &mut EventQueue<App>,
-        click_position: App::Position,
-        mouse_button: MouseButton,
-    ) -> bool {
-        let mut clicked = false;
-
+    pub fn handle_click(&self, state: &Context<App>, queue: &mut EventQueue<App>, mouse_button: MouseButton) {
         for layer in self.layers.iter().rev() {
-            for click_area in &layer.click_areas {
-                let clip = self.clips[click_area.clip_id.0];
-                let clip = apply_clip(clip, click_area.area);
-
-                if click_area.mouse_button == mouse_button
-                    && click_position.left() >= clip.left()
-                    && click_position.left() <= clip.right()
-                    && click_position.top() >= clip.top()
-                    && click_position.top() <= clip.bottom()
-                {
-                    click_area.handler.execute(state, queue);
-                    clicked = true;
+            for (registered_button, click_handler) in &layer.click_handlers {
+                if *registered_button == mouse_button {
+                    click_handler.handle_click(state, queue);
                 }
             }
         }
-
-        clicked
     }
 
-    pub fn handle_drop(
-        &self,
-        state: &Context<App>,
-        queue: &mut EventQueue<App>,
-        drop_position: App::Position,
-        mouse_mode: &'a MouseMode<App>,
-    ) -> bool {
-        let mut handled = false;
-
+    pub fn handle_drop(&self, state: &Context<App>, queue: &mut EventQueue<App>, mouse_mode: &'a MouseMode<App>) {
         for layer in self.layers.iter().rev() {
-            for drop_area in &layer.drop_areas {
-                let clip = self.clips[drop_area.clip_id.0];
-                let clip = apply_clip(clip, drop_area.area);
-
-                if drop_position.left() >= clip.left()
-                    && drop_position.left() <= clip.right()
-                    && drop_position.top() >= clip.top()
-                    && drop_position.top() <= clip.bottom()
-                {
-                    drop_area.handler.handle_drop(state, queue, mouse_mode);
-                    handled = true;
-                }
+            for drop_handler in &layer.drop_handlers {
+                drop_handler.handle_drop(state, queue, mouse_mode);
             }
         }
-
-        handled
     }
 
-    pub fn handle_scroll(&self, state: &Context<App>, queue: &mut EventQueue<App>, mouse_position: App::Position, delta: f32) -> bool {
+    pub fn handle_scroll(&self, state: &Context<App>, queue: &mut EventQueue<App>, delta: f32) {
         for layer in self.layers.iter().rev() {
-            for scroll_area in &layer.scroll_areas {
-                let clip = self.clips[scroll_area.clip_id.0];
-                let clip = apply_clip(clip, scroll_area.area);
-
-                if mouse_position.left() >= clip.left()
-                    && mouse_position.left() <= clip.right()
-                    && mouse_position.top() >= clip.top()
-                    && mouse_position.top() <= clip.bottom()
-                    && scroll_area.handler.handle_scroll(state, queue, mouse_position, delta)
-                {
-                    return true;
+            for scroll_handler in &layer.scroll_handlers {
+                if scroll_handler.handle_scroll(state, queue, delta) {
+                    return;
                 }
             }
         }
-
-        false
     }
 
     pub fn handle_character(&self, state: &Context<App>, queue: &mut EventQueue<App>, character: char) -> bool {

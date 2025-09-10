@@ -120,7 +120,7 @@ where
         let is_hoverered = layout_info.area.check().run(layout);
 
         if is_hoverered {
-            layout.add_click_area(layout_info.area, MouseButton::Left, &self.event);
+            layout.register_click_handler(MouseButton::Left, &self.event);
         }
 
         let background_color = match is_hoverered {
@@ -285,7 +285,7 @@ where
     A: Path<App, Value>,
     B: Selector<App, Vec<Item>> + Clone,
 {
-    fn execute(&self, _: &Context<App>, queue: &mut EventQueue<App>) {
+    fn handle_click(&self, _: &Context<App>, queue: &mut EventQueue<App>) {
         let element = ErasedElement::new(scroll_view! {
             children: (
                 InnerElement {
@@ -529,7 +529,7 @@ where
         let is_hoverered = layout_info.area.check().run(layout);
 
         if is_hoverered {
-            layout.add_click_area(layout_info.area, MouseButton::Left, &self.click_handler.overlay_element);
+            layout.register_click_handler(MouseButton::Left, &self.click_handler.overlay_element);
         }
 
         let background_color = match is_hoverered {

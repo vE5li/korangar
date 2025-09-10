@@ -732,7 +732,7 @@ where
                 let is_hoverered = layout_info.area.check().run(layout);
 
                 if is_hoverered {
-                    layout.add_click_area(layout_info.area, MouseButton::Left, &self.event);
+                    layout.register_click_handler(MouseButton::Left, &self.event);
 
                     struct ClearTooltip;
                     layout.add_tooltip("Clear the entire vector", ClearTooltip.tooltip_id());

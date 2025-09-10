@@ -63,7 +63,7 @@ mod character_slot_preview {
         A: Path<ClientState, Option<usize>>,
         B: Path<ClientState, CharacterInformation, false>,
     {
-        fn execute(&self, _: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
+        fn handle_click(&self, _: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
             use korangar_interface::prelude::*;
 
             let slot = self.slot;
@@ -208,7 +208,7 @@ mod character_slot_preview {
                     );
 
                     if is_hoverered {
-                        layout.add_click_area(layout_info.area, MouseButton::Left, &self.click_handler.cancel_switch);
+                        layout.register_click_handler(MouseButton::Left, &self.click_handler.cancel_switch);
                     }
                 } else {
                     layout.add_text(
@@ -223,7 +223,7 @@ mod character_slot_preview {
                     );
 
                     if is_hoverered {
-                        layout.add_click_area(layout_info.area, MouseButton::Left, &self.click_handler.request_switch);
+                        layout.register_click_handler(MouseButton::Left, &self.click_handler.request_switch);
                     }
                 }
 
@@ -331,8 +331,8 @@ mod character_slot_preview {
                 );
 
                 if is_hoverered {
-                    layout.add_click_area(layout_info.area, MouseButton::Left, &self.click_handler.select_character);
-                    layout.add_click_area(layout_info.area, MouseButton::Right, &self.overlay_handler);
+                    layout.register_click_handler(MouseButton::Left, &self.click_handler.select_character);
+                    layout.register_click_handler(MouseButton::Right, &self.overlay_handler);
 
                     {
                         struct PrivateTooltipId;
@@ -366,7 +366,7 @@ mod character_slot_preview {
                 );
 
                 if is_hoverered {
-                    layout.add_click_area(layout_info.area, MouseButton::Left, &self.click_handler.create_character);
+                    layout.register_click_handler(MouseButton::Left, &self.click_handler.create_character);
                 }
             }
         }
@@ -416,7 +416,7 @@ mod character_slot_preview {
     }
 
     impl ClickHandler<ClientState> for SelectCharacter {
-        fn execute(&self, _: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
+        fn handle_click(&self, _: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
             queue.queue(InputEvent::SelectCharacter { slot: self.slot });
         }
     }
@@ -426,7 +426,7 @@ mod character_slot_preview {
     }
 
     impl ClickHandler<ClientState> for CreateCharacter {
-        fn execute(&self, _: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
+        fn handle_click(&self, _: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
             queue.queue(InputEvent::OpenCharacterCreationWindow { slot: self.slot });
         }
     }
@@ -439,7 +439,7 @@ mod character_slot_preview {
     where
         P: Path<ClientState, Option<usize>>,
     {
-        fn execute(&self, state: &Context<ClientState>, _: &mut EventQueue<ClientState>) {
+        fn handle_click(&self, state: &Context<ClientState>, _: &mut EventQueue<ClientState>) {
             state.update_value(self.switch_request, None);
         }
     }
@@ -453,7 +453,7 @@ mod character_slot_preview {
     where
         P: Path<ClientState, Option<usize>>,
     {
-        fn execute(&self, state: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
+        fn handle_click(&self, state: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
             // SAFETY
             // We should not be able to get here if there is no switch request, so it's
             // fine to unwrap.

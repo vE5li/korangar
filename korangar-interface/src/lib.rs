@@ -687,57 +687,6 @@ impl<App: Application> InterfaceFrame<'_, App> {
         self.hovered_window.is_some()
     }
 
-    #[cfg(feature = "debug")]
-    pub fn render_click_areas(
-        &self,
-        renderer: &App::Renderer,
-        color: App::Color,
-        shadow_color: App::Color,
-        shadow_padding: App::ShadowPadding,
-    ) {
-        self.window_layouts
-            .values()
-            .for_each(|layout| layout.render_click_areas(renderer, color, shadow_color, shadow_padding));
-
-        if let Some(overlay_layout) = &self.overlay_layout {
-            overlay_layout.render_click_areas(renderer, color, shadow_color, shadow_padding);
-        }
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn render_drop_areas(
-        &self,
-        renderer: &App::Renderer,
-        color: App::Color,
-        shadow_color: App::Color,
-        shadow_padding: App::ShadowPadding,
-    ) {
-        self.window_layouts
-            .values()
-            .for_each(|layout| layout.render_drop_areas(renderer, color, shadow_color, shadow_padding));
-
-        if let Some(overlay_layout) = &self.overlay_layout {
-            overlay_layout.render_drop_areas(renderer, color, shadow_color, shadow_padding);
-        }
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn render_scroll_areas(
-        &self,
-        renderer: &App::Renderer,
-        color: App::Color,
-        shadow_color: App::Color,
-        shadow_padding: App::ShadowPadding,
-    ) {
-        self.window_layouts
-            .values()
-            .for_each(|layout| layout.render_scroll_areas(renderer, color, shadow_color, shadow_padding));
-
-        if let Some(overlay_layout) = &self.overlay_layout {
-            overlay_layout.render_scroll_areas(renderer, color, shadow_color, shadow_padding);
-        }
-    }
-
     #[cfg_attr(feature = "debug", korangar_debug::profile("render user interface"))]
     pub fn render(
         &mut self,
@@ -894,7 +843,7 @@ impl<App: Application> InterfaceFrame<'_, App> {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn click(&mut self, state: &Context<App>, click_position: App::Position, mouse_button: MouseButton) {
+    pub fn click(&mut self, state: &Context<App>, mouse_button: MouseButton) {
         self.event_queue.queue(Event::Unfocus);
         self.event_queue.queue(Event::CloseOverlay);
 
@@ -902,50 +851,44 @@ impl<App: Application> InterfaceFrame<'_, App> {
             self.event_queue.queue(Event::MoveWindowToTop { window_id: hovered_window });
         }
 
-        if let Some(layout) = &self.overlay_layout
-            && layout.handle_click(state, self.event_queue, click_position, mouse_button)
-        {
-            return;
+        if let Some(layout) = &self.overlay_layout {
+            layout.handle_click(state, self.event_queue, mouse_button);
         }
 
         if let Some(window_id) = &self.hovered_window {
             let layout = self.window_layouts.get(window_id).unwrap();
 
-            layout.handle_click(state, self.event_queue, click_position, mouse_button);
+            layout.handle_click(state, self.event_queue, mouse_button);
         }
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn drop(&mut self, state: &Context<App>, drop_position: App::Position) {
+    pub fn drop(&mut self, state: &Context<App>) {
         self.event_queue.queue(Event::SetMouseMode {
             mouse_mode: MouseMode::Default,
         });
 
-        if let Some(layout) = &self.overlay_layout
-            && layout.handle_drop(state, self.event_queue, drop_position, self.mouse_mode)
-        {
-            return;
+        if let Some(layout) = &self.overlay_layout {
+            layout.handle_drop(state, self.event_queue, self.mouse_mode);
         }
 
         if let Some(window_id) = &self.hovered_window {
             let layout = self.window_layouts.get(window_id).unwrap();
 
-            layout.handle_drop(state, self.event_queue, drop_position, self.mouse_mode);
+            layout.handle_drop(state, self.event_queue, self.mouse_mode);
         }
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn scroll(&mut self, state: &Context<App>, mouse_position: App::Position, delta: f32) {
-        if let Some(layout) = &self.overlay_layout
-            && layout.handle_scroll(state, self.event_queue, mouse_position, delta)
-        {
-            return;
+    pub fn scroll(&mut self, state: &Context<App>, delta: f32) {
+        if let Some(layout) = &self.overlay_layout {
+            layout.handle_scroll(state, self.event_queue, delta);
         }
 
         if let Some(window_id) = &self.hovered_window {
             let layout = self.window_layouts.get(window_id).unwrap();
 
-            layout.handle_scroll(state, self.event_queue, mouse_position, delta);
+            layout.handle_scroll(state, self.event_queue, delta);
         }
     }
 

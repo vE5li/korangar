@@ -254,24 +254,6 @@ where
                         state: self.render_options_path.show_sdf_instructions(),
                         event: Toggle(self.render_options_path.show_sdf_instructions()),
                     },
-                    state_button! {
-                        text: "Show click areas",
-                        tooltip: "Show all ^000001click areas^000000. In most cases click areas should only exist for ^000001hovered components^000000.",
-                        state: self.render_options_path.show_click_areas(),
-                        event: Toggle(self.render_options_path.show_click_areas()),
-                    },
-                    state_button! {
-                        text: "Show drop areas",
-                        tooltip: "Show all ^000001drop areas^000000. In most cases drop areas should only exist for ^000001hovered components^000000.",
-                        state: self.render_options_path.show_drop_areas(),
-                        event: Toggle(self.render_options_path.show_drop_areas()),
-                    },
-                    state_button! {
-                        text: "Show scroll areas",
-                        tooltip: "Show all ^000001scroll areas^000000. In most cases scroll areas should only exist for ^000001hovered components^000000.",
-                        state: self.render_options_path.show_scroll_areas(),
-                        event: Toggle(self.render_options_path.show_scroll_areas()),
-                    },
                 ),
             },
             collapsable! {

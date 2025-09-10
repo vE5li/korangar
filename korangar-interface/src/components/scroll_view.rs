@@ -6,8 +6,9 @@ use rust_state::{Context, Selector};
 use crate::application::Application;
 use crate::element::store::{ElementStore, ElementStoreMut, Persistent, PersistentExt};
 use crate::element::{Element, ElementSet};
+use crate::event::ScrollHandler;
 use crate::layout::area::Area;
-use crate::layout::{Resolver, ScrollHandler, WindowLayout};
+use crate::layout::{Resolver, WindowLayout};
 use crate::prelude::EventQueue;
 
 /// If the current scroll is this far away from the maximum scroll the scroll
@@ -39,7 +40,7 @@ impl<App> ScrollHandler<App> for PersistentData
 where
     App: Application,
 {
-    fn handle_scroll(&self, _: &Context<App>, _: &mut EventQueue<App>, _: <App as Application>::Position, delta: f32) -> bool {
+    fn handle_scroll(&self, _: &Context<App>, _: &mut EventQueue<App>, delta: f32) -> bool {
         let mut inner = self.inner.borrow_mut();
 
         // Don't try to scroll if its already at the minimum or maximum scroll value.
@@ -154,7 +155,7 @@ where
         let persistent = self.get_persistent_data(&store, ());
 
         if layout_info.area.check().dont_mark().run(layout) {
-            layout.add_scroll_area(layout_info.area, persistent);
+            layout.register_scroll_handler(persistent);
         }
 
         layout.with_clip(layout_info.area, |layout| {

@@ -186,7 +186,7 @@ where
                     layout.add_tooltip(disabled_tooltip, ButtonTooltip.tooltip_id());
                 }
             } else {
-                layout.add_click_area(layout_info.area, MouseButton::Left, &self.event);
+                layout.register_click_handler(MouseButton::Left, &self.event);
             }
         }
 

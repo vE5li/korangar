@@ -105,8 +105,6 @@ use crate::interface::windows::*;
 use crate::loaders::*;
 #[cfg(feature = "debug")]
 use crate::renderer::DebugMarkerRenderer;
-#[cfg(feature = "debug")]
-use crate::renderer::InterfaceFrameExt;
 use crate::renderer::{AlignHorizontal, EffectRenderer, GameInterfaceRenderer};
 use crate::settings::{GraphicsSettings, LightingMode};
 use crate::system::GameTimer;
@@ -2733,7 +2731,7 @@ impl Client {
 
                     if let Some(mouse_button) = input_report.mouse_click {
                         if is_interface_hovered {
-                            interface_frame.click(&self.client_state, input_report.mouse_position, mouse_button);
+                            interface_frame.click(&self.client_state, mouse_button);
                         } else {
                             interface_frame.unfocus();
 
@@ -2776,12 +2774,12 @@ impl Client {
                     }
 
                     if input_report.mouse_button_released {
-                        interface_frame.drop(&self.client_state, input_report.mouse_position);
+                        interface_frame.drop(&self.client_state);
                     }
 
                     if let Some(delta) = input_report.scroll {
                         if is_interface_hovered {
-                            interface_frame.scroll(&self.client_state, input_report.mouse_position, delta);
+                            interface_frame.scroll(&self.client_state, delta);
                         } else {
                             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(!render_options.use_debug_camera))]
                             self.input_event_buffer.push(InputEvent::ZoomCamera { zoom_factor: delta });
@@ -2867,12 +2865,6 @@ impl Client {
                     tooltip_theme,
                     input_report.mouse_position,
                 );
-
-                #[cfg(feature = "debug")]
-                if render_options.show_areas() {
-                    self.interface_renderer
-                        .with_rectangles_direct(|interface_renderer| interface_frame.render_areas(interface_renderer, &render_options));
-                }
 
                 std::mem::drop(interface_frame);
 

@@ -253,7 +253,7 @@ where
                         A: Path<ClientState, ShopItem<(ResourceMetadata, u32)>>,
                         B: Path<ClientState, Vec<ShopItem<(ResourceMetadata, u32)>>>,
                     {
-                        fn execute(&self, state: &Context<ClientState>, _: &mut EventQueue<ClientState>) {
+                        fn handle_click(&self, state: &Context<ClientState>, _: &mut EventQueue<ClientState>) {
                             let item_id = state.get(&self.item_path).item_id;
                             let amount = self.amount;
 

@@ -58,7 +58,7 @@ impl<App> ClickHandler<App> for CollapsableData
 where
     App: Application,
 {
-    fn execute(&self, _: &Context<App>, _: &mut EventQueue<App>) {
+    fn handle_click(&self, _: &Context<App>, _: &mut EventQueue<App>) {
         let mut expanded = self.expanded.borrow_mut();
         *expanded = !*expanded;
     }
@@ -336,7 +336,7 @@ where
             }
 
             let persistent = self.get_persistent_data(&store, *state.get(&self.initially_expanded));
-            layout.add_click_area(title_area, MouseButton::Left, persistent);
+            layout.register_click_handler(MouseButton::Left, persistent);
         }
 
         let icon_offset = icon_size + icon_spacing * 4.0;

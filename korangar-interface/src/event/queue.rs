@@ -63,7 +63,7 @@ impl<App: Application> Clone for Event<App> {
 }
 
 impl<App: Application> ClickHandler<App> for Event<App> {
-    fn execute(&self, _: &Context<App>, queue: &mut EventQueue<App>) {
+    fn handle_click(&self, _: &Context<App>, queue: &mut EventQueue<App>) {
         queue.queue(self.clone());
     }
 }

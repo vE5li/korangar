@@ -157,7 +157,7 @@ where
             layout.add_scroll_area(layout_info.area, persistent);
         }
 
-        layout.with_clip_layer(layout_info.area, |layout| {
+        layout.with_clip(layout_info.area, |layout| {
             layout.with_layer(|layout| {
                 // HACK: We need to do the same as in `create_layout_info`.
                 self.children.lay_out(state, store.child_store(0), &layout_info.children, layout);

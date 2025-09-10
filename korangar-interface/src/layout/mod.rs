@@ -56,7 +56,7 @@ pub enum Icon<App: Application> {
 }
 
 struct RectangleInstruction<App: Application> {
-    clip_layer: ClipLayerId,
+    clip_id: ClipId,
     area: Area,
     corner_diameter: App::CornerDiameter,
     color: App::Color,
@@ -65,14 +65,14 @@ struct RectangleInstruction<App: Application> {
 }
 
 struct IconInstruction<App: Application> {
-    clip_layer: ClipLayerId,
+    clip_id: ClipId,
     icon: Icon<App>,
     area: Area,
     color: App::Color,
 }
 
 struct TextInstruction<'a, App: Application> {
-    clip_layer: ClipLayerId,
+    clip_id: ClipId,
     area: Area,
     text: &'a str,
     font_size: App::FontSize,
@@ -84,20 +84,20 @@ struct TextInstruction<'a, App: Application> {
 }
 
 struct ClickArea<'a, App> {
-    clip_layer: ClipLayerId,
+    clip_id: ClipId,
     area: Area,
     mouse_button: MouseButton,
     handler: &'a dyn ClickHandler<App>,
 }
 
 struct DropArea<'a, App> {
-    clip_layer: ClipLayerId,
+    clip_id: ClipId,
     area: Area,
     handler: &'a dyn DropHandler<App>,
 }
 
 struct ScrollArea<'a, App> {
-    clip_layer: ClipLayerId,
+    clip_id: ClipId,
     area: Area,
     handler: &'a dyn ScrollHandler<App>,
 }
@@ -157,31 +157,11 @@ impl<App: Application> Default for LayoutLayer<'_, App> {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub struct ClipLayerId(usize);
+pub struct ClipId(usize);
 
-impl ClipLayerId {
+impl ClipId {
     pub fn as_index(&self) -> usize {
         self.0
-    }
-}
-
-pub struct ClipLayer<App: Application> {
-    parent: Option<ClipLayerId>,
-    clip: App::Clip,
-}
-
-impl<App: Application> ClipLayer<App> {
-    pub fn get(&self) -> App::Clip {
-        self.clip
-    }
-}
-
-impl<App: Application> Clone for ClipLayer<App> {
-    fn clone(&self) -> Self {
-        Self {
-            parent: self.parent,
-            clip: self.clip,
-        }
     }
 }
 
@@ -210,16 +190,19 @@ impl HoverCheck {
         self
     }
 
-    /// This currently doesn't respect the clip since we don't have the clip
-    /// when performing this check. Maybe this will be changed in the
-    /// future.
     pub fn run<App: Application>(&mut self, layout: &mut WindowLayout<'_, App>) -> bool {
+        let clip = &layout.clips[layout.active_clips.last().unwrap().0];
+
         let is_hovered = layout.can_be_hovered
             && (!self.check_mouse_mode || layout.mouse_mode.as_ref().unwrap().is_default())
             && layout.mouse_position.left() >= self.area.left
             && layout.mouse_position.top() >= self.area.top
             && layout.mouse_position.left() <= self.area.left + self.area.width
-            && layout.mouse_position.top() <= self.area.top + self.area.height;
+            && layout.mouse_position.top() <= self.area.top + self.area.height
+            && layout.mouse_position.left() >= clip.left()
+            && layout.mouse_position.left() <= clip.right()
+            && layout.mouse_position.top() >= clip.top()
+            && layout.mouse_position.top() <= clip.bottom();
 
         layout.can_be_hovered &= !(is_hovered && self.mark_after);
 
@@ -253,8 +236,8 @@ pub struct WindowLayout<'a, App: Application> {
     is_hovered: bool,
     can_be_hovered: bool,
 
-    clip_layers: Vec<ClipLayer<App>>,
-    active_clip_layers: Vec<ClipLayerId>,
+    clips: Vec<App::Clip>,
+    active_clips: Vec<ClipId>,
 
     mouse_position: App::Position,
     focused_element: Option<ElementId>,
@@ -280,11 +263,8 @@ impl<App: Application> Default for WindowLayout<'_, App> {
             is_hovered: false,
             can_be_hovered: false,
 
-            clip_layers: vec![ClipLayer {
-                parent: None,
-                clip: App::Clip::unbound(),
-            }],
-            active_clip_layers: vec![ClipLayerId(0)],
+            clips: vec![App::Clip::unbound()],
+            active_clips: vec![ClipId(0)],
 
             mouse_position: App::Position::new(0.0, 0.0),
             focused_element: None,
@@ -315,11 +295,8 @@ impl<'a, App: Application> WindowLayout<'a, App> {
     pub fn clear(&mut self) {
         self.layers.iter_mut().for_each(LayoutLayer::clear);
 
-        self.clip_layers.clear();
-        self.clip_layers.push(ClipLayer {
-            parent: None,
-            clip: App::Clip::unbound(),
-        });
+        self.clips.clear();
+        self.clips.push(App::Clip::unbound());
 
         self.tooltips.clear();
         self.focus_id_lookup.clear();
@@ -403,38 +380,22 @@ impl<'a, App: Application> WindowLayout<'a, App> {
         self.pop_layer();
     }
 
-    fn new_clip_layer(&mut self) -> ClipLayerId {
-        let id = ClipLayerId(self.clip_layers.len());
-        let parent = *self.active_clip_layers.last().unwrap();
-
-        self.clip_layers.push(ClipLayer {
-            parent: Some(parent),
-            clip: App::Clip::new(0.0, 0.0, 0.0, 0.0),
-        });
-        self.active_clip_layers.push(id);
-
-        id
-    }
-
-    fn set_layer_clip(&mut self, clip_layer_id: ClipLayerId, area: Area) {
-        let area = self.scale_area(area);
+    pub fn with_clip(&mut self, area: Area, mut f: impl FnMut(&mut Self)) {
         let clip = App::Clip::new(area.left, area.top, area.left + area.width, area.top + area.height);
+        let parent_clip = self.clips[self.active_clips.last().unwrap().0];
 
-        self.clip_layers[clip_layer_id.0].clip = clip;
+        let combined_clip = combine_clip(clip, parent_clip);
 
-        self.active_clip_layers.pop();
-    }
-
-    pub fn with_clip_layer(&mut self, area: Area, mut f: impl FnMut(&mut Self)) {
-        let handle = self.new_clip_layer();
+        self.active_clips.push(ClipId(self.clips.len()));
+        self.clips.push(combined_clip);
 
         f(self);
 
-        self.set_layer_clip(handle, area);
+        self.active_clips.pop();
     }
 
-    pub fn get_active_clip_layer(&self) -> ClipLayerId {
-        self.active_clip_layers.last().copied().unwrap()
+    pub fn get_active_clip_id(&self) -> ClipId {
+        self.active_clips.last().copied().unwrap()
     }
 
     pub fn with_secondary_background(&mut self, f: impl Fn(&mut Self)) -> bool {
@@ -448,11 +409,11 @@ impl<'a, App: Application> WindowLayout<'a, App> {
     }
 
     pub fn add_click_area(&mut self, area: Area, button: MouseButton, handler: &'a dyn ClickHandler<App>) {
-        let clip_layer = self.get_active_clip_layer();
+        let clip_id = self.get_active_clip_id();
         let area = self.scale_area(area);
 
         self.layers[self.current_layer].click_areas.push(ClickArea {
-            clip_layer,
+            clip_id,
             area,
             mouse_button: button,
             handler,
@@ -460,21 +421,19 @@ impl<'a, App: Application> WindowLayout<'a, App> {
     }
 
     pub fn add_drop_area(&mut self, area: Area, handler: &'a dyn DropHandler<App>) {
-        let clip_layer = self.get_active_clip_layer();
+        let clip_id = self.get_active_clip_id();
         let area = self.scale_area(area);
 
-        self.layers[self.current_layer]
-            .drop_areas
-            .push(DropArea { clip_layer, area, handler });
+        self.layers[self.current_layer].drop_areas.push(DropArea { clip_id, area, handler });
     }
 
     pub fn add_scroll_area(&mut self, area: Area, handler: &'a dyn ScrollHandler<App>) {
-        let clip_layer = self.get_active_clip_layer();
+        let clip_id = self.get_active_clip_id();
         let area = self.scale_area(area);
 
         self.layers[self.current_layer]
             .scroll_areas
-            .push(ScrollArea { clip_layer, area, handler });
+            .push(ScrollArea { clip_id, area, handler });
     }
 
     pub fn add_input_handler(&mut self, input_handler: &'a dyn InputHandler<App>) {
@@ -489,13 +448,13 @@ impl<'a, App: Application> WindowLayout<'a, App> {
         shadow_color: App::Color,
         shadow_padding: App::ShadowPadding,
     ) {
-        let clip_layer = self.get_active_clip_layer();
+        let clip_id = self.get_active_clip_id();
         let area = self.scale_area(area);
         let corner_diameter = corner_diameter.scaled(self.interface_scaling);
         let shadow_padding = shadow_padding.scaled(self.interface_scaling);
 
         self.layers[self.current_layer].rectangle_instructions.push(RectangleInstruction {
-            clip_layer,
+            clip_id,
             area,
             corner_diameter,
             color,
@@ -516,14 +475,14 @@ impl<'a, App: Application> WindowLayout<'a, App> {
         vertical_alignment: VerticalAlignment,
         overflow_behavior: App::OverflowBehavior,
     ) {
-        let clip_layer = self.get_active_clip_layer();
+        let clip_id = self.get_active_clip_id();
         let area = self.scale_area(area);
         let font_size = font_size.scaled(self.interface_scaling);
         let horizontal_alignment = horizontal_alignment.scaled(self.interface_scaling);
         let vertical_alignment = vertical_alignment.scaled(self.interface_scaling);
 
         self.layers[self.current_layer].text_instructions.push(TextInstruction {
-            clip_layer,
+            clip_id,
             area,
             text,
             font_size,
@@ -536,11 +495,11 @@ impl<'a, App: Application> WindowLayout<'a, App> {
     }
 
     pub fn add_icon(&mut self, area: Area, icon: Icon<App>, color: App::Color) {
-        let clip_layer = self.get_active_clip_layer();
+        let clip_id = self.get_active_clip_id();
         let area = self.scale_area(area);
 
         self.layers[self.current_layer].icon_instructions.push(IconInstruction {
-            clip_layer,
+            clip_id,
             area,
             icon,
             color,
@@ -656,15 +615,16 @@ impl<'a, App: Application> WindowLayout<'a, App> {
 
     #[cfg_attr(feature = "debug", korangar_debug::profile("render layout"))]
     pub fn render(&mut self, renderer: &App::Renderer, text_layouter: &App::TextLayouter) {
-        for index in 0..self.clip_layers.len() {
-            let layer = self.clip_layers[index].clone();
-            let layer_id = ClipLayerId(index);
-
-            for child_layer in &mut self.clip_layers[index + 1..] {
-                if child_layer.parent.is_some_and(|id| id == layer_id) {
-                    child_layer.clip = combine_clip(child_layer.clip, layer.clip);
-                }
-            }
+        // NOTE: For now we scale the clip layers when rendering because we need the
+        // unscaled clip for testing mouse interfection with areas. Ideally this
+        // can be moved to `with_clip` at some point.
+        for clip in &mut self.clips {
+            *clip = App::Clip::new(
+                (clip.left() - self.window_position.left()) * self.interface_scaling + self.window_position.left(),
+                (clip.top() - self.window_position.top()) * self.interface_scaling + self.window_position.top(),
+                (clip.right() - self.window_position.left()) * self.interface_scaling + self.window_position.left(),
+                (clip.bottom() - self.window_position.top()) * self.interface_scaling + self.window_position.top(),
+            );
         }
 
         for layer in self.layers.iter_mut() {
@@ -673,7 +633,7 @@ impl<'a, App: Application> WindowLayout<'a, App> {
 
             layer.rectangle_instructions.drain(..).for_each(
                 |RectangleInstruction {
-                     clip_layer,
+                     clip_id,
                      area,
                      corner_diameter,
                      color,
@@ -683,7 +643,7 @@ impl<'a, App: Application> WindowLayout<'a, App> {
                     #[cfg(feature = "debug")]
                     korangar_debug::profile_block!("rectangle instruction");
 
-                    let clip = self.clip_layers[clip_layer.0].clip;
+                    let clip = self.clips[clip_id.0];
 
                     renderer.render_rectangle(
                         App::Position::new(area.left, area.top),
@@ -699,7 +659,7 @@ impl<'a, App: Application> WindowLayout<'a, App> {
 
             layer.icon_instructions.drain(..).for_each(
                 |IconInstruction {
-                     clip_layer,
+                     clip_id,
                      icon,
                      area,
                      color,
@@ -707,7 +667,7 @@ impl<'a, App: Application> WindowLayout<'a, App> {
                     #[cfg(feature = "debug")]
                     korangar_debug::profile_block!("icon instruction");
 
-                    let clip = self.clip_layers[clip_layer.0].clip;
+                    let clip = self.clips[clip_id.0];
 
                     renderer.render_icon(
                         App::Position::new(area.left, area.top),
@@ -723,12 +683,12 @@ impl<'a, App: Application> WindowLayout<'a, App> {
                 #[cfg(feature = "debug")]
                 korangar_debug::profile_block!("custom instruction");
 
-                renderer.render_custom(instruction, &self.clip_layers);
+                renderer.render_custom(instruction, &self.clips);
             });
 
             layer.text_instructions.drain(..).for_each(
                 |TextInstruction {
-                     clip_layer,
+                     clip_id,
                      area,
                      text,
                      font_size,
@@ -741,7 +701,7 @@ impl<'a, App: Application> WindowLayout<'a, App> {
                     #[cfg(feature = "debug")]
                     korangar_debug::profile_block!("text instruction");
 
-                    let clip = self.clip_layers[clip_layer.0].clip;
+                    let clip = self.clips[clip_id.0];
 
                     let available_width = match horizontal_alignment {
                         HorizontalAlignment::Left { offset, border } => area.width - offset - border,
@@ -801,7 +761,7 @@ impl<'a, App: Application> WindowLayout<'a, App> {
 
         for layer in self.layers.iter().rev() {
             for click_area in &layer.click_areas {
-                let clip = self.clip_layers[click_area.clip_layer.0].clip;
+                let clip = self.clips[click_area.clip_id.0];
                 let clip = apply_clip(clip, click_area.area);
 
                 if click_area.mouse_button == mouse_button
@@ -830,7 +790,7 @@ impl<'a, App: Application> WindowLayout<'a, App> {
 
         for layer in self.layers.iter().rev() {
             for drop_area in &layer.drop_areas {
-                let clip = self.clip_layers[drop_area.clip_layer.0].clip;
+                let clip = self.clips[drop_area.clip_id.0];
                 let clip = apply_clip(clip, drop_area.area);
 
                 if drop_position.left() >= clip.left()
@@ -850,7 +810,7 @@ impl<'a, App: Application> WindowLayout<'a, App> {
     pub fn handle_scroll(&self, state: &Context<App>, queue: &mut EventQueue<App>, mouse_position: App::Position, delta: f32) -> bool {
         for layer in self.layers.iter().rev() {
             for scroll_area in &layer.scroll_areas {
-                let clip = self.clip_layers[scroll_area.clip_layer.0].clip;
+                let clip = self.clips[scroll_area.clip_id.0];
                 let clip = apply_clip(clip, scroll_area.area);
 
                 if mouse_position.left() >= clip.left()

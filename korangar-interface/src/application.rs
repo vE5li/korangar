@@ -1,4 +1,4 @@
-use crate::layout::{ClipLayer, Icon};
+use crate::layout::Icon;
 use crate::theme::ThemePathGetter;
 use crate::window::Anchor;
 
@@ -196,7 +196,7 @@ pub trait RenderLayer<App: Application> {
     fn render_icon(&self, position: App::Position, size: App::Size, clip: App::Clip, icon: Icon<App>, color: App::Color);
 
     /// Render a [`CustomInstruction`](RenderLayer::CustomInstruction).
-    fn render_custom(&self, instruction: Self::CustomInstruction<'_>, clip_layers: &[ClipLayer<App>]);
+    fn render_custom(&self, instruction: Self::CustomInstruction<'_>, clips: &[App::Clip]);
 }
 
 /// Glue between [`korangar_interface`] and the part of the application that

@@ -542,7 +542,7 @@ where
             layout.set_hovered();
         }
 
-        layout.with_clip_layer(layout_info.area, |layout| {
+        layout.with_clip(layout_info.area, |layout| {
             layout.with_layer(|layout| {
                 self.elements
                     .lay_out(state, ElementStore::new(store, data.id), &layout_info.children, layout);

@@ -278,7 +278,7 @@ impl Element<ClientState> for FrameInspectorView {
         // biggest and keep track when a unit has been rendered.
         let mut numbers_shown = false;
 
-        layout.with_clip_layer(layout_info.area, |layout| {
+        layout.with_clip(layout_info.area, |layout| {
             // Technically we could make this macro simpler by unifying the units used for
             // calculating visibility and offset, but that might introduce more
             // floating point inaccuracy as the values get very small or very large.

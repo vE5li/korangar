@@ -8,7 +8,7 @@ use korangar_interface::InterfaceFrame;
 use korangar_interface::application::Clip;
 use korangar_interface::application::{RenderLayer, ShadowPadding as _};
 use korangar_interface::layout::area::Area;
-use korangar_interface::layout::{ClipLayer, ClipLayerId, Icon, WindowLayout};
+use korangar_interface::layout::{ClipId, Icon, WindowLayout};
 
 use crate::graphics::{
     Color, CornerDiameter, InterfaceRectangleInstruction, ScreenClip, ScreenPosition, ScreenSize, ShadowPadding, Texture,
@@ -558,7 +558,7 @@ impl SpriteRenderer for InterfaceRenderer {
 #[allow(private_interfaces)]
 struct TextureInstruction {
     texture: Arc<Texture>,
-    clip_layer: ClipLayerId,
+    clip_id: ClipId,
     area: Area,
     color: Color,
     smooth: bool,
@@ -573,7 +573,7 @@ struct SpriteInstruction<'a> {
     actions: &'a Actions,
     sprite: &'a Sprite,
     animation_state: &'a SpriteAnimationState,
-    clip_layer: ClipLayerId,
+    clip_id: ClipId,
     area: Area,
     color: Color,
     scaling: f32,
@@ -630,13 +630,13 @@ impl RenderLayer<ClientState> for InterfaceRenderer {
         }
     }
 
-    fn render_custom(&self, instruction: Self::CustomInstruction<'_>, clip_layers: &[ClipLayer<ClientState>]) {
+    fn render_custom(&self, instruction: Self::CustomInstruction<'_>, clips: &[ScreenClip]) {
         match instruction {
             CustomInstruction::Sprite(SpriteInstruction {
                 actions,
                 sprite,
                 animation_state,
-                clip_layer,
+                clip_id,
                 area,
                 color,
                 scaling,
@@ -645,13 +645,13 @@ impl RenderLayer<ClientState> for InterfaceRenderer {
                     left: area.left + area.width / 2.0,
                     top: area.top + area.height / 2.0,
                 };
-                let screen_clip = clip_layers[clip_layer.as_index()].get();
+                let screen_clip = clips[clip_id.as_index()];
 
                 actions.render_sprite(self, sprite, animation_state, position, 0, screen_clip, color, scaling);
             }
             CustomInstruction::Texture(TextureInstruction {
                 texture,
-                clip_layer,
+                clip_id,
                 area,
                 color,
                 smooth,
@@ -664,7 +664,7 @@ impl RenderLayer<ClientState> for InterfaceRenderer {
                     width: area.width,
                     height: area.height,
                 };
-                let screen_clip = clip_layers[clip_layer.as_index()].get();
+                let screen_clip = clips[clip_id.as_index()];
 
                 self.render_sprite(texture, position, size, screen_clip, color, smooth);
             }
@@ -684,12 +684,12 @@ pub trait LayoutExt<'a> {
 
 impl<'a> LayoutExt<'a> for WindowLayout<'a, ClientState> {
     fn add_texture(&mut self, area: Area, texture: Arc<Texture>, color: Color, smooth: bool) {
-        let clip_layer = self.get_active_clip_layer();
+        let clip_id = self.get_active_clip_id();
         let area = self.scale_area(area);
 
         self.add_custom_instruction(CustomInstruction::Texture(TextureInstruction {
             texture,
-            clip_layer,
+            clip_id,
             area,
             color,
             smooth,
@@ -704,7 +704,7 @@ impl<'a> LayoutExt<'a> for WindowLayout<'a, ClientState> {
         animation_state: &'a SpriteAnimationState,
         color: Color,
     ) {
-        let clip_layer = self.get_active_clip_layer();
+        let clip_id = self.get_active_clip_id();
         let area = self.scale_area(area);
         let scaling = self.get_interface_scaling();
 
@@ -712,7 +712,7 @@ impl<'a> LayoutExt<'a> for WindowLayout<'a, ClientState> {
             actions,
             sprite,
             animation_state,
-            clip_layer,
+            clip_id,
             area,
             color,
             scaling,

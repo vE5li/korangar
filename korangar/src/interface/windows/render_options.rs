@@ -232,7 +232,7 @@ where
                 children: (
                     state_button! {
                         text: "Show rectangle instructions",
-                        tooltip: "Show all ^000001rectangle instructions^000000. The color of each rectangle is ^000001varied based on height^000000 to make overlapping rectangles easier to distinguish. Rectangles that are ^000001culled^000000 are displayed ^000001red^000000.",
+                        tooltip: "Show all ^000001rectangle instructions^000000. Rectangles that are ^000001culled^000000 are displayed ^000001red^000000.",
                         state: self.render_options_path.show_rectangle_instructions(),
                         event: Toggle(self.render_options_path.show_rectangle_instructions()),
                     },

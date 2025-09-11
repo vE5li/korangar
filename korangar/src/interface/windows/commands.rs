@@ -81,6 +81,20 @@ impl CustomWindow<ClientState> for CommandsWindow {
                     ),
                 },
                 text! {
+                    text: "Monsters",
+                    overflow_behavior: OverflowBehavior::Shrink,
+                },
+                button! {
+                    text: "Spawn Dummy",
+                    tooltip: "Spawns a neutral dummy [^000001@spawn 21077^000000]",
+                    event: InputEvent::SendMessage { text: "@spawn 21077".to_string() },
+                },
+                button! {
+                    text: "Kill all",
+                    tooltip: "Kills all monsters without dropping loot [^000001@killmonster2^000000]",
+                    event: InputEvent::SendMessage { text: "@killmonster2".to_string() },
+                },
+                text! {
                     text: "Stats",
                     overflow_behavior: OverflowBehavior::Shrink,
                 },
@@ -88,6 +102,11 @@ impl CustomWindow<ClientState> for CommandsWindow {
                     text: "Set all to max",
                     tooltip: "Set all stats to the maximum [^000001@allstats^000000]",
                     event: InputEvent::SendMessage { text: "@allstats".to_string() },
+                },
+                button! {
+                    text: "Reset all stats",
+                    tooltip: "Resets all stats back to 1 [^000001@reset^000000]",
+                    event: InputEvent::SendMessage { text: "@reset".to_string() },
                 },
                 text! {
                     text: "Skills",

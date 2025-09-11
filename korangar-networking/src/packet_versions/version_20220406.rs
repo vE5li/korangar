@@ -191,6 +191,7 @@ where
         text: packet.message,
         color: MessageColor::Server,
     })?;
+    packet_handler.register_noop::<MessageTablePacket>()?;
     packet_handler.register(|packet: EntityMessagePacket| {
         // Drop the alpha channel because it might be 0.
         let color = MessageColor::Rgb {
@@ -591,11 +592,35 @@ where
             maximum_health_points: maximum_health_points as usize,
         }
     })?;
-    packet_handler.register_noop::<RequestPlayerAttackFailedPacket>()?;
+    packet_handler.register(|packet: RequestPlayerAttackFailedPacket| {
+        let RequestPlayerAttackFailedPacket {
+            target_entity_id,
+            target_position,
+            player_position,
+            attack_range,
+        } = packet;
+
+        NetworkEvent::AttackFailed {
+            target_entity_id,
+            target_position,
+            player_position,
+            attack_range,
+        }
+    })?;
     packet_handler.register(|packet: DamagePacket1| match packet.damage_type {
         DamageType::Damage => Some(NetworkEvent::DamageEffect {
-            entity_id: packet.destination_entity_id,
-            damage_amount: packet.damage_amount as usize,
+            source_entity_id: packet.source_entity_id,
+            destination_entity_id: packet.destination_entity_id,
+            damage_amount: (packet.damage_amount > 0).then_some(packet.damage_amount as usize),
+            attack_duration: packet.attack_duration,
+            is_critical: false,
+        }),
+        DamageType::CriticalHit => Some(NetworkEvent::DamageEffect {
+            source_entity_id: packet.source_entity_id,
+            destination_entity_id: packet.destination_entity_id,
+            damage_amount: (packet.damage_amount > 0).then_some(packet.damage_amount as usize),
+            attack_duration: packet.attack_duration,
+            is_critical: true,
         }),
         DamageType::StandUp => Some(NetworkEvent::PlayerStandUp {
             entity_id: packet.destination_entity_id,
@@ -604,8 +629,18 @@ where
     })?;
     packet_handler.register(|packet: DamagePacket3| match packet.damage_type {
         DamageType::Damage => Some(NetworkEvent::DamageEffect {
-            entity_id: packet.destination_entity_id,
-            damage_amount: packet.damage_amount as usize,
+            source_entity_id: packet.source_entity_id,
+            destination_entity_id: packet.destination_entity_id,
+            damage_amount: (packet.damage_amount > 0).then_some(packet.damage_amount as usize),
+            attack_duration: packet.attack_duration,
+            is_critical: false,
+        }),
+        DamageType::CriticalHit => Some(NetworkEvent::DamageEffect {
+            source_entity_id: packet.source_entity_id,
+            destination_entity_id: packet.destination_entity_id,
+            damage_amount: (packet.damage_amount > 0).then_some(packet.damage_amount as usize),
+            attack_duration: packet.attack_duration,
+            is_critical: true,
         }),
         DamageType::StandUp => Some(NetworkEvent::PlayerStandUp {
             entity_id: packet.destination_entity_id,
@@ -732,6 +767,8 @@ where
     packet_handler.register(|packet: SellListPacket| NetworkEvent::SellItemList { items: packet.items })?;
     packet_handler.register(|packet: SellItemsResultPacket| NetworkEvent::SellingCompleted { result: packet.result })?;
     packet_handler.register_noop::<RequestStatUpResponsePacket>()?;
+    packet_handler.register_noop::<EquipAmmunitionPacket>()?;
+    packet_handler.register_noop::<AmmunitionActionPacket>()?;
 
     Ok(())
 }

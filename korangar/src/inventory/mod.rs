@@ -72,8 +72,10 @@ impl Inventory {
 
     pub fn update_equipped_position(&mut self, index: InventoryIndex, new_equipped_position: EquipPosition) {
         let item = self.items.iter_mut().find(|item| item.index == index).unwrap();
+
         let InventoryItemDetails::Equippable { equipped_position, .. } = &mut item.details else {
-            panic!();
+            // This can happen for ammunition for example.
+            return;
         };
 
         *equipped_position = new_equipped_position;

@@ -230,6 +230,10 @@ impl InputSystem {
             events.push(InputEvent::ToggleEquipmentWindow);
         }
 
+        if control_down && self.get_key(KeyCode::KeyS).pressed() {
+            events.push(InputEvent::ToggleGameSettingsWindow);
+        }
+
         if control_down && self.get_key(KeyCode::KeyI).pressed() {
             events.push(InputEvent::ToggleInterfaceSettingsWindow);
         }

@@ -21,7 +21,7 @@ use korangar_networking::{MessageColor, SellItem, ShopItem};
 use localization::Localization;
 #[cfg(feature = "debug")]
 use ragnarok_formats::map::{EffectSource, LightSource, MapData, SoundSource};
-use ragnarok_packets::{CharacterId, CharacterServerInformation, Friend};
+use ragnarok_packets::{CharacterId, CharacterServerInformation, EntityId, Friend};
 #[cfg(feature = "debug")]
 use rust_state::{ManuallyAssertExt, VecIndexExt};
 use rust_state::{Path, RustState, Selector};
@@ -42,7 +42,7 @@ use crate::interface::windows::{ProfilerWindowState, ThemeInspectorWindowState};
 use crate::inventory::{Hotbar, Inventory, SkillTree};
 use crate::loaders::{ClientInfo, FontLoader, FontSize, GameFileLoader, OverflowBehavior, load_client_info};
 use crate::renderer::InterfaceRenderer;
-use crate::settings::{GraphicsSettingsCapabilities, InterfaceSettings, InterfaceSettingsCapabilities, LoginSettings};
+use crate::settings::{GameSettings, GraphicsSettingsCapabilities, InterfaceSettings, InterfaceSettingsCapabilities, LoginSettings};
 use crate::state::theme::WorldTheme;
 #[cfg(feature = "debug")]
 use crate::world::Object;
@@ -82,6 +82,8 @@ pub struct ClientState {
     login_settings: LoginSettings,
     /// Saved audio settings.
     audio_settings: AudioSettings,
+    /// Saved game settings.
+    game_settings: GameSettings,
     /// Saved interface settings.
     interface_settings: InterfaceSettings,
     /// Interface capabilities used in the interface settings window.
@@ -112,6 +114,8 @@ pub struct ClientState {
 
     /// All entities on the map.
     entities: Vec<Entity>,
+    /// All dead entities on the map.
+    dead_entities: Vec<Entity>,
 
     /// List of all received chat messages.
     chat_messages: Vec<ChatMessage>,
@@ -158,6 +162,10 @@ pub struct ClientState {
 
     /// Size of the Korangar window.
     window_size: ScreenSize,
+
+    /// Buffered attack entity. Like when attacking a target that is out of
+    /// range.
+    buffered_attack_entity: Option<EntityId>,
 
     /// Map data that is viewed in the inspector. Once added to this vector they
     /// are never removed so we can ensure the user interface remains valid.
@@ -211,6 +219,7 @@ impl ClientState {
         time_phase!("load settings", {
             let mut login_settings = LoginSettings::new();
             let audio_settings = AudioSettings::new();
+            let game_settings = GameSettings::new();
             let interface_settings = InterfaceSettings::new();
             let interface_settings_capabilities = InterfaceSettingsCapabilities::default();
         });
@@ -297,6 +306,8 @@ impl ClientState {
             let graphics_settings_capabilities = GraphicsSettingsCapabilities::default();
         });
 
+        let buffered_attack_entity = None;
+
         #[cfg(feature = "debug")]
         let debug_timer = korangar_debug::logging::Timer::new("creating debug resources");
 
@@ -329,6 +340,7 @@ impl ClientState {
             localization,
             login_settings,
             audio_settings,
+            game_settings,
             interface_settings,
             interface_settings_capabilities,
             graphics_settings,
@@ -342,6 +354,7 @@ impl ClientState {
             friend_list_window,
             dialog_window,
             entities: Vec::new(),
+            dead_entities: Vec::new(),
             chat_messages,
             friend_list,
             shop_items,
@@ -358,6 +371,7 @@ impl ClientState {
             switch_request,
             create_character_name,
             window_size,
+            buffered_attack_entity,
             #[cfg(feature = "debug")]
             inspecting_maps,
             #[cfg(feature = "debug")]

@@ -28,6 +28,10 @@ impl CustomWindow<ClientState> for MenuWindow {
             closable: true,
             elements: (
                 button! {
+                    text: client_state().localization().game_settings_button_text(),
+                    event: InputEvent::ToggleGameSettingsWindow,
+                },
+                button! {
                     text: client_state().localization().interface_settings_button_text(),
                     event: InputEvent::ToggleInterfaceSettingsWindow,
                 },

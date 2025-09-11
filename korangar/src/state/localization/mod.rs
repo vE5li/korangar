@@ -144,6 +144,7 @@ pub struct Localization {
     log_in_button_tooltip: String,
     menu_window_title: String,
     graphics_settings_button_text: String,
+    game_settings_button_text: String,
     interface_settings_button_text: String,
     audio_settings_button_text: String,
     log_out_button_text: String,
@@ -181,6 +182,7 @@ pub struct Localization {
     server_selection_window_title: String,
     skill_tree_window_title: String,
     stats_window_title: String,
+    game_settings_window_title: String,
     interface_settings_window_title: String,
     language_text: String,
     scaling_text: String,
@@ -194,6 +196,7 @@ pub struct Localization {
     intelligence_text: String,
     dexterity_text: String,
     luck_text: String,
+    auto_attack_button_text: String,
 }
 
 impl Localization {

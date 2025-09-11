@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use cgmath::{Point3, Vector2, Vector3};
+use cgmath::{Point3, Vector3};
+#[cfg(feature = "debug")]
+use korangar_debug::logging::Colorize;
 use korangar_interface::application::Clip;
 use ragnarok_packets::{EntityId, QuestColor, QuestEffectPacket};
 use rand_aes::tls::rand_f32;
@@ -29,10 +31,11 @@ pub struct DamageNumber {
     velocity_x: f32,
     velocity_z: f32,
     timer: f32,
+    is_critical: bool,
 }
 
 impl DamageNumber {
-    pub fn new(position: Point3<f32>, damage_amount: String) -> Self {
+    pub fn new(position: Point3<f32>, damage_amount: String, is_critical: bool) -> Self {
         Self {
             position,
             damage_amount,
@@ -40,6 +43,7 @@ impl DamageNumber {
             velocity_x: random_velocity(),
             velocity_z: random_velocity(),
             timer: 0.6,
+            is_critical,
         }
     }
 }
@@ -64,7 +68,44 @@ impl Particle for DamageNumber {
             top: screen_position.y * window_size.height,
         };
 
-        renderer.render_damage_text(&self.damage_amount, final_position, Color::WHITE, FontSize(16.0));
+        let color = match self.is_critical {
+            true => Color::rgb_u8(255, 180, 0),
+            false => Color::WHITE,
+        };
+
+        renderer.render_damage_text(&self.damage_amount, final_position, color, FontSize(16.0));
+    }
+}
+
+pub struct Miss {
+    position: Point3<f32>,
+    timer: f32,
+}
+
+impl Miss {
+    pub fn new(position: Point3<f32>) -> Self {
+        Self { position, timer: 0.6 }
+    }
+}
+
+impl Particle for Miss {
+    fn update(&mut self, delta_time: f32) -> bool {
+        self.position.y += (self.timer - 0.1).max(0.0) * 70.0 * delta_time;
+
+        self.timer -= delta_time;
+        self.timer > 0.0
+    }
+
+    fn render(&self, renderer: &GameInterfaceRenderer, camera: &dyn Camera, window_size: ScreenSize) {
+        let clip_space_position = camera.view_projection_matrix() * self.position.to_homogeneous();
+        let screen_position = camera.clip_to_screen_space(clip_space_position);
+        let final_position = ScreenPosition {
+            left: screen_position.x * window_size.width,
+            top: screen_position.y * window_size.height,
+        };
+        let alpha = (self.timer * 10.0).min(1.0);
+
+        renderer.render_damage_text("miss", final_position, Color::rgba(1.0, 0.0, 0.0, alpha), FontSize(20.0));
     }
 }
 
@@ -115,9 +156,16 @@ pub struct QuestIcon {
 }
 
 impl QuestIcon {
-    pub fn new(texture_loader: &TextureLoader, map: &Map, quest_effect: QuestEffectPacket) -> Self {
-        let position = map.get_world_position(Vector2::new(quest_effect.position.x as usize, quest_effect.position.y as usize))
-            + Vector3::new(0.0, 25.0, 0.0); // TODO: get height of the entity as offset
+    pub fn new(texture_loader: &TextureLoader, map: &Map, quest_effect: QuestEffectPacket) -> Option<Self> {
+        // TODO: Use the height of the entity as offset.
+        let icon_offset = Vector3::new(0.0, 25.0, 0.0);
+        let Some(entity_position) = map.get_world_position(quest_effect.position) else {
+            #[cfg(feature = "debug")]
+            korangar_debug::logging::print_debug!("[{}] quest icon is out of map bounds", "error".red());
+            return None;
+        };
+
+        let position = entity_position + icon_offset;
         let effect_id = quest_effect.effect as usize;
         let texture = texture_loader
             .get_or_load(
@@ -132,7 +180,7 @@ impl QuestIcon {
             QuestColor::Purple => Color::rgb_u8(200, 30, 200),
         };
 
-        Self { position, texture, color }
+        Some(Self { position, texture, color })
     }
 
     fn render(&self, renderer: &GameInterfaceRenderer, camera: &dyn Camera, window_size: ScreenSize, scaling_factor: f32) {
@@ -166,8 +214,11 @@ impl ParticleHolder {
     }
 
     pub fn add_quest_icon(&mut self, texture_loader: &TextureLoader, map: &Map, quest_effect: QuestEffectPacket) {
-        self.quest_icons
-            .insert(quest_effect.entity_id, QuestIcon::new(texture_loader, map, quest_effect));
+        let entity_id = quest_effect.entity_id;
+
+        if let Some(quest_icon) = QuestIcon::new(texture_loader, map, quest_effect) {
+            self.quest_icons.insert(entity_id, quest_icon);
+        }
     }
 
     pub fn remove_quest_icon(&mut self, entity_id: EntityId) {

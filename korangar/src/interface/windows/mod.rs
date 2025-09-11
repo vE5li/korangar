@@ -16,6 +16,7 @@ mod error;
 mod frame_inspector;
 mod friend_list;
 mod friend_request;
+mod game_settings;
 mod graphics_settings;
 mod hotbar;
 mod interface_settings;
@@ -59,6 +60,7 @@ pub use self::error::ErrorWindow;
 pub use self::frame_inspector::FrameInspectorWindow;
 pub use self::friend_list::{FriendListWindow, FriendListWindowState};
 pub use self::friend_request::FriendRequestWindow;
+pub use self::game_settings::GameSettingsWindow;
 pub use self::graphics_settings::GraphicsSettingsWindow;
 pub use self::hotbar::HotbarWindow;
 pub use self::interface_settings::InterfaceSettingsWindow;
@@ -93,6 +95,7 @@ pub enum WindowClass {
     CharacterOverview,
     CharacterSelection,
     Dialog,
+    GameSettings,
     InterfaceSettings,
     GraphicsSettings,
     Hotbar,

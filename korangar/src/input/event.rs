@@ -1,12 +1,12 @@
+#[cfg(feature = "debug")]
 use cgmath::Vector2;
 #[cfg(feature = "debug")]
 use korangar_debug::profiling::FrameMeasurement;
 use korangar_interface::event::{ClickHandler, Event, EventQueue};
 use korangar_networking::{InventoryItem, ShopItem};
-#[cfg(feature = "debug")]
-use ragnarok_packets::TilePosition;
 use ragnarok_packets::{
     AccountId, BuyOrSellOption, CharacterId, CharacterServerInformation, EntityId, HotbarSlot, ShopId, SoldItemInformation, StatUpType,
+    TilePosition,
 };
 use rust_state::Context;
 
@@ -65,6 +65,8 @@ pub enum InputEvent {
     ToggleSkillTreeWindow,
     /// Open or close the stats window. Only works while playing.
     ToggleStatsWindow,
+    /// Open or close the game settings window.
+    ToggleGameSettingsWindow,
     /// Open or close the interface settings window.
     ToggleInterfaceSettingsWindow,
     /// Open or close the graphics settings window.
@@ -109,7 +111,7 @@ pub enum InputEvent {
     /// Start moving the player.
     PlayerMove {
         /// Destination of the move.
-        destination: Vector2<usize>,
+        destination: TilePosition,
     },
     /// Interact with an entity. The type of interaction depends on the entity
     /// type.

@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use cgmath::Vector2;
 use korangar_interface::MouseMode;
 use korangar_networking::InventoryItem;
+use ragnarok_packets::TilePosition;
 
 use crate::graphics::Texture;
 use crate::interface::resource::{ItemSource, SkillSource};
@@ -15,7 +15,7 @@ use crate::world::{Actions, ResourceMetadata, SpriteAnimationState};
 pub enum MouseInputMode {
     RotateCamera,
     Walk {
-        destination: Vector2<usize>,
+        destination: TilePosition,
     },
     MoveItem {
         source: ItemSource,
@@ -41,7 +41,7 @@ pub enum Grabbed {
 pub trait MouseModeExt {
     fn is_rotating_camera(&self) -> bool;
 
-    fn walk_destination(&self) -> Option<Vector2<usize>>;
+    fn walk_destination(&self) -> Option<TilePosition>;
 
     fn grabbed(&self) -> Option<Grabbed>;
 }
@@ -53,7 +53,7 @@ impl MouseModeExt for MouseMode<ClientState> {
         })
     }
 
-    fn walk_destination(&self) -> Option<Vector2<usize>> {
+    fn walk_destination(&self) -> Option<TilePosition> {
         match self {
             MouseMode::Custom {
                 mode: MouseInputMode::Walk { destination },

@@ -4,10 +4,12 @@ mod lighting;
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
-use cgmath::{Deg, Matrix4, Point3, SquareMatrix, Vector2, Vector3};
+use cgmath::{Deg, Matrix4, Point3, SquareMatrix, Vector3};
 use korangar_audio::AudioEngine;
 use korangar_collision::{AABB, Frustum, KDTree, Sphere};
 use korangar_container::{SimpleKey, SimpleSlab, create_simple_key};
+#[cfg(feature = "debug")]
+use korangar_debug::logging::Colorize;
 #[cfg(feature = "debug")]
 use option_ext::OptionExt;
 #[cfg(feature = "debug")]
@@ -17,6 +19,7 @@ use ragnarok_formats::map::MapData;
 use ragnarok_formats::map::{LightSource, SoundSource, Tile, TileFlags};
 #[cfg(feature = "debug")]
 use ragnarok_formats::transform::Transform;
+use ragnarok_packets::TilePosition;
 use rust_state::RustState;
 use wgpu::Queue;
 
@@ -95,8 +98,8 @@ impl WaterPlane {
 
 #[derive(RustState)]
 pub struct Map {
-    width: usize,
-    height: usize,
+    width: u16,
+    height: u16,
     level_bound: AABB,
     lighting: Lighting,
     water_plane: Option<WaterPlane>,
@@ -129,8 +132,8 @@ pub struct Map {
 impl Map {
     #[cfg(not(feature = "debug"))]
     pub fn new(
-        width: usize,
-        height: usize,
+        width: u16,
+        height: u16,
         level_bound: AABB,
         lighting: Lighting,
         water_plane: Option<WaterPlane>,
@@ -174,8 +177,8 @@ impl Map {
 
     #[cfg(feature = "debug")]
     pub fn new(
-        width: usize,
-        height: usize,
+        width: u16,
+        height: u16,
         level_bound: AABB,
         lighting: Lighting,
         water_plane: Option<WaterPlane>,
@@ -233,18 +236,18 @@ impl Map {
         (tile.southwest_corner_height + tile.southeast_corner_height + tile.northwest_corner_height + tile.northeast_corner_height) / 4.0
     }
 
-    pub fn get_world_position(&self, position: Vector2<usize>) -> Point3<f32> {
-        let height = Self::average_tile_height(self.get_tile(position));
-        Point3::new(
+    pub fn get_world_position(&self, position: TilePosition) -> Option<Point3<f32>> {
+        let height = Self::average_tile_height(self.get_tile(position)?);
+
+        Some(Point3::new(
             position.x as f32 * GAT_TILE_SIZE + (GAT_TILE_SIZE / 2.0),
             height,
             position.y as f32 * GAT_TILE_SIZE + (GAT_TILE_SIZE / 2.0),
-        )
+        ))
     }
 
-    // TODO: Make this private once path finding is properly implemented
-    pub fn get_tile(&self, position: Vector2<usize>) -> &Tile {
-        &self.tiles[position.x + position.y * self.width]
+    pub fn get_tile(&self, position: TilePosition) -> Option<&Tile> {
+        self.tiles.get(position.x as usize + position.y as usize * self.width as usize)
     }
 
     pub fn background_music_track_name(&self) -> Option<&str> {
@@ -399,9 +402,15 @@ impl Map {
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn render_entities(&self, instructions: &mut Vec<EntityInstruction>, entities: &[Entity], camera: &dyn Camera) {
-        entities.iter().enumerate().for_each(|(index, entity)| {
-            entity.render(instructions, camera, index != 0);
-        });
+        entities
+            .iter()
+            .enumerate()
+            .for_each(|(index, entity)| entity.render(instructions, camera, index != 0));
+    }
+
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
+    pub fn render_dead_entities(&self, instructions: &mut Vec<EntityInstruction>, entities: &[Entity], camera: &dyn Camera) {
+        entities.iter().for_each(|entity| entity.render(instructions, camera, false));
     }
 
     #[cfg(feature = "debug")]
@@ -444,7 +453,7 @@ impl Map {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn render_walk_indicator(&self, instruction: &mut Option<IndicatorInstruction>, color: Color, position: Vector2<usize>) {
+    pub fn render_walk_indicator(&self, instruction: &mut Option<IndicatorInstruction>, color: Color, position: TilePosition) {
         const OFFSET: f32 = 1.0;
 
         // Since the picker buffer is always one frame behind the current scene, a map
@@ -454,7 +463,11 @@ impl Map {
             return;
         }
 
-        let tile = self.get_tile(position);
+        let Some(tile) = self.get_tile(position) else {
+            #[cfg(feature = "debug")]
+            korangar_debug::logging::print_debug!("[{}] walk indicator out of map bounds", "error".red());
+            return;
+        };
 
         if tile.flags.contains(TileFlags::WALKABLE) {
             let base_x = position.x as f32 * GAT_TILE_SIZE;
@@ -806,16 +819,14 @@ impl Map {
 }
 
 impl Traversable for Map {
-    fn is_walkable(&self, position: Vector2<usize>) -> bool {
-        self.tiles
-            .get(position.x + position.y * self.width)
+    fn is_walkable(&self, position: TilePosition) -> bool {
+        self.get_tile(position)
             .map(|tile| tile.flags.contains(TileFlags::WALKABLE))
             .unwrap_or(false)
     }
 
-    fn is_snipeable(&self, position: Vector2<usize>) -> bool {
-        self.tiles
-            .get(position.x + position.y * self.width)
+    fn is_snipeable(&self, position: TilePosition) -> bool {
+        self.get_tile(position)
             .map(|tile| tile.flags.contains(TileFlags::SNIPABLE))
             .unwrap_or(false)
     }

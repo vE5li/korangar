@@ -48,7 +48,7 @@ use std::ops::Deref;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
 
-use cgmath::{Point3, Vector2, Vector3};
+use cgmath::{Point3, Vector3};
 use image::{EncodableLayout, ImageFormat, ImageReader};
 use input::{MouseInputMode, MouseModeExt};
 use inventory::{HotbarPathExt, InventoryPathExt, SkillTreePathExt};
@@ -107,7 +107,7 @@ use crate::loaders::*;
 #[cfg(feature = "debug")]
 use crate::renderer::DebugMarkerRenderer;
 use crate::renderer::{AlignHorizontal, EffectRenderer, GameInterfaceRenderer};
-use crate::settings::{GraphicsSettings, IN_GAME_THEMES_PATH, LightingMode, MENU_THEMES_PATH, WORLD_THEMES_PATH};
+use crate::settings::{GameSettingsPathExt, GraphicsSettings, IN_GAME_THEMES_PATH, LightingMode, MENU_THEMES_PATH, WORLD_THEMES_PATH};
 use crate::state::theme::{InterfaceTheme, InterfaceThemeType, WorldTheme};
 use crate::system::GameTimer;
 #[cfg(feature = "debug")]
@@ -1030,6 +1030,7 @@ impl Client {
                     self.audio_engine.clear_ambient_sound();
 
                     self.client_state.follow_mut(client_state().entities()).clear();
+                    self.client_state.follow_mut(client_state().dead_entities()).clear();
 
                     self.audio_engine.play_background_music_track(None);
 
@@ -1192,8 +1193,10 @@ impl Client {
                         .open_window(ErrorWindow::new("Failed to switch character slots".to_owned()));
                 }
                 NetworkEvent::AddEntity { entity_data } => {
-                    if let Some(map) = &self.map {
-                        let mut npc = Entity::Npc(Npc::new(map, entity_data, client_tick));
+                    if let Some(map) = &self.map
+                        && let Some(npc) = Npc::new(map, &mut self.path_finder, entity_data, client_tick)
+                    {
+                        let mut npc = Entity::Npc(npc);
 
                         let entity_id = npc.get_entity_id();
                         let entity_type = npc.get_entity_type();
@@ -1231,11 +1234,17 @@ impl Client {
                             let entity_type = entity.get_entity_type();
 
                             if entity_type == EntityType::Monster {
-                                // TODO: If the entity is a monster, it will just disappear. This
-                                // is not the desired behavior and should be updated at some point.
+                                let mut entity = entity.clone();
+                                entity.set_dead(client_tick);
+                                entity.stop_movement();
+
+                                // Remove the entity from the list of alive entities.
                                 self.client_state
                                     .follow_mut(client_state().entities())
                                     .retain(|entity| entity.get_entity_id() != entity_id);
+
+                                // Add the entity to the list of dead entities.
+                                self.client_state.follow_mut(client_state().dead_entities()).push(entity);
                             } else if entity_type == EntityType::Player {
                                 entity.set_dead(client_tick);
 
@@ -1246,9 +1255,17 @@ impl Client {
                             }
                         }
                     } else {
+                        // TODO: Fade entity out.
                         self.client_state
                             .follow_mut(client_state().entities())
                             .retain(|entity| entity.get_entity_id() != entity_id);
+                    }
+
+                    // If the entity that was removed had an attack buffered we remove the entity
+                    // from the buffer.
+                    let buffered_attack_entity = self.client_state.follow_mut(client_state().buffered_attack_entity());
+                    if buffered_attack_entity.is_some_and(|buffered_entity_id| buffered_entity_id == entity_id) {
+                        *buffered_attack_entity = None;
                     }
                 }
                 NetworkEvent::EntityMove {
@@ -1263,10 +1280,13 @@ impl Client {
                     if let Some(entity) = entity
                         && let Some(map) = &self.map
                     {
-                        let position_from = Vector2::new(origin.x, origin.y);
-                        let position_to = Vector2::new(destination.x, destination.y);
-
-                        entity.move_from_to(map, &mut self.path_finder, position_from, position_to, starting_timestamp);
+                        entity.move_from_to(
+                            map,
+                            &mut self.path_finder,
+                            origin.tile_position(),
+                            destination.tile_position(),
+                            starting_timestamp,
+                        );
                         #[cfg(feature = "debug")]
                         entity.generate_pathing_mesh(&self.device, &self.queue, self.graphics_engine.bindless_support(), map);
                     }
@@ -1276,15 +1296,18 @@ impl Client {
                     destination,
                     starting_timestamp,
                 } => {
-                    if let Some(map) = &self.map {
-                        let position_from = Vector2::new(origin.x, origin.y);
-                        let position_to = Vector2::new(destination.x, destination.y);
-
-                        if let Some(player) = self.client_state.try_follow_mut(this_entity()) {
-                            player.move_from_to(map, &mut self.path_finder, position_from, position_to, starting_timestamp);
-                            #[cfg(feature = "debug")]
-                            player.generate_pathing_mesh(&self.device, &self.queue, self.graphics_engine.bindless_support(), map);
-                        }
+                    if let Some(map) = &self.map
+                        && let Some(player) = self.client_state.try_follow_mut(this_entity())
+                    {
+                        player.move_from_to(
+                            map,
+                            &mut self.path_finder,
+                            origin.tile_position(),
+                            destination.tile_position(),
+                            starting_timestamp,
+                        );
+                        #[cfg(feature = "debug")]
+                        player.generate_pathing_mesh(&self.device, &self.queue, self.graphics_engine.bindless_support(), map);
                     }
                 }
                 NetworkEvent::ChangeMap { map_name, position } => {
@@ -1296,6 +1319,7 @@ impl Client {
 
                     // Only the player must stay alive between map changes.
                     self.client_state.follow_mut(client_state().entities()).truncate(1);
+                    self.client_state.follow_mut(client_state().dead_entities()).clear();
 
                     // Close any remaining dialogs.
                     self.interface.close_window_with_class(WindowClass::Dialog);
@@ -1321,16 +1345,65 @@ impl Client {
                         entity.set_details(name);
                     }
                 }
-                NetworkEvent::DamageEffect { entity_id, damage_amount } => {
+                NetworkEvent::DamageEffect {
+                    source_entity_id,
+                    destination_entity_id,
+                    damage_amount,
+                    attack_duration,
+                    is_critical,
+                } => {
+                    let target_position = self
+                        .client_state
+                        .follow(client_state().entities())
+                        .iter()
+                        .find(|entity| entity.get_entity_id() == destination_entity_id)
+                        .map(|entity| entity.get_tile_position());
+
+                    // Auto attack logic.
+                    if self
+                        .client_state
+                        .try_follow(this_entity())
+                        .is_some_and(|player| player.get_entity_id() == source_entity_id)
+                    {
+                        let auto_attack = *self.client_state.follow(client_state().game_settings().auto_attack());
+                        let buffered_attack_entity = self.client_state.follow_mut(client_state().buffered_attack_entity());
+
+                        if let Some(entity_id) = buffered_attack_entity.take() {
+                            let _ = self.networking_system.player_attack(entity_id);
+
+                            if auto_attack {
+                                *buffered_attack_entity = Some(entity_id);
+                            }
+                        }
+                    }
+
+                    if let Some(entity) = self
+                        .client_state
+                        .follow_mut(client_state().entities())
+                        .iter_mut()
+                        .find(|entity| entity.get_entity_id() == source_entity_id)
+                    // TODO: Maybe also or_else this_entity?
+                    {
+                        if let Some(target_position) = target_position {
+                            entity.rotate_towards(target_position);
+                        }
+
+                        entity.set_attack(attack_duration, is_critical, client_tick);
+                    }
+
                     if let Some(entity) = self
                         .client_state
                         .follow(client_state().entities())
                         .iter()
-                        .find(|entity| entity.get_entity_id() == entity_id)
+                        .find(|entity| entity.get_entity_id() == destination_entity_id)
                         .or_else(|| self.client_state.try_follow(this_entity()))
                     {
-                        self.particle_holder
-                            .spawn_particle(Box::new(DamageNumber::new(entity.get_position(), damage_amount.to_string())));
+                        let particle: Box<dyn Particle + Send + Sync> = match damage_amount {
+                            Some(amount) => Box::new(DamageNumber::new(entity.get_position(), amount.to_string(), is_critical)),
+                            None => Box::new(Miss::new(entity.get_position())),
+                        };
+
+                        self.particle_holder.spawn_particle(particle);
                     }
                 }
                 NetworkEvent::HealEffect { entity_id, heal_amount } => {
@@ -1527,8 +1600,12 @@ impl Client {
 
                     match unit_id {
                         UnitId::Firewall => {
-                            let position = Vector2::new(position.x as usize, position.y as usize);
-                            let position = map.get_world_position(position);
+                            let Some(position) = map.get_world_position(position) else {
+                                #[cfg(feature = "debug")]
+                                print_debug!("[{}] entity with id {:?} is out of map bounds", "error".red(), entity_id);
+                                continue;
+                            };
+
                             let effect = self.effect_loader.get_or_load("firewall.str", &self.texture_loader).unwrap();
                             let frame_timer = effect.new_frame_timer();
 
@@ -1548,8 +1625,12 @@ impl Client {
                             );
                         }
                         UnitId::Pneuma => {
-                            let position = Vector2::new(position.x as usize, position.y as usize);
-                            let position = map.get_world_position(position);
+                            let Some(position) = map.get_world_position(position) else {
+                                #[cfg(feature = "debug")]
+                                print_debug!("[{}] entity with id {:?} is out of map bounds", "error".red(), entity_id);
+                                continue;
+                            };
+
                             let effect = self.effect_loader.get_or_load("pneuma1.str", &self.texture_loader).unwrap();
                             let frame_timer = effect.new_frame_timer();
 
@@ -1697,6 +1778,35 @@ impl Client {
                             .push(ChatMessage::new("Failed to sell items".to_owned(), MessageColor::Error));
                     }
                 },
+                NetworkEvent::AttackFailed {
+                    target_entity_id,
+                    target_position,
+                    player_position,
+                    attack_range,
+                } => {
+                    if let Some(map) = &self.map
+                        && self.client_state.try_follow_mut(this_entity()).is_some()
+                        // Make sure that the entity is on screen.
+                        && self
+                            .client_state
+                            .follow(client_state().entities())
+                            .iter()
+                            .any(|entity| entity.get_entity_id() == target_entity_id)
+                        && let Some(path) =
+                            self.path_finder
+                                .find_walkable_path_in_range(&**map, player_position, target_position, attack_range)
+                    {
+                        let nearest_tile = path.last().unwrap();
+
+                        let _ = self.networking_system.player_move(WorldPosition {
+                            x: nearest_tile.x,
+                            y: nearest_tile.y,
+                            direction: Direction::North,
+                        });
+
+                        *self.client_state.follow_mut(client_state().buffered_attack_entity()) = Some(target_entity_id);
+                    }
+                }
             }
         }
 
@@ -1836,6 +1946,10 @@ impl Client {
                         }
                     }
                 }
+                InputEvent::ToggleGameSettingsWindow => match self.interface.is_window_with_class_open(WindowClass::GameSettings) {
+                    true => self.interface.close_window_with_class(WindowClass::GameSettings),
+                    false => self.interface.open_window(GameSettingsWindow::new(client_state().game_settings())),
+                },
                 InputEvent::ToggleInterfaceSettingsWindow => match self.interface.is_window_with_class_open(WindowClass::InterfaceSettings)
                 {
                     true => self.interface.close_window_with_class(WindowClass::InterfaceSettings),
@@ -1900,9 +2014,12 @@ impl Client {
                         let _ = self.networking_system.player_move(WorldPosition {
                             x: destination.x,
                             y: destination.y,
-                            direction: Direction::N,
+                            direction: Direction::North,
                         });
                     }
+
+                    // Unbuffer any buffered attack.
+                    *self.client_state.follow_mut(client_state().buffered_attack_entity()) = None;
                 }
                 InputEvent::PlayerInteract { entity_id } => {
                     let entity = self
@@ -1914,13 +2031,22 @@ impl Client {
                     if let Some(entity) = entity {
                         let _ = match entity.get_entity_type() {
                             EntityType::Npc => self.networking_system.start_dialog(entity_id),
-                            EntityType::Monster => self.networking_system.player_attack(entity_id),
+                            EntityType::Monster => {
+                                let auto_attack = *self.client_state.follow(client_state().game_settings().auto_attack());
+                                let buffered_attack_entity = self.client_state.follow_mut(client_state().buffered_attack_entity());
+
+                                if auto_attack {
+                                    *buffered_attack_entity = Some(entity_id);
+                                }
+
+                                self.networking_system.player_attack(entity_id)
+                            }
                             EntityType::Warp => self.networking_system.player_move({
-                                let position = entity.get_grid_position();
+                                let position = entity.get_tile_position();
                                 WorldPosition {
                                     x: position.x,
                                     y: position.y,
-                                    direction: Direction::N,
+                                    direction: Direction::North,
                                 }
                             }),
                             _ => Ok(()),
@@ -1932,6 +2058,13 @@ impl Client {
                     let _ = self.networking_system.warp_to_map(map_name, position);
                 }
                 InputEvent::SendMessage { text } => {
+                    // Handle special client commands.
+                    if text.as_str() == "/nc" {
+                        let auto_attack = self.client_state.follow_mut(client_state().game_settings().auto_attack());
+                        *auto_attack = !*auto_attack;
+                        continue;
+                    }
+
                     let _ = self
                         .networking_system
                         .send_chat_message(self.client_state.follow(client_state().player_name()), &text);
@@ -2288,8 +2421,6 @@ impl Client {
                             self.audio_engine.play_background_music_track(map.background_music_track_name());
 
                             if let Some(position) = position {
-                                let position = Vector2::new(position.x as usize, position.y as usize);
-
                                 // SAFETY
                                 // `manually_asserted` is safe because we are in
                                 // the branch where `this_player`
@@ -2386,6 +2517,28 @@ impl Client {
                     .follow_mut(client_state().entities())
                     .iter_mut()
                     .for_each(|entity| entity.update(&self.audio_engine, self.map.as_ref().unwrap(), current_camera, client_tick));
+
+                self.client_state
+                    .follow_mut(client_state().dead_entities())
+                    .iter_mut()
+                    .for_each(|entity| entity.update(&self.audio_engine, self.map.as_ref().unwrap(), current_camera, client_tick));
+
+                // Buffered attack (the player tried attacking while out of range).
+                let auto_attack = *self.client_state.follow(client_state().game_settings().auto_attack());
+                if self
+                    .client_state
+                    .try_follow(this_entity())
+                    .is_some_and(|player| player.stopped_moving())
+                {
+                    let buffered_attack_entity = self.client_state.follow_mut(client_state().buffered_attack_entity());
+                    if let Some(entity_id) = buffered_attack_entity.take() {
+                        let _ = self.networking_system.player_attack(entity_id);
+
+                        if auto_attack {
+                            *buffered_attack_entity = Some(entity_id);
+                        }
+                    }
+                }
             }
 
             #[cfg(feature = "debug")]
@@ -2602,6 +2755,13 @@ impl Client {
                         self.client_state.follow(client_state().entities()),
                         &partition_camera,
                     );
+
+                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_entities))]
+                    map.render_dead_entities(
+                        entity_instructions,
+                        self.client_state.follow(client_state().dead_entities()),
+                        &partition_camera,
+                    );
                 }
             }
 
@@ -2669,11 +2829,17 @@ impl Client {
                     _ => current_camera,
                 };
 
-                #[cfg_attr(feature = "debug",
-                    korangar_debug::debug_condition(render_options.show_entities))]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_entities))]
                 map.render_entities(
                     &mut self.entity_instructions,
                     self.client_state.follow(client_state().entities()),
+                    entity_camera,
+                );
+
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_entities))]
+                map.render_dead_entities(
+                    &mut self.entity_instructions,
+                    self.client_state.follow(client_state().dead_entities()),
                     entity_camera,
                 );
 
@@ -2682,6 +2848,12 @@ impl Client {
                     map.render_entities_debug(
                         &mut self.rectangle_instructions,
                         self.client_state.follow(client_state().entities()),
+                        entity_camera,
+                    );
+
+                    map.render_entities_debug(
+                        &mut self.rectangle_instructions,
+                        self.client_state.follow(client_state().dead_entities()),
                         entity_camera,
                     );
                 }
@@ -2794,7 +2966,7 @@ impl Client {
                                         self.input_event_buffer.push(InputEvent::PlayerInteract { entity_id })
                                     }
                                     PickerTarget::Tile { x, y } => {
-                                        let destination = Vector2::new(x as usize, y as usize);
+                                        let destination = TilePosition { x, y };
 
                                         interface_frame.set_mouse_mode(MouseInputMode::Walk { destination });
 
@@ -2817,7 +2989,7 @@ impl Client {
                         && let PickerTarget::Tile { x, y } = input_report.mouse_target
                         && input_report.left_mouse_button_down
                     {
-                        let destination = Vector2::new(x as usize, y as usize);
+                        let destination = TilePosition { x, y };
 
                         if last_destination != destination {
                             interface_frame.set_mouse_mode(MouseInputMode::Walk { destination });
@@ -2851,6 +3023,23 @@ impl Client {
                     interface_frame
                 };
 
+                let buffered_attack_entity = *self.client_state.follow(client_state().buffered_attack_entity());
+
+                if let Some(entity_id) = buffered_attack_entity
+                    && let Some(entity) = self
+                        .client_state
+                        .follow(client_state().entities())
+                        .iter()
+                        .find(|entity| entity.get_entity_id() == entity_id)
+                {
+                    entity.render_status(
+                        &self.middle_interface_renderer,
+                        current_camera,
+                        self.client_state.follow(client_state().world_theme()),
+                        screen_size,
+                    );
+                }
+
                 match input_report.mouse_target {
                     PickerTarget::Tile { x, y } => {
                         // Only show if the mouse mode is default or walking.
@@ -2859,11 +3048,7 @@ impl Client {
                             && (is_mouse_mode_default || last_walking_destination.is_some())
                         {
                             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_indicators))]
-                            map.render_walk_indicator(
-                                &mut indicator_instruction,
-                                walk_indicator_color,
-                                Vector2::new(x as usize, y as usize),
-                            );
+                            map.render_walk_indicator(&mut indicator_instruction, walk_indicator_color, TilePosition { x, y });
                         }
                     }
                     PickerTarget::Entity(entity_id) => {
@@ -2875,12 +3060,16 @@ impl Client {
                                 .find(|entity| entity.get_entity_id() == entity_id);
 
                             if let Some(entity) = entity {
-                                entity.render_status(
-                                    &self.middle_interface_renderer,
-                                    current_camera,
-                                    self.client_state.follow(client_state().world_theme()),
-                                    screen_size,
-                                );
+                                // Since the buffered attack entity will render its status anyway,
+                                // we make sure not to render it here again if it's the same.
+                                if !buffered_attack_entity.is_some_and(|id| id == entity_id) {
+                                    entity.render_status(
+                                        &self.middle_interface_renderer,
+                                        current_camera,
+                                        self.client_state.follow(client_state().world_theme()),
+                                        screen_size,
+                                    );
+                                }
 
                                 if let Some(name) = &entity.get_details() {
                                     let name = name.split('#').next().unwrap();

@@ -259,8 +259,8 @@ impl MapLoader {
         let background_music_track_name = self.audio_engine.get_track_for_map(&map_file_name);
 
         let map = Map::new(
-            gat_data.map_width as usize,
-            gat_data.map_height as usize,
+            gat_data.map_width as u16,
+            gat_data.map_height as u16,
             object_kdtree.root_boundary(),
             lighting,
             water_plane,

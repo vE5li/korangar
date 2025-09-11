@@ -17,7 +17,7 @@ const SPRITE_SCALE: f32 = 1.4;
 
 #[allow(dead_code)]
 #[derive(Copy, Clone, Default, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub enum AnimationActionType {
+enum AnimationActionType {
     Attack1,
     Attack2,
     Attack3,
@@ -69,12 +69,13 @@ impl AnimationActionType {
 
 #[derive(Clone, Debug)]
 pub struct AnimationState {
-    pub action_type: AnimationActionType,
-    pub action_base_offset: usize,
-    pub start_time: ClientTick,
-    pub time: u32,
-    pub duration: Option<u32>,
-    pub factor: Option<f32>,
+    action_type: AnimationActionType,
+    action_base_offset: usize,
+    start_time: ClientTick,
+    time: u32,
+    duration: Option<u32>,
+    factor: Option<f32>,
+    looping: bool,
 }
 
 impl AnimationState {
@@ -87,6 +88,7 @@ impl AnimationState {
             time: 0,
             duration: None,
             factor: None,
+            looping: true,
         }
     }
 
@@ -96,6 +98,19 @@ impl AnimationState {
         self.start_time = client_tick;
         self.duration = None;
         self.factor = None;
+        self.looping = true;
+    }
+
+    pub fn attack(&mut self, entity_type: EntityType, attack_duration: u32, critical: bool, client_tick: ClientTick) {
+        self.action_type = match critical {
+            true => AnimationActionType::Attack3,
+            false => AnimationActionType::Attack1,
+        };
+        self.action_base_offset = self.action_type.action_base_offset(entity_type);
+        self.start_time = client_tick;
+        self.duration = Some(attack_duration);
+        self.factor = None;
+        self.looping = false;
     }
 
     pub fn walk(&mut self, entity_type: EntityType, movement_speed: usize, client_tick: ClientTick) {
@@ -104,6 +119,7 @@ impl AnimationState {
         self.start_time = client_tick;
         self.duration = None;
         self.factor = Some(movement_speed as f32 * 100.0 / 150.0 / 5.0);
+        self.looping = true;
     }
 
     pub fn dead(&mut self, entity_type: EntityType, client_tick: ClientTick) {
@@ -112,6 +128,18 @@ impl AnimationState {
         self.start_time = client_tick;
         self.duration = None;
         self.factor = None;
+        self.looping = false;
+    }
+
+    pub fn is_attack(&self) -> bool {
+        matches!(
+            self.action_type,
+            AnimationActionType::Attack1 | AnimationActionType::Attack2 | AnimationActionType::Attack3
+        )
+    }
+
+    pub fn is_walking(&self) -> bool {
+        self.action_type == AnimationActionType::Walk
     }
 
     pub fn update(&mut self, client_tick: ClientTick) {
@@ -188,9 +216,28 @@ impl Default for AnimationFramePart {
 }
 
 impl AnimationData {
+    pub fn is_animation_over(&self, animation_state: &AnimationState) -> bool {
+        let animation_action_index = animation_state.action_type.action_base_offset(self.entity_type) * 8;
+
+        let delay_index = animation_action_index % self.delays.len();
+        let animation_index = animation_action_index % self.animations.len();
+
+        let delay = self.delays[delay_index];
+        let animation = &self.animations[animation_index];
+
+        let factor = animation_state.factor.map(|factor| delay * factor).unwrap_or_else(|| delay * 50.0);
+
+        let frame_time = animation_state
+            .duration
+            .map(|duration| animation_state.time * animation.frames.len() as u32 / duration)
+            .unwrap_or_else(|| (animation_state.time as f32 / factor) as u32);
+
+        frame_time as usize > animation.frames.len()
+    }
+
     pub fn get_frame(&self, animation_state: &AnimationState, camera: &dyn Camera, direction: Direction) -> &AnimationFrame {
         let camera_direction = camera.camera_direction();
-        let direction = (camera_direction + usize::from(direction)) & 7;
+        let direction = (camera_direction + u16::from(direction) as usize) & 7;
         let animation_action_index = animation_state.action_type.action_base_offset(self.entity_type) * 8 + direction;
 
         let delay_index = animation_action_index % self.delays.len();
@@ -206,7 +253,10 @@ impl AnimationData {
             .map(|duration| animation_state.time * animation.frames.len() as u32 / duration)
             .unwrap_or_else(|| (animation_state.time as f32 / factor) as u32);
 
-        let frame_index = frame_time as usize % animation.frames.len();
+        let frame_index = match animation_state.looping {
+            true => frame_time as usize % animation.frames.len(),
+            false => (frame_time as usize).min(animation.frames.len().saturating_sub(1)),
+        };
 
         // Remove Doridori animation from Player
         if self.entity_type == EntityType::Player && animation_state.action_type == AnimationActionType::Idle {

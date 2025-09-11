@@ -144,6 +144,10 @@ pub struct ShopId(pub u32);
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct Price(pub u32);
 
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub struct AttackRange(pub u16);
+
 #[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct ServerAddress(pub [u8; 4]);
@@ -162,14 +166,14 @@ impl From<ServerAddress> for Ipv4Addr {
     }
 }
 
-#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct TilePosition {
     pub x: u16,
     pub y: u16,
 }
 
-#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct LargeTilePosition {
     pub x: u32,
@@ -668,6 +672,7 @@ pub struct EntityMovePacket {
     pub starting_timestamp: ClientTick,
 }
 
+// TODO: Handle this to improve the combat system.
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x0088)]
@@ -748,6 +753,13 @@ pub struct SelectCharacterPacket {
 pub struct ServerMessagePacket {
     #[length_remaining]
     pub message: String,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0291)]
+pub struct MessageTablePacket {
+    pub message_id: u16,
 }
 
 /// Sent by the client to the map server when the user hovers over an entity.
@@ -1411,7 +1423,7 @@ pub struct UpdateStatPacket3 {
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x013A)]
 pub struct UpdateAttackRangePacket {
-    pub attack_range: u16,
+    pub attack_range: AttackRange,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1538,8 +1550,8 @@ pub struct GlobalMessagePacket {
 pub struct RequestPlayerAttackFailedPacket {
     pub target_entity_id: EntityId,
     pub target_position: TilePosition,
-    pub position: TilePosition,
-    pub attack_range: u16,
+    pub player_position: TilePosition,
+    pub attack_range: AttackRange,
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
@@ -1577,8 +1589,8 @@ pub struct DamagePacket1 {
     pub source_entity_id: EntityId,
     pub destination_entity_id: EntityId,
     pub client_tick: ClientTick,
-    pub source_movement_speed: u32,
-    pub destination_movement_speed: u32,
+    pub attack_duration: u32,
+    pub damage_delay: u32,
     pub damage_amount: i16,
     pub number_of_hits: u16,
     pub damage_type: DamageType,
@@ -1586,6 +1598,7 @@ pub struct DamagePacket1 {
     pub damage_amount_2: i16,
 }
 
+// FIX: This one is the attack animation one
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x08C8)]
@@ -1593,8 +1606,8 @@ pub struct DamagePacket3 {
     pub source_entity_id: EntityId,
     pub destination_entity_id: EntityId,
     pub client_tick: ClientTick,
-    pub source_movement_speed: u32,
-    pub destination_movement_speed: u32,
+    pub attack_duration: u32,
+    pub damage_delay: u32,
     pub damage_amount: u32,
     pub is_special_damage: u8,
     pub number_of_hits: u16,
@@ -1827,7 +1840,7 @@ pub struct SkillInformation {
     pub skill_type: SkillType,
     pub skill_level: SkillLevel,
     pub spell_point_cost: u16,
-    pub attack_range: u16,
+    pub attack_range: AttackRange,
     #[length(24)]
     pub skill_name: String,
     pub upgraded: u8,
@@ -3593,6 +3606,29 @@ pub struct RequestEquipItemStatusPacket {
     pub equipped_position: EquipPosition,
     pub view_id: u16,
     pub result: RequestEquipItemStatus,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x013C)]
+pub struct EquipAmmunitionPacket {
+    pub inventory_index: InventoryIndex,
+}
+
+#[derive(Debug, Clone, ByteConvertable)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub enum AmmunitionActionType {
+    EquipProperAmmunitionFirst,
+    WeightLimitExceeded1,
+    WeightLimitExceeded2,
+    Equipped,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x013B)]
+pub struct AmmunitionActionPacket {
+    pub action_type: AmmunitionActionType,
 }
 
 #[derive(Debug, Clone, Packet, ClientPacket, MapServer)]

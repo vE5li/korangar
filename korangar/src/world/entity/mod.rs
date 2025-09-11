@@ -822,6 +822,12 @@ pub struct Player {
     pub maximum_activity_points: usize,
     pub base_level: usize,
     pub job_level: usize,
+    pub strength: u32,
+    pub agility: u32,
+    pub vitality: u32,
+    pub intelligence: u32,
+    pub dexterity: u32,
+    pub luck: u32,
 }
 
 impl Player {
@@ -852,6 +858,12 @@ impl Player {
             maximum_activity_points,
             base_level,
             job_level,
+            strength: character_information.strength as u32,
+            agility: character_information.agility as u32,
+            vitality: character_information.vitality as u32,
+            intelligence: character_information.intelligence as u32,
+            dexterity: character_information.dexterity as u32,
+            luck: character_information.luck as u32,
         }
     }
 
@@ -874,6 +886,12 @@ impl Player {
             StatusType::MovementSpeed(value) => self.common.movement_speed = value as usize,
             StatusType::BaseLevel(value) => self.base_level = value as usize,
             StatusType::JobLevel(value) => self.job_level = value as usize,
+            StatusType::Strength(base, _bonus) => self.strength = base,
+            StatusType::Agility(base, _bonus) => self.agility = base,
+            StatusType::Vitality(base, _bonus) => self.vitality = base,
+            StatusType::Intelligence(base, _bonus) => self.intelligence = base,
+            StatusType::Dexterity(base, _bonus) => self.dexterity = base,
+            StatusType::Luck(base, _bonus) => self.luck = base,
             _ => {}
         }
     }

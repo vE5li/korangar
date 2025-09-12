@@ -2,13 +2,15 @@ use std::string::String;
 use std::sync::Arc;
 
 use arrayvec::ArrayVec;
-use cgmath::{EuclideanSpace, Point3, Vector2, VectorSpace, Zero};
+use cgmath::{EuclideanSpace, Point3, Vector2, VectorSpace};
 use korangar_audio::{AudioEngine, SoundEffectKey};
+#[cfg(feature = "debug")]
+use korangar_debug::logging::Colorize;
 use korangar_interface::element::StateElement;
 use korangar_interface::window::{StateWindow, Window};
 use korangar_networking::EntityData;
 use korangar_util::pathing::{MAX_WALK_PATH_SIZE, PathFinder};
-use ragnarok_packets::{AccountId, CharacterInformation, ClientTick, Direction, EntityId, Sex, StatusType, WorldPosition};
+use ragnarok_packets::{AccountId, CharacterInformation, ClientTick, Direction, EntityId, Sex, StatusType, TilePosition, WorldPosition};
 use rust_state::{Path, RustState, VecItem};
 #[cfg(feature = "debug")]
 use smallvec::smallvec_inline;
@@ -28,7 +30,7 @@ use crate::renderer::GameInterfaceRenderer;
 use crate::renderer::MarkerRenderer;
 use crate::state::ClientState;
 use crate::state::theme::{InterfaceThemeType, WorldTheme};
-use crate::world::{ActionEvent, AnimationActionType, AnimationData, AnimationState, Camera, Library, Map};
+use crate::world::{ActionEvent, AnimationData, AnimationState, Camera, Library, Map};
 #[cfg(feature = "debug")]
 use crate::world::{MarkerIdentifier, SubMesh};
 #[cfg(feature = "debug")]
@@ -86,7 +88,7 @@ pub struct Pathing {
 
 #[derive(Copy, Clone)]
 pub struct Step {
-    arrival_position: Vector2<usize>,
+    arrival_position: TilePosition,
     arrival_timestamp: u32,
 }
 
@@ -157,8 +159,8 @@ pub struct Common {
     pub entity_type: EntityType,
     pub active_movement: Option<Movement>,
     pub animation_data: Option<Arc<AnimationData>>,
-    pub grid_position: Vector2<usize>,
-    pub position: Point3<f32>,
+    pub tile_position: TilePosition,
+    pub world_position: Point3<f32>,
     #[hidden_element]
     details: ResourceState<String>,
     #[hidden_element]
@@ -357,7 +359,7 @@ fn get_entity_part_files(library: &Library, entity_type: EntityType, job_id: usi
 }
 
 impl Common {
-    pub fn new(entity_data: &EntityData, grid_position: Vector2<usize>, position: Point3<f32>, client_tick: ClientTick) -> Self {
+    pub fn new(entity_data: &EntityData, tile_position: TilePosition, world_position: Point3<f32>, client_tick: ClientTick) -> Self {
         let entity_id = entity_data.entity_id;
         let job_id = entity_data.job as usize;
         let head_direction = entity_data.head_direction;
@@ -375,8 +377,8 @@ impl Common {
         let animation_state = AnimationState::new(entity_type, client_tick);
 
         Self {
-            grid_position,
-            position,
+            tile_position,
+            world_position,
             entity_id,
             job_id,
             direction,
@@ -403,10 +405,15 @@ impl Common {
         self.animation_state.update(client_tick);
 
         if let Some(animation_data) = self.animation_data.as_ref() {
+            if animation_data.is_animation_over(&self.animation_state) && self.animation_state.is_attack() {
+                self.animation_state.idle(self.entity_type, client_tick);
+            }
+
             let frame = animation_data.get_frame(&self.animation_state, camera, self.direction);
+
             match frame.event {
                 Some(ActionEvent::Sound { key }) => {
-                    self.sound_state.update(audio_engine, self.position, key, client_tick);
+                    self.sound_state.update(audio_engine, self.world_position, key, client_tick);
                 }
                 Some(ActionEvent::Attack) => {
                     // TODO: NHA What do we need to do at this event? Other
@@ -423,8 +430,7 @@ impl Common {
             let last_step = active_movement.steps.last().unwrap();
 
             if client_tick.0 > last_step.arrival_timestamp {
-                let position = Vector2::new(last_step.arrival_position.x, last_step.arrival_position.y);
-                self.set_position(map, position, client_tick);
+                self.set_position(map, last_step.arrival_position, client_tick);
             } else {
                 let mut last_step_index = 0;
                 while active_movement.steps[last_step_index + 1].arrival_timestamp < client_tick.0 {
@@ -434,32 +440,46 @@ impl Common {
                 let last_step = active_movement.steps[last_step_index];
                 let next_step = active_movement.steps[last_step_index + 1];
 
-                let last_step_position = last_step.arrival_position.map(|value| value as isize);
-                let next_step_position = next_step.arrival_position.map(|value| value as isize);
+                self.tile_position = next_step.arrival_position;
+
+                let last_step_position = Vector2::new(last_step.arrival_position.x as isize, last_step.arrival_position.y as isize);
+                let next_step_position = Vector2::new(next_step.arrival_position.x as isize, next_step.arrival_position.y as isize);
 
                 let array = last_step_position - next_step_position;
                 let array: &[isize; 2] = array.as_ref();
-                self.direction = (*array).into();
+                self.direction = (*array).try_into().unwrap();
 
-                let last_step_position = map.get_world_position(last_step.arrival_position).to_vec();
-                let next_step_position = map.get_world_position(next_step.arrival_position).to_vec();
+                let Some(last_step_position) = map.get_world_position(last_step.arrival_position) else {
+                    self.active_movement = active_movement.into();
+                    return;
+                };
+                let Some(next_step_position) = map.get_world_position(next_step.arrival_position) else {
+                    self.active_movement = active_movement.into();
+                    return;
+                };
 
                 let clamped_tick = u32::max(last_step.arrival_timestamp, client_tick.0);
                 let total = next_step.arrival_timestamp - last_step.arrival_timestamp;
                 let offset = clamped_tick - last_step.arrival_timestamp;
 
                 let movement_elapsed = (1.0 / total as f32) * offset as f32;
-                let position = last_step_position.lerp(next_step_position, movement_elapsed);
+                let position = last_step_position.to_vec().lerp(next_step_position.to_vec(), movement_elapsed);
 
-                self.position = Point3::from_vec(position);
+                self.world_position = Point3::from_vec(position);
                 self.active_movement = active_movement.into();
             }
         }
     }
 
-    fn set_position(&mut self, map: &Map, position: Vector2<usize>, client_tick: ClientTick) {
-        self.grid_position = position;
-        self.position = map.get_world_position(position);
+    fn set_position(&mut self, map: &Map, position: TilePosition, client_tick: ClientTick) {
+        let Some(world_position) = map.get_world_position(position) else {
+            #[cfg(feature = "debug")]
+            korangar_debug::logging::print_debug!("[{}] entity position is out of map bounds", "error".red());
+            return;
+        };
+
+        self.tile_position = position;
+        self.world_position = world_position;
         self.active_movement = None;
         self.animation_state.idle(self.entity_type, client_tick);
     }
@@ -467,9 +487,9 @@ impl Common {
     pub fn move_from_to(
         &mut self,
         map: &Map,
-        path_finder: &mut PathFinder,
-        start: Vector2<usize>,
-        goal: Vector2<usize>,
+        path_finder: &mut PathFinder<TilePosition>,
+        start: TilePosition,
+        goal: TilePosition,
         starting_timestamp: ClientTick,
     ) {
         if let Some(path) = path_finder.find_walkable_path(map, start, goal) {
@@ -478,7 +498,7 @@ impl Common {
             }
 
             let mut last_timestamp = starting_timestamp.0;
-            let mut last_position: Option<Vector2<usize>> = None;
+            let mut last_position: Option<TilePosition> = None;
 
             let steps: ArrayVec<Step, MAX_WALK_PATH_SIZE> = path
                 .iter()
@@ -518,7 +538,7 @@ impl Common {
             if steps.len() > 1 {
                 self.active_movement = Movement::new(steps, starting_timestamp.0).into();
 
-                if self.animation_state.action_type != AnimationActionType::Walk {
+                if !self.animation_state.is_walking() {
                     self.animation_state.walk(self.entity_type, self.movement_speed, starting_timestamp);
                 }
             }
@@ -539,7 +559,11 @@ impl Common {
             );
         }
 
-        let delta = steps[index + 1].arrival_position.map(|component| component as isize) - step.map(|component| component as isize);
+        let arrival_position = steps[index + 1].arrival_position;
+        let delta = Vector2::new(
+            arrival_position.x as isize - step.x as isize,
+            arrival_position.y as isize - step.y as isize,
+        );
 
         match delta {
             Vector2 { x: 1, y: 0 } => (
@@ -638,7 +662,11 @@ impl Common {
         };
 
         for (index, Step { arrival_position, .. }) in active_movement.steps.iter().copied().enumerate() {
-            let tile = map.get_tile(arrival_position);
+            let Some(tile) = map.get_tile(arrival_position) else {
+                korangar_debug::logging::print_debug!("[{}] movement is out of map bounds", "error".red());
+                continue;
+            };
+
             let offset = Vector2::new(
                 arrival_position.x as f32 * GAT_TILE_SIZE,
                 arrival_position.y as f32 * GAT_TILE_SIZE,
@@ -664,7 +692,11 @@ impl Common {
             let first_normal = NativeModelVertex::calculate_normal(first_position, second_position, third_position);
             let second_normal = NativeModelVertex::calculate_normal(third_position, second_position, fourth_position);
 
-            let (texture_coordinates, texture_index) = Self::pathing_texture_coordinates(&active_movement.steps, arrival_position, index);
+            let (texture_coordinates, texture_index) = Self::pathing_texture_coordinates(
+                &active_movement.steps,
+                Vector2::new(arrival_position.x as usize, arrival_position.y as usize),
+                index,
+            );
 
             if let Some(first_normal) = first_normal {
                 pathing_native_vertices.push(NativeModelVertex::new(
@@ -778,7 +810,7 @@ impl Common {
                 camera,
                 add_to_picker,
                 self.entity_id,
-                self.position,
+                self.world_position,
                 &self.animation_state,
                 self.direction,
             );
@@ -791,7 +823,7 @@ impl Common {
             animation_data.render_debug(
                 instructions,
                 camera,
-                self.position,
+                self.world_position,
                 &self.animation_state,
                 self.direction,
                 Color::rgb_u8(255, 0, 0),
@@ -808,7 +840,7 @@ impl Common {
         marker_identifier: MarkerIdentifier,
         hovered: bool,
     ) {
-        renderer.render_marker(camera, marker_identifier, self.position, hovered);
+        renderer.render_marker(camera, marker_identifier, self.world_position, hovered);
     }
 }
 
@@ -838,10 +870,10 @@ impl Player {
         let job_level = character_information.job_level as usize;
 
         let entity_data = EntityData::from_character(account_id, character_information, WorldPosition::origin());
-        let grid_position = Vector2::zero();
+        let tile_position = TilePosition::new(0, 0);
         let position = Point3::origin();
 
-        let common = Common::new(&entity_data, grid_position, position, client_tick);
+        let common = Common::new(&entity_data, tile_position, position, client_tick);
 
         Self {
             common,
@@ -879,7 +911,7 @@ impl Player {
     }
 
     pub fn render_status(&self, renderer: &GameInterfaceRenderer, camera: &dyn Camera, theme: &WorldTheme, window_size: ScreenSize) {
-        let clip_space_position = camera.view_projection_matrix() * self.common.position.to_homogeneous();
+        let clip_space_position = camera.view_projection_matrix() * self.common.world_position.to_homogeneous();
         let screen_position = camera.clip_to_screen_space(clip_space_position);
         let final_position = ScreenPosition {
             left: screen_position.x * window_size.width,
@@ -952,20 +984,30 @@ pub struct Npc {
 }
 
 impl Npc {
-    pub fn new(map: &Map, entity_data: EntityData, client_tick: ClientTick) -> Self {
-        let grid_position = Vector2::new(entity_data.position.x, entity_data.position.y);
-        let position = map.get_world_position(grid_position);
+    pub fn new(map: &Map, path_finder: &mut PathFinder<TilePosition>, entity_data: EntityData, client_tick: ClientTick) -> Option<Self> {
+        let Some(position) = map.get_world_position(entity_data.position.tile_position()) else {
+            #[cfg(feature = "debug")]
+            korangar_debug::logging::print_debug!(
+                "[{}] NPC with id {:?} is out of map bounds",
+                "error".red(),
+                entity_data.entity_id
+            );
+            return None;
+        };
 
-        let mut common = Common::new(&entity_data, grid_position, position, client_tick);
+        let mut common = Common::new(&entity_data, entity_data.position.tile_position(), position, client_tick);
 
         if let Some(destination) = entity_data.destination {
-            let mut path_finder = PathFinder::default();
-            let position_from = Vector2::new(entity_data.position.x, entity_data.position.y);
-            let position_to = Vector2::new(destination.x, destination.y);
-            common.move_from_to(map, &mut path_finder, position_from, position_to, client_tick);
+            common.move_from_to(
+                map,
+                path_finder,
+                entity_data.position.tile_position(),
+                destination.tile_position(),
+                client_tick,
+            );
         }
 
-        Self { common }
+        Some(Self { common })
     }
 
     pub fn get_common(&self) -> &Common {
@@ -981,7 +1023,7 @@ impl Npc {
             return;
         }
 
-        let clip_space_position = camera.view_projection_matrix() * self.common.position.to_homogeneous();
+        let clip_space_position = camera.view_projection_matrix() * self.common.world_position.to_homogeneous();
         let screen_position = camera.clip_to_screen_space(clip_space_position);
         let final_position = ScreenPosition {
             left: screen_position.x * window_size.width,
@@ -1081,15 +1123,15 @@ impl Entity {
         self.get_common().details.as_option()
     }
 
-    pub fn get_grid_position(&self) -> Vector2<usize> {
-        self.get_common().grid_position
+    pub fn get_tile_position(&self) -> TilePosition {
+        self.get_common().tile_position
     }
 
     pub fn get_position(&self) -> Point3<f32> {
-        self.get_common().position
+        self.get_common().world_position
     }
 
-    pub fn set_position(&mut self, map: &Map, position: Vector2<usize>, client_tick: ClientTick) {
+    pub fn set_position(&mut self, map: &Map, position: TilePosition, client_tick: ClientTick) {
         self.get_common_mut().set_position(map, position, client_tick);
     }
 
@@ -1101,6 +1143,32 @@ impl Entity {
     pub fn set_idle(&mut self, client_tick: ClientTick) {
         let entity_type = self.get_entity_type();
         self.get_common_mut().animation_state.idle(entity_type, client_tick);
+    }
+
+    pub fn rotate_towards(&mut self, target_position: TilePosition) {
+        let common = self.get_common_mut();
+
+        // FIX: This check is a little bit broken. This will prefer rotation diagonally
+        // over rotating straight.
+        if let Ok(direction) = Direction::try_from([
+            (common.tile_position.x as isize - target_position.x as isize).clamp(-1, 1),
+            (common.tile_position.y as isize - target_position.y as isize).clamp(-1, 1),
+        ]) {
+            common.direction = direction;
+        }
+    }
+
+    pub fn set_attack(&mut self, critical: bool, client_tick: ClientTick) {
+        let entity_type = self.get_entity_type();
+        self.get_common_mut().animation_state.attack(entity_type, critical, client_tick);
+    }
+
+    pub fn is_walking(&self) -> bool {
+        self.get_common().active_movement.is_some()
+    }
+
+    pub fn stop_movement(&mut self) {
+        self.get_common_mut().active_movement = None;
     }
 
     pub fn update_health(&mut self, health_points: usize, maximum_health_points: usize) {
@@ -1116,9 +1184,9 @@ impl Entity {
     pub fn move_from_to(
         &mut self,
         map: &Map,
-        path_finder: &mut PathFinder,
-        from: Vector2<usize>,
-        to: Vector2<usize>,
+        path_finder: &mut PathFinder<TilePosition>,
+        from: TilePosition,
+        to: TilePosition,
         starting_timestamp: ClientTick,
     ) {
         self.get_common_mut().move_from_to(map, path_finder, from, to, starting_timestamp);

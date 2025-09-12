@@ -144,6 +144,10 @@ pub struct ShopId(pub u32);
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct Price(pub u32);
 
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub struct AttackRange(pub u16);
+
 #[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct ServerAddress(pub [u8; 4]);
@@ -167,6 +171,20 @@ impl From<ServerAddress> for Ipv4Addr {
 pub struct TilePosition {
     pub x: u16,
     pub y: u16,
+}
+
+impl korangar_util::pathing::TraversablePosition for TilePosition {
+    fn new(x: u16, y: u16) -> Self {
+        Self { x, y }
+    }
+
+    fn x(&self) -> u16 {
+        self.x
+    }
+
+    fn y(&self) -> u16 {
+        self.y
+    }
 }
 
 #[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, Hash)]
@@ -668,6 +686,12 @@ pub struct EntityMovePacket {
     pub starting_timestamp: ClientTick,
 }
 
+// TODO: Handle this to improve the combat system.
+// description:
+// Visually moves(slides) a character to x,y. If the target cell
+// isn't walkable, the char doesn't move at all. If the char is
+// sitting it will stand up.
+// 0088 <id>.L <x>.W <y>.W (ZC_STOPMOVE)
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x0088)]
@@ -1401,7 +1425,7 @@ pub struct UpdateStatusPacket3 {
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x013A)]
 pub struct UpdateAttackRangePacket {
-    pub attack_range: u16,
+    pub attack_range: AttackRange,
 }
 
 #[derive(Debug, Clone, Packet, ClientPacket, CharacterServer)]
@@ -1455,8 +1479,8 @@ pub struct GlobalMessagePacket {
 pub struct RequestPlayerAttackFailedPacket {
     pub target_entity_id: EntityId,
     pub target_position: TilePosition,
-    pub position: TilePosition,
-    pub attack_range: u16,
+    pub player_position: TilePosition,
+    pub attack_range: AttackRange,
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
@@ -1503,6 +1527,7 @@ pub struct DamagePacket1 {
     pub damage_amount_2: i16,
 }
 
+// FIX: This one is the attack animation one
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x08C8)]
@@ -1744,7 +1769,7 @@ pub struct SkillInformation {
     pub skill_type: SkillType,
     pub skill_level: SkillLevel,
     pub spell_point_cost: u16,
-    pub attack_range: u16,
+    pub attack_range: AttackRange,
     #[length(24)]
     pub skill_name: String,
     pub upgraded: u8,

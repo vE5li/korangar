@@ -1797,6 +1797,14 @@ impl Client {
                         }
                     }
                 }
+                InputEvent::ToggleStatsWindow => {
+                    if self.client_state.try_follow(this_entity()).is_some() {
+                        match self.interface.is_window_with_class_open(WindowClass::Stats) {
+                            true => self.interface.close_window_with_class(WindowClass::Stats),
+                            false => self.interface.open_window(StatsWindow::new(this_player().manually_asserted())),
+                        }
+                    }
+                }
                 InputEvent::ToggleInterfaceSettingsWindow => match self.interface.is_window_with_class_open(WindowClass::InterfaceSettings)
                 {
                     true => self.interface.close_window_with_class(WindowClass::InterfaceSettings),

@@ -63,6 +63,8 @@ pub enum InputEvent {
     ToggleEquipmentWindow,
     /// Open or close the skill tree window. Only works while playing.
     ToggleSkillTreeWindow,
+    /// Open or close the stats window. Only works while playing.
+    ToggleStatsWindow,
     /// Open or close the interface settings window.
     ToggleInterfaceSettingsWindow,
     /// Open or close the graphics settings window.

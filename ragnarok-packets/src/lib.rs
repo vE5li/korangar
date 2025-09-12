@@ -573,7 +573,7 @@ pub struct CharacterInformation {
     pub name: String,
     pub strength: u8,
     pub agility: u8,
-    pub vit: u8,
+    pub vitality: u8,
     pub intelligence: u8,
     pub dexterity: u8,
     pub luck: u8,

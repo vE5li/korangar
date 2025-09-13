@@ -3,8 +3,8 @@ use cgmath::{EuclideanSpace, InnerSpace, Matrix4, Point3, Transform, Vector2, Ve
 use super::Camera;
 use crate::graphics::orthographic_reverse_lh;
 
-const FAR_PLANE: f32 = 500.0;
-const NEAR_PLANE: f32 = -500.0;
+const FAR_PLANE: f32 = 600.0;
+const NEAR_PLANE: f32 = -150.0;
 const MAX_BOUNDS: f32 = 200.0;
 const FOCUS_POINT_OFFSET: f32 = 50.0;
 const ORIGIN: Point3<f32> = Point3::new(0.0, 0.0, 0.0);

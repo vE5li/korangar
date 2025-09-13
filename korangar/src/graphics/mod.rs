@@ -627,7 +627,7 @@ impl GlobalContext {
 
         shadow_factory.new_attachment(
             "directional shadow map",
-            TextureFormat::Depth32Float,
+            TextureFormat::Depth16Unorm,
             AttachmentTextureType::DepthAttachment,
         )
     }

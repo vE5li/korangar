@@ -3,20 +3,20 @@ use wgpu::{
     ShaderModuleDescriptor, include_wgsl,
 };
 
-use crate::graphics::passes::light_culling::LightCullingPassContext;
-use crate::graphics::passes::{BindGroupCount, ComputePassContext, Dispatch};
-use crate::graphics::{Capabilities, GlobalContext, ScreenSize, calculate_light_tile_count};
+use crate::graphics::passes::{BindGroupCount, ComputePassContext, Dispatch, SdsmPassContext};
+use crate::graphics::{Capabilities, GlobalContext};
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/light_culling.wgsl");
-const DISPATCHER_NAME: &str = "light culling";
+const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/compute_partitions.wgsl");
 
-pub(crate) struct LightCullingDispatcher {
+const DISPATCHER_NAME: &str = "compute partitions";
+
+pub(crate) struct ComputePartitionsDispatcher {
     pipeline: ComputePipeline,
 }
 
-impl Dispatch<{ BindGroupCount::Two }> for LightCullingDispatcher {
-    type Context = LightCullingPassContext;
-    type DispatchData<'data> = ScreenSize;
+impl Dispatch<{ BindGroupCount::Two }> for ComputePartitionsDispatcher {
+    type Context = SdsmPassContext;
+    type DispatchData<'data> = ();
 
     fn new(
         _capabilities: &Capabilities,
@@ -50,19 +50,8 @@ impl Dispatch<{ BindGroupCount::Two }> for LightCullingDispatcher {
         Self { pipeline }
     }
 
-    fn dispatch(&mut self, pass: &mut ComputePass<'_>, draw_data: Self::DispatchData<'_>) {
+    fn dispatch(&mut self, pass: &mut ComputePass<'_>, _draw_data: Self::DispatchData<'_>) {
         pass.set_pipeline(&self.pipeline);
-        let (x, y) = calculate_dispatch_size(draw_data);
-        pass.dispatch_workgroups(x, y, 1);
+        pass.dispatch_workgroups(1, 1, 1);
     }
-}
-
-fn calculate_dispatch_size(forward_size: ScreenSize) -> (u32, u32) {
-    let (tiles_x, tiles_y) = calculate_light_tile_count(forward_size);
-
-    // Round up division by workgroup size (8)
-    let dispatch_x = tiles_x.div_ceil(8);
-    let dispatch_y = tiles_y.div_ceil(8);
-
-    (dispatch_x, dispatch_y)
 }

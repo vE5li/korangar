@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use std::sync::atomic::AtomicU64;
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use cgmath::Vector2;
@@ -10,7 +10,7 @@ use korangar_debug::profile_block;
 use rayon::ThreadPool;
 use wgpu::util::StagingBelt;
 use wgpu::{
-    Adapter, CommandBuffer, CommandEncoder, CommandEncoderDescriptor, Device, Extent3d, Instance, Origin3d, PollType, Queue,
+    Adapter, BufferAddress, CommandBuffer, CommandEncoder, CommandEncoderDescriptor, Device, Extent3d, Instance, Origin3d, PollType, Queue,
     SurfaceTexture, TexelCopyBufferInfo, TexelCopyBufferLayout, TexelCopyTextureInfo, TextureAspect, TextureFormat, TextureViewDescriptor,
 };
 use winit::dpi::PhysicalSize;
@@ -19,8 +19,9 @@ use winit::window::Window;
 #[cfg(feature = "debug")]
 use super::BindlessSupport;
 use super::{
-    AntiAliasingResources, Capabilities, FramePacer, FrameStage, GlobalContext, LimitFramerate, Msaa, Prepare, PresentModeInfo,
-    RENDER_TO_TEXTURE_FORMAT, ScreenSpaceAntiAliasing, ShadowDetail, Ssaa, Surface, TextureSamplerType,
+    AntiAliasingResources, Capabilities, DirectionalShadowPartition, FramePacer, FrameStage, GlobalContext, LimitFramerate, Msaa,
+    PARTITION_COUNT, Partition, Prepare, PresentModeInfo, RENDER_TO_TEXTURE_FORMAT, ScreenSpaceAntiAliasing, ShadowDetail, Ssaa, Surface,
+    TextureSamplerType,
 };
 use crate::graphics::ScreenSize;
 use crate::graphics::instruction::RenderInstruction;
@@ -36,6 +37,7 @@ pub struct GraphicsEngineDescriptor {
     pub queue: Queue,
     pub texture_loader: Arc<TextureLoader>,
     pub picker_value: Arc<AtomicU64>,
+    pub directional_shadow_partitions: Arc<Mutex<[DirectionalShadowPartition; PARTITION_COUNT]>>,
 }
 
 /// Bind Group layout:
@@ -60,6 +62,7 @@ pub struct GraphicsEngine {
     texture_loader: Arc<TextureLoader>,
     engine_context: Option<EngineContext>,
     picker_value: Arc<AtomicU64>,
+    directional_shadow_partitions: Arc<Mutex<[DirectionalShadowPartition; PARTITION_COUNT]>>,
     staging_belt: StagingBelt,
     queue: Queue,
     device: Device,
@@ -78,6 +81,7 @@ struct EngineContext {
     point_shadow_pass_context: PointShadowRenderPassContext,
     light_culling_pass_context: LightCullingPassContext,
     forward_pass_context: ForwardRenderPassContext,
+    sdsm_pass_context: SdsmPassContext,
     post_processing_pass_context: PostProcessingRenderPassContext,
     screen_blit_pass_context: ScreenBlitRenderPassContext,
 
@@ -95,6 +99,12 @@ struct EngineContext {
     forward_indicator_drawer: ForwardIndicatorDrawer,
     forward_model_drawer: ForwardModelDrawer,
     water_wave_drawer: WaterWaveDrawer,
+    clear_partitions_dispatcher: ClearPartitionsDispatcher,
+    reduce_partitions_dispatcher: ReducePartitionsDispatcher,
+    compute_partitions_dispatcher: ComputePartitionsDispatcher,
+    clear_bounds_dispatcher: ClearBoundsDispatcher,
+    reduce_bounds_dispatcher: ReduceBoundsDispatcher,
+    compute_custom_partitions_dispatcher: ComputeCustomPartitionsDispatcher,
     post_processing_effect_drawer: PostProcessingEffectDrawer,
     post_processing_fxaa_drawer: PostProcessingFxaaDrawer,
     post_processing_blitter_drawer: PostProcessingBlitterDrawer,
@@ -147,6 +157,7 @@ impl GraphicsEngine {
             texture_loader: descriptor.texture_loader,
             engine_context: None,
             picker_value: descriptor.picker_value,
+            directional_shadow_partitions: descriptor.directional_shadow_partitions,
             staging_belt,
             queue: descriptor.queue,
             device: descriptor.device,
@@ -224,6 +235,7 @@ impl GraphicsEngine {
                         let light_culling_pass_context = LightCullingPassContext::new(&self.device, &self.queue, &global_context);
                         let forward_pass_context =
                             ForwardRenderPassContext::new(&self.device, &self.queue, &self.texture_loader, &global_context);
+                        let sdsm_pass_context = SdsmPassContext::new(&self.device, &self.queue, &global_context);
                         let post_processing_pass_context =
                             PostProcessingRenderPassContext::new(&self.device, &self.queue, &self.texture_loader, &global_context);
                         let screen_blit_pass_context =
@@ -319,6 +331,48 @@ impl GraphicsEngine {
                             &global_context,
                             &forward_pass_context,
                         );
+                        let clear_partitions_dispatcher = ClearPartitionsDispatcher::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &sdsm_pass_context,
+                        );
+                        let reduce_partitions_dispatcher = ReducePartitionsDispatcher::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &sdsm_pass_context,
+                        );
+                        let compute_partitions_dispatcher = ComputePartitionsDispatcher::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &sdsm_pass_context,
+                        );
+                        let clear_bounds_dispatcher = ClearBoundsDispatcher::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &sdsm_pass_context,
+                        );
+                        let reduce_bounds_dispatcher = ReduceBoundsDispatcher::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &sdsm_pass_context,
+                        );
+                        let compute_custom_partitions_dispatcher = ComputeCustomPartitionsDispatcher::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &sdsm_pass_context,
+                        );
                         let PostProcessingResources {
                             post_processing_effect_drawer,
                             post_processing_fxaa_drawer,
@@ -365,6 +419,7 @@ impl GraphicsEngine {
                         point_shadow_pass_context,
                         light_culling_pass_context,
                         forward_pass_context,
+                        sdsm_pass_context: SdsmPassContext {},
                         post_processing_pass_context,
                         screen_blit_pass_context,
                         interface_rectangle_drawer,
@@ -381,6 +436,12 @@ impl GraphicsEngine {
                         forward_indicator_drawer,
                         forward_model_drawer,
                         water_wave_drawer,
+                        clear_partitions_dispatcher,
+                        reduce_partitions_dispatcher,
+                        compute_partitions_dispatcher,
+                        clear_bounds_dispatcher,
+                        reduce_bounds_dispatcher,
+                        compute_custom_partitions_dispatcher,
                         post_processing_effect_drawer,
                         post_processing_fxaa_drawer,
                         post_processing_blitter_drawer,
@@ -559,12 +620,63 @@ impl GraphicsEngine {
                 &engine_context.forward_pass_context,
             );
 
+            engine_context.clear_partitions_dispatcher = ClearPartitionsDispatcher::new(
+                &self.capabilities,
+                &self.device,
+                &self.queue,
+                &engine_context.global_context,
+                &engine_context.sdsm_pass_context,
+            );
+            engine_context.reduce_partitions_dispatcher = ReducePartitionsDispatcher::new(
+                &self.capabilities,
+                &self.device,
+                &self.queue,
+                &engine_context.global_context,
+                &engine_context.sdsm_pass_context,
+            );
+            engine_context.compute_partitions_dispatcher = ComputePartitionsDispatcher::new(
+                &self.capabilities,
+                &self.device,
+                &self.queue,
+                &engine_context.global_context,
+                &engine_context.sdsm_pass_context,
+            );
+            engine_context.clear_bounds_dispatcher = ClearBoundsDispatcher::new(
+                &self.capabilities,
+                &self.device,
+                &self.queue,
+                &engine_context.global_context,
+                &engine_context.sdsm_pass_context,
+            );
+            engine_context.reduce_bounds_dispatcher = ReduceBoundsDispatcher::new(
+                &self.capabilities,
+                &self.device,
+                &self.queue,
+                &engine_context.global_context,
+                &engine_context.sdsm_pass_context,
+            );
+            engine_context.compute_custom_partitions_dispatcher = ComputeCustomPartitionsDispatcher::new(
+                &self.capabilities,
+                &self.device,
+                &self.queue,
+                &engine_context.global_context,
+                &engine_context.sdsm_pass_context,
+            );
+
             #[cfg(feature = "debug")]
             {
                 engine_context.debug_aabb_drawer = debug_aabb_drawer;
                 engine_context.debug_buffer_drawer = debug_buffer_drawer;
                 engine_context.debug_circle_drawer = debug_circle_drawer;
                 engine_context.debug_rectangle_drawer = debug_rectangle_drawer;
+
+                engine_context.debug_buffer_drawer = DebugBufferDrawer::new(
+                    &self.capabilities,
+                    &self.device,
+                    &self.queue,
+                    &engine_context.global_context,
+                    &engine_context.post_processing_pass_context,
+                );
             }
         }
     }
@@ -663,7 +775,7 @@ impl GraphicsEngine {
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn render_next_frame(&mut self, frame: SurfaceTexture, mut instruction: RenderInstruction) {
-        assert!(instruction.point_light_shadow_caster.len() <= NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS);
+        assert!(instruction.point_light_with_shadows.len() <= NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS);
 
         self.sort_instructions(&mut instruction);
 
@@ -682,12 +794,13 @@ impl GraphicsEngine {
             light_culling_command_buffer,
             forward_command_buffer,
             post_processing_command_buffer,
+            sdsm_command_buffer,
         ) = self.draw_frame(&frame, &instruction);
 
         // Queue all staging belt writes.
         self.staging_belt.finish();
 
-        self.queue_picker_value();
+        self.queue_async_reads();
         self.wait_and_submit_frame(
             prepare_command_buffer,
             interface_command_buffer,
@@ -696,6 +809,7 @@ impl GraphicsEngine {
             point_shadow_command_buffer,
             light_culling_command_buffer,
             forward_command_buffer,
+            sdsm_command_buffer,
             post_processing_command_buffer,
         );
 
@@ -748,6 +862,7 @@ impl GraphicsEngine {
         point_shadow_command_buffer: CommandBuffer,
         light_culling_command_buffer: CommandBuffer,
         forward_command_buffer: CommandBuffer,
+        sdsm_command_buffer: CommandBuffer,
         post_processing_command_buffer: CommandBuffer,
     ) {
         // We have gathered all data for the next frame and can now wait until the GPU
@@ -763,17 +878,22 @@ impl GraphicsEngine {
             point_shadow_command_buffer,
             light_culling_command_buffer,
             forward_command_buffer,
+            sdsm_command_buffer,
             post_processing_command_buffer,
         ]);
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn queue_picker_value(&mut self) {
+    fn queue_async_reads(&mut self) {
         if let Some(engine_context) = self.engine_context.as_ref() {
             engine_context
                 .global_context
                 .picker_value_buffer
                 .queue_read_u64(self.picker_value.clone());
+            engine_context
+                .global_context
+                .partition_value_buffer
+                .queue_read_partitions(self.directional_shadow_partitions.clone());
         }
     }
 
@@ -870,6 +990,7 @@ impl GraphicsEngine {
         CommandBuffer,
         CommandBuffer,
         CommandBuffer,
+        CommandBuffer,
     ) {
         let frame_view = &frame.texture.create_view(&TextureViewDescriptor::default());
         let engine_context = self.engine_context.as_mut().unwrap();
@@ -880,6 +1001,7 @@ impl GraphicsEngine {
         let mut point_shadow_encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
         let mut light_culling_encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
         let mut forward_encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
+        let mut sdsm_encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
         let mut post_processing_encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
 
         self.thread_pool.in_place_scope(|scope| {
@@ -950,33 +1072,43 @@ impl GraphicsEngine {
                     .draw(&mut render_pass, instruction.interface);
             });
 
-            // Directional Shadow Caster Pass
+            // Directional Shadow Caster Passes
             scope.spawn(|_| {
-                let mut render_pass = engine_context.directional_shadow_pass_context.create_pass(
-                    &mut directional_shadow_encoder,
-                    &engine_context.global_context,
-                    None,
-                );
+                for partition_index in 0..PARTITION_COUNT {
+                    let mut render_pass = engine_context.directional_shadow_pass_context.create_pass(
+                        &mut directional_shadow_encoder,
+                        &engine_context.global_context,
+                        partition_index,
+                    );
 
-                let draw_data = ModelBatchDrawData {
-                    batches: instruction.directional_model_batches,
-                    instructions: instruction.directional_shadow_models,
-                    #[cfg(feature = "debug")]
-                    show_wireframe: false,
-                };
+                    if let Some(batches) = instruction.directional_shadow_model_batches.get(partition_index) {
+                        let draw_data = ModelBatchDrawData {
+                            batches,
+                            instructions: instruction.directional_shadow_models,
+                            #[cfg(feature = "debug")]
+                            show_wireframe: false,
+                        };
+                        engine_context.directional_shadow_model_drawer.draw(&mut render_pass, draw_data);
+                    }
 
-                engine_context.directional_shadow_model_drawer.draw(&mut render_pass, draw_data);
-                engine_context
-                    .directional_shadow_indicator_drawer
-                    .draw(&mut render_pass, instruction.indicator.as_ref());
-                engine_context
-                    .directional_shadow_entity_drawer
-                    .draw(&mut render_pass, instruction.directional_shadow_entities);
+                    engine_context
+                        .directional_shadow_indicator_drawer
+                        .draw(&mut render_pass, instruction.indicator.as_ref());
+
+                    if let Some(entity_instructions) = instruction.directional_shadow_entities.get(partition_index) {
+                        engine_context
+                            .directional_shadow_entity_drawer
+                            .draw(&mut render_pass, DirectionalShadowEntityDrawData {
+                                partition_index,
+                                instructions: entity_instructions,
+                            });
+                    }
+                }
             });
 
             // Point Shadow Caster Pass
             scope.spawn(|_| {
-                (0..instruction.point_light_shadow_caster.len()).for_each(|shadow_caster_index| {
+                (0..instruction.point_light_with_shadows.len()).for_each(|shadow_caster_index| {
                     (0..6).for_each(|face_index| {
                         let pass_data = PointShadowData {
                             shadow_caster_index,
@@ -984,12 +1116,12 @@ impl GraphicsEngine {
                         };
                         let model_data = PointShadowModelBatchData {
                             pass_data,
-                            caster: instruction.point_light_shadow_caster,
+                            caster: instruction.point_light_with_shadows,
                             instructions: instruction.point_shadow_models,
                         };
                         let entity_data = PointShadowEntityBatchData {
                             pass_data,
-                            caster: instruction.point_light_shadow_caster,
+                            caster: instruction.point_light_with_shadows,
                             instructions: instruction.point_shadow_entities,
                         };
 
@@ -1008,8 +1140,8 @@ impl GraphicsEngine {
                 });
             });
 
-            // Light Culling Pass
             scope.spawn(|_| {
+                // Light Culling Pass
                 let mut compute_pass =
                     engine_context
                         .light_culling_pass_context
@@ -1068,6 +1200,38 @@ impl GraphicsEngine {
                 if let Some(water_instruction) = instruction.water.as_ref() {
                     engine_context.water_wave_drawer.draw(&mut render_pass, water_instruction);
                 }
+
+                // SDSM Pass
+                let mut compute_pass =
+                    engine_context
+                        .sdsm_pass_context
+                        .create_pass(&mut sdsm_encoder, &engine_context.global_context, None);
+
+                engine_context.clear_partitions_dispatcher.dispatch(&mut compute_pass, ());
+
+                engine_context
+                    .reduce_partitions_dispatcher
+                    .dispatch(&mut compute_pass, engine_context.global_context.forward_size);
+
+                engine_context.compute_partitions_dispatcher.dispatch(&mut compute_pass, ());
+
+                engine_context.clear_bounds_dispatcher.dispatch(&mut compute_pass, ());
+
+                engine_context
+                    .reduce_bounds_dispatcher
+                    .dispatch(&mut compute_pass, engine_context.global_context.forward_size);
+
+                engine_context.compute_custom_partitions_dispatcher.dispatch(&mut compute_pass, ());
+
+                drop(compute_pass);
+
+                sdsm_encoder.copy_buffer_to_buffer(
+                    engine_context.global_context.partition_data_buffer.get_buffer(),
+                    0,
+                    engine_context.global_context.partition_value_buffer.get_buffer(),
+                    0,
+                    Some(size_of::<[Partition; PARTITION_COUNT]>() as BufferAddress),
+                );
             });
 
             // Post Processing Passes
@@ -1233,6 +1397,7 @@ impl GraphicsEngine {
             light_culling_encoder.finish(),
             forward_encoder.finish(),
             post_processing_encoder.finish(),
+            sdsm_encoder.finish(),
         )
     }
 }

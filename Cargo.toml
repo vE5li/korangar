@@ -74,6 +74,10 @@ opt-level = 3
 opt-level = 3
 debug-assertions = false
 
+[profile.dev.package.wgpu-core]
+opt-level = 3
+debug-assertions = false
+
 [profile.dev.package.korangar]
 opt-level = 0
 

@@ -3,14 +3,17 @@ use cgmath::{Array, Deg, InnerSpace, Matrix4, Point3, Quaternion, Rad, Rotation,
 use super::{Camera, MAXIMUM_CAMERA_DISTANCE, MINIMUM_CAMERA_DISTANCE, SmoothedValue};
 use crate::graphics::perspective_reverse_lh;
 
-const ZOOM_SPEED: f32 = 2.0;
-const ROTATION_SPEED: f32 = 0.01;
+const ZOOM_SPEED: f32 = 1.0;
+const ROTATION_SPEED: f32 = 0.005;
 const DEFAULT_DISTANCE: f32 = 400.0;
 const DEFAULT_ANGLE: f32 = 180_f32.to_radians();
 const CAMERA_PITCH: Deg<f32> = Deg(-55.0);
 const VERTICAL_FOV: Deg<f32> = Deg(15.5);
 const THRESHOLD: f32 = 0.01;
 const LOOK_UP: Vector3<f32> = Vector3::new(0.0, 1.0, 0.0);
+
+const ROTATION_SPEED_THRESHOLD: f32 = 0.02;
+const ZOOM_SPEED_THRESHOLD: f32 = 20.0;
 
 pub struct PlayerCamera {
     focus_point: Point3<SmoothedValue>,
@@ -60,6 +63,13 @@ impl PlayerCamera {
 
     pub fn reset_rotation(&mut self) {
         self.view_angle.set_desired(DEFAULT_ANGLE);
+    }
+
+    pub fn is_rotating_or_zooming_fast(&self) -> bool {
+        let rotation_velocity = self.view_angle.get_velocity();
+        let zoom_velocity = self.camera_distance.get_velocity();
+
+        rotation_velocity > ROTATION_SPEED_THRESHOLD || zoom_velocity > ZOOM_SPEED_THRESHOLD
     }
 
     pub fn update(&mut self, delta_time: f64) {

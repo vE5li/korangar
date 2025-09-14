@@ -20,7 +20,7 @@ use std::num::NonZeroU64;
 use std::sync::{Arc, OnceLock};
 
 use bytemuck::{Pod, Zeroable};
-use cgmath::{Matrix4, SquareMatrix, Zero};
+use cgmath::{Matrix4, SquareMatrix, Vector4, Zero};
 use image::RgbaImage;
 use wgpu::util::StagingBelt;
 use wgpu::{
@@ -52,6 +52,13 @@ use crate::loaders::{ImageType, TextureLoader};
 
 /// The size of a tile in pixel of the tile based light culling.
 const LIGHT_TILE_SIZE: u32 = 16;
+
+/// The count of shadow maps in which we partition the directional shadow.
+/// We can't make this an overridable constant in WGSL or runtime defined, since
+/// we use the const in the WGSL shader in locations that need const and don't
+/// allow overrides. So if you change this variable, you also need to replace
+/// the constants in the shaders of the same name.
+pub const PARTITION_COUNT: usize = 3;
 
 pub const RENDER_TO_TEXTURE_FORMAT: TextureFormat = TextureFormat::Rgba8UnormSrgb;
 pub const RENDER_TO_TEXTURE_DEPTH_FORMAT: TextureFormat = TextureFormat::Depth32Float;
@@ -98,6 +105,16 @@ pub(crate) struct DirectionalLightUniforms {
     direction: [f32; 4],
 }
 
+#[derive(Copy, Clone, Default, Pod, Zeroable)]
+#[repr(C)]
+pub(crate) struct DirectionalLightPartition {
+    view_projection: [[f32; 4]; 4],
+    interval_end: f32,
+    world_space_texel_size: f32,
+    near_plane: f32,
+    far_plane: f32,
+}
+
 #[derive(Copy, Clone, Pod, Zeroable)]
 #[repr(C)]
 pub(crate) struct PointLightData {
@@ -108,6 +125,51 @@ pub(crate) struct PointLightData {
     padding: [u32; 2],
 }
 
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Pod, Zeroable)]
+pub(crate) struct Partition {
+    extents: [f32; 4],
+    center: [f32; 4],
+    interval_begin: f32,
+    interval_end: f32,
+    padding: [u32; 2],
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct DirectionalShadowPartition {
+    pub extents: Vector4<f32>,
+    pub center: Vector4<f32>,
+    pub interval_end: f32,
+}
+
+impl Default for DirectionalShadowPartition {
+    fn default() -> Self {
+        Self {
+            extents: Vector4::zero(),
+            center: Vector4::zero(),
+            interval_end: 0.0,
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Pod, Zeroable)]
+pub(crate) struct Interval {
+    begin: u32,
+    end: u32,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Pod, Zeroable)]
+pub(crate) struct Bounds {
+    min_coord_x: u32,
+    min_coord_y: u32,
+    min_coord_z: u32,
+    max_coord_x: u32,
+    max_coord_y: u32,
+    max_coord_z: u32,
+}
+
 #[cfg(feature = "debug")]
 #[derive(Copy, Clone, Default, Pod, Zeroable)]
 #[repr(C)]
@@ -116,6 +178,7 @@ pub(crate) struct DebugUniforms {
     show_directional_shadow_map: u32,
     show_point_shadow_map: u32,
     show_light_culling_count_buffer: u32,
+    show_sdsm_partitions: u32,
     show_font_map: u32,
 }
 
@@ -148,11 +211,16 @@ pub(crate) struct GlobalContext {
     pub(crate) tile_light_count_texture: StorageTexture,
     pub(crate) global_uniforms_buffer: Buffer<GlobalUniforms>,
     pub(crate) directional_light_uniforms_buffer: Buffer<DirectionalLightUniforms>,
+    pub(crate) directional_light_partitions_buffer: Buffer<DirectionalLightPartition>,
     pub(crate) point_light_data_buffer: Buffer<PointLightData>,
     #[cfg(feature = "debug")]
     pub(crate) debug_uniforms_buffer: Buffer<DebugUniforms>,
     pub(crate) picker_value_buffer: Buffer<u64>,
     pub(crate) tile_light_indices_buffer: Buffer<TileLightIndices>,
+    pub(crate) partition_data_buffer: Buffer<Partition>,
+    pub(crate) partition_value_buffer: Buffer<Partition>,
+    pub(crate) interval_data_buffer: Buffer<Interval>,
+    pub(crate) bounds_data_buffer: Buffer<Bounds>,
     pub(crate) anti_aliasing_resources: AntiAliasingResources,
     pub(crate) nearest_sampler: Sampler,
     pub(crate) linear_sampler: Sampler,
@@ -161,6 +229,7 @@ pub(crate) struct GlobalContext {
     pub(crate) global_bind_group: BindGroup,
     pub(crate) light_culling_bind_group: BindGroup,
     pub(crate) forward_bind_group: BindGroup,
+    pub(crate) sdsm_bind_group: BindGroup,
     #[cfg(feature = "debug")]
     pub(crate) debug_bind_group: BindGroup,
     pub(crate) screen_size: ScreenSize,
@@ -170,6 +239,7 @@ pub(crate) struct GlobalContext {
     pub(crate) point_shadow_size: ScreenSize,
     global_uniforms: GlobalUniforms,
     directional_light_uniforms: DirectionalLightUniforms,
+    directional_light_partitions_data: Vec<DirectionalLightPartition>,
     point_light_data: Vec<PointLightData>,
     #[cfg(feature = "debug")]
     debug_uniforms: DebugUniforms,
@@ -177,6 +247,7 @@ pub(crate) struct GlobalContext {
 
 impl Prepare for GlobalContext {
     fn prepare(&mut self, _device: &Device, instructions: &RenderInstruction) {
+        self.directional_light_partitions_data.clear();
         self.point_light_data.clear();
 
         #[allow(unused_mut)]
@@ -188,7 +259,7 @@ impl Prepare for GlobalContext {
         };
 
         #[allow(unused_mut)]
-        let mut directional_light_color = instructions.directional_light_with_shadow.color;
+        let mut directional_light_color = instructions.directional_light.color;
 
         #[cfg(feature = "debug")]
         if !instructions.render_options.enable_directional_lighting {
@@ -232,19 +303,29 @@ impl Prepare for GlobalContext {
             pointer_position: [instructions.picker_position.left as u32, instructions.picker_position.top as u32],
             animation_timer: instructions.uniforms.animation_timer_ms / 1000.0,
             day_timer: instructions.uniforms.day_timer,
-            point_light_count: (instructions.point_light_shadow_caster.len() + instructions.point_light.len()) as u32,
+            point_light_count: (instructions.point_light_with_shadows.len() + instructions.point_light.len()) as u32,
             enhanced_lighting: instructions.uniforms.enhanced_lighting as u32,
             shadow_quality: instructions.uniforms.shadow_quality.into(),
             padding: Default::default(),
         };
 
         self.directional_light_uniforms = DirectionalLightUniforms {
-            view_projection: instructions.directional_light_with_shadow.view_projection_matrix.into(),
+            view_projection: instructions.directional_light.view_projection_matrix.into(),
             color: directional_light_color.components_linear(),
-            direction: instructions.directional_light_with_shadow.direction.extend(0.0).into(),
+            direction: instructions.directional_light.direction.extend(0.0).into(),
         };
 
-        for (instance_index, instruction) in instructions.point_light_shadow_caster.iter().enumerate() {
+        for partition in instructions.directional_light_partitions {
+            self.directional_light_partitions_data.push(DirectionalLightPartition {
+                view_projection: partition.view_projection_matrix.into(),
+                interval_end: partition.interval_end,
+                world_space_texel_size: partition.world_space_texel_size,
+                near_plane: partition.near_plane,
+                far_plane: partition.far_plane,
+            });
+        }
+
+        for (instance_index, instruction) in instructions.point_light_with_shadows.iter().enumerate() {
             self.point_light_data.push(PointLightData {
                 position: instruction.position.to_homogeneous().into(),
                 color: instruction.color.components_linear(),
@@ -268,13 +349,18 @@ impl Prepare for GlobalContext {
         {
             self.debug_uniforms = DebugUniforms {
                 show_picker_buffer: instructions.render_options.show_picker_buffer as u32,
-                show_directional_shadow_map: instructions.render_options.show_directional_shadow_map as u32,
+                show_directional_shadow_map: instructions
+                    .render_options
+                    .show_directional_shadow_map
+                    .map(|value| value.get())
+                    .unwrap_or(0),
                 show_point_shadow_map: instructions
                     .render_options
                     .show_point_shadow_map
                     .map(|value| value.get())
                     .unwrap_or(0),
                 show_light_culling_count_buffer: instructions.render_options.show_light_culling_count_buffer as u32,
+                show_sdsm_partitions: instructions.render_options.show_sdsm_partitions as u32,
                 show_font_map: instructions.render_options.show_font_map as u32,
             };
         }
@@ -294,6 +380,10 @@ impl Prepare for GlobalContext {
                 .point_light_data_buffer
                 .write(device, staging_belt, command_encoder, &self.point_light_data);
         }
+
+        recreated |=
+            self.directional_light_partitions_buffer
+                .write(device, staging_belt, command_encoder, &self.directional_light_partitions_data);
 
         #[cfg(feature = "debug")]
         {
@@ -327,17 +417,31 @@ impl Prepare for GlobalContext {
                 &self.tile_light_indices_buffer,
                 &self.directional_shadow_map_texture,
                 &self.point_shadow_map_textures,
+                &self.directional_light_partitions_buffer,
+            );
+
+            self.sdsm_bind_group = Self::create_sdsm_bind_group(
+                device,
+                self.msaa,
+                &self.directional_light_uniforms_buffer,
+                &self.forward_depth_texture,
+                &self.partition_data_buffer,
+                &self.interval_data_buffer,
+                &self.bounds_data_buffer,
             );
 
             #[cfg(feature = "debug")]
             {
                 self.debug_bind_group = Self::create_debug_bind_group(
                     device,
+                    self.msaa,
                     &self.debug_uniforms_buffer,
                     &self.picker_buffer_texture,
                     &self.directional_shadow_map_texture,
                     &self.tile_light_count_texture,
                     &self.point_shadow_map_textures,
+                    &self.forward_depth_texture,
+                    &self.partition_data_buffer,
                 );
             }
         }
@@ -383,7 +487,7 @@ impl GlobalContext {
         let walk_indicator_texture = texture_loader.get_or_load("grid.tga", ImageType::Color).unwrap();
         let forward_textures = Self::create_forward_textures(device, forward_size, msaa);
         let picker_textures = Self::create_picker_textures(device, screen_size);
-        let directional_shadow_map_texture = Self::create_directional_shadow_texture(device, directional_shadow_size);
+        let directional_shadow_map_texture = Self::create_directional_shadow_textures(device, directional_shadow_size);
         let point_shadow_map_textures = Self::create_point_shadow_textures(device, point_shadow_size);
         let resolved_color_texture = Self::create_resolved_color_texture(device, forward_size, msaa);
         let supersampled_color_texture = Self::create_supersampled_texture(device, screen_size, ssaa);
@@ -418,6 +522,13 @@ impl GlobalContext {
             size_of::<DebugUniforms>() as _,
         );
 
+        let directional_light_partitions_buffer = Buffer::with_capacity(
+            device,
+            "directional light partitions",
+            BufferUsages::COPY_DST | BufferUsages::STORAGE,
+            (PARTITION_COUNT * size_of::<DirectionalLightPartition>()) as _,
+        );
+
         let point_light_data_buffer = Buffer::with_capacity(
             device,
             "point light data",
@@ -426,6 +537,34 @@ impl GlobalContext {
         );
 
         let tile_light_indices_buffer = Self::create_tile_light_indices_buffer(device, forward_size);
+
+        let partition_data_buffer = Buffer::with_capacity(
+            device,
+            "partition data",
+            BufferUsages::COPY_SRC | BufferUsages::STORAGE,
+            (PARTITION_COUNT * size_of::<Partition>()) as _,
+        );
+
+        let partition_value_buffer = Buffer::with_capacity(
+            device,
+            "partition value",
+            BufferUsages::COPY_DST | BufferUsages::MAP_READ,
+            (PARTITION_COUNT * size_of::<Partition>()) as _,
+        );
+
+        let bounds_data_buffer = Buffer::with_capacity(
+            device,
+            "bounds data",
+            BufferUsages::COPY_SRC | BufferUsages::STORAGE,
+            (PARTITION_COUNT * size_of::<Bounds>()) as _,
+        );
+
+        let interval_data_buffer = Buffer::with_capacity(
+            device,
+            "interval data",
+            BufferUsages::STORAGE,
+            (PARTITION_COUNT * size_of::<Interval>()) as _,
+        );
 
         let nearest_sampler = create_new_sampler(device, capabilities, "nearest", SamplerType::TextureNearest);
         let linear_sampler = create_new_sampler(device, capabilities, "linear", SamplerType::TextureLinear);
@@ -458,16 +597,30 @@ impl GlobalContext {
             &tile_light_indices_buffer,
             &directional_shadow_map_texture,
             &point_shadow_map_textures,
+            &directional_light_partitions_buffer,
+        );
+
+        let sdsm_bind_group = Self::create_sdsm_bind_group(
+            device,
+            msaa,
+            &directional_light_uniforms_buffer,
+            &forward_textures.forward_depth_texture,
+            &partition_data_buffer,
+            &interval_data_buffer,
+            &bounds_data_buffer,
         );
 
         #[cfg(feature = "debug")]
         let debug_bind_group = Self::create_debug_bind_group(
             device,
+            msaa,
             &debug_uniforms_buffer,
             &picker_textures.picker_buffer_texture,
             &directional_shadow_map_texture,
             &forward_textures.tile_light_count_texture,
             &point_shadow_map_textures,
+            &forward_textures.forward_depth_texture,
+            &partition_data_buffer,
         );
 
         Self {
@@ -492,13 +645,18 @@ impl GlobalContext {
             tile_light_count_texture: forward_textures.tile_light_count_texture,
             global_uniforms_buffer,
             forward_bind_group,
+            sdsm_bind_group,
             #[cfg(feature = "debug")]
             debug_bind_group,
             directional_light_uniforms_buffer,
             tile_light_indices_buffer,
+            partition_data_buffer,
+            partition_value_buffer,
+            bounds_data_buffer,
             #[cfg(feature = "debug")]
             debug_uniforms_buffer,
             picker_value_buffer,
+            directional_light_partitions_buffer,
             point_light_data_buffer,
             anti_aliasing_resources,
             nearest_sampler,
@@ -514,9 +672,11 @@ impl GlobalContext {
             point_shadow_size,
             global_uniforms: GlobalUniforms::default(),
             directional_light_uniforms: DirectionalLightUniforms::default(),
+            directional_light_partitions_data: Vec::default(),
             point_light_data: Vec::default(),
             #[cfg(feature = "debug")]
             debug_uniforms: DebugUniforms::default(),
+            interval_data_buffer,
         }
     }
 
@@ -622,13 +782,14 @@ impl GlobalContext {
         )
     }
 
-    fn create_directional_shadow_texture(device: &Device, shadow_size: ScreenSize) -> AttachmentTexture {
+    fn create_directional_shadow_textures(device: &Device, shadow_size: ScreenSize) -> AttachmentTexture {
         let shadow_factory = AttachmentTextureFactory::new(device, shadow_size, 1, None);
 
-        shadow_factory.new_attachment(
+        shadow_factory.new_attachment_array(
             "directional shadow map",
             TextureFormat::Depth16Unorm,
             AttachmentTextureType::DepthAttachment,
+            PARTITION_COUNT as u32,
         )
     }
 
@@ -733,17 +894,31 @@ impl GlobalContext {
             &self.tile_light_indices_buffer,
             &self.directional_shadow_map_texture,
             &self.point_shadow_map_textures,
+            &self.directional_light_partitions_buffer,
+        );
+
+        self.sdsm_bind_group = Self::create_sdsm_bind_group(
+            device,
+            self.msaa,
+            &self.directional_light_uniforms_buffer,
+            &self.forward_depth_texture,
+            &self.partition_data_buffer,
+            &self.interval_data_buffer,
+            &self.bounds_data_buffer,
         );
 
         #[cfg(feature = "debug")]
         {
             self.debug_bind_group = Self::create_debug_bind_group(
                 device,
+                self.msaa,
                 &self.debug_uniforms_buffer,
                 &self.picker_buffer_texture,
                 &self.directional_shadow_map_texture,
                 &self.tile_light_count_texture,
                 &self.point_shadow_map_textures,
+                &self.forward_depth_texture,
+                &self.partition_data_buffer,
             );
         }
     }
@@ -752,7 +927,7 @@ impl GlobalContext {
         self.directional_shadow_size = ScreenSize::uniform(shadow_detail.directional_shadow_resolution() as f32);
         self.point_shadow_size = ScreenSize::uniform(shadow_detail.point_shadow_resolution() as f32);
 
-        self.directional_shadow_map_texture = Self::create_directional_shadow_texture(device, self.directional_shadow_size);
+        self.directional_shadow_map_texture = Self::create_directional_shadow_textures(device, self.directional_shadow_size);
         self.point_shadow_map_textures = Self::create_point_shadow_textures(device, self.point_shadow_size);
 
         // We need to update this bind group, because it's content changed, and it isn't
@@ -765,17 +940,21 @@ impl GlobalContext {
             &self.tile_light_indices_buffer,
             &self.directional_shadow_map_texture,
             &self.point_shadow_map_textures,
+            &self.directional_light_partitions_buffer,
         );
 
         #[cfg(feature = "debug")]
         {
             self.debug_bind_group = Self::create_debug_bind_group(
                 device,
+                self.msaa,
                 &self.debug_uniforms_buffer,
                 &self.picker_buffer_texture,
                 &self.directional_shadow_map_texture,
                 &self.tile_light_count_texture,
                 &self.point_shadow_map_textures,
+                &self.forward_depth_texture,
+                &self.partition_data_buffer,
             );
         }
     }
@@ -809,6 +988,31 @@ impl GlobalContext {
         self.forward_revealage_texture = forward_revealage_texture;
         self.tile_light_count_texture = tile_light_count_texture;
         self.resolved_color_texture = Self::create_resolved_color_texture(device, self.forward_size, self.msaa);
+
+        self.sdsm_bind_group = Self::create_sdsm_bind_group(
+            device,
+            self.msaa,
+            &self.directional_light_uniforms_buffer,
+            &self.forward_depth_texture,
+            &self.partition_data_buffer,
+            &self.interval_data_buffer,
+            &self.bounds_data_buffer,
+        );
+
+        #[cfg(feature = "debug")]
+        {
+            self.debug_bind_group = Self::create_debug_bind_group(
+                device,
+                self.msaa,
+                &self.debug_uniforms_buffer,
+                &self.picker_buffer_texture,
+                &self.directional_shadow_map_texture,
+                &self.tile_light_count_texture,
+                &self.point_shadow_map_textures,
+                &self.forward_depth_texture,
+                &self.partition_data_buffer,
+            );
+        }
     }
 
     fn update_ssaa(&mut self, device: &Device, ssaa: Ssaa) {
@@ -940,7 +1144,7 @@ impl GlobalContext {
                         visibility: ShaderStages::FRAGMENT,
                         ty: BindingType::Texture {
                             sample_type: TextureSampleType::Depth,
-                            view_dimension: TextureViewDimension::D2,
+                            view_dimension: TextureViewDimension::D2Array,
                             multisampled: false,
                         },
                         count: None,
@@ -985,15 +1189,102 @@ impl GlobalContext {
                         },
                         count: None,
                     },
+                    BindGroupLayoutEntry {
+                        binding: 6,
+                        visibility: ShaderStages::FRAGMENT,
+                        ty: BindingType::Buffer {
+                            ty: BufferBindingType::Storage { read_only: true },
+                            has_dynamic_offset: false,
+                            min_binding_size: NonZeroU64::new((PARTITION_COUNT * size_of::<DirectionalLightPartition>()) as _),
+                        },
+                        count: None,
+                    },
+                ],
+            })
+        })
+    }
+
+    fn sdsm_bind_group_layout(device: &Device, msaa: Msaa) -> &'static BindGroupLayout {
+        static LAYOUT_NO_MSAA: OnceLock<BindGroupLayout> = OnceLock::new();
+        static LAYOUT_WITH_MSAA: OnceLock<BindGroupLayout> = OnceLock::new();
+
+        let layout_lock = if msaa.multisampling_activated() {
+            &LAYOUT_WITH_MSAA
+        } else {
+            &LAYOUT_NO_MSAA
+        };
+
+        layout_lock.get_or_init(|| {
+            device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+                label: Some("sdsm"),
+                entries: &[
+                    BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: ShaderStages::all(),
+                        ty: BindingType::Buffer {
+                            ty: BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: NonZeroU64::new(size_of::<DirectionalLightUniforms>() as _),
+                        },
+                        count: None,
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: ShaderStages::COMPUTE,
+                        ty: BindingType::Texture {
+                            sample_type: TextureSampleType::Depth,
+                            view_dimension: TextureViewDimension::D2,
+                            multisampled: msaa.multisampling_activated(),
+                        },
+                        count: None,
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: ShaderStages::COMPUTE,
+                        ty: BindingType::Buffer {
+                            ty: BufferBindingType::Storage { read_only: false },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 3,
+                        visibility: ShaderStages::COMPUTE,
+                        ty: BindingType::Buffer {
+                            ty: BufferBindingType::Storage { read_only: false },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 4,
+                        visibility: ShaderStages::COMPUTE,
+                        ty: BindingType::Buffer {
+                            ty: BufferBindingType::Storage { read_only: false },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
                 ],
             })
         })
     }
 
     #[cfg(feature = "debug")]
-    fn debug_bind_group_layout(device: &Device) -> &'static BindGroupLayout {
-        static LAYOUT: OnceLock<BindGroupLayout> = OnceLock::new();
-        LAYOUT.get_or_init(|| {
+    fn debug_bind_group_layout(device: &Device, msaa: Msaa) -> &'static BindGroupLayout {
+        static LAYOUT_NO_MSAA: OnceLock<BindGroupLayout> = OnceLock::new();
+        static LAYOUT_WITH_MSAA: OnceLock<BindGroupLayout> = OnceLock::new();
+
+        let layout_lock = if msaa.multisampling_activated() {
+            &LAYOUT_WITH_MSAA
+        } else {
+            &LAYOUT_NO_MSAA
+        };
+
+        layout_lock.get_or_init(|| {
             device.create_bind_group_layout(&BindGroupLayoutDescriptor {
                 label: Some("debug"),
                 entries: &[
@@ -1022,7 +1313,7 @@ impl GlobalContext {
                         visibility: ShaderStages::FRAGMENT,
                         ty: BindingType::Texture {
                             sample_type: TextureSampleType::Depth,
-                            view_dimension: TextureViewDimension::D2,
+                            view_dimension: TextureViewDimension::D2Array,
                             multisampled: false,
                         },
                         count: None,
@@ -1044,6 +1335,26 @@ impl GlobalContext {
                             sample_type: TextureSampleType::Depth,
                             view_dimension: TextureViewDimension::CubeArray,
                             multisampled: false,
+                        },
+                        count: None,
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 5,
+                        visibility: ShaderStages::FRAGMENT,
+                        ty: BindingType::Texture {
+                            sample_type: TextureSampleType::Depth,
+                            view_dimension: TextureViewDimension::D2,
+                            multisampled: msaa.multisampling_activated(),
+                        },
+                        count: None,
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 6,
+                        visibility: ShaderStages::FRAGMENT,
+                        ty: BindingType::Buffer {
+                            ty: BufferBindingType::Storage { read_only: true },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
                         },
                         count: None,
                     },
@@ -1122,6 +1433,7 @@ impl GlobalContext {
         tile_light_indices_buffer: &Buffer<TileLightIndices>,
         directional_shadow_map_texture: &AttachmentTexture,
         point_shadow_maps_texture: &CubeArrayTexture,
+        directional_light_partition: &Buffer<DirectionalLightPartition>,
     ) -> BindGroup {
         device.create_bind_group(&BindGroupDescriptor {
             label: Some("forward"),
@@ -1151,6 +1463,47 @@ impl GlobalContext {
                     binding: 5,
                     resource: BindingResource::TextureView(point_shadow_maps_texture.get_texture_view()),
                 },
+                BindGroupEntry {
+                    binding: 6,
+                    resource: directional_light_partition.as_entire_binding(),
+                },
+            ],
+        })
+    }
+
+    fn create_sdsm_bind_group(
+        device: &Device,
+        msaa: Msaa,
+        directional_light_uniforms_buffer: &Buffer<DirectionalLightUniforms>,
+        forward_depth_texture: &AttachmentTexture,
+        partition_data_buffer: &Buffer<Partition>,
+        interval_data_buffer: &Buffer<Interval>,
+        bounds_data_buffer: &Buffer<Bounds>,
+    ) -> BindGroup {
+        device.create_bind_group(&BindGroupDescriptor {
+            label: Some("sdsm"),
+            layout: Self::sdsm_bind_group_layout(device, msaa),
+            entries: &[
+                BindGroupEntry {
+                    binding: 0,
+                    resource: directional_light_uniforms_buffer.as_entire_binding(),
+                },
+                BindGroupEntry {
+                    binding: 1,
+                    resource: BindingResource::TextureView(forward_depth_texture.get_texture_view()),
+                },
+                BindGroupEntry {
+                    binding: 2,
+                    resource: partition_data_buffer.as_entire_binding(),
+                },
+                BindGroupEntry {
+                    binding: 3,
+                    resource: interval_data_buffer.as_entire_binding(),
+                },
+                BindGroupEntry {
+                    binding: 4,
+                    resource: bounds_data_buffer.as_entire_binding(),
+                },
             ],
         })
     }
@@ -1158,15 +1511,18 @@ impl GlobalContext {
     #[cfg(feature = "debug")]
     fn create_debug_bind_group(
         device: &Device,
+        msaa: Msaa,
         debug_uniforms_buffer: &Buffer<DebugUniforms>,
         picker_buffer_texture: &AttachmentTexture,
         directional_shadow_map_texture: &AttachmentTexture,
         tile_light_count_texture: &StorageTexture,
         point_shadow_maps_texture: &CubeArrayTexture,
+        forward_depth_texture: &AttachmentTexture,
+        partition_data_buffer: &Buffer<Partition>,
     ) -> BindGroup {
         device.create_bind_group(&BindGroupDescriptor {
             label: Some("debug"),
-            layout: Self::debug_bind_group_layout(device),
+            layout: Self::debug_bind_group_layout(device, msaa),
             entries: &[
                 BindGroupEntry {
                     binding: 0,
@@ -1187,6 +1543,14 @@ impl GlobalContext {
                 BindGroupEntry {
                     binding: 4,
                     resource: BindingResource::TextureView(point_shadow_maps_texture.get_texture_view()),
+                },
+                BindGroupEntry {
+                    binding: 5,
+                    resource: BindingResource::TextureView(forward_depth_texture.get_texture_view()),
+                },
+                BindGroupEntry {
+                    binding: 6,
+                    resource: partition_data_buffer.as_entire_binding(),
                 },
             ],
         })

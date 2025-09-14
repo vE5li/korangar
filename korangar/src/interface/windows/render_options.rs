@@ -3,7 +3,7 @@ use std::num::NonZeroU32;
 use korangar_interface::window::{CustomWindow, Window};
 use rust_state::Path;
 
-use crate::graphics::{RenderOptions, RenderOptionsPathExt};
+use crate::graphics::{PARTITION_COUNT, RenderOptions, RenderOptionsPathExt};
 use crate::interface::windows::WindowClass;
 use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
@@ -28,6 +28,8 @@ where
 
     fn to_window<'a>(self) -> impl Window<ClientState> + 'a {
         use korangar_interface::prelude::*;
+
+        let show_directional_shadow_map_options: Vec<Option<NonZeroU32>> = (0..=PARTITION_COUNT as u32).map(NonZeroU32::new).collect();
 
         let show_point_shadow_map_options = vec![
             None,
@@ -267,11 +269,17 @@ where
                         state: self.render_options_path.show_picker_buffer(),
                         event: Toggle(self.render_options_path.show_picker_buffer()),
                     },
-                    state_button! {
-                        text: "Directional shadow",
-                        tooltip: "Overlay the ^000001directional shadow map^000000",
-                        state: self.render_options_path.show_directional_shadow_map(),
-                        event: Toggle(self.render_options_path.show_directional_shadow_map()),
+                    split! {
+                        children: (
+                            text! {
+                                text: "Directional shadow"
+                            },
+                            drop_down! {
+                                selected: self.render_options_path.show_directional_shadow_map(),
+                                options: show_directional_shadow_map_options.clone(),
+                                click_handler: DefaultClickHandler::new(self.render_options_path.show_directional_shadow_map(), show_directional_shadow_map_options.clone()),
+                            },
+                        ),
                     },
                     split! {
                         children: (
@@ -290,6 +298,12 @@ where
                         tooltip: "Overlay the ^000001light culling count buffer^000000",
                         state: self.render_options_path.show_light_culling_count_buffer(),
                         event: Toggle(self.render_options_path.show_light_culling_count_buffer()),
+                    },
+                    state_button! {
+                        text: "SDSM partitions",
+                        tooltip: "Overlay the ^000001SDSM partitions^000000",
+                        state: self.render_options_path.show_sdsm_partitions(),
+                        event: Toggle(self.render_options_path.show_sdsm_partitions()),
                     },
                     state_button! {
                         text: "Font map",

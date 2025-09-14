@@ -13,6 +13,8 @@ use crate::graphics::settings::RenderOptions;
 use crate::graphics::{Capabilities, GlobalContext, Prepare, RenderInstruction, Texture};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/debug_buffer.wgsl");
+const SHADER_MSAA: ShaderModuleDescriptor = include_wgsl!("shader/debug_buffer_msaa.wgsl");
+
 const DRAWER_NAME: &str = "debug buffer";
 
 pub(crate) struct DebugBufferDrawData<'a> {
@@ -37,7 +39,10 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
         global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {
-        let shader_module = device.create_shader_module(SHADER);
+        let shader_module = match global_context.msaa.multisampling_activated() {
+            false => device.create_shader_module(SHADER),
+            true => device.create_shader_module(SHADER_MSAA),
+        };
 
         let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: Some(DRAWER_NAME),
@@ -61,7 +66,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
             label: Some(DRAWER_NAME),
             bind_group_layouts: &[
                 bind_group_layouts[0],
-                GlobalContext::debug_bind_group_layout(device),
+                GlobalContext::debug_bind_group_layout(device, global_context.msaa),
                 &bind_group_layout,
             ],
             push_constant_ranges: &[],

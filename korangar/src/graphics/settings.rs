@@ -67,8 +67,8 @@ impl ShadowDetail {
     pub fn directional_shadow_resolution(self) -> u32 {
         match self {
             ShadowDetail::Normal => 2048,
-            ShadowDetail::Ultra => 4096,
-            ShadowDetail::Insane => 8192,
+            ShadowDetail::Ultra => 3072,
+            ShadowDetail::Insane => 4096,
         }
     }
 
@@ -307,10 +307,11 @@ pub struct RenderOptions {
     pub show_map_tiles: bool,
     pub show_pathing: bool,
     pub show_picker_buffer: bool,
-    pub show_directional_shadow_map: bool,
+    pub show_directional_shadow_map: Option<NonZeroU32>,
     pub show_point_shadow_map: Option<NonZeroU32>,
     pub show_light_culling_count_buffer: bool,
     pub show_font_map: bool,
+    pub show_sdsm_partitions: bool,
     pub show_rectangle_instructions: bool,
     pub show_glyph_instructions: bool,
     pub show_sprite_instructions: bool,
@@ -347,9 +348,10 @@ impl RenderOptions {
             show_map_tiles: false,
             show_pathing: false,
             show_picker_buffer: false,
-            show_directional_shadow_map: false,
+            show_directional_shadow_map: None,
             show_point_shadow_map: None,
             show_light_culling_count_buffer: false,
+            show_sdsm_partitions: false,
             show_font_map: false,
             show_rectangle_instructions: false,
             show_glyph_instructions: false,
@@ -362,10 +364,11 @@ impl RenderOptions {
 #[cfg(feature = "debug")]
 impl RenderOptions {
     pub fn show_buffers(&self) -> bool {
-        self.show_directional_shadow_map
-            || self.show_picker_buffer
+        self.show_picker_buffer
+            || self.show_directional_shadow_map.is_some()
             || self.show_point_shadow_map.is_some()
             || self.show_light_culling_count_buffer
+            || self.show_sdsm_partitions
             || self.show_font_map
     }
 }

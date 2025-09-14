@@ -18,7 +18,7 @@ use wgpu::{
 
 use super::{BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, RenderPassContext};
 use crate::graphics::buffer::DynamicUniformBuffer;
-use crate::graphics::{EntityInstruction, GlobalContext, ModelInstruction, PointShadowCasterInstruction, Prepare, RenderInstruction};
+use crate::graphics::{EntityInstruction, GlobalContext, ModelInstruction, PointLightWithShadowInstruction, Prepare, RenderInstruction};
 use crate::loaders::TextureLoader;
 
 const PASS_NAME: &str = "point shadow render pass";
@@ -43,13 +43,13 @@ pub(crate) struct PointShadowData {
 
 pub(crate) struct PointShadowEntityBatchData<'a> {
     pub(crate) pass_data: PointShadowData,
-    pub(crate) caster: &'a [PointShadowCasterInstruction],
+    pub(crate) caster: &'a [PointLightWithShadowInstruction],
     pub(crate) instructions: &'a [EntityInstruction],
 }
 
 pub(crate) struct PointShadowModelBatchData<'a> {
     pub(crate) pass_data: PointShadowData,
-    pub(crate) caster: &'a [PointShadowCasterInstruction],
+    pub(crate) caster: &'a [PointLightWithShadowInstruction],
     pub(crate) instructions: &'a [ModelInstruction],
 }
 
@@ -148,7 +148,7 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, 
 
 impl Prepare for PointShadowRenderPassContext {
     fn prepare(&mut self, _device: &Device, instructions: &RenderInstruction) {
-        let uniforms = instructions.point_light_shadow_caster.iter().flat_map(|caster| {
+        let uniforms = instructions.point_light_with_shadows.iter().flat_map(|caster| {
             (0..NUMBER_FACES).map(|face_index| PassUniforms {
                 view_projection: caster.view_projection_matrices[face_index].into(),
                 view: caster.view_matrices[face_index].into(),

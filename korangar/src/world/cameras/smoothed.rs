@@ -48,4 +48,8 @@ impl SmoothedValue {
     pub fn get_current(&self) -> f32 {
         self.current
     }
+
+    pub fn get_velocity(&self) -> f32 {
+        (self.desired - self.current).abs()
+    }
 }

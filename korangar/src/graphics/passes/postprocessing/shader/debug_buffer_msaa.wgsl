@@ -51,7 +51,7 @@ const PARTITION_COUNT: u32 = 2;
 @group(1) @binding(2) var directional_shadow_maps: texture_depth_2d_array;
 @group(1) @binding(3) var light_count_texture: texture_2d<u32>;
 @group(1) @binding(4) var point_shadow_maps: texture_depth_cube_array;
-@group(1) @binding(5) var depth_texture: texture_depth_2d;
+@group(1) @binding(5) var depth_texture: texture_depth_multisampled_2d;
 @group(1) @binding(6) var<storage, read> partition_data: array<Partition>;
 @group(2) @binding(0) var font_map: texture_2d<f32>;
 
@@ -85,7 +85,7 @@ fn fs_main(
     }
 
     if (debug_uniforms.show_directional_shadow_map != 0u) {
-        var sample_position = clip_to_uv(fragment_position);
+        let sample_position = clip_to_uv(fragment_position);
         let depth = textureSample(directional_shadow_maps, nearest_sampler, sample_position, debug_uniforms.show_directional_shadow_map - 1u);
         output_color += vec4<f32>(depth, depth, depth, 1.0);
     }

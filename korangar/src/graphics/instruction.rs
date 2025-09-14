@@ -26,15 +26,16 @@ pub struct RenderInstruction<'a> {
     pub middle_layer_rectangles: &'a [RectangleInstruction],
     /// On top of everything else.
     pub top_layer_rectangles: &'a [RectangleInstruction],
-    pub directional_light_with_shadow: DirectionalShadowCasterInstruction,
-    pub point_light_shadow_caster: &'a [PointShadowCasterInstruction],
+    pub directional_light: DirectionalLightInstruction,
+    pub directional_light_partitions: &'a [DirectionalLightPartitionInstruction],
     pub point_light: &'a [PointLightInstruction],
+    pub point_light_with_shadows: &'a [PointLightWithShadowInstruction],
     pub model_batches: &'a [ModelBatch],
     pub models: &'a mut [ModelInstruction],
     pub entities: &'a mut [EntityInstruction],
-    pub directional_model_batches: &'a [ModelBatch],
+    pub directional_shadow_model_batches: &'a [Vec<ModelBatch>],
     pub directional_shadow_models: &'a [ModelInstruction],
-    pub directional_shadow_entities: &'a [EntityInstruction],
+    pub directional_shadow_entities: &'a [Vec<EntityInstruction>],
     pub point_shadow_models: &'a [ModelInstruction],
     pub point_shadow_entities: &'a [EntityInstruction],
     pub effects: &'a [EffectInstruction],
@@ -94,28 +95,58 @@ pub struct WaterInstruction<'a> {
 }
 
 #[derive(Clone, Debug)]
-pub struct DirectionalShadowCasterInstruction {
+pub struct DirectionalLightInstruction {
     pub view_projection_matrix: Matrix4<f32>,
-    pub view_matrix: Matrix4<f32>,
     pub direction: Vector3<f32>,
     pub color: Color,
 }
 
-impl Default for DirectionalShadowCasterInstruction {
+impl Default for DirectionalLightInstruction {
     fn default() -> Self {
         Self {
             view_projection_matrix: Matrix4::identity(),
-            view_matrix: Matrix4::identity(),
             direction: Vector3::zero(),
             color: Color::default(),
         }
     }
 }
 
-/// Right now point shadows can't cast shadows of models that are not part of
-/// the map.
+#[derive(Clone, Copy, Debug)]
+pub struct DirectionalLightPartitionInstruction {
+    pub view_projection_matrix: Matrix4<f32>,
+    pub projection_matrix: Matrix4<f32>,
+    pub view_matrix: Matrix4<f32>,
+    pub interval_end: f32,
+    pub world_space_texel_size: f32,
+    pub near_plane: f32,
+    pub far_plane: f32,
+}
+
+impl Default for DirectionalLightPartitionInstruction {
+    fn default() -> Self {
+        Self {
+            view_projection_matrix: Matrix4::identity(),
+            projection_matrix: Matrix4::identity(),
+            view_matrix: Matrix4::identity(),
+            interval_end: 0.0,
+            world_space_texel_size: 0.0,
+            near_plane: 0.0,
+            far_plane: 0.0,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
-pub struct PointShadowCasterInstruction {
+pub struct PointLightInstruction {
+    pub position: Point3<f32>,
+    pub color: Color,
+    pub range: f32,
+}
+
+/// Right now point light can't cast shadows of models that are not part of
+/// the map (like the debug models).
+#[derive(Clone, Debug)]
+pub struct PointLightWithShadowInstruction {
     pub view_projection_matrices: [Matrix4<f32>; 6],
     pub view_matrices: [Matrix4<f32>; 6],
     pub position: Point3<f32>,
@@ -132,13 +163,6 @@ pub struct PointShadowCasterInstruction {
     pub model_offset: [usize; 6],
     /// Model count inside the point_shadow_models.
     pub model_count: [usize; 6],
-}
-
-#[derive(Clone, Debug)]
-pub struct PointLightInstruction {
-    pub position: Point3<f32>,
-    pub color: Color,
-    pub range: f32,
 }
 
 #[derive(Clone, Debug)]

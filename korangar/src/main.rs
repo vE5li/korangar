@@ -44,8 +44,9 @@ mod world;
 
 use std::io::Cursor;
 use std::net::{SocketAddr, ToSocketAddrs};
+use std::ops::Deref;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, LazyLock};
+use std::sync::{Arc, LazyLock, Mutex};
 
 use cgmath::{Point3, Vector2, Vector3};
 use image::{EncodableLayout, ImageFormat, ImageReader};
@@ -365,13 +366,13 @@ struct Client {
     model_batches: Vec<ModelBatch>,
     model_instructions: Vec<ModelInstruction>,
     entity_instructions: Vec<EntityInstruction>,
-    directional_shadow_model_batches: Vec<ModelBatch>,
+    directional_shadow_model_batches: [Vec<ModelBatch>; PARTITION_COUNT],
     directional_shadow_model_instructions: Vec<ModelInstruction>,
-    directional_shadow_entity_instructions: Vec<EntityInstruction>,
+    directional_shadow_entity_instructions: [Vec<EntityInstruction>; PARTITION_COUNT],
     point_shadow_model_batches: Vec<ModelBatch>,
     point_shadow_model_instructions: Vec<ModelInstruction>,
     point_shadow_entity_instructions: Vec<EntityInstruction>,
-    point_light_with_shadow_instructions: Vec<PointShadowCasterInstruction>,
+    point_light_with_shadow_instructions: Vec<PointLightWithShadowInstruction>,
     point_light_instructions: Vec<PointLightInstruction>,
 
     input_system: InputSystem,
@@ -386,6 +387,7 @@ struct Client {
     start_camera: StartCamera,
     player_camera: PlayerCamera,
     directional_shadow_camera: DirectionalShadowCamera,
+    directional_shadow_partitions: Arc<Mutex<[DirectionalShadowPartition; PARTITION_COUNT]>>,
     point_shadow_camera: PointShadowCamera,
 
     input_event_buffer: Vec<InputEvent>,
@@ -443,6 +445,7 @@ impl Client {
     fn init(sync_cache: bool) -> Option<Self> {
         time_phase!("load graphics settings", {
             let picker_value = Arc::new(AtomicU64::new(0));
+            let directional_shadow_partitions = Arc::new(Mutex::new([DirectionalShadowPartition::default(); PARTITION_COUNT]));
             let input_system = InputSystem::new(picker_value.clone());
             let graphics_settings = GraphicsSettings::new();
         });
@@ -610,9 +613,9 @@ impl Client {
             let model_batches = Vec::default();
             let model_instructions = Vec::default();
             let entity_instructions = Vec::default();
-            let directional_shadow_model_batches = Vec::default();
+            let directional_shadow_model_batches = Default::default();
             let directional_shadow_model_instructions = Vec::default();
-            let directional_shadow_entity_instructions = Vec::default();
+            let directional_shadow_entity_instructions = Default::default();
             let point_shadow_model_batches = Vec::default();
             let point_shadow_model_instructions = Vec::default();
             let point_shadow_entity_instructions = Vec::default();
@@ -629,6 +632,7 @@ impl Client {
                 queue: queue.clone(),
                 texture_loader: texture_loader.clone(),
                 picker_value,
+                directional_shadow_partitions: directional_shadow_partitions.clone(),
             });
         });
 
@@ -649,9 +653,7 @@ impl Client {
             let player_camera = PlayerCamera::new();
             let mut directional_shadow_camera = DirectionalShadowCamera::new();
             let point_shadow_camera = PointShadowCamera::new();
-
             start_camera.set_focus_point(START_CAMERA_FOCUS_POINT);
-            directional_shadow_camera.set_focus_point(start_camera.focus_point(), start_camera.view_direction());
         });
 
         // TODO: Move all of these to the ClientState
@@ -723,6 +725,8 @@ impl Client {
                 )
                 .expect("failed to load initial map");
 
+            directional_shadow_camera.set_level_bound(map.get_level_bound());
+
             audio_engine.play_background_music_track(DEFAULT_BACKGROUND_MUSIC);
             map.set_ambient_sound_sources(&audio_engine);
         });
@@ -789,6 +793,7 @@ impl Client {
             start_camera,
             player_camera,
             directional_shadow_camera,
+            directional_shadow_partitions,
             point_shadow_camera,
             input_event_buffer,
             network_event_buffer,
@@ -857,9 +862,11 @@ impl Client {
         self.model_batches.clear();
         self.model_instructions.clear();
         self.entity_instructions.clear();
-        self.directional_shadow_model_batches.clear();
+        self.directional_shadow_model_batches.iter_mut().for_each(|batch| batch.clear());
         self.directional_shadow_model_instructions.clear();
-        self.directional_shadow_entity_instructions.clear();
+        self.directional_shadow_entity_instructions
+            .iter_mut()
+            .for_each(|instructions| instructions.clear());
         self.point_shadow_model_batches.clear();
         self.point_shadow_model_instructions.clear();
         self.point_shadow_entity_instructions.clear();
@@ -2243,8 +2250,7 @@ impl Client {
                             ));
 
                             self.start_camera.set_focus_point(START_CAMERA_FOCUS_POINT);
-                            self.directional_shadow_camera
-                                .set_focus_point(self.start_camera.focus_point(), self.start_camera.view_direction());
+                            self.directional_shadow_camera.set_level_bound(map.get_level_bound());
                         }
                         false => {
                             // Normal map switch
@@ -2266,6 +2272,7 @@ impl Client {
                                 self.player_camera.set_focus_point(player.get_position());
                             }
 
+                            self.directional_shadow_camera.set_level_bound(map.get_level_bound());
                             let _ = self.networking_system.map_loaded();
                         }
                     }
@@ -2366,20 +2373,12 @@ impl Client {
             #[cfg(feature = "debug")]
             update_videos_measurement.stop();
 
-            match currently_playing {
-                true => {
-                    // SAFETY
-                    // `manually_asserted` is safe because we are in the branch where `this_player`
-                    // is not `None`.
-                    let position = self.client_state.follow(this_entity().manually_asserted()).get_position();
-                    self.player_camera.set_smoothed_focus_point(position);
-                    self.directional_shadow_camera
-                        .set_focus_point(self.player_camera.focus_point(), self.player_camera.view_direction());
-                }
-                false => {
-                    self.directional_shadow_camera
-                        .set_focus_point(self.start_camera.focus_point(), self.start_camera.view_direction());
-                }
+            if currently_playing {
+                // SAFETY
+                // `manually_asserted` is safe because we are in the branch where `this_player`
+                // is not `None`.
+                let position = self.client_state.follow(this_entity().manually_asserted()).get_position();
+                self.player_camera.set_smoothed_focus_point(position);
             }
 
             let current_camera: &(dyn Camera + Send + Sync) = match currently_playing {
@@ -2399,18 +2398,31 @@ impl Client {
             let shadow_detail = *self.client_state.follow(client_state().graphics_settings().shadow_detail());
             let shadow_quality = *self.client_state.follow(client_state().graphics_settings().shadow_quality());
 
-            let shadow_map_size = shadow_detail.directional_shadow_resolution();
             let ambient_light_color = map.ambient_light_color(lighting_mode, day_timer);
 
             let (directional_light_direction, directional_light_color) = map.directional_light(lighting_mode, day_timer);
 
-            self.directional_shadow_camera
-                .update(directional_light_direction, current_camera.view_direction(), shadow_map_size);
-            self.directional_shadow_camera.generate_view_projection(window_size);
+            match self.player_camera.is_rotating_or_zooming_fast() {
+                true => {
+                    self.directional_shadow_camera.update_camera_pssm(
+                        directional_light_direction,
+                        &view_matrix,
+                        &projection_matrix,
+                        shadow_detail.directional_shadow_resolution(),
+                    );
+                }
+                false => {
+                    self.directional_shadow_camera.update_camera_sdsm(
+                        directional_light_direction,
+                        &view_matrix,
+                        &projection_matrix,
+                        shadow_detail.directional_shadow_resolution(),
+                        self.directional_shadow_partitions.lock().unwrap().deref(),
+                    );
+                }
+            }
 
-            let (directional_light_view_matrix, directional_light_projection_matrix) =
-                self.directional_shadow_camera.view_projection_matrices();
-            let directional_light_view_projection_matrix = directional_light_projection_matrix * directional_light_view_matrix;
+            let directional_light_view_projection_matrix = self.directional_shadow_camera.view_projection_matrix();
 
             #[cfg(feature = "debug")]
             update_shadow_camera_measurement.stop();
@@ -2504,59 +2516,65 @@ impl Client {
 
             // Directional Shadows
             {
-                let object_set = map.cull_objects_with_frustum(
-                    &self.directional_shadow_camera,
-                    &mut self.directional_shadow_object_set_buffer,
+                for partition_index in 0..PARTITION_COUNT {
+                    let partition_camera = self.directional_shadow_camera.get_partition_camera(partition_index);
+
+                    let object_set = map.cull_objects_with_frustum(
+                        &partition_camera,
+                        &mut self.directional_shadow_object_set_buffer,
+                        #[cfg(feature = "debug")]
+                        render_options.frustum_culling,
+                    );
+
+                    let offset = self.directional_shadow_model_instructions.len();
+                    let model_batches = &mut self.directional_shadow_model_batches[partition_index];
+                    let entity_instructions = &mut self.directional_shadow_entity_instructions[partition_index];
+
+                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_objects))]
+                    map.render_objects(
+                        &mut self.directional_shadow_model_instructions,
+                        &object_set,
+                        animation_timer_ms,
+                        &partition_camera,
+                    );
+
+                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_map))]
+                    map.render_ground(&mut self.directional_shadow_model_instructions);
+
+                    let count = self.directional_shadow_model_instructions.len() - offset;
+
+                    model_batches.push(ModelBatch {
+                        offset,
+                        count,
+                        texture_set: map.get_texture_set().clone(),
+                        vertex_buffer: map.get_model_vertex_buffer().clone(),
+                        index_buffer: map.get_model_index_buffer().clone(),
+                    });
+
                     #[cfg(feature = "debug")]
-                    render_options.frustum_culling,
-                );
+                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_map_tiles))]
+                    map.render_overlay_tiles(
+                        &mut self.directional_shadow_model_instructions,
+                        model_batches,
+                        &self.tile_texture_set,
+                    );
 
-                let offset = self.directional_shadow_model_instructions.len();
+                    #[cfg(feature = "debug")]
+                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_pathing))]
+                    map.render_entity_pathing(
+                        &mut self.directional_shadow_model_instructions,
+                        model_batches,
+                        self.client_state.follow(client_state().entities()),
+                        &self.pathing_texture_set,
+                    );
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_objects))]
-                map.render_objects(
-                    &mut self.directional_shadow_model_instructions,
-                    &object_set,
-                    animation_timer_ms,
-                    &self.directional_shadow_camera,
-                );
-
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_map))]
-                map.render_ground(&mut self.directional_shadow_model_instructions);
-
-                let count = self.directional_shadow_model_instructions.len() - offset;
-
-                self.directional_shadow_model_batches.push(ModelBatch {
-                    offset,
-                    count,
-                    texture_set: map.get_texture_set().clone(),
-                    vertex_buffer: map.get_model_vertex_buffer().clone(),
-                    index_buffer: map.get_model_index_buffer().clone(),
-                });
-
-                #[cfg(feature = "debug")]
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_map_tiles))]
-                map.render_overlay_tiles(
-                    &mut self.directional_shadow_model_instructions,
-                    &mut self.directional_shadow_model_batches,
-                    &self.tile_texture_set,
-                );
-
-                #[cfg(feature = "debug")]
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_pathing))]
-                map.render_entity_pathing(
-                    &mut self.directional_shadow_model_instructions,
-                    &mut self.directional_shadow_model_batches,
-                    self.client_state.follow(client_state().entities()),
-                    &self.pathing_texture_set,
-                );
-
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_entities))]
-                map.render_entities(
-                    &mut self.directional_shadow_entity_instructions,
-                    self.client_state.follow(client_state().entities()),
-                    &self.directional_shadow_camera,
-                );
+                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_entities))]
+                    map.render_entities(
+                        entity_instructions,
+                        self.client_state.follow(client_state().entities()),
+                        &partition_camera,
+                    );
+                }
             }
 
             // Point Lights and Shadows
@@ -2872,7 +2890,7 @@ impl Client {
                     input_report.mouse_position,
                 );
 
-                std::mem::drop(interface_frame);
+                drop(interface_frame);
 
                 if let Some(delta) = input_report.drag {
                     // TODO: The scaling should be removed here.
@@ -2932,18 +2950,18 @@ impl Client {
                 bottom_layer_rectangles: bottom_layer_instructions.as_slice(),
                 middle_layer_rectangles: middle_layer_instructions.as_slice(),
                 top_layer_rectangles: top_layer_instructions.as_slice(),
-                directional_light_with_shadow: DirectionalShadowCasterInstruction {
+                directional_light: DirectionalLightInstruction {
                     view_projection_matrix: directional_light_view_projection_matrix,
-                    view_matrix: directional_light_view_matrix,
                     direction: directional_light_direction,
                     color: directional_light_color,
                 },
-                point_light_shadow_caster: &self.point_light_with_shadow_instructions,
+                directional_light_partitions: &self.directional_shadow_camera.get_partition_instructions(),
                 point_light: &self.point_light_instructions,
+                point_light_with_shadows: &self.point_light_with_shadow_instructions,
                 model_batches: &self.model_batches,
                 models: &mut self.model_instructions,
                 entities: &mut self.entity_instructions,
-                directional_model_batches: &self.directional_shadow_model_batches,
+                directional_shadow_model_batches: &self.directional_shadow_model_batches,
                 directional_shadow_models: &self.directional_shadow_model_instructions,
                 directional_shadow_entities: &self.directional_shadow_entity_instructions,
                 point_shadow_models: &self.point_shadow_model_instructions,

@@ -7,6 +7,8 @@ mod picker;
 mod point_shadow;
 mod postprocessing;
 mod screen_blit;
+mod sdsm;
+
 use std::marker::ConstParamTy;
 
 use bytemuck::{Pod, Zeroable};
@@ -19,9 +21,10 @@ pub(crate) use picker::*;
 pub(crate) use point_shadow::*;
 pub(crate) use postprocessing::*;
 pub(crate) use screen_blit::*;
+pub(crate) use sdsm::*;
 use wgpu::{BindGroupLayout, CommandEncoder, ComputePass, Device, Queue, RenderPass, TextureFormat};
 
-use crate::graphics::{Capabilities, GlobalContext, ModelBatch, ModelInstruction};
+use crate::graphics::{Capabilities, GlobalContext, ModelBatch, ModelInstruction, Msaa};
 use crate::loaders::TextureLoader;
 
 #[derive(Clone, Copy, PartialEq, Eq, ConstParamTy)]
@@ -89,7 +92,7 @@ pub(crate) trait ComputePassContext<const BIND: BindGroupCount> {
     ) -> ComputePass<'encoder>;
 
     /// The bind group layout of the compute pass.
-    fn bind_group_layout(device: &Device) -> [&'static BindGroupLayout; BIND as usize];
+    fn bind_group_layout(device: &Device, msaa: Msaa) -> [&'static BindGroupLayout; BIND as usize];
 }
 
 /// Trait for structures that do draw operations inside a render pass.

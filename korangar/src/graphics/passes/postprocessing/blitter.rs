@@ -2,7 +2,7 @@ use hashbrown::HashMap;
 use wgpu::{
     BlendState, ColorTargetState, ColorWrites, Device, FragmentState, MultisampleState, PipelineCompilationOptions,
     PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModule,
-    ShaderModuleDescriptor, TextureFormat, TextureSampleType, VertexState, include_wgsl,
+    ShaderModuleDescriptor, TextureFormat, TextureSampleType, TextureViewDimension, VertexState, include_wgsl,
 };
 
 use crate::graphics::passes::{
@@ -91,7 +91,12 @@ impl PostProcessingBlitterDrawer {
         luma_in_alpha: bool,
         alpha_blending: bool,
     ) -> RenderPipeline {
-        let texture_bind_group_layout = AttachmentTexture::bind_group_layout(device, TextureSampleType::Float { filterable: true }, false);
+        let texture_bind_group_layout = AttachmentTexture::bind_group_layout(
+            device,
+            TextureViewDimension::D2,
+            TextureSampleType::Float { filterable: true },
+            false,
+        );
 
         let pass_bind_group_layouts = <Self as Drawer<
             { BindGroupCount::One },

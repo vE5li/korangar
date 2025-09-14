@@ -1,7 +1,7 @@
 use wgpu::{
     ColorTargetState, ColorWrites, Device, FragmentState, MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor,
-    PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, TextureSampleType, VertexState,
-    include_wgsl,
+    PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, TextureSampleType,
+    TextureViewDimension, VertexState, include_wgsl,
 };
 
 use crate::graphics::passes::{
@@ -31,8 +31,12 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
 
         let pass_bind_group_layouts = Self::Context::bind_group_layout(device);
 
-        let input_texture_bind_group_layout =
-            AttachmentTexture::bind_group_layout(device, TextureSampleType::Float { filterable: true }, false);
+        let input_texture_bind_group_layout = AttachmentTexture::bind_group_layout(
+            device,
+            TextureViewDimension::D2,
+            TextureSampleType::Float { filterable: true },
+            false,
+        );
 
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some(DRAWER_NAME),

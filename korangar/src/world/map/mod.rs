@@ -99,6 +99,7 @@ impl WaterPlane {
 pub struct Map {
     width: usize,
     height: usize,
+    level_bound: AABB,
     lighting: Lighting,
     water_plane: Option<WaterPlane>,
     tiles: Vec<Tile>,
@@ -132,6 +133,7 @@ impl Map {
     pub fn new(
         width: usize,
         height: usize,
+        level_bound: AABB,
         lighting: Lighting,
         water_plane: Option<WaterPlane>,
         tiles: Vec<Tile>,
@@ -152,6 +154,7 @@ impl Map {
         Self {
             width,
             height,
+            level_bound,
             lighting,
             water_plane,
             tiles,
@@ -175,6 +178,7 @@ impl Map {
     pub fn new(
         width: usize,
         height: usize,
+        level_bound: AABB,
         lighting: Lighting,
         water_plane: Option<WaterPlane>,
         tiles: Vec<Tile>,
@@ -200,6 +204,7 @@ impl Map {
         Self {
             width,
             height,
+            level_bound,
             lighting,
             water_plane,
             tiles,
@@ -262,6 +267,10 @@ impl Map {
 
     pub fn get_tile_picker_vertex_buffer(&self) -> &Buffer<TileVertex> {
         &self.tile_picker_vertex_buffer
+    }
+
+    pub fn get_level_bound(&self) -> AABB {
+        self.level_bound
     }
 
     pub fn get_tile_picker_index_buffer(&self) -> &Buffer<u32> {

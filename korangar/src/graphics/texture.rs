@@ -410,6 +410,7 @@ pub struct AttachmentTexture {
     label: Option<String>,
     texture: wgpu::Texture,
     texture_view: TextureView,
+    array_texture_views: Vec<TextureView>,
     unpadded_size: Extent3d,
     bind_group: BindGroup,
 }
@@ -431,26 +432,50 @@ impl AttachmentTexture {
             descriptor.size.width = padded_width;
         }
 
+        let (view_dimension, array_layer_count) = if descriptor.size.depth_or_array_layers == 1 {
+            (TextureViewDimension::D2, None)
+        } else {
+            (TextureViewDimension::D2Array, Some(descriptor.size.depth_or_array_layers))
+        };
+
         let label = descriptor.label.map(|label| label.to_string());
         let texture = device.create_texture(&descriptor);
         let texture_view = texture.create_view(&TextureViewDescriptor {
             label: descriptor.label,
             format: None,
-            dimension: None,
+            dimension: Some(view_dimension),
             usage: None,
             aspect: TextureAspect::default(),
             base_mip_level: 0,
             mip_level_count: None,
             base_array_layer: 0,
-            array_layer_count: None,
+            array_layer_count,
         });
+
+        let mut array_texture_views = Vec::default();
+
+        if descriptor.size.depth_or_array_layers > 1 {
+            for layer in 0..descriptor.size.depth_or_array_layers {
+                array_texture_views.push(texture.create_view(&TextureViewDescriptor {
+                    label: descriptor.label,
+                    format: None,
+                    dimension: None,
+                    usage: None,
+                    aspect: TextureAspect::default(),
+                    base_mip_level: 0,
+                    mip_level_count: None,
+                    base_array_layer: layer,
+                    array_layer_count: Some(1),
+                }));
+            }
+        }
 
         let sample_type = descriptor.format.sample_type(Some(TextureAspect::All), None).unwrap();
 
         let layout = if descriptor.sample_count == 1 {
-            Self::bind_group_layout(device, sample_type, false)
+            Self::bind_group_layout(device, view_dimension, sample_type, false)
         } else {
-            Self::bind_group_layout(device, sample_type, true)
+            Self::bind_group_layout(device, view_dimension, sample_type, true)
         };
 
         let bind_group = device.create_bind_group(&BindGroupDescriptor {
@@ -466,6 +491,7 @@ impl AttachmentTexture {
             label,
             texture,
             texture_view,
+            array_texture_views,
             unpadded_size,
             bind_group,
         }
@@ -491,11 +517,20 @@ impl AttachmentTexture {
         &self.texture_view
     }
 
+    pub fn get_array_texture_view(&self, index: usize) -> &TextureView {
+        &self.array_texture_views[index]
+    }
+
     pub fn get_bind_group(&self) -> &BindGroup {
         &self.bind_group
     }
 
-    pub fn bind_group_layout(device: &Device, mut sample_type: TextureSampleType, multisampled: bool) -> Arc<BindGroupLayout> {
+    pub fn bind_group_layout(
+        device: &Device,
+        view_dimension: TextureViewDimension,
+        mut sample_type: TextureSampleType,
+        multisampled: bool,
+    ) -> Arc<BindGroupLayout> {
         if multisampled
             && let TextureSampleType::Float { filterable } = &mut sample_type
             && *filterable
@@ -504,10 +539,10 @@ impl AttachmentTexture {
         }
 
         #[allow(clippy::type_complexity)]
-        static LAYOUTS: OnceLock<Mutex<HashMap<(bool, TextureSampleType), Arc<BindGroupLayout>>>> = OnceLock::new();
+        static LAYOUTS: OnceLock<Mutex<HashMap<(TextureViewDimension, TextureSampleType, bool), Arc<BindGroupLayout>>>> = OnceLock::new();
         let layouts = LAYOUTS.get_or_init(|| Mutex::new(HashMap::new()));
         let lock = layouts.lock().unwrap();
-        match lock.get(&(multisampled, sample_type)) {
+        match lock.get(&(view_dimension, sample_type, multisampled)) {
             None => {
                 let layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
                     label: None,
@@ -516,7 +551,7 @@ impl AttachmentTexture {
                         visibility: ShaderStages::FRAGMENT | ShaderStages::COMPUTE,
                         ty: BindingType::Texture {
                             sample_type,
-                            view_dimension: TextureViewDimension::D2,
+                            view_dimension,
                             multisampled,
                         },
                         count: None,
@@ -524,7 +559,10 @@ impl AttachmentTexture {
                 });
                 let layout = Arc::new(layout);
                 drop(lock);
-                layouts.lock().unwrap().insert((multisampled, sample_type), layout.clone());
+                layouts
+                    .lock()
+                    .unwrap()
+                    .insert((view_dimension, sample_type, multisampled), layout.clone());
                 layout
             }
             Some(layout) => layout.clone(),
@@ -565,6 +603,33 @@ impl AttachmentTextureFactory<'_> {
                     width: self.dimensions.width as u32,
                     height: self.dimensions.height as u32,
                     depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: self.sample_count,
+                dimension: TextureDimension::D2,
+                format,
+                usage: attachment_image_type.into(),
+                view_formats: &[],
+            },
+            self.padded_width,
+        )
+    }
+
+    pub(crate) fn new_attachment_array(
+        &self,
+        texture_name: &str,
+        format: TextureFormat,
+        attachment_image_type: AttachmentTextureType,
+        count: u32,
+    ) -> AttachmentTexture {
+        AttachmentTexture::new(
+            self.device,
+            TextureDescriptor {
+                label: Some(texture_name),
+                size: Extent3d {
+                    width: self.dimensions.width as u32,
+                    height: self.dimensions.height as u32,
+                    depth_or_array_layers: count,
                 },
                 mip_level_count: 1,
                 sample_count: self.sample_count,

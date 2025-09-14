@@ -16,7 +16,9 @@ use wgpu::{
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, DirectionalShadowRenderPassContext, Drawer, RenderPassContext,
 };
-use crate::graphics::{BindlessSupport, Buffer, Capabilities, EntityInstruction, GlobalContext, Prepare, RenderInstruction, Texture};
+use crate::graphics::{
+    BindlessSupport, Buffer, Capabilities, EntityInstruction, GlobalContext, PARTITION_COUNT, Prepare, RenderInstruction, Texture,
+};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/entity.wgsl");
 const SHADER_BINDLESS: ShaderModuleDescriptor = include_wgsl!("shader/entity_bindless.wgsl");
@@ -39,6 +41,11 @@ struct InstanceData {
     alpha: f32,
 }
 
+pub(crate) struct DirectionalShadowEntityDrawData<'data> {
+    pub(crate) partition_index: usize,
+    pub(crate) instructions: &'data [EntityInstruction],
+}
+
 pub(crate) struct DirectionalShadowEntityDrawer {
     bindless_support: bool,
     solid_pixel_texture: Arc<Texture>,
@@ -46,7 +53,7 @@ pub(crate) struct DirectionalShadowEntityDrawer {
     bind_group_layout: BindGroupLayout,
     bind_group: BindGroup,
     pipeline: RenderPipeline,
-    draw_count: usize,
+    draw_counts: [usize; PARTITION_COUNT],
     instance_data: Vec<InstanceData>,
     bump: Bump,
     lookup: HashMap<u64, i32>,
@@ -54,7 +61,7 @@ pub(crate) struct DirectionalShadowEntityDrawer {
 
 impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAttachmentCount::One }> for DirectionalShadowEntityDrawer {
     type Context = DirectionalShadowRenderPassContext;
-    type DrawData<'data> = &'data [EntityInstruction];
+    type DrawData<'data> = DirectionalShadowEntityDrawData<'data>;
 
     fn new(
         capabilities: &Capabilities,
@@ -180,7 +187,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
             bind_group_layout,
             bind_group,
             pipeline,
-            draw_count: 0,
+            draw_counts: [0; PARTITION_COUNT],
             instance_data: Vec::default(),
             bump: Bump::default(),
             lookup: HashMap::default(),
@@ -188,7 +195,9 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
     }
 
     fn draw(&mut self, pass: &mut RenderPass<'_>, draw_data: Self::DrawData<'_>) {
-        if self.draw_count == 0 {
+        let draw_count = self.draw_counts[draw_data.partition_index];
+
+        if draw_count == 0 {
             return;
         }
 
@@ -196,12 +205,12 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
         pass.set_bind_group(2, &self.bind_group, &[]);
 
         if self.bindless_support {
-            pass.draw(0..6, 0..self.draw_count as u32);
+            pass.draw(0..6, 0..draw_count as u32);
         } else {
             let mut current_texture_id = self.solid_pixel_texture.get_id();
             pass.set_bind_group(3, self.solid_pixel_texture.get_bind_group(), &[]);
 
-            for (index, instruction) in draw_data[0..self.draw_count].iter().enumerate() {
+            for (index, instruction) in draw_data.instructions[0..draw_count].iter().enumerate() {
                 if instruction.texture.get_id() != current_texture_id {
                     current_texture_id = instruction.texture.get_id();
                     pass.set_bind_group(3, instruction.texture.get_bind_group(), &[]);
@@ -216,9 +225,13 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
 
 impl Prepare for DirectionalShadowEntityDrawer {
     fn prepare(&mut self, device: &Device, instructions: &RenderInstruction) {
-        self.draw_count = instructions.directional_shadow_entities.len();
+        let instruction_sum: usize = instructions
+            .directional_shadow_entities
+            .iter()
+            .map(|instructions| instructions.len())
+            .sum();
 
-        if self.draw_count == 0 {
+        if instruction_sum == 0 {
             return;
         }
 
@@ -227,33 +240,38 @@ impl Prepare for DirectionalShadowEntityDrawer {
         if self.bindless_support {
             self.bump.reset();
             self.lookup.clear();
-            let mut texture_views = Vec::with_capacity_in(self.draw_count, &self.bump);
 
-            for instruction in instructions.directional_shadow_entities.iter() {
-                let mut texture_index = texture_views.len() as i32;
-                let id = instruction.texture.get_id();
-                let potential_index = self.lookup.get(&id);
+            let mut texture_views = Vec::with_capacity_in(instruction_sum, &self.bump);
 
-                if let Some(potential_index) = potential_index {
-                    texture_index = *potential_index;
-                } else {
-                    self.lookup.insert(id, texture_index);
-                    texture_views.push(instruction.texture.get_texture_view());
+            for (partition_index, partition_instructions) in instructions.directional_shadow_entities.iter().enumerate() {
+                self.draw_counts[partition_index] = partition_instructions.len();
+
+                for instruction in partition_instructions.iter() {
+                    let mut texture_index = texture_views.len() as i32;
+                    let id = instruction.texture.get_id();
+                    let potential_index = self.lookup.get(&id);
+
+                    if let Some(potential_index) = potential_index {
+                        texture_index = *potential_index;
+                    } else {
+                        self.lookup.insert(id, texture_index);
+                        texture_views.push(instruction.texture.get_texture_view());
+                    }
+
+                    self.instance_data.push(InstanceData {
+                        world: instruction.world.into(),
+                        frame_part_transform: instruction.frame_part_transform.into(),
+                        texture_position: instruction.texture_position.into(),
+                        texture_size: instruction.texture_size.into(),
+                        frame_size: instruction.frame_size.into(),
+                        extra_depth_offset: instruction.extra_depth_offset,
+                        depth_offset: instruction.depth_offset,
+                        curvature: instruction.curvature,
+                        mirror: instruction.mirror as u32,
+                        alpha: instruction.color.alpha,
+                        texture_index,
+                    });
                 }
-
-                self.instance_data.push(InstanceData {
-                    world: instruction.world.into(),
-                    frame_part_transform: instruction.frame_part_transform.into(),
-                    texture_position: instruction.texture_position.into(),
-                    texture_size: instruction.texture_size.into(),
-                    frame_size: instruction.frame_size.into(),
-                    extra_depth_offset: instruction.extra_depth_offset,
-                    depth_offset: instruction.depth_offset,
-                    curvature: instruction.curvature,
-                    mirror: instruction.mirror as u32,
-                    alpha: instruction.color.alpha,
-                    texture_index,
-                });
             }
 
             if texture_views.is_empty() {
@@ -263,20 +281,22 @@ impl Prepare for DirectionalShadowEntityDrawer {
             self.instance_data_buffer.reserve(device, self.instance_data.len());
             self.bind_group = Self::create_bind_group_bindless(device, &self.bind_group_layout, &self.instance_data_buffer, &texture_views)
         } else {
-            for instruction in instructions.directional_shadow_entities.iter() {
-                self.instance_data.push(InstanceData {
-                    world: instruction.world.into(),
-                    frame_part_transform: instruction.frame_part_transform.into(),
-                    texture_position: instruction.texture_position.into(),
-                    texture_size: instruction.texture_size.into(),
-                    frame_size: instruction.frame_size.into(),
-                    extra_depth_offset: instruction.extra_depth_offset,
-                    depth_offset: instruction.depth_offset,
-                    curvature: instruction.curvature,
-                    mirror: instruction.mirror as u32,
-                    alpha: instruction.color.alpha,
-                    texture_index: 0,
-                });
+            for partition_instructions in instructions.directional_shadow_entities.iter() {
+                for instruction in partition_instructions.iter() {
+                    self.instance_data.push(InstanceData {
+                        world: instruction.world.into(),
+                        frame_part_transform: instruction.frame_part_transform.into(),
+                        texture_position: instruction.texture_position.into(),
+                        texture_size: instruction.texture_size.into(),
+                        frame_size: instruction.frame_size.into(),
+                        extra_depth_offset: instruction.extra_depth_offset,
+                        depth_offset: instruction.depth_offset,
+                        curvature: instruction.curvature,
+                        mirror: instruction.mirror as u32,
+                        alpha: instruction.color.alpha,
+                        texture_index: 0,
+                    });
+                }
             }
 
             self.instance_data_buffer.reserve(device, self.instance_data.len());

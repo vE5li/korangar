@@ -2,23 +2,23 @@ mod entity;
 mod indicator;
 mod model;
 
-use std::num::NonZeroU64;
 use std::sync::OnceLock;
 
 use bytemuck::{Pod, Zeroable};
 use cgmath::{Matrix4, SquareMatrix};
-pub(crate) use entity::DirectionalShadowEntityDrawer;
+pub(crate) use entity::{DirectionalShadowEntityDrawData, DirectionalShadowEntityDrawer};
 pub(crate) use indicator::DirectionalShadowIndicatorDrawer;
 pub(crate) use model::DirectionalShadowModelDrawer;
 use wgpu::util::StagingBelt;
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
-    BufferBindingType, BufferUsages, CommandEncoder, Device, LoadOp, Operations, Queue, RenderPass, RenderPassDepthStencilAttachment,
-    RenderPassDescriptor, ShaderStages, StoreOp, TextureFormat,
+    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, CommandEncoder,
+    Device, LoadOp, Operations, Queue, RenderPass, RenderPassDepthStencilAttachment, RenderPassDescriptor, ShaderStages, StoreOp,
+    TextureFormat,
 };
 
 use super::{BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, RenderPassContext};
-use crate::graphics::{Buffer, GlobalContext, Prepare, RenderInstruction};
+use crate::graphics::buffer::DynamicUniformBuffer;
+use crate::graphics::{GlobalContext, Prepare, RenderInstruction};
 use crate::loaders::TextureLoader;
 
 const PASS_NAME: &str = "directional shadow render pass";
@@ -34,24 +34,18 @@ struct PassUniforms {
 }
 
 pub(crate) struct DirectionalShadowRenderPassContext {
-    uniforms_buffer: Buffer<PassUniforms>,
+    uniforms_buffer: DynamicUniformBuffer<PassUniforms>,
     bind_group: BindGroup,
     directional_shadow_texture_format: TextureFormat,
-    uniforms_data: PassUniforms,
 }
 
 impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAttachmentCount::One }>
     for DirectionalShadowRenderPassContext
 {
-    type PassData<'data> = Option<()>;
+    type PassData<'data> = usize;
 
     fn new(device: &Device, _queue: &Queue, _texture_loader: &TextureLoader, global_context: &GlobalContext) -> Self {
-        let uniforms_buffer = Buffer::with_capacity(
-            device,
-            format!("{PASS_NAME} uniforms"),
-            BufferUsages::COPY_DST | BufferUsages::UNIFORM,
-            size_of::<PassUniforms>() as _,
-        );
+        let uniforms_buffer = DynamicUniformBuffer::new(device, &format!("{PASS_NAME} uniforms"));
 
         let bind_group = Self::create_bind_group(device, &uniforms_buffer);
 
@@ -61,7 +55,6 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, 
             uniforms_buffer,
             bind_group,
             directional_shadow_texture_format,
-            uniforms_data: Default::default(),
         }
     }
 
@@ -69,13 +62,15 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, 
         &mut self,
         encoder: &'encoder mut CommandEncoder,
         global_context: &GlobalContext,
-        _pass_data: Self::PassData<'_>,
+        pass_data: Self::PassData<'_>,
     ) -> RenderPass<'encoder> {
+        let dynamic_offset = self.uniforms_buffer.dynamic_offset(pass_data);
+
         let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
             label: Some(PASS_NAME),
             color_attachments: &[],
             depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
-                view: global_context.directional_shadow_map_texture.get_texture_view(),
+                view: global_context.directional_shadow_map_texture.get_array_texture_view(pass_data),
                 depth_ops: Some(Operations {
                     load: LoadOp::Clear(0.0),
                     store: StoreOp::Store,
@@ -95,7 +90,7 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, 
             1.0,
         );
         pass.set_bind_group(0, &global_context.global_bind_group, &[]);
-        pass.set_bind_group(1, &self.bind_group, &[]);
+        pass.set_bind_group(1, &self.bind_group, &[dynamic_offset]);
 
         pass
     }
@@ -109,11 +104,7 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, 
                 entries: &[BindGroupLayoutEntry {
                     binding: 0,
                     visibility: ShaderStages::VERTEX_FRAGMENT,
-                    ty: BindingType::Buffer {
-                        ty: BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: NonZeroU64::new(size_of::<PassUniforms>() as _),
-                    },
+                    ty: DynamicUniformBuffer::<PassUniforms>::get_binding_type(),
                     count: None,
                 }],
             })
@@ -133,24 +124,18 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, 
 
 impl Prepare for DirectionalShadowRenderPassContext {
     fn prepare(&mut self, _device: &Device, instructions: &RenderInstruction) {
-        self.uniforms_data = PassUniforms {
-            view_projection: instructions.directional_light_with_shadow.view_projection_matrix.into(),
-            view: instructions.directional_light_with_shadow.view_matrix.into(),
-            inverse_view: instructions
-                .directional_light_with_shadow
-                .view_matrix
-                .invert()
-                .unwrap_or(Matrix4::identity())
-                .into(),
+        let uniforms = instructions.directional_light_partitions.iter().map(|caster| PassUniforms {
+            view_projection: caster.view_projection_matrix.into(),
+            view: caster.view_matrix.into(),
+            inverse_view: caster.view_matrix.invert().unwrap_or(Matrix4::identity()).into(),
             animation_timer: instructions.uniforms.animation_timer_ms / 1000.0,
             padding: Default::default(),
-        };
+        });
+        self.uniforms_buffer.write_data(uniforms);
     }
 
     fn upload(&mut self, device: &Device, staging_belt: &mut StagingBelt, command_encoder: &mut CommandEncoder) {
-        let recreated = self
-            .uniforms_buffer
-            .write(device, staging_belt, command_encoder, &[self.uniforms_data]);
+        let recreated = self.uniforms_buffer.upload(device, staging_belt, command_encoder);
 
         if recreated {
             self.bind_group = Self::create_bind_group(device, &self.uniforms_buffer);
@@ -159,13 +144,13 @@ impl Prepare for DirectionalShadowRenderPassContext {
 }
 
 impl DirectionalShadowRenderPassContext {
-    fn create_bind_group(device: &Device, pass_uniforms_buffer: &Buffer<PassUniforms>) -> BindGroup {
+    fn create_bind_group(device: &Device, uniforms_buffer: &DynamicUniformBuffer<PassUniforms>) -> BindGroup {
         device.create_bind_group(&BindGroupDescriptor {
             label: Some(PASS_NAME),
             layout: Self::bind_group_layout(device)[1],
             entries: &[BindGroupEntry {
                 binding: 0,
-                resource: pass_uniforms_buffer.as_entire_binding(),
+                resource: uniforms_buffer.get_binding_resource(),
             }],
         })
     }

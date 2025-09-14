@@ -1,16 +1,19 @@
+use std::array;
 use std::collections::Bound;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::num::NonZeroU64;
 use std::ops::RangeBounds;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 
 use bytemuck::{Pod, Zeroable, bytes_of, cast_slice};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, print_debug};
 use wgpu::util::StagingBelt;
 use wgpu::{BindingResource, BindingType, BufferBindingType, BufferDescriptor, BufferSlice, BufferUsages, CommandEncoder, Device, Queue};
+
+use crate::graphics::{DirectionalShadowPartition, PARTITION_COUNT, Partition};
 
 /// Convenience abstraction over GPU buffers. Can be seen as a "Vec<T>" on the
 /// GPU.
@@ -205,6 +208,50 @@ impl Buffer<u64> {
                 Err(_error) => {
                     #[cfg(feature = "debug")]
                     print_debug!("[{}] failed to map picker buffer: {:?}", "error".red(), _error);
+                }
+            }
+        });
+    }
+}
+
+impl Buffer<Partition> {
+    /// This function is a special case for the SDMS, where we want to read back
+    /// the partitions.
+    pub fn queue_read_partitions(&self, output: Arc<Mutex<[DirectionalShadowPartition; PARTITION_COUNT]>>) {
+        const VALUE_SIZE: usize = size_of::<[Partition; PARTITION_COUNT]>();
+
+        let captured_buffer = Arc::clone(&self.buffer);
+        self.buffer.slice(..).map_async(wgpu::MapMode::Read, move |result| {
+            match result {
+                Ok(_) => {
+                    let mapped = captured_buffer.slice(..).get_mapped_range_mut();
+
+                    if VALUE_SIZE <= mapped.len() {
+                        // The mapped memory is not guaranteed to be aligned to Partition.
+                        let mut buffer = [0u8; VALUE_SIZE];
+                        buffer.copy_from_slice(&mapped[..VALUE_SIZE]);
+
+                        let partitions: [Partition; PARTITION_COUNT] = bytemuck::cast(buffer);
+
+                        let partitions = array::from_fn(|i| {
+                            let partition = partitions[i];
+
+                            DirectionalShadowPartition {
+                                extents: partition.extents.into(),
+                                center: partition.center.into(),
+                                interval_end: partition.interval_end,
+                            }
+                        });
+
+                        *output.lock().unwrap() = partitions;
+                    }
+
+                    drop(mapped);
+                    captured_buffer.unmap();
+                }
+                Err(_error) => {
+                    #[cfg(feature = "debug")]
+                    print_debug!("[{}] failed to map partitions data buffer: {:?}", "error".red(), _error);
                 }
             }
         });

@@ -24,6 +24,14 @@ struct DirectionalLightUniforms {
     direction: vec4<f32>,
 }
 
+struct DirectionalLightPartition {
+    view_projection: mat4x4<f32>,
+    interval_end: f32,
+    world_space_texel_size: f32,
+    near_plane: f32,
+    far_plane: f32,
+}
+
 struct PointLight {
     position: vec4<f32>,
     color: vec4<f32>,
@@ -54,10 +62,15 @@ override PASS_MODE: u32;
 const MIP_SCALE: f32 = 0.25;
 const ALPHA_CUTOFF: f32 = 0.4;
 const TILE_SIZE: u32 = 16;
+const PARTITION_COUNT: u32 = 3u;
+const NEAR_PLANE = 0.1;
+const DEPTH_EPSILON: f32 = 1.0e-7;
 // This value is important, since we don't want to have "opaque"
 // pixels in our WBOIT textures, or else they would dominate the
 // transparent pixels.
-const OPAGUE_EPSILON: f32 = 0.01;
+const OPAQUE_EPSILON: f32 = 0.01;
+// PCSS light source parameters (world units).
+const LIGHT_WORLD_SIZE: f32 = 5.0;
 
 struct WboitOutput {
     @location(1) accumulation: vec4<f32>,
@@ -70,11 +83,12 @@ struct WboitOutput {
 @group(0) @binding(3) var texture_sampler: sampler;
 @group(0) @binding(4) var shadow_map_sampler: sampler_comparison;
 @group(1) @binding(0) var<uniform> directional_light: DirectionalLightUniforms;
-@group(1) @binding(1) var shadow_map: texture_depth_2d;
+@group(1) @binding(1) var shadow_maps: texture_depth_2d_array;
 @group(1) @binding(2) var<storage, read> point_lights: array<PointLight>;
 @group(1) @binding(3) var light_count_texture: texture_2d<u32>;
 @group(1) @binding(4) var<storage, read> tile_light_indices: array<TileLightIndices>;
 @group(1) @binding(5) var point_shadow_maps: texture_depth_cube_array;
+@group(1) @binding(6) var<storage, read> directional_light_partitions: array<DirectionalLightPartition>;
 @group(2) @binding(0) var<storage, read> instance_data: array<InstanceData>;
 @group(3) @binding(0) var textures: binding_array<texture_2d<f32>>;
 
@@ -126,6 +140,18 @@ fn transparent_main(input: VertexOutput) -> WboitOutput {
     return output;
 }
 
+const SHADOW_OFFSET_NORMAL: f32 = -0.2;
+const SHADOW_OFFSET_LIGHT: f32 = -0.2;
+const CONSTANT_DEPTH_BIAS: f32 = 0.0001;
+
+// Based on: https://www.ludicon.com/castano/blog/articles/shadow-mapping-summary-part-1/
+fn get_shadow_offsets(normal: vec3<f32>, light_direction: vec3<f32>) -> vec2<f32> {
+    let cos_alpha = saturate(dot(normal, light_direction));
+    let sin_alpha = sqrt(1.0 - (cos_alpha * cos_alpha));
+    let tan_alpha = sin_alpha / max(0.001, cos_alpha);
+    return vec2<f32>(sin_alpha, min(2.0, tan_alpha));
+}
+
 fn fragment(input: VertexOutput) -> vec4<f32> {
     var diffuse_color: vec4<f32>;
     var alpha_channel: f32;
@@ -141,13 +167,13 @@ fn fragment(input: VertexOutput) -> vec4<f32> {
     var fragment_color: vec4<f32>;
 
     if (PASS_MODE == 0 && alpha_channel == 0.0) {
-        // Opaque pass we exit early on invisiable pixels.
+        // Opaque pass we exit early on invisible pixels.
         discard;
-    } else  if (PASS_MODE == 1 && (alpha_channel == 0.0 || alpha_channel <= (1.0 - OPAGUE_EPSILON))) {
-        // Semi opaque pass can early exit if invivisble or transparent pixel was found.
+    } else  if (PASS_MODE == 1 && (alpha_channel == 0.0 || alpha_channel <= (1.0 - OPAQUE_EPSILON))) {
+        // Semi opaque pass can early exit if invisible or transparent pixel was found.
         discard;
-    } else if (PASS_MODE == 2 && (alpha_channel == 0.0 || alpha_channel > (1.0 - OPAGUE_EPSILON))) {
-        // Transparent pass can early exit if invivisble or opague pixel was found.
+    } else if (PASS_MODE == 2 && (alpha_channel == 0.0 || alpha_channel > (1.0 - OPAQUE_EPSILON))) {
+        // Transparent pass can early exit if invisible or opaque pixel was found.
         discard;
     } else {
         // Calculate which tile this fragment belongs to
@@ -181,29 +207,48 @@ fn fragment(input: VertexOutput) -> vec4<f32> {
         let light_percent = max(dot(light_direction, normal), 0.0);
 
         // Shadow calculation
-        let shadow_position = directional_light.view_projection * input.world_position;
+        let linear_view_z = nonLinearToLinear(input.position.z);
+
+        var partition_index: u32 = 0u;
+        for (var i: u32 = 0u; i < (PARTITION_COUNT - 1u); i++) {
+            if (linear_view_z >= directional_light_partitions[i].interval_end) {
+                partition_index++;
+            }
+        }
+
+        let offset_scales = get_shadow_offsets(normal, light_direction);
+        let displacement_N = offset_scales.x * normal * SHADOW_OFFSET_NORMAL;
+        let displacement_L = offset_scales.y * light_direction * SHADOW_OFFSET_LIGHT;
+        let biased_world_position = input.world_position + vec4<f32>(displacement_N + displacement_L, 0.0);
+
+        let shadow_position = directional_light_partitions[partition_index].view_projection * biased_world_position;
         var shadow_coords = shadow_position.xyz / shadow_position.w;
-        let bias = get_oriented_bias(normal, light_direction);
-        let world_position = input.world_position.xyz / input.world_position.w;
-        shadow_coords = vec3<f32>(clip_to_screen_space(shadow_coords.xy), shadow_coords.z + bias);
+        shadow_coords = vec3<f32>(
+            clip_to_screen_space(shadow_coords.xy),
+            // If the far plane of the shadow is in front of the dran object, then it's value would be below 0.0.
+            // That would create a false shadow, so we need to make sure the value is never below 0.0 so that this
+            // phantom shadowing is not occuring (can happen when zooming).
+            max(shadow_coords.z, 0.0) + CONSTANT_DEPTH_BIAS
+        );
 
         var visibility: f32;
 
         switch (global_uniforms.shadow_quality) {
             case 0u: {
                 visibility = textureSampleCompare(
-                          shadow_map,
+                          shadow_maps,
                           shadow_map_sampler,
                           shadow_coords.xy,
+                          partition_index,
                           shadow_coords.z
                 );
             }
             case 1u: {
-                let shadow_map_dimensions = textureDimensions(shadow_map);
-                visibility = get_pcf_shadow(shadow_coords, shadow_map_dimensions);
+                let shadow_map_dimensions = textureDimensions(shadow_maps);
+                visibility = get_pcf_shadow(partition_index, shadow_coords, shadow_map_dimensions);
             }
             default: {
-                visibility = get_pcf_pcss_shadow(shadow_coords, shadow_position.z);
+                visibility = get_pcf_pcss_shadow(partition_index, shadow_coords);
             }
 
         }
@@ -288,14 +333,18 @@ fn calculate_mip_level(texture_coordinate: vec2<f32>) -> f32 {
     return max(0.0, 0.5 * log2(delta_max_squared));
 }
 
-fn get_pcf_shadow(shadow_coords: vec3<f32>, shadow_map_dimensions: vec2<u32>) -> f32 {
+fn get_pcf_shadow(
+    partition_index: u32,
+    shadow_coords: vec3<f32>,
+    shadow_map_dimensions: vec2<u32>
+) -> f32 {
     var gaussian_offset: i32;
     switch (shadow_map_dimensions.x) {
-        case 8192u: {
-            gaussian_offset = 8;
-        }
         case 4096u: {
             gaussian_offset = 4;
+        }
+        case 3072u: {
+            gaussian_offset = 3;
         }
         default: {
             gaussian_offset = 2;
@@ -320,9 +369,10 @@ fn get_pcf_shadow(shadow_coords: vec3<f32>, shadow_map_dimensions: vec2<u32>) ->
             let weight = exp(-distance_squared * weight_factor);
 
             let samples = textureGatherCompare(
-                shadow_map,
+                shadow_maps,
                 shadow_map_sampler,
                 shadow_coords.xy + offset,
+                partition_index,
                 depth
             );
 
@@ -333,10 +383,6 @@ fn get_pcf_shadow(shadow_coords: vec3<f32>, shadow_map_dimensions: vec2<u32>) ->
 
     return shadow / total_weight;
 }
-
-const FRUSTUM_SIZE: f32 = 400.0;
-const LIGHT_WORLD_SIZE: f32 = 5.0;
-const LIGHT_SIZE_UV: f32 = LIGHT_WORLD_SIZE / FRUSTUM_SIZE;
 
 const SAMPLE_POINTS_8: array<vec2<f32>, 8> = array<vec2<f32>, 8>(
     vec2<f32>(0.125, -0.375),
@@ -471,10 +517,14 @@ const SAMPLE_POINTS_64: array<vec2<f32>, 64> = array<vec2<f32>, 64>(
 );
 
 fn get_pcf_pcss_shadow(
-    shadow_coords: vec3<f32>,
-    pos_from_light: f32
+    partition_index: u32,
+    shadow_coords: vec3<f32>
 ) -> f32 {
-    let blocker = find_blocker(shadow_coords.xy, shadow_coords.z, pos_from_light);
+    let shadow_map_size = vec2<f32>(textureDimensions(shadow_maps));
+    let world_space_texel_size = directional_light_partitions[partition_index].world_space_texel_size;
+    let light_size_uv = LIGHT_WORLD_SIZE / (world_space_texel_size * shadow_map_size.x);
+
+    let blocker = find_blocker(partition_index, shadow_coords.xy, shadow_coords.z, light_size_uv);
     let average_blocker_depth = blocker.x;
     let blocker_count = blocker.y;
 
@@ -482,30 +532,33 @@ fn get_pcf_pcss_shadow(
         return 1.0;
     }
 
-    let penumbra = ((average_blocker_depth - shadow_coords.z) * LIGHT_SIZE_UV) / average_blocker_depth;
+    let receiver_distance = shadow_coords.z;
+    let blocker_distance = average_blocker_depth;
+    let depth_difference = abs(receiver_distance - blocker_distance);
+    let penumbra = depth_difference * light_size_uv * 2.0;
 
-    return pcf_filter(shadow_coords, penumbra);
+    return pcf_filter(partition_index, shadow_coords, penumbra);
 }
 
 fn find_blocker(
+    partition_index: u32,
     uv: vec2<f32>,
     receiver_depth: f32,
-    position_from_light: f32
+    light_size_uv: f32
 ) -> vec2<f32> {
     var blocker_sum = 0.0;
     var blocker_count = 0.0;
-
-    let search_radius = LIGHT_SIZE_UV * position_from_light / position_from_light;
 
     switch (global_uniforms.shadow_quality) {
         default: {
             // We need at least 16 sample points to get enough coverage for our penumbra.
             for (var i = 0u; i < 16; i++) {
-                let offset = SAMPLE_POINTS_16[i] * search_radius;
+                let offset = SAMPLE_POINTS_16[i] * light_size_uv;
                 let shadow_depth = textureSample(
-                    shadow_map,
+                    shadow_maps,
                     linear_sampler,
                     uv + offset,
+                    partition_index,
                 );
 
                 if(receiver_depth < shadow_depth) {
@@ -516,11 +569,12 @@ fn find_blocker(
         }
         case 4u: {
             for (var i = 0u; i < 32; i++) {
-                let offset = SAMPLE_POINTS_32[i] * search_radius;
+                let offset = SAMPLE_POINTS_32[i] * light_size_uv;
                 let shadow_depth = textureSample(
-                    shadow_map,
+                    shadow_maps,
                     linear_sampler,
                     uv + offset,
+                    partition_index,
                 );
 
                 if(receiver_depth < shadow_depth) {
@@ -531,11 +585,12 @@ fn find_blocker(
         }
         case 5u: {
             for (var i = 0u; i < 64; i++) {
-                let offset = SAMPLE_POINTS_64[i] * search_radius;
+                let offset = SAMPLE_POINTS_64[i] * light_size_uv;
                 let shadow_depth = textureSample(
-                    shadow_map,
+                    shadow_maps,
                     linear_sampler,
                     uv + offset,
+                    partition_index,
                 );
 
                 if(receiver_depth < shadow_depth) {
@@ -554,19 +609,23 @@ fn find_blocker(
 }
 
 fn pcf_filter(
+    partition_index: u32,
     shadow_coords: vec3<f32>,
     filter_radius_uv: f32
 ) -> f32 {
     var visibility = 0.0;
 
+    let clamped_radius = min(filter_radius_uv, 0.05);
+
     switch (global_uniforms.shadow_quality) {
         default: {
             for (var i = 0u; i < 8; i++) {
-                let offset = SAMPLE_POINTS_8[i] * filter_radius_uv;
+                let offset = SAMPLE_POINTS_8[i] * clamped_radius;
                 visibility += textureSampleCompare(
-                    shadow_map,
+                    shadow_maps,
                     shadow_map_sampler,
                     shadow_coords.xy + offset,
+                    partition_index,
                     shadow_coords.z
                 );
             }
@@ -574,11 +633,12 @@ fn pcf_filter(
         }
         case 3u: {
             for (var i = 0u; i < 16; i++) {
-                let offset = SAMPLE_POINTS_16[i] * filter_radius_uv;
+                let offset = SAMPLE_POINTS_16[i] * clamped_radius;
                 visibility += textureSampleCompare(
-                    shadow_map,
+                    shadow_maps,
                     shadow_map_sampler,
                     shadow_coords.xy + offset,
+                    partition_index,
                     shadow_coords.z
                 );
             }
@@ -586,11 +646,12 @@ fn pcf_filter(
         }
         case 4u: {
             for (var i = 0u; i < 32; i++) {
-                let offset = SAMPLE_POINTS_32[i] * filter_radius_uv;
+                let offset = SAMPLE_POINTS_32[i] * clamped_radius;
                 visibility += textureSampleCompare(
-                    shadow_map,
+                    shadow_maps,
                     shadow_map_sampler,
                     shadow_coords.xy + offset,
+                    partition_index,
                     shadow_coords.z
                 );
             }
@@ -598,11 +659,12 @@ fn pcf_filter(
         }
         case 5u: {
             for (var i = 0u; i < 64; i++) {
-                let offset = SAMPLE_POINTS_64[i] * filter_radius_uv;
+                let offset = SAMPLE_POINTS_64[i] * clamped_radius;
                 visibility += textureSampleCompare(
-                    shadow_map,
+                    shadow_maps,
                     shadow_map_sampler,
                     shadow_coords.xy + offset,
+                    partition_index,
                     shadow_coords.z
                 );
             }
@@ -611,15 +673,10 @@ fn pcf_filter(
     }
 }
 
-fn linearToNonLinear(linear_depth: f32) -> f32 {
-    const NEAR_PLANE = 0.1;
-    return NEAR_PLANE / (linear_depth + 1e-7);
+fn nonLinearToLinear(non_linear_depth: f32) -> f32 {
+    return NEAR_PLANE / (non_linear_depth + DEPTH_EPSILON);
 }
 
-// Based on "Shadow Techniques from Final Fantasy XVI" by Sammy Fatnassi (2023)
-fn get_oriented_bias(normal: vec3<f32>, light_direction: vec3<f32>) -> f32 {
-    let bias = 0.002;
-    let is_facing_light = dot(normal, light_direction) > 0.0;
-    // sic! We use reverse Z projection!
-    return select(-bias, bias, is_facing_light);
+fn linearToNonLinear(linear_depth: f32) -> f32 {
+    return NEAR_PLANE / (linear_depth + DEPTH_EPSILON);
 }

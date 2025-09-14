@@ -6,7 +6,7 @@ use ragnarok_formats::map::LightSource;
 
 #[cfg(feature = "debug")]
 use crate::graphics::RenderOptions;
-use crate::graphics::{Buffer, ModelInstruction, ModelVertex, PointLightInstruction, PointShadowCasterInstruction, TextureSet};
+use crate::graphics::{Buffer, ModelInstruction, ModelVertex, PointLightInstruction, PointLightWithShadowInstruction, TextureSet};
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
 #[cfg(feature = "debug")]
@@ -63,7 +63,7 @@ impl PointLight {
 
     pub fn render_with_shadows(
         &self,
-        instructions: &mut Vec<PointShadowCasterInstruction>,
+        instructions: &mut Vec<PointLightWithShadowInstruction>,
         view_projection_matrices: [Matrix4<f32>; 6],
         view_matrices: [Matrix4<f32>; 6],
         model_texture_set: Arc<TextureSet>,
@@ -74,7 +74,7 @@ impl PointLight {
         model_offset: [usize; 6],
         model_count: [usize; 6],
     ) {
-        instructions.push(PointShadowCasterInstruction {
+        instructions.push(PointLightWithShadowInstruction {
             view_projection_matrices,
             view_matrices,
             position: self.position,
@@ -221,7 +221,7 @@ impl PointLightSet<'_> {
         point_shadow_camera: &mut PointShadowCamera,
         point_shadow_object_set_buffer: &mut ResourceSetBuffer<ObjectKey>,
         point_shadow_model_instructions: &mut Vec<ModelInstruction>,
-        point_light_with_shadow_instructions: &mut Vec<PointShadowCasterInstruction>,
+        point_light_with_shadow_instructions: &mut Vec<PointLightWithShadowInstruction>,
         animation_timer_ms: f32,
         #[cfg(feature = "debug")] render_options: &RenderOptions,
     ) {

@@ -3,19 +3,20 @@ use wgpu::{
     ShaderModuleDescriptor, include_wgsl,
 };
 
-use crate::graphics::passes::light_culling::LightCullingPassContext;
-use crate::graphics::passes::{BindGroupCount, ComputePassContext, Dispatch};
-use crate::graphics::{Capabilities, GlobalContext, ScreenSize, calculate_light_tile_count};
+use crate::graphics::passes::{BindGroupCount, ComputePassContext, Dispatch, SdsmPassContext};
+use crate::graphics::{Capabilities, GlobalContext, ScreenSize};
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/light_culling.wgsl");
-const DISPATCHER_NAME: &str = "light culling";
+const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/reduce_partitions.wgsl");
+const SHADER_MSAA: ShaderModuleDescriptor = include_wgsl!("shader/reduce_partitions_msaa.wgsl");
 
-pub(crate) struct LightCullingDispatcher {
+const DISPATCHER_NAME: &str = "reduce partitions";
+
+pub(crate) struct ReducePartitionsDispatcher {
     pipeline: ComputePipeline,
 }
 
-impl Dispatch<{ BindGroupCount::Two }> for LightCullingDispatcher {
-    type Context = LightCullingPassContext;
+impl Dispatch<{ BindGroupCount::Two }> for ReducePartitionsDispatcher {
+    type Context = SdsmPassContext;
     type DispatchData<'data> = ScreenSize;
 
     fn new(
@@ -25,7 +26,10 @@ impl Dispatch<{ BindGroupCount::Two }> for LightCullingDispatcher {
         global_context: &GlobalContext,
         _compute_pass_context: &Self::Context,
     ) -> Self {
-        let shader_module = device.create_shader_module(SHADER);
+        let shader_module = match global_context.msaa.multisampling_activated() {
+            false => device.create_shader_module(SHADER),
+            true => device.create_shader_module(SHADER_MSAA),
+        };
 
         let pass_bind_group_layouts = Self::Context::bind_group_layout(device, global_context.msaa);
 
@@ -58,11 +62,8 @@ impl Dispatch<{ BindGroupCount::Two }> for LightCullingDispatcher {
 }
 
 fn calculate_dispatch_size(forward_size: ScreenSize) -> (u32, u32) {
-    let (tiles_x, tiles_y) = calculate_light_tile_count(forward_size);
-
-    // Round up division by workgroup size (8)
-    let dispatch_x = tiles_x.div_ceil(8);
-    let dispatch_y = tiles_y.div_ceil(8);
-
-    (dispatch_x, dispatch_y)
+    const REDUCE_TILE_DIM: u32 = 64;
+    let tiles_x = (forward_size.width.ceil() as u32).div_ceil(REDUCE_TILE_DIM);
+    let tiles_y = (forward_size.height.ceil() as u32).div_ceil(REDUCE_TILE_DIM);
+    (tiles_x, tiles_y)
 }

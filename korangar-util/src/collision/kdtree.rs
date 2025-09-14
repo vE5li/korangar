@@ -101,6 +101,11 @@ impl<K: SimpleKey + Ord + Hash, O: Insertable> KDTree<K, O> {
         }
     }
 
+    /// Returns the root boundary of the tree.
+    pub fn root_boundary(&self) -> AABB {
+        self.root_boundary
+    }
+
     /// Constructs a new KD-tree from a slice of key-object pairs.
     ///
     /// This method is using a O(N log N) construction algorithm.

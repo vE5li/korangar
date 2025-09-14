@@ -1,7 +1,7 @@
 use wgpu::{
     BlendComponent, BlendFactor, BlendOperation, BlendState, ColorTargetState, ColorWrites, Device, FragmentState, MultisampleState,
     PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor,
-    ShaderModuleDescriptor, TextureSampleType, VertexState, include_wgsl,
+    ShaderModuleDescriptor, TextureSampleType, TextureViewDimension, VertexState, include_wgsl,
 };
 
 use crate::graphics::passes::{
@@ -46,6 +46,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
 
         let texture_bind_group_layout = AttachmentTexture::bind_group_layout(
             device,
+            TextureViewDimension::D2,
             TextureSampleType::Float {
                 filterable: !msaa_activated,
             },

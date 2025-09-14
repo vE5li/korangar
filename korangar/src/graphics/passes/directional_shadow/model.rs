@@ -219,9 +219,11 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
 
 impl Prepare for DirectionalShadowModelDrawer {
     fn prepare(&mut self, _device: &Device, instructions: &RenderInstruction) {
-        let draw_count = instructions.directional_shadow_models.len();
-
-        if draw_count == 0 {
+        if instructions
+            .directional_shadow_model_batches
+            .iter()
+            .all(|instructions| instructions.is_empty())
+        {
             return;
         }
 

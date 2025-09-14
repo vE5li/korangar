@@ -261,6 +261,7 @@ impl MapLoader {
         let map = Map::new(
             gat_data.map_width as usize,
             gat_data.map_height as usize,
+            object_kdtree.root_boundary(),
             lighting,
             water_plane,
             gat_data.tiles,

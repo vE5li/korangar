@@ -649,9 +649,7 @@ impl Client {
             let player_camera = PlayerCamera::new();
             let mut directional_shadow_camera = DirectionalShadowCamera::new();
             let point_shadow_camera = PointShadowCamera::new();
-
             start_camera.set_focus_point(START_CAMERA_FOCUS_POINT);
-            directional_shadow_camera.set_focus_point(start_camera.focus_point(), start_camera.view_direction());
         });
 
         // TODO: Move all of these to the ClientState
@@ -722,6 +720,8 @@ impl Client {
                     &library,
                 )
                 .expect("failed to load initial map");
+
+            directional_shadow_camera.set_level_bound(map.get_level_bound());
 
             audio_engine.play_background_music_track(DEFAULT_BACKGROUND_MUSIC);
             map.set_ambient_sound_sources(&audio_engine);
@@ -2243,8 +2243,7 @@ impl Client {
                             ));
 
                             self.start_camera.set_focus_point(START_CAMERA_FOCUS_POINT);
-                            self.directional_shadow_camera
-                                .set_focus_point(self.start_camera.focus_point(), self.start_camera.view_direction());
+                            self.directional_shadow_camera.set_level_bound(map.get_level_bound());
                         }
                         false => {
                             // Normal map switch
@@ -2266,6 +2265,7 @@ impl Client {
                                 self.player_camera.set_focus_point(player.get_position());
                             }
 
+                            self.directional_shadow_camera.set_level_bound(map.get_level_bound());
                             let _ = self.networking_system.map_loaded();
                         }
                     }
@@ -2366,20 +2366,12 @@ impl Client {
             #[cfg(feature = "debug")]
             update_videos_measurement.stop();
 
-            match currently_playing {
-                true => {
-                    // SAFETY
-                    // `manually_asserted` is safe because we are in the branch where `this_player`
-                    // is not `None`.
-                    let position = self.client_state.follow(this_entity().manually_asserted()).get_position();
-                    self.player_camera.set_smoothed_focus_point(position);
-                    self.directional_shadow_camera
-                        .set_focus_point(self.player_camera.focus_point(), self.player_camera.view_direction());
-                }
-                false => {
-                    self.directional_shadow_camera
-                        .set_focus_point(self.start_camera.focus_point(), self.start_camera.view_direction());
-                }
+            if currently_playing {
+                // SAFETY
+                // `manually_asserted` is safe because we are in the branch where `this_player`
+                // is not `None`.
+                let position = self.client_state.follow(this_entity().manually_asserted()).get_position();
+                self.player_camera.set_smoothed_focus_point(position);
             }
 
             let current_camera: &(dyn Camera + Send + Sync) = match currently_playing {
@@ -2396,17 +2388,14 @@ impl Client {
             let update_shadow_camera_measurement = Profiler::start_measurement("update directional shadow camera");
 
             let lighting_mode = *self.client_state.follow(client_state().graphics_settings().lighting_mode());
-            let shadow_detail = *self.client_state.follow(client_state().graphics_settings().shadow_detail());
             let shadow_quality = *self.client_state.follow(client_state().graphics_settings().shadow_quality());
 
-            let shadow_map_size = shadow_detail.directional_shadow_resolution();
             let ambient_light_color = map.ambient_light_color(lighting_mode, day_timer);
 
             let (directional_light_direction, directional_light_color) = map.directional_light(lighting_mode, day_timer);
 
             self.directional_shadow_camera
-                .update(directional_light_direction, current_camera.view_direction(), shadow_map_size);
-            self.directional_shadow_camera.generate_view_projection(window_size);
+                .update_from_camera(directional_light_direction, &view_matrix, &projection_matrix);
 
             let (directional_light_view_matrix, directional_light_projection_matrix) =
                 self.directional_shadow_camera.view_projection_matrices();

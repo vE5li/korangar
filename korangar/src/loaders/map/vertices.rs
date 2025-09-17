@@ -218,6 +218,13 @@ pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<
     let mut tile_vertices = Vec::new();
     let mut tile_picker_vertices = Vec::new();
 
+    for tile in gat_data.tiles.iter_mut() {
+        tile.southwest_corner_height = -tile.southwest_corner_height;
+        tile.southeast_corner_height = -tile.southeast_corner_height;
+        tile.northwest_corner_height = -tile.northwest_corner_height;
+        tile.northeast_corner_height = -tile.northeast_corner_height;
+    }
+
     let tile_picker_indices = gat_data
         .tiles
         .iter_mut()
@@ -226,11 +233,6 @@ pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<
         .flat_map(|(index, tile)| {
             let x = index % gat_data.map_width as usize;
             let y = index / gat_data.map_width as usize;
-
-            tile.southwest_corner_height = -tile.southwest_corner_height;
-            tile.southeast_corner_height = -tile.southeast_corner_height;
-            tile.northwest_corner_height = -tile.northwest_corner_height;
-            tile.northeast_corner_height = -tile.northeast_corner_height;
 
             let offset = Vector2::new(x as f32 * GAT_TILE_SIZE, y as f32 * GAT_TILE_SIZE);
 

@@ -3,10 +3,8 @@ use cgmath::Vector2;
 use korangar_debug::profiling::FrameMeasurement;
 use korangar_interface::event::{ClickHandler, Event, EventQueue};
 use korangar_networking::{InventoryItem, ShopItem};
-#[cfg(feature = "debug")]
-use ragnarok_packets::TilePosition;
 use ragnarok_packets::{
-    AccountId, BuyOrSellOption, CharacterId, CharacterServerInformation, EntityId, HotbarSlot, ShopId, SoldItemInformation,
+    AccountId, BuyOrSellOption, CharacterId, CharacterServerInformation, EntityId, HotbarSlot, ShopId, SoldItemInformation, TilePosition,
 };
 use rust_state::Context;
 
@@ -107,7 +105,7 @@ pub enum InputEvent {
     /// Start moving the player.
     PlayerMove {
         /// Destination of the move.
-        destination: Vector2<usize>,
+        destination: TilePosition,
     },
     /// Interact with an entity. The type of interaction depends on the entity
     /// type.

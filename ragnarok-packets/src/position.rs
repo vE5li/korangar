@@ -1,54 +1,61 @@
 use ragnarok_bytes::{ByteConvertable, ByteReader, ByteWriter, ConversionResult, FromBytes, ToBytes};
 
+use crate::TilePosition;
+
 #[derive(Debug, Copy, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub enum Direction {
-    N = 0,
-    NE = 1,
-    E = 2,
-    SE = 3,
-    S = 4,
-    SW = 5,
-    W = 6,
-    NW = 7,
+    North = 0,
+    NorthEast = 1,
+    East = 2,
+    SouthEast = 3,
+    South = 4,
+    SouthWest = 5,
+    West = 6,
+    NorthWest = 7,
 }
 
-impl From<Direction> for usize {
+impl From<Direction> for u16 {
     fn from(value: Direction) -> Self {
-        value as usize
+        value as u16
     }
 }
 
-impl From<usize> for Direction {
-    fn from(value: usize) -> Self {
+impl From<u16> for Direction {
+    fn from(value: u16) -> Self {
         let value = value & 7;
 
         match value {
-            0 => Direction::N,
-            1 => Direction::NE,
-            2 => Direction::E,
-            3 => Direction::SE,
-            4 => Direction::S,
-            5 => Direction::SW,
-            6 => Direction::W,
-            7 => Direction::NW,
+            0 => Direction::North,
+            1 => Direction::NorthEast,
+            2 => Direction::East,
+            3 => Direction::SouthEast,
+            4 => Direction::South,
+            5 => Direction::SouthWest,
+            6 => Direction::West,
+            7 => Direction::NorthWest,
             _ => unreachable!(),
         }
     }
 }
 
-impl From<[isize; 2]> for Direction {
-    fn from(value: [isize; 2]) -> Self {
+#[derive(Debug, Clone, Copy)]
+pub struct InvalidDirectionError;
+
+impl TryFrom<[isize; 2]> for Direction {
+    type Error = InvalidDirectionError;
+
+    fn try_from(value: [isize; 2]) -> Result<Self, Self::Error> {
         match value {
-            [0, 1] => Direction::N,
-            [1, 1] => Direction::NE,
-            [1, 0] => Direction::E,
-            [1, -1] => Direction::SE,
-            [0, -1] => Direction::S,
-            [-1, -1] => Direction::SW,
-            [-1, 0] => Direction::W,
-            [-1, 1] => Direction::NW,
-            _ => panic!("impossible direction"),
+            [0, 1] => Ok(Direction::North),
+            [1, 1] => Ok(Direction::NorthEast),
+            [1, 0] => Ok(Direction::East),
+            [1, -1] => Ok(Direction::SouthEast),
+            [0, -1] => Ok(Direction::South),
+            [-1, -1] => Ok(Direction::SouthWest),
+            [-1, 0] => Ok(Direction::West),
+            [-1, 1] => Ok(Direction::NorthWest),
+            _ => Err(InvalidDirectionError),
         }
     }
 }
@@ -56,13 +63,13 @@ impl From<[isize; 2]> for Direction {
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct WorldPosition {
-    pub x: usize,
-    pub y: usize,
+    pub x: u16,
+    pub y: u16,
     pub direction: Direction,
 }
 
 impl WorldPosition {
-    pub fn new(x: usize, y: usize, direction: Direction) -> Self {
+    pub fn new(x: u16, y: u16, direction: Direction) -> Self {
         Self { x, y, direction }
     }
 
@@ -70,14 +77,18 @@ impl WorldPosition {
         Self {
             x: 0,
             y: 0,
-            direction: Direction::N,
+            direction: Direction::North,
         }
+    }
+
+    pub fn tile_position(&self) -> TilePosition {
+        TilePosition { x: self.x, y: self.y }
     }
 }
 
 impl FromBytes for WorldPosition {
     fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
-        let coordinates: Vec<usize> = byte_reader.slice::<Self>(3)?.iter().map(|byte| *byte as usize).collect();
+        let coordinates: Vec<u16> = byte_reader.slice::<Self>(3)?.iter().map(|byte| *byte as u16).collect();
 
         let x = (coordinates[1] >> 6) | (coordinates[0] << 2);
         let y = (coordinates[2] >> 4) | ((coordinates[1] & 0b111111) << 4);
@@ -96,7 +107,7 @@ impl ToBytes for WorldPosition {
     fn to_bytes(&self, byte_writer: &mut ByteWriter) -> ConversionResult<usize> {
         byte_writer.write_counted(|write| {
             let mut coordinates = [0, 0, 0];
-            let direction = (8 - usize::from(self.direction) + 4) & 7;
+            let direction = (8 - u16::from(self.direction) + 4) & 7;
 
             coordinates[0] = (self.x >> 2) as u8;
             coordinates[1] = ((self.x << 6) as u8) | (((self.y >> 4) & 0x3F) as u8);
@@ -112,15 +123,15 @@ impl ToBytes for WorldPosition {
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct WorldPosition2 {
-    pub x1: usize,
-    pub y1: usize,
-    pub x2: usize,
-    pub y2: usize,
-    pub unknown: usize,
+    pub x1: u16,
+    pub y1: u16,
+    pub x2: u16,
+    pub y2: u16,
+    pub unknown: u16,
 }
 
 impl WorldPosition2 {
-    pub fn new(x1: usize, y1: usize, x2: usize, y2: usize) -> Self {
+    pub fn new(x1: u16, y1: u16, x2: u16, y2: u16) -> Self {
         Self {
             x1,
             y1,
@@ -135,12 +146,12 @@ impl WorldPosition2 {
             WorldPosition {
                 x: self.x1,
                 y: self.y1,
-                direction: Direction::N,
+                direction: Direction::North,
             },
             WorldPosition {
                 x: self.x2,
                 y: self.y2,
-                direction: Direction::N,
+                direction: Direction::North,
             },
         )
     }
@@ -148,7 +159,7 @@ impl WorldPosition2 {
 
 impl FromBytes for WorldPosition2 {
     fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
-        let coordinates: Vec<usize> = byte_reader.slice::<Self>(6)?.iter().map(|byte| *byte as usize).collect();
+        let coordinates: Vec<u16> = byte_reader.slice::<Self>(6)?.iter().map(|byte| *byte as u16).collect();
 
         let x1 = (coordinates[1] >> 6) | (coordinates[0] << 2);
         let y1 = (coordinates[2] >> 4) | ((coordinates[1] & 0b111111) << 4);

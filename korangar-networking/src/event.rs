@@ -121,8 +121,10 @@ pub enum NetworkEvent {
         maximum_health_points: usize,
     },
     DamageEffect {
-        entity_id: EntityId,
+        source_entity_id: EntityId,
+        destination_entity_id: EntityId,
         damage_amount: usize,
+        is_critical: bool,
     },
     HealEffect {
         entity_id: EntityId,
@@ -221,6 +223,12 @@ pub enum NetworkEvent {
         reason: RemoveItemReason,
         index: InventoryIndex,
         amount: u16,
+    },
+    AttackFailed {
+        target_entity_id: EntityId,
+        target_position: TilePosition,
+        player_position: TilePosition,
+        attack_range: AttackRange,
     },
 }
 

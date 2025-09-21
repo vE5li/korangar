@@ -227,7 +227,7 @@ pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<
 
     let tile_picker_indices = gat_data
         .tiles
-        .iter_mut()
+        .iter()
         .enumerate()
         .filter(|(_, tile)| !tile.flags.is_empty())
         .flat_map(|(index, tile)| {

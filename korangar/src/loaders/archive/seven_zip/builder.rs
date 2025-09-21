@@ -3,13 +3,12 @@
 //! This implementation is writing the data into the 7zip file right away and
 //! will finish the file on drop.
 
-use std::collections::HashSet;
 use std::fs::File;
 use std::io::BufWriter;
 use std::num::NonZeroUsize;
 use std::path::Path;
 
-use sevenz_rust2::encoder_options::LZMA2Options;
+use sevenz_rust2::encoder_options::Lzma2Options;
 use sevenz_rust2::{ArchiveEntry, ArchiveWriter, EncoderMethod, NtTime};
 
 use super::SevenZipArchive;
@@ -17,7 +16,6 @@ use crate::loaders::archive::{Archive, Compression, Writable};
 
 pub struct SevenZipArchiveBuilder {
     writer: Option<ArchiveWriter<BufWriter<File>>>,
-    seen_directories: HashSet<String>,
     thread_count: u32,
 }
 
@@ -30,7 +28,6 @@ impl SevenZipArchiveBuilder {
 
         Self {
             writer: Some(writer),
-            seen_directories: HashSet::default(),
             thread_count,
         }
     }
@@ -45,12 +42,6 @@ impl SevenZipArchiveBuilder {
             return false;
         };
 
-        let path_with_slash = path.replace('\\', "/").to_string();
-
-        get_parent_directories(&path_with_slash)
-            .iter()
-            .for_each(|directory| self.add_directory(directory));
-
         // Custom overrides if we want to use different compressions on re-sync in
         // future versions.
         if path.ends_with(".dds") {
@@ -61,21 +52,11 @@ impl SevenZipArchiveBuilder {
 
         true
     }
-
-    fn add_directory(&mut self, path: &str) {
-        if !self.seen_directories.contains(path) {
-            self.seen_directories.insert(path.to_string());
-        }
-    }
 }
 
 impl Writable for SevenZipArchiveBuilder {
     fn add_file(&mut self, path: &str, asset_data: Vec<u8>, compression: Compression) {
         let path = path.replace('\\', "/").to_string();
-
-        get_parent_directories(&path)
-            .iter()
-            .for_each(|directory| self.add_directory(directory));
 
         if let Some(writer) = self.writer.as_mut() {
             let mut file_entry = ArchiveEntry::new_file(&path);
@@ -98,7 +79,7 @@ impl Writable for SevenZipArchiveBuilder {
             match compression {
                 Compression::Off => writer.set_content_methods(vec![EncoderMethod::COPY.into()]),
                 Compression::Default => {
-                    writer.set_content_methods(vec![LZMA2Options::from_level_mt(7, self.thread_count, stream_size).into()])
+                    writer.set_content_methods(vec![Lzma2Options::from_level_mt(7, self.thread_count, stream_size).into()])
                 }
             };
 
@@ -109,39 +90,15 @@ impl Writable for SevenZipArchiveBuilder {
     }
 
     fn finish(&mut self) -> Result<(), std::io::Error> {
-        // File will be finished on drop
+        if let Some(writer) = self.writer.take() {
+            writer.finish()?;
+        }
         Ok(())
     }
 }
 
 impl Drop for SevenZipArchiveBuilder {
     fn drop(&mut self) {
-        if let Some(mut writer) = self.writer.take() {
-            let mut seen_directories: Vec<String> = self.seen_directories.drain().collect();
-            seen_directories.sort();
-
-            for directory_path in seen_directories.iter() {
-                let directory = ArchiveEntry::new_directory(directory_path);
-                writer
-                    .push_archive_entry::<&[u8]>(directory, None)
-                    .unwrap_or_else(|_| panic!("can't add directory path '{directory_path}' to archive"));
-            }
-
-            writer.finish().unwrap();
-        }
+        self.finish().unwrap();
     }
-}
-
-fn get_parent_directories(asset_path: &str) -> Vec<String> {
-    let mut result = Vec::new();
-    let parts: Vec<&str> = asset_path.split('/').collect();
-
-    for index in 1..parts.len() {
-        let path = parts[..index].join("/");
-        if !path.is_empty() {
-            result.push(path);
-        }
-    }
-
-    result
 }

@@ -81,6 +81,30 @@ fn vs_main(
 
 @fragment
 fn fs_main(input: VertexOutput) -> @builtin(frag_depth) f32 {
+    return fragment(input);
+}
+
+@fragment
+fn fs_main_evsm(input: VertexOutput) -> @location(0) vec4<f32> {
+    let depth = fragment(input);
+
+    const C_POSITIVE: f32 = 42.0;
+    const C_NEGATIVE: f32 = 5.0;
+
+    let pos_warp = exp(C_POSITIVE * depth);
+    let neg_warp = -exp(-C_NEGATIVE * depth);
+
+    let moments = vec4<f32>(
+        pos_warp,                // M1 positive
+        pos_warp * pos_warp,     // M2 positive
+        neg_warp,                // M1 negative
+        neg_warp * neg_warp      // M2 negative
+    );
+
+    return moments;
+}
+
+fn fragment(input: VertexOutput) -> f32 {
     let diffuse_color = textureSampleLevel(texture, linear_sampler, input.texture_coordinates, 0.0);
     if (diffuse_color.a != 1.0 || input.alpha != 1.0) {
         discard;

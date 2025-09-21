@@ -27,7 +27,8 @@ struct PassUniforms {
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
-    @location(0) texture_coordinates: vec2<f32>,
+    @location(0) depth: f32,
+    @location(1) texture_coordinates: vec2<f32>,
 }
 
 @group(0) @binding(0) var<uniform> global_uniforms: GlobalUniforms;
@@ -39,6 +40,7 @@ struct VertexOutput {
 fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     var output: VertexOutput;
     output.position = pass_uniforms.view_projection * position_data(vertex_index);
+    output.depth = output.position.z / output.position.w;
     output.texture_coordinates = uv_data(vertex_index);
     return output;
 }
@@ -52,6 +54,32 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     return fragment_color;
+}
+
+@fragment
+fn fs_main_evsm(input: VertexOutput) -> @location(0) vec4<f32> {
+    let fragment_color = textureSampleLevel(texture, linear_sampler, input.texture_coordinates, 0.0);
+
+    if (fragment_color.a < 0.1) {
+        discard;
+    }
+
+    let depth = input.depth;
+
+    const C_POSITIVE: f32 = 42.0;
+    const C_NEGATIVE: f32 = 5.0;
+
+    let pos_warp = exp(C_POSITIVE * depth);
+    let neg_warp = -exp(-C_NEGATIVE * depth);
+
+    let moments = vec4<f32>(
+        pos_warp,                // M1 positive
+        pos_warp * pos_warp,     // M2 positive
+        neg_warp,                // M1 negative
+        neg_warp * neg_warp      // M2 negative
+    );
+
+    return moments;
 }
 
 fn position_data(vertex_index: u32) -> vec4<f32> {

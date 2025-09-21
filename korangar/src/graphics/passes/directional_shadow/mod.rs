@@ -66,6 +66,8 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, 
     ) -> RenderPass<'encoder> {
         let dynamic_offset = self.uniforms_buffer.dynamic_offset(pass_data);
 
+        // TODO: NHA We could start different configured passes here. But our
+        //       "ColorAttachmentCount" would then be an "OptionalOne".
         let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
             label: Some(PASS_NAME),
             color_attachments: &[],

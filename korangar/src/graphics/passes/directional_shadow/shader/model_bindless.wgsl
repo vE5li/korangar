@@ -11,8 +11,9 @@ struct InstanceData {
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
-    @location(0) texture_coordinates: vec2<f32>,
-    @location(1) texture_index: i32,
+    @location(0) depth: f32,
+    @location(1) texture_coordinates: vec2<f32>,
+    @location(2) texture_index: i32,
 }
 
 @group(0) @binding(2) var linear_sampler: sampler;
@@ -36,6 +37,7 @@ fn vs_main(
 
     var output: VertexOutput;
     output.position = pass_uniforms.view_projection * (world_position + offset);
+    output.depth = output.position.z / output.position.w;
     output.texture_coordinates = texture_coordinates;
     output.texture_index = texture_index;
     return output;
@@ -50,4 +52,30 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     return diffuse_color;
+}
+
+@fragment
+fn fs_main_evsm(input: VertexOutput) -> @location(0) vec4<f32> {
+    var diffuse_color = textureSampleLevel(textures[input.texture_index], linear_sampler, input.texture_coordinates, 0.0);
+
+    if (diffuse_color.a == 0.0) {
+        discard;
+    }
+
+    let depth = input.depth;
+
+    const C_POSITIVE: f32 = 42.0;
+    const C_NEGATIVE: f32 = 5.0;
+
+    let pos_warp = exp(C_POSITIVE * depth);
+    let neg_warp = -exp(-C_NEGATIVE * depth);
+
+    let moments = vec4<f32>(
+        pos_warp,                // M1 positive
+        pos_warp * pos_warp,     // M2 positive
+        neg_warp,                // M1 negative
+        neg_warp * neg_warp      // M2 negative
+    );
+
+    return moments;
 }

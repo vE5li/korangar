@@ -6,17 +6,16 @@ use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
     BufferAddress, BufferBindingType, BufferUsages, CommandEncoder, CompareFunction, DepthBiasState, DepthStencilState, Device,
     FragmentState, IndexFormat, MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass,
-    RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderStages, StencilState, VertexState, include_wgsl,
+    RenderPipeline, RenderPipelineDescriptor, ShaderStages, StencilState, VertexState,
 };
 
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, DirectionalShadowRenderPassContext, DrawIndexedIndirectArgs, Drawer,
     ModelBatchDrawData, RenderPassContext,
 };
+use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::graphics::{BindlessSupport, Buffer, Capabilities, GlobalContext, ModelVertex, Prepare, RenderInstruction, Texture, TextureSet};
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/model.wgsl");
-const SHADER_BINDLESS: ShaderModuleDescriptor = include_wgsl!("shader/model_bindless.wgsl");
 const DRAWER_NAME: &str = "directional shadow model";
 const INITIAL_INSTRUCTION_SIZE: usize = 256;
 
@@ -46,12 +45,15 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
         capabilities: &Capabilities,
         device: &Device,
         _queue: &Queue,
+        shader_compiler: &ShaderCompiler,
         _global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {
         let shader_module = match capabilities.bindless_support() {
-            BindlessSupport::Full | BindlessSupport::Limited => device.create_shader_module(SHADER_BINDLESS),
-            BindlessSupport::None => device.create_shader_module(SHADER),
+            BindlessSupport::Full | BindlessSupport::Limited => {
+                shader_compiler.create_shader_module("directional_shadow", "model_bindless")
+            }
+            BindlessSupport::None => shader_compiler.create_shader_module("directional_shadow", "model"),
         };
 
         let instance_data_buffer = Buffer::with_capacity(

@@ -6,15 +6,15 @@ use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
     BufferBindingType, BufferUsages, ColorTargetState, ColorWrites, CommandEncoder, CompareFunction, DepthStencilState, Device,
     FragmentState, MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass,
-    RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderStages, VertexState, include_wgsl,
+    RenderPipeline, RenderPipelineDescriptor, ShaderStages, VertexState,
 };
 
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, PickerRenderPassContext, RenderPassContext,
 };
+use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::graphics::{Buffer, Capabilities, GlobalContext, PickerTarget, Prepare, RenderInstruction};
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/marker.wgsl");
 const DRAWER_NAME: &str = "picker marker";
 const INITIAL_INSTRUCTION_SIZE: usize = 128;
 
@@ -78,10 +78,11 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
         _capabilities: &Capabilities,
         device: &Device,
         _queue: &Queue,
+        shader_compiler: &ShaderCompiler,
         _global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {
-        let shader_module = device.create_shader_module(SHADER);
+        let shader_module = shader_compiler.create_shader_module("picker", "marker");
 
         let instance_data_buffer = Buffer::with_capacity(
             device,

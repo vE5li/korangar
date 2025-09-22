@@ -128,7 +128,7 @@ impl Color {
         }
     }
 
-    /// Converts the sRGB color into a linear representation for the shader.
+    /// Converts the sRGB color into a linear representation for the shaders.
     /// Since we use pre-multiplied alpha blending, we premultiply the alpha
     /// here too.
     pub fn components_linear(self) -> [f32; 4] {

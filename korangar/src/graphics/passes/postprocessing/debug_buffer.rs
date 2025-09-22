@@ -10,6 +10,7 @@ use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, PostProcessingRenderPassContext, RenderPassContext,
 };
 use crate::graphics::settings::RenderOptions;
+use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::graphics::{Capabilities, GlobalContext, Prepare, RenderInstruction, Texture};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/debug_buffer.wgsl");
@@ -36,6 +37,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
         _capabilities: &Capabilities,
         device: &Device,
         _queue: &Queue,
+        _shader_compiler: &ShaderCompiler,
         global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {

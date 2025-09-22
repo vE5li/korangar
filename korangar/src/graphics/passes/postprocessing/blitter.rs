@@ -8,6 +8,7 @@ use wgpu::{
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, PostProcessingRenderPassContext, RenderPassContext,
 };
+use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::graphics::{AttachmentTexture, Capabilities, FXAA_COLOR_LUMA_TEXTURE_FORMAT, GlobalContext};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/blitter.wgsl");
@@ -39,6 +40,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
         _capabilities: &Capabilities,
         device: &Device,
         _queue: &Queue,
+        _shader_compiler: &ShaderCompiler,
         _global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {

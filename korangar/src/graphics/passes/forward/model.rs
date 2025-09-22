@@ -16,6 +16,7 @@ use crate::graphics::passes::forward::ForwardRenderPassContext;
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, DrawIndexedIndirectArgs, Drawer, ModelBatchDrawData, RenderPassContext,
 };
+use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::graphics::{
     BindlessSupport, Buffer, Capabilities, GlobalContext, ModelBatch, ModelVertex, Msaa, Prepare, RenderInstruction, Texture, TextureSet,
 };
@@ -75,6 +76,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
         capabilities: &Capabilities,
         device: &Device,
         _queue: &Queue,
+        _shader_compiler: &ShaderCompiler,
         global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {

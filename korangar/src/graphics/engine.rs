@@ -26,6 +26,7 @@ use super::{
 use crate::graphics::ScreenSize;
 use crate::graphics::instruction::RenderInstruction;
 use crate::graphics::passes::*;
+use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::loaders::TextureLoader;
 use crate::{NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS, init_tls_rand};
 
@@ -70,6 +71,7 @@ pub struct GraphicsEngine {
     instance: Instance,
     surface: Option<Surface>,
     thread_pool: ThreadPool,
+    shader_compiler: ShaderCompiler,
 }
 
 struct EngineContext {
@@ -148,6 +150,8 @@ impl GraphicsEngine {
             .build()
             .unwrap();
 
+        let shader_compiler = ShaderCompiler::new(descriptor.device.clone());
+
         Self {
             capabilities: descriptor.capabilities,
             frame_pacer,
@@ -165,6 +169,7 @@ impl GraphicsEngine {
             instance: descriptor.instance,
             surface: None,
             thread_pool,
+            shader_compiler,
         }
     }
 
@@ -183,8 +188,6 @@ impl GraphicsEngine {
     ) {
         self.set_limit_framerate(limit_framerate);
 
-        // Android devices need to drop the surface on suspend, so we might need to
-        // re-create it.
         if self.surface.is_none() {
             time_phase!("create surface", {
                 let screen_size: ScreenSize = window.inner_size().max(PhysicalSize::new(1, 1)).into();
@@ -247,6 +250,7 @@ impl GraphicsEngine {
                             &self.capabilities,
                             &self.device,
                             &self.queue,
+                            &self.shader_compiler,
                             &global_context,
                             &interface_render_pass_context,
                         );
@@ -254,6 +258,7 @@ impl GraphicsEngine {
                             &self.capabilities,
                             &self.device,
                             &self.queue,
+                            &self.shader_compiler,
                             &global_context,
                             &picker_render_pass_context,
                         );
@@ -261,6 +266,7 @@ impl GraphicsEngine {
                             &self.capabilities,
                             &self.device,
                             &self.queue,
+                            &self.shader_compiler,
                             &global_context,
                             &picker_render_pass_context,
                         );
@@ -268,6 +274,7 @@ impl GraphicsEngine {
                             &self.capabilities,
                             &self.device,
                             &self.queue,
+                            &self.shader_compiler,
                             &global_context,
                             &directional_shadow_pass_context,
                         );
@@ -275,6 +282,7 @@ impl GraphicsEngine {
                             &self.capabilities,
                             &self.device,
                             &self.queue,
+                            &self.shader_compiler,
                             &global_context,
                             &directional_shadow_pass_context,
                         );
@@ -282,6 +290,7 @@ impl GraphicsEngine {
                             &self.capabilities,
                             &self.device,
                             &self.queue,
+                            &self.shader_compiler,
                             &global_context,
                             &directional_shadow_pass_context,
                         );
@@ -289,6 +298,7 @@ impl GraphicsEngine {
                             &self.capabilities,
                             &self.device,
                             &self.queue,
+                            &self.shader_compiler,
                             &global_context,
                             &point_shadow_pass_context,
                         );
@@ -296,6 +306,7 @@ impl GraphicsEngine {
                             &self.capabilities,
                             &self.device,
                             &self.queue,
+                            &self.shader_compiler,
                             &global_context,
                             &point_shadow_pass_context,
                         );
@@ -303,6 +314,7 @@ impl GraphicsEngine {
                             &self.capabilities,
                             &self.device,
                             &self.queue,
+                            &self.shader_compiler,
                             &global_context,
                             &point_shadow_pass_context,
                         );
@@ -321,6 +333,7 @@ impl GraphicsEngine {
                             &self.capabilities,
                             &self.device,
                             &self.queue,
+                            &self.shader_compiler,
                             &global_context,
                             &forward_pass_context,
                         );
@@ -328,6 +341,7 @@ impl GraphicsEngine {
                             &self.capabilities,
                             &self.device,
                             &self.queue,
+                            &self.shader_compiler,
                             &global_context,
                             &forward_pass_context,
                         );
@@ -391,6 +405,7 @@ impl GraphicsEngine {
                             &self.capabilities,
                             &self.device,
                             &self.queue,
+                            &self.shader_compiler,
                             &global_context,
                             &post_processing_pass_context,
                         );
@@ -398,6 +413,7 @@ impl GraphicsEngine {
                             &self.capabilities,
                             &self.device,
                             &self.queue,
+                            &self.shader_compiler,
                             &global_context,
                             &screen_blit_pass_context,
                         );
@@ -406,6 +422,7 @@ impl GraphicsEngine {
                             &self.capabilities,
                             &self.device,
                             &self.queue,
+                            &self.shader_compiler,
                             &global_context,
                             &picker_render_pass_context,
                         );
@@ -467,6 +484,8 @@ impl GraphicsEngine {
                 print_debug!("created {}", "surface".magenta());
             });
         }
+        // Android devices need to drop the surface on suspend, so we might need
+        // to re-create it.
     }
 
     #[cfg(feature = "debug")]
@@ -577,6 +596,7 @@ impl GraphicsEngine {
                 &self.capabilities,
                 &self.device,
                 &self.queue,
+                &self.shader_compiler,
                 &engine_context.global_context,
                 &engine_context.forward_pass_context,
             );
@@ -599,6 +619,7 @@ impl GraphicsEngine {
                 &self.capabilities,
                 &self.device,
                 &self.queue,
+                &self.shader_compiler,
                 &engine_context.global_context,
                 &engine_context.post_processing_pass_context,
             );
@@ -616,6 +637,7 @@ impl GraphicsEngine {
                 &self.capabilities,
                 &self.device,
                 &self.queue,
+                &self.shader_compiler,
                 &engine_context.global_context,
                 &engine_context.forward_pass_context,
             );
@@ -674,6 +696,7 @@ impl GraphicsEngine {
                     &self.capabilities,
                     &self.device,
                     &self.queue,
+                    &self.shader_compiler,
                     &engine_context.global_context,
                     &engine_context.post_processing_pass_context,
                 );
@@ -1425,12 +1448,34 @@ impl ForwardResources {
         capabilities: &Capabilities,
         device: &Device,
         queue: &Queue,
+        shader_compiler: &ShaderCompiler,
         global_context: &GlobalContext,
         forward_pass_context: &ForwardRenderPassContext,
     ) -> Self {
-        let forward_entity_drawer = ForwardEntityDrawer::new(capabilities, device, queue, global_context, forward_pass_context);
-        let forward_indicator_drawer = ForwardIndicatorDrawer::new(capabilities, device, queue, global_context, forward_pass_context);
-        let forward_model_drawer = ForwardModelDrawer::new(capabilities, device, queue, global_context, forward_pass_context);
+        let forward_entity_drawer = ForwardEntityDrawer::new(
+            capabilities,
+            device,
+            queue,
+            shader_compiler,
+            global_context,
+            forward_pass_context,
+        );
+        let forward_indicator_drawer = ForwardIndicatorDrawer::new(
+            capabilities,
+            device,
+            queue,
+            shader_compiler,
+            global_context,
+            forward_pass_context,
+        );
+        let forward_model_drawer = ForwardModelDrawer::new(
+            capabilities,
+            device,
+            queue,
+            shader_compiler,
+            global_context,
+            forward_pass_context,
+        );
 
         Self {
             forward_entity_drawer,
@@ -1461,27 +1506,86 @@ impl PostProcessingResources {
         capabilities: &Capabilities,
         device: &Device,
         queue: &Queue,
+        shader_compiler: &ShaderCompiler,
         global_context: &GlobalContext,
         post_processing_pass_context: &PostProcessingRenderPassContext,
     ) -> Self {
-        let post_processing_effect_drawer =
-            PostProcessingEffectDrawer::new(capabilities, device, queue, global_context, post_processing_pass_context);
-        let post_processing_fxaa_drawer =
-            PostProcessingFxaaDrawer::new(capabilities, device, queue, global_context, post_processing_pass_context);
-        let post_processing_blitter_drawer =
-            PostProcessingBlitterDrawer::new(capabilities, device, queue, global_context, post_processing_pass_context);
-        let post_processing_rectangle_drawer =
-            PostProcessingRectangleDrawer::new(capabilities, device, queue, global_context, post_processing_pass_context);
-        let post_processing_wboit_resolve_drawer =
-            PostProcessingWboitResolveDrawer::new(capabilities, device, queue, global_context, post_processing_pass_context);
+        let post_processing_effect_drawer = PostProcessingEffectDrawer::new(
+            capabilities,
+            device,
+            queue,
+            shader_compiler,
+            global_context,
+            post_processing_pass_context,
+        );
+        let post_processing_fxaa_drawer = PostProcessingFxaaDrawer::new(
+            capabilities,
+            device,
+            queue,
+            shader_compiler,
+            global_context,
+            post_processing_pass_context,
+        );
+        let post_processing_blitter_drawer = PostProcessingBlitterDrawer::new(
+            capabilities,
+            device,
+            queue,
+            shader_compiler,
+            global_context,
+            post_processing_pass_context,
+        );
+        let post_processing_rectangle_drawer = PostProcessingRectangleDrawer::new(
+            capabilities,
+            device,
+            queue,
+            shader_compiler,
+            global_context,
+            post_processing_pass_context,
+        );
+        let post_processing_wboit_resolve_drawer = PostProcessingWboitResolveDrawer::new(
+            capabilities,
+            device,
+            queue,
+            shader_compiler,
+            global_context,
+            post_processing_pass_context,
+        );
         #[cfg(feature = "debug")]
-        let debug_aabb_drawer = DebugAabbDrawer::new(capabilities, device, queue, global_context, post_processing_pass_context);
+        let debug_aabb_drawer = DebugAabbDrawer::new(
+            capabilities,
+            device,
+            queue,
+            shader_compiler,
+            global_context,
+            post_processing_pass_context,
+        );
         #[cfg(feature = "debug")]
-        let debug_buffer_drawer = DebugBufferDrawer::new(capabilities, device, queue, global_context, post_processing_pass_context);
+        let debug_buffer_drawer = DebugBufferDrawer::new(
+            capabilities,
+            device,
+            queue,
+            shader_compiler,
+            global_context,
+            post_processing_pass_context,
+        );
         #[cfg(feature = "debug")]
-        let debug_circle_drawer = DebugCircleDrawer::new(capabilities, device, queue, global_context, post_processing_pass_context);
+        let debug_circle_drawer = DebugCircleDrawer::new(
+            capabilities,
+            device,
+            queue,
+            shader_compiler,
+            global_context,
+            post_processing_pass_context,
+        );
         #[cfg(feature = "debug")]
-        let debug_rectangle_drawer = DebugRectangleDrawer::new(capabilities, device, queue, global_context, post_processing_pass_context);
+        let debug_rectangle_drawer = DebugRectangleDrawer::new(
+            capabilities,
+            device,
+            queue,
+            shader_compiler,
+            global_context,
+            post_processing_pass_context,
+        );
 
         Self {
             post_processing_effect_drawer,

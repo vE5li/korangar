@@ -9,18 +9,17 @@ use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource,
     BindingType, BlendState, BufferBindingType, BufferUsages, ColorTargetState, ColorWrites, CommandEncoder, Device, FragmentState,
     MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor,
-    ShaderModuleDescriptor, ShaderStages, TextureSampleType, TextureView, TextureViewDimension, VertexState, include_wgsl,
+    ShaderStages, TextureSampleType, TextureView, TextureViewDimension, VertexState,
 };
 
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, InterfaceRenderPassContext, RenderPassContext,
 };
+use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::graphics::{
     BindlessSupport, Buffer, Capabilities, GlobalContext, InterfaceRectangleInstruction, Prepare, RenderInstruction, Texture,
 };
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/rectangle.wgsl");
-const SHADER_BINDLESS: ShaderModuleDescriptor = include_wgsl!("shader/rectangle_bindless.wgsl");
 const DRAWER_NAME: &str = "interface rectangle";
 const INITIAL_INSTRUCTION_SIZE: usize = 1024;
 
@@ -62,13 +61,14 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
         capabilities: &Capabilities,
         device: &Device,
         _queue: &Queue,
+        shader_compiler: &ShaderCompiler,
         global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {
         let shader_module = if capabilities.bindless_support() == BindlessSupport::Full {
-            device.create_shader_module(SHADER_BINDLESS)
+            shader_compiler.create_shader_module("interface", "rectangle_bindless")
         } else {
-            device.create_shader_module(SHADER)
+            shader_compiler.create_shader_module("interface", "rectangle")
         };
 
         let instance_data_buffer = Buffer::with_capacity(

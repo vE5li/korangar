@@ -72,7 +72,6 @@ impl Capabilities {
             Self::check_feature(adapter_features, Features::ADDRESS_MODE_CLAMP_TO_BORDER);
             Self::check_feature(adapter_features, Features::ADDRESS_MODE_CLAMP_TO_ZERO);
             Self::check_feature(adapter_features, Features::INDIRECT_FIRST_INSTANCE);
-            Self::check_feature(adapter_features, Features::MULTI_DRAW_INDIRECT);
             Self::check_feature(adapter_features, Features::PARTIALLY_BOUND_BINDING_ARRAY);
             Self::check_feature(
                 adapter_features,
@@ -100,9 +99,9 @@ impl Capabilities {
             }
         }
 
-        if adapter_features.contains(Features::INDIRECT_FIRST_INSTANCE | Features::MULTI_DRAW_INDIRECT) {
+        if adapter_features.contains(Features::INDIRECT_FIRST_INSTANCE) {
             capabilities.multidraw_indirect = true;
-            capabilities.required_features |= Features::INDIRECT_FIRST_INSTANCE | Features::MULTI_DRAW_INDIRECT;
+            capabilities.required_features |= Features::INDIRECT_FIRST_INSTANCE;
         }
 
         if adapter_features.contains(Features::ADDRESS_MODE_CLAMP_TO_BORDER | Features::ADDRESS_MODE_CLAMP_TO_ZERO) {

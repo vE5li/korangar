@@ -87,9 +87,10 @@ use state::{ChatMessage, ClientState, ClientStatePathExt, ClientStateRootExt, cl
 #[cfg(feature = "debug")]
 use wgpu::Device;
 use wgpu::util::initialize_adapter_from_env_or_default;
+use wgpu::wgt::{Dx12SwapchainKind, Dx12UseFrameLatencyWaitableObject};
 use wgpu::{
-    BackendOptions, Backends, DeviceDescriptor, Dx12BackendOptions, Dx12Compiler, GlBackendOptions, GlFenceBehavior, Gles3MinorVersion,
-    Instance, InstanceDescriptor, InstanceFlags, MemoryBudgetThresholds, MemoryHints, NoopBackendOptions, Queue, Trace,
+    BackendOptions, Backends, DeviceDescriptor, Dx12BackendOptions, Dx12Compiler, ExperimentalFeatures, GlBackendOptions, GlFenceBehavior,
+    Gles3MinorVersion, Instance, InstanceDescriptor, InstanceFlags, MemoryBudgetThresholds, MemoryHints, NoopBackendOptions, Queue, Trace,
 };
 use winit::application::ApplicationHandler;
 use winit::dpi::{LogicalSize, PhysicalSize};
@@ -462,6 +463,8 @@ impl Client {
                     },
                     dx12: Dx12BackendOptions {
                         shader_compiler: Dx12Compiler::StaticDxc.with_env(),
+                        presentation_system: Dx12SwapchainKind::DxgiFromHwnd,
+                        latency_waitable_object: Dx12UseFrameLatencyWaitableObject::Wait,
                     },
                     noop: NoopBackendOptions { enable: false },
                 },
@@ -487,6 +490,7 @@ impl Client {
                         label: None,
                         required_features: capabilities.get_required_features(),
                         required_limits: capabilities.get_required_limits(),
+                        experimental_features: ExperimentalFeatures::disabled(),
                         memory_hints: MemoryHints::Performance,
                         trace: Trace::Off,
                     })
@@ -495,7 +499,7 @@ impl Client {
             });
 
             #[cfg(feature = "debug")]
-            device.on_uncaptured_error(Box::new(error_handler));
+            device.on_uncaptured_error(Arc::new(error_handler));
 
             #[cfg(feature = "debug")]
             print_debug!("received {} and {}", "queue".magenta(), "device".magenta());

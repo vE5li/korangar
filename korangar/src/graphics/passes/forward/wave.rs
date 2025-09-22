@@ -13,6 +13,7 @@ use wgpu::{
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, ForwardRenderPassContext, RenderPassContext,
 };
+use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::graphics::{Buffer, Capabilities, GlobalContext, Prepare, RenderInstruction, Texture, WaterInstruction, WaterVertex};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/wave.wgsl");
@@ -44,6 +45,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
         _capabilities: &Capabilities,
         device: &Device,
         queue: &Queue,
+        _shader_compiler: &ShaderCompiler,
         global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {

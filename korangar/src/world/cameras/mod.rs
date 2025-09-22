@@ -55,8 +55,8 @@ pub trait Camera {
         let translation_matrix = Matrix4::from_translation(position.to_vec());
         let origin_matrix = Matrix4::from_translation(-origin.to_vec());
         // The vertices of the billboard are [-1, 0], [-1, 2], [1, 0], and [1, 2].
-        // To obtain the correct size, the shader rectangle needs to be half the size of
-        // the original rectangle, because of the factor 2.
+        // To obtain the correct size, the shaders rectangle needs to be half the size
+        // of the original rectangle, because of the factor 2.
         let scale_matrix = Matrix4::from_nonuniform_scale(size.x / 2.0, size.y / 2.0, 1.0);
 
         translation_matrix * (rotation_matrix * origin_matrix) * scale_matrix

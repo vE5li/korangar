@@ -421,6 +421,9 @@ impl TextureLoader {
                     }
                     Ok(PollStatus::QueueEmpty) => break,
                     Err(PollError::Timeout) => panic!("timeout while waiting for blocks data download"),
+                    Err(PollError::WrongSubmissionIndex(index, last_successful)) => {
+                        panic!("wrong submission index {index}. last successful: {last_successful}")
+                    }
                 }
             }
 

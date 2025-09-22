@@ -1,15 +1,13 @@
 use wgpu::{
     ColorTargetState, ColorWrites, Device, FragmentState, MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor,
-    PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, TextureSampleType,
-    TextureViewDimension, VertexState, include_wgsl,
+    PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, TextureSampleType, TextureViewDimension, VertexState,
 };
 
 use crate::graphics::passes::screen_blit::ScreenBlitRenderPassContext;
 use crate::graphics::passes::{BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer};
+use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::graphics::{AttachmentTexture, Capabilities, GlobalContext};
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/blitter.wgsl");
-const SHADER_SRGB: ShaderModuleDescriptor = include_wgsl!("shader/blitter_srgb.wgsl");
 const DRAWER_NAME: &str = "screen blit blitter";
 
 pub(crate) struct ScreenBlitBlitterDrawer {
@@ -24,14 +22,15 @@ impl Drawer<{ BindGroupCount::None }, { ColorAttachmentCount::One }, { DepthAtta
         _capabilities: &Capabilities,
         device: &Device,
         _queue: &Queue,
+        shader_compiler: &ShaderCompiler,
         global_context: &GlobalContext,
         _render_pass_context: &Self::Context,
     ) -> Self {
         let surface_texture_format = global_context.surface_texture_format;
 
         let shader_module = match surface_texture_format.is_srgb() {
-            true => device.create_shader_module(SHADER_SRGB),
-            false => device.create_shader_module(SHADER),
+            true => shader_compiler.create_shader_module("screen_blit", "blitter_srgb"),
+            false => shader_compiler.create_shader_module("screen_blit", "blitter"),
         };
 
         let label = format!("{DRAWER_NAME} {surface_texture_format:?}");

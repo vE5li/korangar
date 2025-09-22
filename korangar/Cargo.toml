@@ -44,8 +44,11 @@ smallvec = { workspace = true, features = ["const_generics", "const_new", "union
 spin_sleep = { workspace = true }
 sys-locale = { workspace = true }
 walkdir = { workspace = true }
-wgpu = { workspace = true, features = ["static-dxc"] }
+wgpu = { workspace = true, features = ["static-dxc", "spirv"] }
 winit = { workspace = true }
+
+[build-dependencies]
+sevenz-rust2 = { workspace = true, features = ["compress"] }
 
 [features]
 debug = ["korangar-audio/debug", "korangar-debug", "korangar-interface/debug", "korangar-networking/debug", "ragnarok-packets/debug"]

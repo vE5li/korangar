@@ -9,19 +9,18 @@ use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource,
     BindingType, BufferBindingType, BufferUsages, ColorTargetState, ColorWrites, CommandEncoder, CompareFunction, DepthBiasState,
     DepthStencilState, Device, FragmentState, MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState,
-    Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderStages, StencilState, TextureSampleType,
-    TextureView, TextureViewDimension, VertexState, include_wgsl,
+    Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderStages, StencilState, TextureSampleType, TextureView,
+    TextureViewDimension, VertexState,
 };
 
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, PickerRenderPassContext, RenderPassContext,
 };
+use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::graphics::{
     BindlessSupport, Buffer, Capabilities, EntityInstruction, GlobalContext, PickerTarget, Prepare, RenderInstruction, Texture,
 };
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/entity.wgsl");
-const SHADER_BINDLESS: ShaderModuleDescriptor = include_wgsl!("shader/entity_bindless.wgsl");
 const DRAWER_NAME: &str = "picker entity";
 const INITIAL_INSTRUCTION_SIZE: usize = 128;
 
@@ -59,13 +58,14 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
         capabilities: &Capabilities,
         device: &Device,
         _queue: &Queue,
+        shader_compiler: &ShaderCompiler,
         global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {
         let shader_module = if capabilities.bindless_support() == BindlessSupport::Full {
-            device.create_shader_module(SHADER_BINDLESS)
+            shader_compiler.create_shader_module("picker", "entity_bindless")
         } else {
-            device.create_shader_module(SHADER)
+            shader_compiler.create_shader_module("picker", "entity")
         };
 
         let instance_data_buffer = Buffer::with_capacity(

@@ -61,6 +61,13 @@ walkdir = "2"
 wgpu = "26"
 winit = "0.30"
 
+[patch.crates-io]
+naga = { git = "https://github.com/gfx-rs/wgpu.git", rev = "2f7ebf1401abcc8a3cd53c32ab71a3a0794c1f5e" }
+wgpu = { git = "https://github.com/gfx-rs/wgpu.git", rev = "2f7ebf1401abcc8a3cd53c32ab71a3a0794c1f5e" }
+wgpu-hal = { git = "https://github.com/gfx-rs/wgpu.git", rev = "2f7ebf1401abcc8a3cd53c32ab71a3a0794c1f5e" }
+wgpu-core = { git = "https://github.com/gfx-rs/wgpu.git", rev = "2f7ebf1401abcc8a3cd53c32ab71a3a0794c1f5e" }
+wgpu-types = { git = "https://github.com/gfx-rs/wgpu.git", rev = "2f7ebf1401abcc8a3cd53c32ab71a3a0794c1f5e" }
+
 [profile.release]
 lto = "thin"
 

@@ -12,6 +12,7 @@ mod primitives;
 mod projection;
 mod sampler;
 mod settings;
+mod shader_compiler;
 mod surface;
 mod texture;
 mod vertices;
@@ -55,7 +56,7 @@ const LIGHT_TILE_SIZE: u32 = 16;
 
 /// The count of shadow maps in which we partition the directional shadow.
 /// We can't make this an overridable constant in WGSL or runtime defined, since
-/// we use the const in the WGSL shader in locations that need const and don't
+/// we use the const in the WGSL shaders in locations that need const and don't
 /// allow overrides. So if you change this variable, you also need to replace
 /// the constants in the shaders of the same name.
 pub const PARTITION_COUNT: usize = 3;

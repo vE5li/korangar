@@ -1,16 +1,16 @@
 use wgpu::{
     ColorTargetState, ColorWrites, CompareFunction, DepthStencilState, Device, FragmentState, IndexFormat, MultisampleState,
     PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor,
-    ShaderModuleDescriptor, VertexState, include_wgsl,
+    VertexState,
 };
 
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, PickerRenderPassContext, RenderPassContext,
 };
 use crate::graphics::picker_target::PickerValueType;
+use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::graphics::{Buffer, Capabilities, GlobalContext, TileVertex};
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/tile.wgsl");
 const DRAWER_NAME: &str = "picker tile";
 
 pub(crate) struct PickerTileDrawData<'a> {
@@ -30,10 +30,11 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
         _capabilities: &Capabilities,
         device: &Device,
         _queue: &Queue,
+        shader_compiler: &ShaderCompiler,
         _global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {
-        let shader_module = device.create_shader_module(SHADER);
+        let shader_module = shader_compiler.create_shader_module("picker", "tile");
 
         let layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some(DRAWER_NAME),
@@ -41,7 +42,10 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
             push_constant_ranges: &[],
         });
 
-        let constants = &[("tile_enum_value", PickerValueType::Tile as u32 as f64)];
+        let constants = &[
+            // tile_enum_value
+            ("0", PickerValueType::Tile as u32 as f64),
+        ];
 
         let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
             label: Some(DRAWER_NAME),

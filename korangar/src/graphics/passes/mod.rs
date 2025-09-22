@@ -24,6 +24,7 @@ pub(crate) use screen_blit::*;
 pub(crate) use sdsm::*;
 use wgpu::{BindGroupLayout, CommandEncoder, ComputePass, Device, Queue, RenderPass, TextureFormat};
 
+use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::graphics::{Capabilities, GlobalContext, ModelBatch, ModelInstruction, Msaa};
 use crate::loaders::TextureLoader;
 
@@ -105,6 +106,7 @@ pub(crate) trait Drawer<const BIND: BindGroupCount, const COLOR: ColorAttachment
         capabilities: &Capabilities,
         device: &Device,
         queue: &Queue,
+        shader_compiler: &ShaderCompiler,
         global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self;

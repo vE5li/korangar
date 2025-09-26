@@ -11,7 +11,6 @@ korangar/lua_files/
 korangar/lua_files.grf
 korangar/[Bb][Gg][Mm]/
 korangar/*.7z
-korangar/shaders_compiled/
 
 # Nix & direnv
 .direnv/

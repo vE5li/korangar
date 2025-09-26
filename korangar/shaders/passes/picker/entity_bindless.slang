@@ -39,7 +39,7 @@ func vs_main(input: VertexInput) -> VertexOutput {
     output.texture_coordinates = instance.texture_position + vertex.texture_coordinates * instance.texture_size;
     output.texture_index = instance.texture_index;
 
-    if (instance.mirror != 0u) {
+    if (instance.mirror != 0) {
         output.texture_coordinates.x = 1.0 - output.texture_coordinates.x;
     }
 

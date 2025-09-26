@@ -38,7 +38,7 @@ func vs_main(input: VertexInput) -> VertexOutput {
     output.position = mul(global_uniforms.view_projection, mul(instance.world, frame_part_vertex));
     output.texture_coordinates = instance.texture_position + vertex.texture_coordinates * instance.texture_size;
 
-    if (instance.mirror != 0u) {
+    if (instance.mirror != 0) {
         output.texture_coordinates.x = 1.0 - output.texture_coordinates.x;
     }
 

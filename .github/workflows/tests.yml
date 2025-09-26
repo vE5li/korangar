@@ -14,6 +14,7 @@ name: Tests
 
 env:
   CARGO_TERM_COLOR: always
+  SLANG_VERSION: v2025.17.2
 
 jobs:
   build:
@@ -25,6 +26,36 @@ jobs:
 
       - name: Install test dependencies
         run: sudo apt install libpcap-dev libasound2-dev nasm
+
+      - name: Cache slangc
+        id: cache-slangc
+        uses: actions/cache@v4
+        with:
+          path: ~/slangc
+          key: ${{ runner.os }}-slangc-${{ env.SLANG_VERSION }}
+
+      - name: Download and install slangc
+        if: steps.cache-slangc.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/slangc
+          cd ~/slangc
+          
+          VERSION_NO_V=${SLANG_VERSION#v}
+          curl -L -o slang-linux-x86_64.tar.gz \
+            "https://github.com/shader-slang/slang/releases/download/${{ env.SLANG_VERSION }}/slang-${VERSION_NO_V}-linux-x86_64.tar.gz"
+          
+          tar -xzf slang-linux-x86_64.tar.gz
+          rm slang-linux-x86_64.tar.gz
+          
+          chmod +x bin/slangc bin/slangd
+
+      - name: Add slangc to PATH
+        run: echo "$HOME/slangc/bin" >> $GITHUB_PATH
+
+      - name: Verify slangc installation
+        run: |
+          which slangc
+          slangc -version
 
       - name: Run unit tests
         run: cargo test --all-features

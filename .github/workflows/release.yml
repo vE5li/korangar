@@ -13,6 +13,7 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   BINARY_NAME: korangar
+  SLANG_VERSION: v2025.17.2
 
 jobs:
   build-release:
@@ -47,6 +48,49 @@ jobs:
 
       - name: Install build dependencies
         run: ${{ matrix.install-deps }}
+
+      - name: Cache slangc
+        id: cache-slangc
+        uses: actions/cache@v4
+        with:
+          path: ~/slangc
+          key: ${{ runner.os }}-${{ matrix.architecture }}-slangc-${{ env.SLANG_VERSION }}
+
+      - name: Download and install slangc
+        if: steps.cache-slangc.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/slangc
+          cd ~/slangc
+
+          VERSION_NO_V=${SLANG_VERSION#v}
+
+          if [ "${{ matrix.name }}" = "Linux" ]; then
+            curl -L -o slang-linux-x86_64.tar.gz \
+              "https://github.com/shader-slang/slang/releases/download/${{ env.SLANG_VERSION }}/slang-${VERSION_NO_V}-linux-x86_64.tar.gz"
+            tar -xzf slang-linux-x86_64.tar.gz
+            rm slang-linux-x86_64.tar.gz
+            chmod +x bin/slangc bin/slangd
+          elif [ "${{ matrix.name }}" = "Windows" ]; then
+            curl -L -o slang-windows-x86_64.zip \
+              "https://github.com/shader-slang/slang/releases/download/${{ env.SLANG_VERSION }}/slang-${VERSION_NO_V}-windows-x86_64.zip"
+            unzip slang-windows-x86_64.zip
+            rm slang-windows-x86_64.zip
+            chmod +x bin/slangc.exe bin/slangd.exe
+          elif [ "${{ matrix.name }}" = "MacOS" ]; then
+            curl -L -o slang-macos-aarch64.tar.gz \
+              "https://github.com/shader-slang/slang/releases/download/${{ env.SLANG_VERSION }}/slang-${VERSION_NO_V}-macos-aarch64.tar.gz"
+            tar -xzf slang-macos-aarch64.tar.gz
+            rm slang-macos-aarch64.tar.gz
+            chmod +x bin/slangc bin/slangd
+          fi
+
+      - name: Add slangc to PATH
+        run: echo "$HOME/slangc/bin" >> $GITHUB_PATH
+
+      - name: Verify slangc installation
+        run: |
+          which slangc
+          slangc -version
 
       - name: Get the release version from the tag
         run: |

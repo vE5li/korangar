@@ -56,8 +56,8 @@ func fs_main(input: VertexOutput) -> uint2 {
 //
 // (x,y) are the vertex position
 public func vertex_data(vertex_index: uint) -> float2 {
-    let index = 1u << vertex_index;
-    let x = float((index & 0xEu) != 0u);
-    let y = float((index & 0x1Cu) != 0u);
+    let index = 1 << vertex_index;
+    let x = float((index & 0x0E) != 0u);
+    let y = float((index & 0x1C) != 0u);
     return float2(x, -y);
 }

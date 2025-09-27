@@ -44,6 +44,7 @@ pub use self::picker_target::PickerTarget;
 pub use self::primitives::*;
 pub use self::projection::*;
 pub use self::settings::*;
+pub use self::shader_compiler::ShaderCompiler;
 pub use self::surface::*;
 pub use self::texture::*;
 pub use self::vertices::*;

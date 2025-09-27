@@ -1,11 +1,11 @@
 use wgpu::{
     ColorTargetState, ColorWrites, Device, FragmentState, MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor,
-    PrimitiveState, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, TextureFormat, VertexState, include_wgsl,
+    PrimitiveState, RenderPass, RenderPipeline, RenderPipelineDescriptor, TextureFormat, VertexState,
 };
 
 use crate::graphics::passes::mipmap::MipMapRenderPassContext;
+use crate::graphics::shader_compiler::ShaderCompiler;
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/lanczos3.wgsl");
 const DRAWER_NAME: &str = "lanczos3";
 
 pub struct Lanczos3Drawer {
@@ -13,8 +13,8 @@ pub struct Lanczos3Drawer {
 }
 
 impl Lanczos3Drawer {
-    pub fn new(device: &Device) -> Self {
-        let shader_module = device.create_shader_module(SHADER);
+    pub fn new(device: &Device, shader_compiler: &ShaderCompiler) -> Self {
+        let shader_module = shader_compiler.create_shader_module("mipmap", "lanczos3");
 
         let pass_bind_group_layouts = MipMapRenderPassContext::bind_group_layout(device);
 

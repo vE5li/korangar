@@ -24,7 +24,7 @@ use super::{
     texture_file_dds_name,
 };
 use crate::SHUTDOWN_SIGNAL;
-use crate::graphics::{BindlessSupport, Capabilities, Lanczos3Drawer, MipMapRenderPassContext, Texture, TextureSet};
+use crate::graphics::{BindlessSupport, Capabilities, Lanczos3Drawer, MipMapRenderPassContext, ShaderCompiler, Texture, TextureSet};
 use crate::loaders::GameFileLoader;
 use crate::loaders::color::contains_transparent_pixel;
 use crate::world::Video;
@@ -53,8 +53,14 @@ pub struct TextureLoader {
 }
 
 impl TextureLoader {
-    pub fn new(device: Device, queue: Queue, capabilities: &Capabilities, game_file_loader: Arc<GameFileLoader>) -> Self {
-        let lanczos3_drawer = Lanczos3Drawer::new(&device);
+    pub fn new(
+        device: Device,
+        queue: Queue,
+        shader_compiler: &ShaderCompiler,
+        capabilities: &Capabilities,
+        game_file_loader: Arc<GameFileLoader>,
+    ) -> Self {
+        let lanczos3_drawer = Lanczos3Drawer::new(&device, shader_compiler);
         let block_compressor = Mutex::new(GpuBlockCompressor::new(device.clone(), queue.clone()));
 
         Self {

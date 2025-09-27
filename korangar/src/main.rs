@@ -504,6 +504,10 @@ impl Client {
             print_debug!("received {} and {}", "queue".magenta(), "device".magenta());
         });
 
+        time_phase!("create shader compiler", {
+            let shader_compiler = ShaderCompiler::new(device.clone());
+        });
+
         time_phase!("create game file loader", {
             let game_file_loader = Arc::new(GameFileLoader::default());
 
@@ -531,6 +535,7 @@ impl Client {
             let texture_loader = Arc::new(TextureLoader::new(
                 device.clone(),
                 queue.clone(),
+                &shader_compiler,
                 &capabilities,
                 game_file_loader.clone(),
             ));
@@ -633,6 +638,7 @@ impl Client {
                 instance,
                 device: device.clone(),
                 queue: queue.clone(),
+                shader_compiler,
                 texture_loader: texture_loader.clone(),
                 picker_value,
                 directional_shadow_partitions: directional_shadow_partitions.clone(),

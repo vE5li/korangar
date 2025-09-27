@@ -36,6 +36,7 @@ pub struct GraphicsEngineDescriptor {
     pub adapter: Adapter,
     pub device: Device,
     pub queue: Queue,
+    pub shader_compiler: ShaderCompiler,
     pub texture_loader: Arc<TextureLoader>,
     pub picker_value: Arc<AtomicU64>,
     pub directional_shadow_partitions: Arc<Mutex<[DirectionalShadowPartition; PARTITION_COUNT]>>,
@@ -150,8 +151,6 @@ impl GraphicsEngine {
             .build()
             .unwrap();
 
-        let shader_compiler = ShaderCompiler::new(descriptor.device.clone());
-
         Self {
             capabilities: descriptor.capabilities,
             frame_pacer,
@@ -169,7 +168,7 @@ impl GraphicsEngine {
             instance: descriptor.instance,
             surface: None,
             thread_pool,
-            shader_compiler,
+            shader_compiler: descriptor.shader_compiler,
         }
     }
 

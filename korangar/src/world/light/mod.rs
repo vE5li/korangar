@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use cgmath::{Matrix4, Point3, SquareMatrix, Vector2, Vector3, Zero};
-use korangar_util::collision::Sphere;
+use korangar_collision::Sphere;
 use ragnarok_formats::map::LightSource;
 
 #[cfg(feature = "debug")]

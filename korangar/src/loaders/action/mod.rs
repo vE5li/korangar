@@ -3,11 +3,11 @@ use std::sync::{Arc, Mutex};
 
 use korangar_audio::AudioEngine;
 #[cfg(feature = "debug")]
-use korangar_debug::logging::{Colorize, Timer, print_debug};
-use korangar_util::FileLoader;
+use korangar_container::CacheStatistics;
+use korangar_container::SimpleCache;
 #[cfg(feature = "debug")]
-use korangar_util::container::CacheStatistics;
-use korangar_util::container::SimpleCache;
+use korangar_debug::logging::{Colorize, Timer, print_debug};
+use korangar_loaders::FileLoader;
 use ragnarok_bytes::{ByteReader, FromBytes};
 use ragnarok_formats::action::ActionsData;
 use ragnarok_formats::version::InternalVersion;

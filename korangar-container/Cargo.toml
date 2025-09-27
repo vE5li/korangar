@@ -1,0 +1,12 @@
+[package]
+name = "korangar-container"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+hashbrown = { workspace = true }
+rust-state = { workspace = true, optional = true }
+korangar-interface = { workspace = true, optional = true }
+
+[features]
+interface = ["korangar-interface", "rust-state"]

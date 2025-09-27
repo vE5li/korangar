@@ -2,8 +2,8 @@ use std::ops::Mul;
 
 use cgmath::{Array, Vector2};
 use korangar_audio::SoundEffectKey;
+use korangar_container::Cacheable;
 use korangar_interface::element::StateElement;
-use korangar_util::container::Cacheable;
 use ragnarok_formats::action::Action;
 #[cfg(feature = "debug")]
 use ragnarok_formats::action::ActionsData;

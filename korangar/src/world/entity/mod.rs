@@ -7,7 +7,6 @@ use korangar_audio::{AudioEngine, SoundEffectKey};
 use korangar_interface::element::StateElement;
 use korangar_interface::window::{StateWindow, Window};
 use korangar_networking::EntityData;
-use korangar_util::pathing::{MAX_WALK_PATH_SIZE, PathFinder};
 use ragnarok_packets::{AccountId, CharacterInformation, ClientTick, Direction, EntityId, Sex, StatType, WorldPosition};
 use rust_state::{Path, RustState, VecItem};
 #[cfg(feature = "debug")]
@@ -28,6 +27,7 @@ use crate::renderer::GameInterfaceRenderer;
 use crate::renderer::MarkerRenderer;
 use crate::state::ClientState;
 use crate::state::theme::{InterfaceThemeType, WorldTheme};
+use crate::world::pathing::{MAX_WALK_PATH_SIZE, PathFinder};
 use crate::world::{ActionEvent, AnimationActionType, AnimationData, AnimationState, Camera, Library, Map};
 #[cfg(feature = "debug")]
 use crate::world::{MarkerIdentifier, SubMesh};

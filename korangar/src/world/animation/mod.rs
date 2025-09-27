@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use cgmath::{Array, Matrix4, Point3, Transform, Vector2, Vector3, Zero};
+use korangar_container::Cacheable;
 use korangar_interface::element::StateElement;
-use korangar_util::container::Cacheable;
 use ragnarok_packets::{ClientTick, Direction, EntityId};
 use rust_state::RustState;
 

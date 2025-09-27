@@ -9,7 +9,7 @@ use blake3::Hash;
 use ddsfile::{AlphaMode, D3D10ResourceDimension, Dds, DxgiFormat, NewDxgiParams};
 use hashbrown::HashSet;
 use image::{EncodableLayout, RgbaImage};
-use korangar_util::FileLoader;
+use korangar_loaders::FileLoader;
 use rayon::prelude::*;
 
 use crate::SHUTDOWN_SIGNAL;

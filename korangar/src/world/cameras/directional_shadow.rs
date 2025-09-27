@@ -1,6 +1,5 @@
 use cgmath::{EuclideanSpace, InnerSpace, Matrix4, Point3, SquareMatrix, Transform, Vector2, Vector3, Zero};
-use korangar_util::collision::AABB;
-use korangar_util::math::lerp;
+use korangar_collision::{AABB, lerp};
 
 use super::Camera;
 use crate::graphics::{DirectionalLightPartitionInstruction, DirectionalShadowPartition, PARTITION_COUNT, orthographic_reverse_lh};

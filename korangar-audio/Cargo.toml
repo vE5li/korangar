@@ -8,7 +8,9 @@ cpal = { workspace = true }
 cgmath = { workspace = true, features = ["mint"] }
 kira = { workspace = true, features = ["cpal", "mp3", "wav"] }
 korangar-debug = { workspace = true, optional = true }
-korangar-util = { workspace = true }
+korangar-collision = { workspace = true }
+korangar-container = { workspace = true }
+korangar-loaders = { workspace = true }
 rayon = { workspace = true }
 
 [dev-dependencies]

@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
+use korangar_collision::AABB;
 use korangar_interface::element::StateElement;
 use korangar_interface::window::StateWindow;
-use korangar_util::collision::AABB;
 use ragnarok_formats::transform::Transform;
 use rust_state::RustState;
 

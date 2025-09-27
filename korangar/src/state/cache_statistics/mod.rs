@@ -1,7 +1,6 @@
 use korangar_audio::AudioEngine;
 use korangar_interface::element::StateElement;
 use korangar_interface::window::StateWindow;
-use korangar_util::container;
 use rust_state::RustState;
 
 use crate::interface::windows::WindowClass;
@@ -11,13 +10,13 @@ use crate::loaders::{ActionLoader, AnimationLoader, EffectLoader, FontLoader, Ga
 #[window_class(WindowClass::CacheStatistics)]
 #[window_title("Cache Statistics")]
 pub struct CacheStatistics {
-    texture_cache: container::CacheStatistics,
-    sprite_cache: container::CacheStatistics,
-    font_cache: container::CacheStatistics,
-    sound_cache: container::CacheStatistics,
-    action_cache: container::CacheStatistics,
-    animation_cache: container::CacheStatistics,
-    effect_cache: container::CacheStatistics,
+    texture_cache: korangar_container::CacheStatistics,
+    sprite_cache: korangar_container::CacheStatistics,
+    font_cache: korangar_container::CacheStatistics,
+    sound_cache: korangar_container::CacheStatistics,
+    action_cache: korangar_container::CacheStatistics,
+    animation_cache: korangar_container::CacheStatistics,
+    effect_cache: korangar_container::CacheStatistics,
     #[hidden_element]
     last_update: f64,
 }

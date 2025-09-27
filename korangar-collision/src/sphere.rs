@@ -1,6 +1,6 @@
 use cgmath::{Array, InnerSpace, Matrix4, MetricSpace, Point3, Vector3};
 
-use crate::collision::{AABB, Insertable, Query};
+use crate::{AABB, Insertable, Query};
 
 /// A sphere.
 #[derive(Debug, Clone, Copy)]
@@ -132,7 +132,7 @@ impl Query<AABB> for Sphere {
 mod tests {
     use cgmath::{Matrix4, Point3};
 
-    use crate::collision::{AABB, Query, Sphere};
+    use crate::{AABB, Query, Sphere};
 
     #[test]
     fn test_new() {

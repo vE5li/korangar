@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, Timer, print_debug};
-use korangar_util::FileLoader;
+use korangar_loaders::FileLoader;
 use korangar_video::ivf::Ivf;
 use wgpu::TextureFormat;
 

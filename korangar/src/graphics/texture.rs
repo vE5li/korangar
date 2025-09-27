@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
 use hashbrown::HashMap;
-use korangar_util::container::Cacheable;
+use korangar_container::Cacheable;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource,
     BindingType, Device, Extent3d, Origin3d, Queue, ShaderStages, TexelCopyBufferLayout, TexelCopyTextureInfo, TextureAspect,

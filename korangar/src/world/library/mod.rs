@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use encoding_rs::EUC_KR;
 use hashbrown::HashMap;
+use korangar_loaders::FileLoader;
 use korangar_networking::{InventoryItem, NoMetadata, ShopItem};
-use korangar_util::FileLoader;
 use mlua::{Lua, Value};
 use ragnarok_packets::ItemId;
 

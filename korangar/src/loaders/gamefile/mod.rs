@@ -12,7 +12,7 @@ use std::sync::RwLock;
 use blake3::Hash;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, Timer, print_debug};
-use korangar_util::{FileLoader, FileNotFoundError};
+use korangar_loaders::{FileLoader, FileNotFoundError};
 
 pub use self::cache::{sync_cache_archive, texture_file_dds_name, video_file_ivf_name};
 use self::list::GameArchiveList;

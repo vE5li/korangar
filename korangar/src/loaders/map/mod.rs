@@ -7,11 +7,11 @@ use bytemuck::Pod;
 use cgmath::Vector3;
 use hashbrown::HashMap;
 use korangar_audio::AudioEngine;
+use korangar_collision::{AABB, KDTree, Sphere};
+use korangar_container::SimpleSlab;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::Timer;
-use korangar_util::FileLoader;
-use korangar_util::collision::{AABB, KDTree, Sphere};
-use korangar_util::container::SimpleSlab;
+use korangar_loaders::FileLoader;
 use ragnarok_bytes::{ByteReader, FromBytes};
 use ragnarok_formats::map::{GatData, GroundData, MapData, MapResources};
 use ragnarok_formats::version::InternalVersion;

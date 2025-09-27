@@ -65,7 +65,6 @@ use korangar_networking::{
     DisconnectReason, HotkeyState, LoginServerLoginData, MessageColor, NetworkEvent, NetworkEventBuffer, NetworkingSystem, SellItem,
     SupportedPacketVersion,
 };
-use korangar_util::pathing::PathFinder;
 #[cfg(feature = "debug")]
 use networking::{PacketHistory, PacketHistoryCallback};
 #[cfg(not(feature = "debug"))]

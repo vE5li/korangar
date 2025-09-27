@@ -1,8 +1,7 @@
 use cgmath::{Array, EuclideanSpace, Matrix4, Point3, Vector3};
 
-use crate::collision::aligned_plane::{AlignedPlane, Axis};
-use crate::collision::{Insertable, Query, Sphere};
-use crate::math::multiply_matrix4_and_point3;
+use crate::aligned_plane::{AlignedPlane, Axis};
+use crate::{Insertable, Query, Sphere, multiply_matrix4_and_point3};
 
 /// An axis aligned bounding box.
 #[derive(Debug, Clone, Copy)]
@@ -195,7 +194,7 @@ impl Query<AABB> for AABB {
 mod tests {
     use cgmath::{Matrix4, Point3, Vector3};
 
-    use crate::collision::{AABB, AlignedPlane, Axis, Sphere};
+    use crate::{AABB, AlignedPlane, Axis, Sphere};
 
     #[test]
     fn test_new() {

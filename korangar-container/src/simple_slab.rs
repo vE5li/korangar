@@ -343,7 +343,7 @@ impl<'a, I: SimpleKey, T> Iterator for SecondarySimpleIterator<'a, I, T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::container::{SecondarySimpleSlab, SimpleSlab};
+    use crate::{SecondarySimpleSlab, SimpleSlab};
 
     #[test]
     fn test_simple_slab_insert_and_get() {

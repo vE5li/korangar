@@ -6,10 +6,8 @@ use std::sync::{Arc, Mutex};
 
 use cgmath::{Deg, Matrix4, Point3, SquareMatrix, Vector2, Vector3};
 use korangar_audio::AudioEngine;
-use korangar_util::collision::{AABB, Frustum, KDTree, Sphere};
-use korangar_util::container::{SimpleKey, SimpleSlab};
-use korangar_util::create_simple_key;
-use korangar_util::pathing::Traversable;
+use korangar_collision::{AABB, Frustum, KDTree, Sphere};
+use korangar_container::{SimpleKey, SimpleSlab, create_simple_key};
 #[cfg(feature = "debug")]
 use option_ext::OptionExt;
 #[cfg(feature = "debug")]
@@ -35,6 +33,7 @@ use crate::loaders::GAT_TILE_SIZE;
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
 use crate::settings::LightingMode;
+use crate::world::pathing::Traversable;
 use crate::{Buffer, Color, GameFileLoader, ModelVertex, TileVertex};
 
 create_simple_key!(ObjectKey, "Key to an object inside the map");

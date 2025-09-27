@@ -1,6 +1,8 @@
 mod action;
 mod animation;
 mod archive;
+mod color;
+mod rectangle;
 
 mod r#async;
 mod effect;

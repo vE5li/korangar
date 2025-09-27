@@ -15,6 +15,7 @@ pub const MAX_WALK_PATH_SIZE: usize = 32;
 pub trait Traversable {
     /// Must return `true` if the position can be walked on.
     fn is_walkable(&self, position: Vector2<usize>) -> bool;
+
     /// Must return `true` if the position can be shot through.
     fn is_snipeable(&self, position: Vector2<usize>) -> bool;
 }
@@ -117,6 +118,8 @@ impl PathFinder {
 
     /// Returns the shortest path between start and goal that can be shot
     /// through.
+    // TODO: Unused for now.
+    #[allow(dead_code)]
     pub fn find_snipable_path(&mut self, map: &impl Traversable, start: Vector2<usize>, goal: Vector2<usize>) -> Option<&[Vector2<usize>]> {
         self.path.clear();
 

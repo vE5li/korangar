@@ -1,4 +1,4 @@
-use korangar_util::FileNotFoundError;
+use korangar_loaders::FileNotFoundError;
 use ragnarok_bytes::ConversionError;
 
 #[derive(Debug)]

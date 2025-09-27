@@ -98,7 +98,7 @@ fn compile_shader(shader_file: &Path, output_dir: &Path, modules_dir: &Path) -> 
     cmd.arg("-target")
         .arg("spirv")
         .arg("-profile")
-        .arg("spirv_1_5")
+        .arg("spirv_1_3")
         .arg("-I")
         .arg(modules_dir)
         .arg("-O3")

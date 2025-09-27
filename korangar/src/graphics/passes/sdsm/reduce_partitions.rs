@@ -4,10 +4,11 @@ use wgpu::{
 };
 
 use crate::graphics::passes::{BindGroupCount, ComputePassContext, Dispatch, SdsmPassContext};
+use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::graphics::{Capabilities, GlobalContext, ScreenSize};
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/reduce_partitions.wgsl");
-const SHADER_MSAA: ShaderModuleDescriptor = include_wgsl!("shader/reduce_partitions_msaa.wgsl");
+const SHADER: ShaderModuleDescriptor = include_wgsl!("../../../../shaders/passes/sdsm/reduce_partitions.wgsl");
+const SHADER_MSAA: ShaderModuleDescriptor = include_wgsl!("../../../../shaders/passes/sdsm/reduce_partitions_msaa.wgsl");
 
 const DISPATCHER_NAME: &str = "reduce partitions";
 
@@ -23,6 +24,7 @@ impl Dispatch<{ BindGroupCount::Two }> for ReducePartitionsDispatcher {
         _capabilities: &Capabilities,
         device: &Device,
         _queue: &Queue,
+        _shader_compiler: &ShaderCompiler,
         global_context: &GlobalContext,
         _compute_pass_context: &Self::Context,
     ) -> Self {
@@ -43,7 +45,7 @@ impl Dispatch<{ BindGroupCount::Two }> for ReducePartitionsDispatcher {
             label: Some(DISPATCHER_NAME),
             layout: Some(&pipeline_layout),
             module: &shader_module,
-            entry_point: Some("cs_main"),
+            entry_point: Some("main"),
             compilation_options: PipelineCompilationOptions {
                 zero_initialize_workgroup_memory: false,
                 ..Default::default()

@@ -30,7 +30,7 @@ fn nonLinearToLinear(non_linear_depth: f32) -> f32 {
 }
 
 @compute @workgroup_size(REDUCE_ZBOUNDS_BLOCK_DIM, REDUCE_ZBOUNDS_BLOCK_DIM, 1)
-fn cs_main(
+fn main(
     @builtin(global_invocation_id) globalId: vec3<u32>,
     @builtin(local_invocation_id) localId: vec3<u32>,
     @builtin(workgroup_id) groupId: vec3<u32>,

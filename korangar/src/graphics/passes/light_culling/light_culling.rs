@@ -5,6 +5,7 @@ use wgpu::{
 
 use crate::graphics::passes::light_culling::LightCullingPassContext;
 use crate::graphics::passes::{BindGroupCount, ComputePassContext, Dispatch};
+use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::graphics::{Capabilities, GlobalContext, ScreenSize, calculate_light_tile_count};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/light_culling.wgsl");
@@ -22,6 +23,7 @@ impl Dispatch<{ BindGroupCount::Two }> for LightCullingDispatcher {
         _capabilities: &Capabilities,
         device: &Device,
         _queue: &Queue,
+        _shader_compiler: &ShaderCompiler,
         global_context: &GlobalContext,
         _compute_pass_context: &Self::Context,
     ) -> Self {

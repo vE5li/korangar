@@ -322,6 +322,7 @@ impl GraphicsEngine {
                             &self.capabilities,
                             &self.device,
                             &self.queue,
+                            &self.shader_compiler,
                             &global_context,
                             &light_culling_pass_context,
                         );
@@ -349,6 +350,7 @@ impl GraphicsEngine {
                             &self.capabilities,
                             &self.device,
                             &self.queue,
+                            &self.shader_compiler,
                             &global_context,
                             &sdsm_pass_context,
                         );
@@ -356,6 +358,7 @@ impl GraphicsEngine {
                             &self.capabilities,
                             &self.device,
                             &self.queue,
+                            &self.shader_compiler,
                             &global_context,
                             &sdsm_pass_context,
                         );
@@ -363,6 +366,7 @@ impl GraphicsEngine {
                             &self.capabilities,
                             &self.device,
                             &self.queue,
+                            &self.shader_compiler,
                             &global_context,
                             &sdsm_pass_context,
                         );
@@ -370,6 +374,7 @@ impl GraphicsEngine {
                             &self.capabilities,
                             &self.device,
                             &self.queue,
+                            &self.shader_compiler,
                             &global_context,
                             &sdsm_pass_context,
                         );
@@ -377,6 +382,7 @@ impl GraphicsEngine {
                             &self.capabilities,
                             &self.device,
                             &self.queue,
+                            &self.shader_compiler,
                             &global_context,
                             &sdsm_pass_context,
                         );
@@ -384,6 +390,7 @@ impl GraphicsEngine {
                             &self.capabilities,
                             &self.device,
                             &self.queue,
+                            &self.shader_compiler,
                             &global_context,
                             &sdsm_pass_context,
                         );
@@ -646,6 +653,7 @@ impl GraphicsEngine {
                 &self.capabilities,
                 &self.device,
                 &self.queue,
+                &self.shader_compiler,
                 &engine_context.global_context,
                 &engine_context.sdsm_pass_context,
             );
@@ -653,6 +661,7 @@ impl GraphicsEngine {
                 &self.capabilities,
                 &self.device,
                 &self.queue,
+                &self.shader_compiler,
                 &engine_context.global_context,
                 &engine_context.sdsm_pass_context,
             );
@@ -660,6 +669,7 @@ impl GraphicsEngine {
                 &self.capabilities,
                 &self.device,
                 &self.queue,
+                &self.shader_compiler,
                 &engine_context.global_context,
                 &engine_context.sdsm_pass_context,
             );
@@ -667,6 +677,7 @@ impl GraphicsEngine {
                 &self.capabilities,
                 &self.device,
                 &self.queue,
+                &self.shader_compiler,
                 &engine_context.global_context,
                 &engine_context.sdsm_pass_context,
             );
@@ -674,6 +685,7 @@ impl GraphicsEngine {
                 &self.capabilities,
                 &self.device,
                 &self.queue,
+                &self.shader_compiler,
                 &engine_context.global_context,
                 &engine_context.sdsm_pass_context,
             );
@@ -681,6 +693,7 @@ impl GraphicsEngine {
                 &self.capabilities,
                 &self.device,
                 &self.queue,
+                &self.shader_compiler,
                 &engine_context.global_context,
                 &engine_context.sdsm_pass_context,
             );

@@ -3,12 +3,12 @@
 import globals;
 import matrix;
 
-struct VertexInput {
+struct TileVertexInput {
     [[vk::location(0)]] var position: float3;
     [[vk::location(1)]] var identifier: uint;
 }
 
-struct VertexOutput {
+struct TileVertexOutput {
     float4 position: SV_Position;
     [[vk::location(0)]] var identifier: uint;
 }
@@ -18,14 +18,14 @@ struct VertexOutput {
 [[vk::constant_id(0)]] const var tile_enum_value: float;
 
 [[shader("vertex")]]
-func vs_main(input: VertexInput) -> VertexOutput {
-    var output: VertexOutput;
+func vs_main(input: TileVertexInput) -> TileVertexOutput {
+    var output: TileVertexOutput;
     output.position = mul(global_uniforms.view_projection, float4(input.position, 1.0));
     output.identifier = input.identifier;
     return output;
 }
 
 [[shader("pixel")]]
-func fs_main(input: VertexOutput) -> uint2 {
+func fs_main(input: TileVertexOutput) -> uint2 {
     return uint2(input.identifier, uint(tile_enum_value));
 }

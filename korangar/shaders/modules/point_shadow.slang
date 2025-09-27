@@ -1,6 +1,6 @@
 #language slang 2026
 
-module directional_shadow;
+module point_shadow;
 
 public static const var SPRITE_MAX_SIZE_X: float = 400.0;
 public static const var SPRITE_MAX_SIZE_Y: float = 400.0;
@@ -9,6 +9,7 @@ public struct PassUniforms {
     public var view_projection: float4x4;
     public var view: float4x4;
     public var inverse_view: float4x4;
+    public var light_position: float4;
     public var animation_timer: float;
 };
 
@@ -30,13 +31,13 @@ public struct ModelInstanceData {
     public var world: float4x4;
 };
 
-public struct EntityVertexInput {
-	public uint vertex_index : SV_VulkanVertexID;
-	public uint instance_index : SV_VulkanInstanceID;
+public struct ModelFragmentOutput {
+    public float depth: SV_Depth;
 };
 
-public struct EntityFragmentOutput {
-    public float depth : SV_Depth;
+public struct EntityVertexInput {
+    public uint vertex_index : SV_VulkanVertexID;
+    public uint instance_index : SV_VulkanInstanceID;
 };
 
 public struct EntityVertex {

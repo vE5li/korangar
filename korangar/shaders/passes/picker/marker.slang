@@ -3,12 +3,12 @@
 import picker;
 import transform;
 
-struct VertexInput {
+struct MarkerVertexInput {
     uint vertex_index: SV_VulkanVertexID;
     uint instance_index: SV_VulkanInstanceID;
 }
 
-struct VertexOutput {
+struct MarkerVertexOutput {
     float4 position: SV_Position;
     var identifier_high: uint;
     var identifier_low: uint;
@@ -24,14 +24,14 @@ public struct MarkerInstanceData {
 [[vk::binding(0, 1)]] var instance_data: StructuredBuffer<MarkerInstanceData>;
 
 [[shader("vertex")]]
-func vs_main(input: VertexInput) -> VertexOutput {
+func vs_main(input: MarkerVertexInput) -> MarkerVertexOutput {
     let instance = instance_data[input.instance_index];
     let vertex = vertex_data(input.vertex_index);
 
     let clip_size = instance.screen_size * 2.0;
     let position = coordinate_space::screen_to_clip_space(instance.screen_position) + vertex.xy * clip_size;
 
-    var output: VertexOutput;
+    var output: MarkerVertexOutput;
     output.position = float4(position, 1.0, 1.0);
     output.identifier_high = instance.identifier_high;
     output.identifier_low = instance.identifier_low;
@@ -40,7 +40,7 @@ func vs_main(input: VertexInput) -> VertexOutput {
 }
 
 [[shader("pixel")]]
-func fs_main(input: VertexOutput) -> uint2 {
+func fs_main(input: MarkerVertexOutput) -> uint2 {
     return uint2(input.identifier_low, input.identifier_high);
 }
 

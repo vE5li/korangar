@@ -5,12 +5,12 @@ import matrix;
 import picker;
 import transform;
 
-struct VertexInput {
+struct EntityVertexInput {
     uint vertex_index: SV_VulkanVertexID;
     uint instance_index: SV_VulkanInstanceID;
 }
 
-struct VertexOutput {
+struct EntityVertexOutput {
     float4 position: SV_Position;
     var texture_coordinates: float2;
     var texture_index: int;
@@ -18,7 +18,7 @@ struct VertexOutput {
     var identifier_low: uint;
 }
 
-struct FragmentOutput {
+struct EntityFragmentOutput {
     [[vk::location(0)]] var identifier: uint2;
     float depth: SV_Depth;
 }
@@ -29,12 +29,12 @@ struct FragmentOutput {
 [[vk::binding(1, 1)]] var textures: Texture2D[];
 
 [[shader("vertex")]]
-func vs_main(input: VertexInput) -> VertexOutput {
+func vs_main(input: EntityVertexInput) -> EntityVertexOutput {
     let instance = instance_data[input.instance_index];
     let vertex = entity_vertex_data(input.vertex_index);
     let frame_part_vertex = mul(instance.frame_part_transform, float4(vertex.position, 1.0));
 
-    var output: VertexOutput;
+    var output: EntityVertexOutput;
     output.position = mul(global_uniforms.view_projection, mul(instance.world, frame_part_vertex));
     output.texture_coordinates = instance.texture_position + vertex.texture_coordinates * instance.texture_size;
     output.texture_index = instance.texture_index;
@@ -49,7 +49,7 @@ func vs_main(input: VertexInput) -> VertexOutput {
 }
 
 [[shader("pixel")]]
-func fs_main(input: VertexOutput) -> FragmentOutput {
+func fs_main(input: EntityVertexOutput) -> EntityFragmentOutput {
     let diffuse_color = textures[input.texture_index].Sample(nearest_sampler, input.texture_coordinates);
     if (diffuse_color.a != 1.0) {
         discard;
@@ -61,7 +61,7 @@ func fs_main(input: VertexOutput) -> FragmentOutput {
     let non_linear_z = depth::linearToNonLinear(adjusted_linear_z);
     let clamped_depth = saturate(non_linear_z);
 
-    var output: FragmentOutput;
+    var output: EntityFragmentOutput;
     output.identifier = uint2(input.identifier_low, input.identifier_high);
     output.depth = clamped_depth;
     return output;

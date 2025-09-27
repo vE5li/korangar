@@ -11,12 +11,12 @@ import interface;
 [[vk::binding(0, 2)]] var texture: Texture2D;
 
 [[shader("vertex")]]
-func vs_main(input: VertexInput) -> VertexOutput {
+func vs_main(input: RectangleVertexInput) -> RectangleVertexOutput {
     return rectangle_vertex_shader(input.vertex_index, input.instance_index, global_uniforms, instance_data);
 }
 
 [[shader("pixel")]]
-func fs_main(input: VertexOutput) -> float4 {
+func fs_main(input: RectangleVertexOutput) -> float4 {
     let instance = instance_data[input.instance_index];
 
     let clip_adjustment = any(instance.corner_diameter != float4(0.0)) ? float4(-0.5, -0.5, 0.5, 0.5) : float4(0.0);

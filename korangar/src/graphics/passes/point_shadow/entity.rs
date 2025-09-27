@@ -6,8 +6,8 @@ use hashbrown::HashMap;
 use wgpu::{
     BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType,
     CompareFunction, DepthBiasState, DepthStencilState, Device, FragmentState, MultisampleState, PipelineCompilationOptions,
-    PipelineLayoutDescriptor, PrimitiveState, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderStages,
-    StencilState, TextureSampleType, TextureView, TextureViewDimension, VertexState, include_wgsl,
+    PipelineLayoutDescriptor, PrimitiveState, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderStages, StencilState,
+    TextureSampleType, TextureView, TextureViewDimension, VertexState,
 };
 
 use crate::graphics::passes::{
@@ -17,8 +17,6 @@ use crate::graphics::passes::{
 use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::graphics::*;
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/entity.wgsl");
-const SHADER_BINDLESS: ShaderModuleDescriptor = include_wgsl!("shader/entity_bindless.wgsl");
 const DRAWER_NAME: &str = "point shadow entity";
 const INITIAL_INSTRUCTION_SIZE: usize = 256;
 
@@ -58,14 +56,13 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
         capabilities: &Capabilities,
         device: &Device,
         _queue: &Queue,
-        _shader_compiler: &ShaderCompiler,
+        shader_compiler: &ShaderCompiler,
         global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {
-        let shader_module = if capabilities.bindless_support() == BindlessSupport::Full {
-            device.create_shader_module(SHADER_BINDLESS)
-        } else {
-            device.create_shader_module(SHADER)
+        let shader_module = match capabilities.bindless_support() {
+            BindlessSupport::Full => shader_compiler.create_shader_module("point_shadow", "entity_bindless"),
+            _ => shader_compiler.create_shader_module("point_shadow", "entity"),
         };
 
         let instance_data_buffer = Buffer::with_capacity(

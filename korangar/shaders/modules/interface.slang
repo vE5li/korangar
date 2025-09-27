@@ -23,12 +23,12 @@ public struct RectangleInstanceData {
     public var texture_index: int;
 };
 
-public struct VertexInput {
+public struct RectangleVertexInput {
 	public uint vertex_index : SV_VulkanVertexID;
 	public uint instance_index : SV_VulkanInstanceID;
 };
 
-public struct VertexOutput {
+public struct RectangleVertexOutput {
     public float4 position : SV_Position;
     public var fragment_position: float2;
     public var texture_coordinates: float2;
@@ -221,7 +221,7 @@ public func rectangle_vertex_shader(
     instance_index: uint,
     global_uniforms: GlobalUniforms,
     instance_data: StructuredBuffer<RectangleInstanceData>,
-) -> VertexOutput {
+) -> RectangleVertexOutput {
     let instance = instance_data[instance_index];
     let vertex = vertex_data(vertex_index);
 
@@ -252,7 +252,7 @@ public func rectangle_vertex_shader(
     let clip_size = adjusted_size * 2.0;
     let position = coordinate_space::screen_to_clip_space(instance.screen_position + position_offset) + vertex.xy * clip_size;
 
-    var output: VertexOutput;
+    var output: RectangleVertexOutput;
     output.position = float4(position, 0.0, 1.0);
     output.fragment_position = coordinate_space::clip_to_screen_space(position);
     output.texture_coordinates = instance.texture_position + vertex.zw * instance.texture_size;

@@ -35,6 +35,7 @@ mod sell;
 mod sell_cart;
 mod server_selection;
 mod skill_tree;
+mod stats;
 #[cfg(feature = "debug")]
 mod theme_inspector;
 #[cfg(feature = "debug")]
@@ -79,6 +80,7 @@ pub use self::sell::SellWindow;
 pub use self::sell_cart::SellCartWindow;
 pub use self::server_selection::ServerSelectionWindow;
 pub use self::skill_tree::SkillTreeWindow;
+pub use self::stats::StatsWindow;
 #[cfg(feature = "debug")]
 pub use self::theme_inspector::{ThemeInspectorWindow, ThemeInspectorWindowState};
 #[cfg(feature = "debug")]
@@ -101,6 +103,7 @@ pub enum WindowClass {
     Inventory,
     Equipment,
     SkillTree,
+    Stats,
     FriendList,
     FriendRequest,
     Login,

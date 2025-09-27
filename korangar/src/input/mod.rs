@@ -218,6 +218,10 @@ impl InputSystem {
             events.push(InputEvent::ToggleSkillTreeWindow);
         }
 
+        if alt_down && self.get_key(KeyCode::KeyA).pressed() {
+            events.push(InputEvent::ToggleStatsWindow);
+        }
+
         if alt_down && self.get_key(KeyCode::KeyZ).pressed() {
             events.push(InputEvent::ToggleFriendListWindow);
         }

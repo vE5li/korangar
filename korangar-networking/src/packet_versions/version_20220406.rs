@@ -258,21 +258,21 @@ where
         entity_id: packet.entity_id,
         reason: packet.reason,
     })?;
-    packet_handler.register(|packet: UpdateStatusPacket| {
-        let UpdateStatusPacket { status_type } = packet;
-        NetworkEvent::UpdateStatus { status_type }
+    packet_handler.register(|packet: UpdateStatPacket| {
+        let UpdateStatPacket { stat_type } = packet;
+        NetworkEvent::UpdateStat { stat_type }
     })?;
-    packet_handler.register(|packet: UpdateStatusPacket1| {
-        let UpdateStatusPacket1 { status_type } = packet;
-        NetworkEvent::UpdateStatus { status_type }
+    packet_handler.register(|packet: UpdateStatPacket1| {
+        let UpdateStatPacket1 { stat_type } = packet;
+        NetworkEvent::UpdateStat { stat_type }
     })?;
-    packet_handler.register(|packet: UpdateStatusPacket2| {
-        let UpdateStatusPacket2 { status_type } = packet;
-        NetworkEvent::UpdateStatus { status_type }
+    packet_handler.register(|packet: UpdateStatPacket2| {
+        let UpdateStatPacket2 { stat_type } = packet;
+        NetworkEvent::UpdateStat { stat_type }
     })?;
-    packet_handler.register(|packet: UpdateStatusPacket3| {
-        let UpdateStatusPacket3 { status_type } = packet;
-        NetworkEvent::UpdateStatus { status_type }
+    packet_handler.register(|packet: UpdateStatPacket3| {
+        let UpdateStatPacket3 { stat_type } = packet;
+        NetworkEvent::UpdateStat { stat_type }
     })?;
     packet_handler.register_noop::<UpdateAttackRangePacket>()?;
     packet_handler.register_noop::<NewMailStatusPacket>()?;
@@ -409,7 +409,26 @@ where
             })
             .collect(),
     })?;
-    packet_handler.register_noop::<InitialStatusPacket>()?;
+    packet_handler.register(|packet: InitialStatsPacket| {
+        let InitialStatsPacket {
+            strength_stat_points_cost,
+            agility_stat_points_cost,
+            vitality_stat_points_cost,
+            intelligence_stat_points_cost,
+            dexterity_stat_points_cost,
+            luck_stat_points_cost,
+            ..
+        } = packet;
+
+        NetworkEvent::InitialStats {
+            strength_stat_points_cost,
+            agility_stat_points_cost,
+            vitality_stat_points_cost,
+            intelligence_stat_points_cost,
+            dexterity_stat_points_cost,
+            luck_stat_points_cost,
+        }
+    })?;
     packet_handler.register_noop::<UpdatePartyInvitationStatePacket>()?;
     packet_handler.register_noop::<UpdateShowEquipPacket>()?;
     packet_handler.register_noop::<UpdateConfigurationPacket>()?;
@@ -712,6 +731,7 @@ where
     packet_handler.register_noop::<ParameterChangePacket>()?;
     packet_handler.register(|packet: SellListPacket| NetworkEvent::SellItemList { items: packet.items })?;
     packet_handler.register(|packet: SellItemsResultPacket| NetworkEvent::SellingCompleted { result: packet.result })?;
+    packet_handler.register_noop::<RequestStatUpResponsePacket>()?;
 
     Ok(())
 }

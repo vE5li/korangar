@@ -154,6 +154,7 @@ pub struct Localization {
     job_level_text: String,
     inventory_button_text: String,
     equipment_button_text: String,
+    stats_button_text: String,
     skill_tree_button_text: String,
     friend_list_button_text: String,
     menu_button_text: String,
@@ -179,12 +180,20 @@ pub struct Localization {
     disconnect_button_text: String,
     server_selection_window_title: String,
     skill_tree_window_title: String,
+    stats_window_title: String,
     interface_settings_window_title: String,
     language_text: String,
     scaling_text: String,
     menu_theme_text: String,
     in_game_theme_text: String,
     world_theme_text: String,
+    available_stat_points_text: String,
+    strength_text: String,
+    agility_text: String,
+    vitality_text: String,
+    intelligence_text: String,
+    dexterity_text: String,
+    luck_text: String,
 }
 
 impl Localization {

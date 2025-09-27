@@ -551,7 +551,7 @@ pub struct CharacterInformation {
     pub effect_state: i32,
     pub virtue: i32,
     pub honor: i32,
-    pub job_points: i16,
+    pub stat_points: i16,
     pub health_points: i64,
     pub maximum_health_points: i64,
     pub spell_points: i64,
@@ -573,7 +573,7 @@ pub struct CharacterInformation {
     pub name: String,
     pub strength: u8,
     pub agility: u8,
-    pub vit: u8,
+    pub vitality: u8,
     pub intelligence: u8,
     pub dexterity: u8,
     pub luck: u8,
@@ -1091,12 +1091,12 @@ pub struct DisplayEmotionPacket {
     pub emotion: u8,
 }
 
-/// Every value that can be set from the server through [UpdateStatusPacket],
-/// [UpdateStatusPacket1], [UpdateStatusPacket2], and [UpdateStatusPacket3].
-/// All UpdateStatusPackets do the same, they just have different sizes
+/// Every value that can be set from the server through [UpdateStatPacket],
+/// [UpdateStatPacket1], [UpdateStatPacket2], and [UpdateStatPacket3].
+/// All UpdateStatPackets do the same, they just have different sizes
 /// correlating to the space the updated value requires.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum StatusType {
+pub enum StatType {
     Weight(u32),
     MaximumWeight(u32),
     MovementSpeed(u32),
@@ -1104,7 +1104,7 @@ pub enum StatusType {
     JobLevel(u32),
     Karma(u32),
     Manner(u32),
-    StatusPoint(u32),
+    StatPoints(u32),
     SkillPoint(u32),
     Hit(u32),
     Flee1(u32),
@@ -1128,18 +1128,18 @@ pub enum StatusType {
     JobExperience(u64),
     NextBaseExperience(u64),
     NextJobExperience(u64),
-    SpUstr(u8),
-    SpUagi(u8),
-    SpUvit(u8),
-    SpUint(u8),
-    SpUdex(u8),
-    SpUluk(u8),
-    Strength(u32, u32),
-    Agility(u32, u32),
-    Vitality(u32, u32),
-    Intelligence(u32, u32),
-    Dexterity(u32, u32),
-    Luck(u32, u32),
+    StrengthStatPointCost(u8),
+    AgilityStatPointCost(u8),
+    VitalityStatPointCost(u8),
+    IntelligenceStatPointCost(u8),
+    DexterityStatPointCost(u8),
+    LuckStatPointCost(u8),
+    Strength(i32, i32),
+    Agility(i32, i32),
+    Vitality(i32, i32),
+    Intelligence(i32, i32),
+    Dexterity(i32, i32),
+    Luck(i32, i32),
     CartInfo(u16, u32, u32),
     ActivityPoints(u32),
     TraitPoint(u32),
@@ -1150,12 +1150,12 @@ pub enum StatusType {
     Spell(u32, u32),
     Concentration(u32, u32),
     Creativity(u32, u32),
-    SpUpow(u8),
-    SpUsta(u8),
-    SpUwis(u8),
-    SpUspl(u8),
-    SpUcon(u8),
-    SpUcrt(u8),
+    PowerStatPointCost(u8),
+    StaminaStatPointCost(u8),
+    WisdomStatPointCost(u8),
+    SpellStatPointCost(u8),
+    ConcentrationStatPointCost(u8),
+    CreativitySpellPointCost(u8),
     PhysicalAttack(u32),
     SpellMagicAttack(u32),
     Resistance(u32),
@@ -1164,9 +1164,21 @@ pub enum StatusType {
     CriticalDamageRate(u32),
 }
 
-impl FromBytes for StatusType {
+impl FromBytes for StatType {
     fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
-        let status = match u16::from_bytes(byte_reader).trace::<Self>()? {
+        /// For some reason, the stats are packed into the upper two bytes of an
+        /// `i32`. I am unsure why that is but for now we will just work
+        /// with what we got.
+        fn weirdly_formatted_stat<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<(i32, i32)> {
+            let _ = i16::from_bytes(byte_reader)?;
+            let base = i16::from_bytes(byte_reader)?;
+            let _ = i16::from_bytes(byte_reader)?;
+            let bonus = i16::from_bytes(byte_reader)?;
+
+            Ok((base as i32, bonus as i32))
+        }
+
+        let stat = match u16::from_bytes(byte_reader).trace::<Self>()? {
             0 => u32::from_bytes(byte_reader).map(Self::MovementSpeed),
             1 => u64::from_bytes(byte_reader).map(Self::BaseExperience),
             2 => u64::from_bytes(byte_reader).map(Self::JobExperience),
@@ -1176,26 +1188,26 @@ impl FromBytes for StatusType {
             6 => u32::from_bytes(byte_reader).map(Self::MaximumHealthPoints),
             7 => u32::from_bytes(byte_reader).map(Self::SpellPoints),
             8 => u32::from_bytes(byte_reader).map(Self::MaximumSpellPoints),
-            9 => u32::from_bytes(byte_reader).map(Self::StatusPoint),
+            9 => u32::from_bytes(byte_reader).map(Self::StatPoints),
             11 => u32::from_bytes(byte_reader).map(Self::BaseLevel),
             12 => u32::from_bytes(byte_reader).map(Self::SkillPoint),
-            13 => u32::from_bytes(byte_reader).and_then(|a| Ok(Self::Strength(a, u32::from_bytes(byte_reader)?))),
-            14 => u32::from_bytes(byte_reader).and_then(|a| Ok(Self::Agility(a, u32::from_bytes(byte_reader)?))),
-            15 => u32::from_bytes(byte_reader).and_then(|a| Ok(Self::Vitality(a, u32::from_bytes(byte_reader)?))),
-            16 => u32::from_bytes(byte_reader).and_then(|a| Ok(Self::Intelligence(a, u32::from_bytes(byte_reader)?))),
-            17 => u32::from_bytes(byte_reader).and_then(|a| Ok(Self::Dexterity(a, u32::from_bytes(byte_reader)?))),
-            18 => u32::from_bytes(byte_reader).and_then(|a| Ok(Self::Luck(a, u32::from_bytes(byte_reader)?))),
+            13 => weirdly_formatted_stat(byte_reader).map(|(base, bonus)| Self::Strength(base, bonus)),
+            14 => weirdly_formatted_stat(byte_reader).map(|(base, bonus)| Self::Agility(base, bonus)),
+            15 => weirdly_formatted_stat(byte_reader).map(|(base, bonus)| Self::Vitality(base, bonus)),
+            16 => weirdly_formatted_stat(byte_reader).map(|(base, bonus)| Self::Intelligence(base, bonus)),
+            17 => weirdly_formatted_stat(byte_reader).map(|(base, bonus)| Self::Dexterity(base, bonus)),
+            18 => weirdly_formatted_stat(byte_reader).map(|(base, bonus)| Self::Luck(base, bonus)),
             20 => u32::from_bytes(byte_reader).map(Self::Zeny),
             22 => u64::from_bytes(byte_reader).map(Self::NextBaseExperience),
             23 => u64::from_bytes(byte_reader).map(Self::NextJobExperience),
             24 => u32::from_bytes(byte_reader).map(Self::Weight),
             25 => u32::from_bytes(byte_reader).map(Self::MaximumWeight),
-            32 => u8::from_bytes(byte_reader).map(Self::SpUstr),
-            33 => u8::from_bytes(byte_reader).map(Self::SpUagi),
-            34 => u8::from_bytes(byte_reader).map(Self::SpUvit),
-            35 => u8::from_bytes(byte_reader).map(Self::SpUint),
-            36 => u8::from_bytes(byte_reader).map(Self::SpUdex),
-            37 => u8::from_bytes(byte_reader).map(Self::SpUluk),
+            32 => u8::from_bytes(byte_reader).map(Self::StrengthStatPointCost),
+            33 => u8::from_bytes(byte_reader).map(Self::AgilityStatPointCost),
+            34 => u8::from_bytes(byte_reader).map(Self::VitalityStatPointCost),
+            35 => u8::from_bytes(byte_reader).map(Self::IntelligenceStatPointCost),
+            36 => u8::from_bytes(byte_reader).map(Self::DexterityStatPointCost),
+            37 => u8::from_bytes(byte_reader).map(Self::LuckStatPointCost),
             41 => u32::from_bytes(byte_reader).map(Self::Attack1),
             42 => u32::from_bytes(byte_reader).map(Self::Attack2),
             43 => u32::from_bytes(byte_reader).map(Self::MagicAttack1),
@@ -1227,26 +1239,26 @@ impl FromBytes for StatusType {
             231 => u32::from_bytes(byte_reader).map(Self::TraitPoint),
             232 => u32::from_bytes(byte_reader).map(Self::ActivityPoints),
             233 => u32::from_bytes(byte_reader).map(Self::MaximumActivityPoints),
-            247 => u8::from_bytes(byte_reader).map(Self::SpUpow),
-            248 => u8::from_bytes(byte_reader).map(Self::SpUsta),
-            249 => u8::from_bytes(byte_reader).map(Self::SpUwis),
-            250 => u8::from_bytes(byte_reader).map(Self::SpUspl),
-            251 => u8::from_bytes(byte_reader).map(Self::SpUcon),
-            252 => u8::from_bytes(byte_reader).map(Self::SpUcrt),
-            invalid => Err(ConversionError::from_message(format!("invalid status code {invalid}"))),
+            247 => u8::from_bytes(byte_reader).map(Self::PowerStatPointCost),
+            248 => u8::from_bytes(byte_reader).map(Self::StaminaStatPointCost),
+            249 => u8::from_bytes(byte_reader).map(Self::WisdomStatPointCost),
+            250 => u8::from_bytes(byte_reader).map(Self::SpellStatPointCost),
+            251 => u8::from_bytes(byte_reader).map(Self::ConcentrationStatPointCost),
+            252 => u8::from_bytes(byte_reader).map(Self::CreativitySpellPointCost),
+            invalid => Err(ConversionError::from_message(format!("invalid stat id {invalid}"))),
         };
 
-        status.trace::<Self>()
+        stat.trace::<Self>()
     }
 }
 
-impl ToBytes for StatusType {
+impl ToBytes for StatType {
     fn to_bytes(&self, _byte_writer: &mut ByteWriter) -> ConversionResult<usize> {
         panic!("this should be derived");
     }
 }
 
-impl std::fmt::Display for StatusType {
+impl std::fmt::Display for StatType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Weight(value) => write!(f, "Weight: {}", value),
@@ -1256,7 +1268,7 @@ impl std::fmt::Display for StatusType {
             Self::JobLevel(value) => write!(f, "Job Level: {}", value),
             Self::Karma(value) => write!(f, "Karma: {}", value),
             Self::Manner(value) => write!(f, "Manner: {}", value),
-            Self::StatusPoint(value) => write!(f, "Status Point: {}", value),
+            Self::StatPoints(value) => write!(f, "Stat Points: {}", value),
             Self::SkillPoint(value) => write!(f, "Skill Point: {}", value),
             Self::Hit(value) => write!(f, "Hit: {}", value),
             Self::Flee1(value) => write!(f, "Flee1: {}", value),
@@ -1280,12 +1292,12 @@ impl std::fmt::Display for StatusType {
             Self::JobExperience(value) => write!(f, "Job Experience: {}", value),
             Self::NextBaseExperience(value) => write!(f, "Next Base Experience: {}", value),
             Self::NextJobExperience(value) => write!(f, "Next Job Experience: {}", value),
-            Self::SpUstr(value) => write!(f, "SpUstr: {}", value),
-            Self::SpUagi(value) => write!(f, "SpUagi: {}", value),
-            Self::SpUvit(value) => write!(f, "SpUvit: {}", value),
-            Self::SpUint(value) => write!(f, "SpUint: {}", value),
-            Self::SpUdex(value) => write!(f, "SpUdex: {}", value),
-            Self::SpUluk(value) => write!(f, "SpUluk: {}", value),
+            Self::StrengthStatPointCost(value) => write!(f, "Strength Stat Point Cost: {}", value),
+            Self::AgilityStatPointCost(value) => write!(f, "Agility Stat Point Cost: {}", value),
+            Self::VitalityStatPointCost(value) => write!(f, "Vitality Stat Point Cost: {}", value),
+            Self::IntelligenceStatPointCost(value) => write!(f, "Intelligence Stat Point Cost: {}", value),
+            Self::DexterityStatPointCost(value) => write!(f, "Dexterity Stat Point Cost: {}", value),
+            Self::LuckStatPointCost(value) => write!(f, "Luck Stat Point Cost: {}", value),
             Self::Strength(base, bonus) => write!(f, "Strength: {} (+{})", base, bonus),
             Self::Agility(base, bonus) => write!(f, "Agility: {} (+{})", base, bonus),
             Self::Vitality(base, bonus) => write!(f, "Vitality: {} (+{})", base, bonus),
@@ -1302,12 +1314,12 @@ impl std::fmt::Display for StatusType {
             Self::Spell(base, bonus) => write!(f, "Spell: {} (+{})", base, bonus),
             Self::Concentration(base, bonus) => write!(f, "Concentration: {} (+{})", base, bonus),
             Self::Creativity(base, bonus) => write!(f, "Creativity: {} (+{})", base, bonus),
-            Self::SpUpow(value) => write!(f, "SpUpow: {}", value),
-            Self::SpUsta(value) => write!(f, "SpUsta: {}", value),
-            Self::SpUwis(value) => write!(f, "SpUwis: {}", value),
-            Self::SpUspl(value) => write!(f, "SpUspl: {}", value),
-            Self::SpUcon(value) => write!(f, "SpUcon: {}", value),
-            Self::SpUcrt(value) => write!(f, "SpUcrt: {}", value),
+            Self::PowerStatPointCost(value) => write!(f, "Power Stat Point Cost: {}", value),
+            Self::StaminaStatPointCost(value) => write!(f, "Stamina Stat Point Cost: {}", value),
+            Self::WisdomStatPointCost(value) => write!(f, "Wisdom Stat Point Cost: {}", value),
+            Self::SpellStatPointCost(value) => write!(f, "Spell Stat Point Cost: {}", value),
+            Self::ConcentrationStatPointCost(value) => write!(f, "Concentration Stat Point Cost: {}", value),
+            Self::CreativitySpellPointCost(value) => write!(f, "Creativity Stat Point Cost: {}", value),
             Self::PhysicalAttack(value) => write!(f, "Physical Attack: {}", value),
             Self::SpellMagicAttack(value) => write!(f, "Spell Magic Attack: {}", value),
             Self::Resistance(value) => write!(f, "Resistance: {}", value),
@@ -1321,9 +1333,9 @@ impl std::fmt::Display for StatusType {
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x00B0)]
-pub struct UpdateStatusPacket {
+pub struct UpdateStatPacket {
     #[length(6)]
-    pub status_type: StatusType,
+    pub stat_type: StatType,
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
@@ -1336,25 +1348,23 @@ pub struct StatusChangeSequencePacket {
 }
 
 /// Sent by the character server to the client when loading onto a new map.
-/// This packet is ignored by Korangar since all of the provided values are set
-/// again individually using the UpdateStatusPackets.
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x00BD)]
-pub struct InitialStatusPacket {
-    pub status_points: u16,
+pub struct InitialStatsPacket {
+    pub stat_points: u16,
     pub strength: u8,
-    pub required_strength: u8,
+    pub strength_stat_points_cost: u8,
     pub agility: u8,
-    pub required_agility: u8,
+    pub agility_stat_points_cost: u8,
     pub vitatity: u8,
-    pub required_vitatity: u8,
+    pub vitality_stat_points_cost: u8,
     pub intelligence: u8,
-    pub required_intelligence: u8,
+    pub intelligence_stat_points_cost: u8,
     pub dexterity: u8,
-    pub required_dexterity: u8,
+    pub dexterity_stat_points_cost: u8,
     pub luck: u8,
-    pub required_luck: u8,
+    pub luck_stat_points_cost: u8,
     pub left_attack: u16,
     pub rigth_attack: u16,
     pub rigth_magic_attack: u16,
@@ -1376,25 +1386,25 @@ pub struct InitialStatusPacket {
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x0141)]
-pub struct UpdateStatusPacket1 {
+pub struct UpdateStatPacket1 {
     #[length(12)]
-    pub status_type: StatusType,
+    pub stat_type: StatType,
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x0ACB)]
-pub struct UpdateStatusPacket2 {
+pub struct UpdateStatPacket2 {
     #[length(10)]
-    pub status_type: StatusType,
+    pub stat_type: StatType,
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x00BE)]
-pub struct UpdateStatusPacket3 {
+pub struct UpdateStatPacket3 {
     #[length(3)]
-    pub status_type: StatusType,
+    pub stat_type: StatType,
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
@@ -1402,6 +1412,79 @@ pub struct UpdateStatusPacket3 {
 #[header(0x013A)]
 pub struct UpdateAttackRangePacket {
     pub attack_range: u16,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub enum StatUpType {
+    Strength { amount: u8 },
+    Agility { amount: u8 },
+    Vitality { amount: u8 },
+    Intelligence { amount: u8 },
+    Dexterity { amount: u8 },
+    Luck { amount: u8 },
+}
+
+impl FromBytes for StatUpType {
+    fn from_bytes<Meta>(_: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+        todo!()
+    }
+}
+
+impl ToBytes for StatUpType {
+    fn to_bytes(&self, byte_writer: &mut ByteWriter) -> ConversionResult<usize> {
+        match self {
+            Self::Strength { amount } => {
+                13u16.to_bytes(byte_writer)?;
+                amount.to_bytes(byte_writer)
+            }
+            Self::Agility { amount } => {
+                14u16.to_bytes(byte_writer)?;
+                amount.to_bytes(byte_writer)
+            }
+            Self::Vitality { amount } => {
+                15u16.to_bytes(byte_writer)?;
+                amount.to_bytes(byte_writer)
+            }
+            Self::Intelligence { amount } => {
+                16u16.to_bytes(byte_writer)?;
+                amount.to_bytes(byte_writer)
+            }
+            Self::Dexterity { amount } => {
+                17u16.to_bytes(byte_writer)?;
+                amount.to_bytes(byte_writer)
+            }
+            Self::Luck { amount } => {
+                18u16.to_bytes(byte_writer)?;
+                amount.to_bytes(byte_writer)
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x00BB)]
+pub struct RequestStatUpPacket {
+    pub stat_type: StatUpType,
+}
+
+/// rAthena seems to always return [`Success`](RequestStatUpResult::Success),
+/// even if the request fails.
+#[derive(Debug, Clone, ByteConvertable, PartialEq, Eq)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub enum RequestStatUpResult {
+    Failure,
+    Success,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x00BC)]
+pub struct RequestStatUpResponsePacket {
+    pub staus_type: u16,
+    pub success: RequestStatUpResult,
+    pub value: u8,
 }
 
 #[derive(Debug, Clone, Packet, ClientPacket, CharacterServer)]

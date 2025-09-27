@@ -1035,6 +1035,23 @@ impl Client {
                     self.async_loader
                         .request_map_load(DEFAULT_MAP.to_string(), Some(TilePosition::new(0, 0)));
                 }
+                NetworkEvent::InitialStats {
+                    strength_stat_points_cost,
+                    agility_stat_points_cost,
+                    vitality_stat_points_cost,
+                    intelligence_stat_points_cost,
+                    dexterity_stat_points_cost,
+                    luck_stat_points_cost,
+                } => {
+                    if let Some(player) = self.client_state.try_follow_mut(this_player()) {
+                        player.strength_stat_points_cost = strength_stat_points_cost;
+                        player.agility_stat_points_cost = agility_stat_points_cost;
+                        player.vitality_stat_points_cost = vitality_stat_points_cost;
+                        player.intelligence_stat_points_cost = intelligence_stat_points_cost;
+                        player.dexterity_stat_points_cost = dexterity_stat_points_cost;
+                        player.luck_stat_points_cost = luck_stat_points_cost;
+                    }
+                }
                 NetworkEvent::ResurrectPlayer { entity_id } => {
                     // If the resurrected player is us, close the resurrect window.
                     if self
@@ -1336,9 +1353,9 @@ impl Client {
                         entity.update_health(health_points, maximum_health_points);
                     }
                 }
-                NetworkEvent::UpdateStatus { status_type } => {
+                NetworkEvent::UpdateStat { stat_type } => {
                     if let Some(player) = self.client_state.try_follow_mut(this_player()) {
-                        player.update_status(status_type);
+                        player.update_stat(stat_type);
                     }
                 }
                 NetworkEvent::OpenDialog { text, npc_id } => {
@@ -1804,6 +1821,14 @@ impl Client {
                         }
                     }
                 }
+                InputEvent::ToggleStatsWindow => {
+                    if self.client_state.try_follow(this_entity()).is_some() {
+                        match self.interface.is_window_with_class_open(WindowClass::Stats) {
+                            true => self.interface.close_window_with_class(WindowClass::Stats),
+                            false => self.interface.open_window(StatsWindow::new(this_player().manually_asserted())),
+                        }
+                    }
+                }
                 InputEvent::ToggleInterfaceSettingsWindow => match self.interface.is_window_with_class_open(WindowClass::InterfaceSettings)
                 {
                     true => self.interface.close_window_with_class(WindowClass::InterfaceSettings),
@@ -2040,6 +2065,9 @@ impl Client {
                 }
                 InputEvent::SellItems { items } => {
                     let _ = self.networking_system.sell_items(items);
+                }
+                InputEvent::StatUp { stat_type } => {
+                    let _ = self.networking_system.request_stat_up(stat_type);
                 }
                 #[cfg(feature = "debug")]
                 InputEvent::ReloadLanguage => {

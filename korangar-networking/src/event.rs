@@ -61,6 +61,15 @@ pub enum NetworkEvent {
     MapServerDisconnected {
         reason: DisconnectReason,
     },
+    /// Initial player status.
+    InitialStats {
+        strength_stat_points_cost: u8,
+        agility_stat_points_cost: u8,
+        vitality_stat_points_cost: u8,
+        intelligence_stat_points_cost: u8,
+        dexterity_stat_points_cost: u8,
+        luck_stat_points_cost: u8,
+    },
     /// Resurrect a player.
     ResurrectPlayer {
         entity_id: EntityId,
@@ -128,8 +137,8 @@ pub enum NetworkEvent {
         entity_id: EntityId,
         heal_amount: usize,
     },
-    UpdateStatus {
-        status_type: StatusType,
+    UpdateStat {
+        stat_type: StatType,
     },
     OpenDialog {
         text: String,

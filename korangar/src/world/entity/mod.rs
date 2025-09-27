@@ -8,7 +8,7 @@ use korangar_interface::element::StateElement;
 use korangar_interface::window::{StateWindow, Window};
 use korangar_networking::EntityData;
 use korangar_util::pathing::{MAX_WALK_PATH_SIZE, PathFinder};
-use ragnarok_packets::{AccountId, CharacterInformation, ClientTick, Direction, EntityId, Sex, StatusType, WorldPosition};
+use ragnarok_packets::{AccountId, CharacterInformation, ClientTick, Direction, EntityId, Sex, StatType, WorldPosition};
 use rust_state::{Path, RustState, VecItem};
 #[cfg(feature = "debug")]
 use smallvec::smallvec_inline;
@@ -822,6 +822,25 @@ pub struct Player {
     pub maximum_activity_points: usize,
     pub base_level: usize,
     pub job_level: usize,
+    pub stat_points: u32,
+    pub strength: i32,
+    pub bonus_strength: i32,
+    pub strength_stat_points_cost: u8,
+    pub agility: i32,
+    pub bonus_agility: i32,
+    pub agility_stat_points_cost: u8,
+    pub vitality: i32,
+    pub bonus_vitality: i32,
+    pub vitality_stat_points_cost: u8,
+    pub intelligence: i32,
+    pub bonus_intelligence: i32,
+    pub intelligence_stat_points_cost: u8,
+    pub dexterity: i32,
+    pub bonus_dexterity: i32,
+    pub dexterity_stat_points_cost: u8,
+    pub luck: i32,
+    pub bonus_luck: i32,
+    pub luck_stat_points_cost: u8,
 }
 
 impl Player {
@@ -836,6 +855,7 @@ impl Player {
         let maximum_activity_points = 0;
         let base_level = character_information.base_level as usize;
         let job_level = character_information.job_level as usize;
+        let stat_points = character_information.stat_points as u32;
 
         let entity_data = EntityData::from_character(account_id, character_information, WorldPosition::origin());
         let grid_position = Vector2::zero();
@@ -852,6 +872,25 @@ impl Player {
             maximum_activity_points,
             base_level,
             job_level,
+            stat_points,
+            strength: character_information.strength as i32,
+            bonus_strength: 0,
+            strength_stat_points_cost: 0,
+            agility: character_information.agility as i32,
+            bonus_agility: 0,
+            agility_stat_points_cost: 0,
+            vitality: character_information.vitality as i32,
+            bonus_vitality: 0,
+            vitality_stat_points_cost: 0,
+            intelligence: character_information.intelligence as i32,
+            bonus_intelligence: 0,
+            intelligence_stat_points_cost: 0,
+            dexterity: character_information.dexterity as i32,
+            bonus_dexterity: 0,
+            dexterity_stat_points_cost: 0,
+            luck: character_information.luck as i32,
+            bonus_luck: 0,
+            luck_stat_points_cost: 0,
         }
     }
 
@@ -863,17 +902,48 @@ impl Player {
         &mut self.common
     }
 
-    pub fn update_status(&mut self, status_type: StatusType) {
-        match status_type {
-            StatusType::MaximumHealthPoints(value) => self.common.maximum_health_points = value as usize,
-            StatusType::MaximumSpellPoints(value) => self.maximum_spell_points = value as usize,
-            StatusType::HealthPoints(value) => self.common.health_points = value as usize,
-            StatusType::SpellPoints(value) => self.spell_points = value as usize,
-            StatusType::ActivityPoints(value) => self.activity_points = value as usize,
-            StatusType::MaximumActivityPoints(value) => self.maximum_activity_points = value as usize,
-            StatusType::MovementSpeed(value) => self.common.movement_speed = value as usize,
-            StatusType::BaseLevel(value) => self.base_level = value as usize,
-            StatusType::JobLevel(value) => self.job_level = value as usize,
+    pub fn update_stat(&mut self, stat_type: StatType) {
+        match stat_type {
+            StatType::MaximumHealthPoints(value) => self.common.maximum_health_points = value as usize,
+            StatType::MaximumSpellPoints(value) => self.maximum_spell_points = value as usize,
+            StatType::HealthPoints(value) => self.common.health_points = value as usize,
+            StatType::SpellPoints(value) => self.spell_points = value as usize,
+            StatType::ActivityPoints(value) => self.activity_points = value as usize,
+            StatType::MaximumActivityPoints(value) => self.maximum_activity_points = value as usize,
+            StatType::MovementSpeed(value) => self.common.movement_speed = value as usize,
+            StatType::BaseLevel(value) => self.base_level = value as usize,
+            StatType::JobLevel(value) => self.job_level = value as usize,
+            StatType::StatPoints(stat_points) => self.stat_points = stat_points,
+            StatType::Strength(base, bonus) => {
+                self.strength = base;
+                self.bonus_strength = bonus;
+            }
+            StatType::Agility(base, bonus) => {
+                self.agility = base;
+                self.bonus_agility = bonus;
+            }
+            StatType::Vitality(base, bonus) => {
+                self.vitality = base;
+                self.bonus_vitality = bonus;
+            }
+            StatType::Intelligence(base, bonus) => {
+                self.intelligence = base;
+                self.bonus_intelligence = bonus;
+            }
+            StatType::Dexterity(base, bonus) => {
+                self.dexterity = base;
+                self.bonus_dexterity = bonus;
+            }
+            StatType::Luck(base, bonus) => {
+                self.luck = base;
+                self.bonus_luck = bonus;
+            }
+            StatType::StrengthStatPointCost(cost) => self.strength_stat_points_cost = cost,
+            StatType::AgilityStatPointCost(cost) => self.agility_stat_points_cost = cost,
+            StatType::VitalityStatPointCost(cost) => self.vitality_stat_points_cost = cost,
+            StatType::IntelligenceStatPointCost(cost) => self.intelligence_stat_points_cost = cost,
+            StatType::DexterityStatPointCost(cost) => self.dexterity_stat_points_cost = cost,
+            StatType::LuckStatPointCost(cost) => self.luck_stat_points_cost = cost,
             _ => {}
         }
     }

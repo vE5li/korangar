@@ -858,6 +858,12 @@ where
             SupportedPacketVersion::_20220406 => SellItemsPacket { items },
         })
     }
+
+    pub fn request_stat_up(&mut self, stat_type: StatUpType) -> Result<(), NotConnectedError> {
+        self.send_map_server_packet(|packet_version| match packet_version {
+            SupportedPacketVersion::_20220406 => RequestStatUpPacket::new(stat_type),
+        })
+    }
 }
 
 #[cfg(test)]

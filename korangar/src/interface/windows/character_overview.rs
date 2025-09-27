@@ -105,6 +105,10 @@ where
                     event: InputEvent::ToggleSkillTreeWindow,
                 },
                 button! {
+                    text: client_state().localization().stats_button_text(),
+                    event: InputEvent::ToggleStatsWindow,
+                },
+                button! {
                     text: client_state().localization().friend_list_button_text(),
                     event: InputEvent::ToggleFriendListWindow,
                 },

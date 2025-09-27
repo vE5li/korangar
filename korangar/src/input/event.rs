@@ -6,7 +6,7 @@ use korangar_networking::{InventoryItem, ShopItem};
 #[cfg(feature = "debug")]
 use ragnarok_packets::TilePosition;
 use ragnarok_packets::{
-    AccountId, BuyOrSellOption, CharacterId, CharacterServerInformation, EntityId, HotbarSlot, ShopId, SoldItemInformation,
+    AccountId, BuyOrSellOption, CharacterId, CharacterServerInformation, EntityId, HotbarSlot, ShopId, SoldItemInformation, StatUpType,
 };
 use rust_state::Context;
 
@@ -63,6 +63,8 @@ pub enum InputEvent {
     ToggleEquipmentWindow,
     /// Open or close the skill tree window. Only works while playing.
     ToggleSkillTreeWindow,
+    /// Open or close the stats window. Only works while playing.
+    ToggleStatsWindow,
     /// Open or close the interface settings window.
     ToggleInterfaceSettingsWindow,
     /// Open or close the graphics settings window.
@@ -210,6 +212,8 @@ pub enum InputEvent {
         /// Items to sell.
         items: Vec<SoldItemInformation>,
     },
+    /// Up a stat.
+    StatUp { stat_type: StatUpType },
     /// Reload the language from disk.
     #[cfg(feature = "debug")]
     ReloadLanguage,

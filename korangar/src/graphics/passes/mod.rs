@@ -124,6 +124,7 @@ pub(crate) trait Dispatch<const BIND: BindGroupCount> {
         capabilities: &Capabilities,
         device: &Device,
         queue: &Queue,
+        shader_compiler: &ShaderCompiler,
         global_context: &GlobalContext,
         compute_pass_context: &Self::Context,
     ) -> Self;

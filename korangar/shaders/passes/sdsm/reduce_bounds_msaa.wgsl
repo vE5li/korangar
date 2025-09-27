@@ -57,7 +57,7 @@ const ATOMIC_FLOAT_OFFSET: f32 = 1.0;
 
 @group(0) @binding(0) var<uniform> global_uniforms: GlobalUniforms;
 @group(1) @binding(0) var<uniform> directional_light: DirectionalLightUniforms;
-@group(1) @binding(1) var depth_texture: texture_depth_2d;
+@group(1) @binding(1) var depth_texture: texture_depth_multisampled_2d;
 @group(1) @binding(2) var<storage, read_write> partition_data: array<Partition>;
 @group(1) @binding(4) var<storage, read_write> bounds_data: array<Bounds>;
 
@@ -97,7 +97,7 @@ fn empty_bounds_float() -> BoundsFloat {
 }
 
 @compute @workgroup_size(REDUCE_BOUNDS_BLOCK_X, REDUCE_BOUNDS_BLOCK_Y, 1)
-fn cs_main(
+fn main(
     @builtin(global_invocation_id) global_id: vec3<u32>,
     @builtin(local_invocation_id) local_id: vec3<u32>,
     @builtin(workgroup_id) group_id: vec3<u32>,

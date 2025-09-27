@@ -1,14 +1,10 @@
-use wgpu::{
-    ComputePass, ComputePipeline, ComputePipelineDescriptor, Device, PipelineCompilationOptions, PipelineLayoutDescriptor, Queue,
-    ShaderModuleDescriptor, include_wgsl,
-};
+use wgpu::{ComputePass, ComputePipeline, ComputePipelineDescriptor, Device, PipelineCompilationOptions, PipelineLayoutDescriptor, Queue};
 
 use crate::graphics::passes::light_culling::LightCullingPassContext;
 use crate::graphics::passes::{BindGroupCount, ComputePassContext, Dispatch};
 use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::graphics::{Capabilities, GlobalContext, ScreenSize, calculate_light_tile_count};
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/light_culling.wgsl");
 const DISPATCHER_NAME: &str = "light culling";
 
 pub(crate) struct LightCullingDispatcher {
@@ -23,11 +19,11 @@ impl Dispatch<{ BindGroupCount::Two }> for LightCullingDispatcher {
         _capabilities: &Capabilities,
         device: &Device,
         _queue: &Queue,
-        _shader_compiler: &ShaderCompiler,
+        shader_compiler: &ShaderCompiler,
         global_context: &GlobalContext,
         _compute_pass_context: &Self::Context,
     ) -> Self {
-        let shader_module = device.create_shader_module(SHADER);
+        let shader_module = shader_compiler.create_shader_module("light_culling", "light_culling");
 
         let pass_bind_group_layouts = Self::Context::bind_group_layout(device, global_context.msaa);
 
@@ -41,7 +37,7 @@ impl Dispatch<{ BindGroupCount::Two }> for LightCullingDispatcher {
             label: Some(DISPATCHER_NAME),
             layout: Some(&pipeline_layout),
             module: &shader_module,
-            entry_point: Some("cs_main"),
+            entry_point: Some("main"),
             compilation_options: PipelineCompilationOptions {
                 zero_initialize_workgroup_memory: false,
                 ..Default::default()

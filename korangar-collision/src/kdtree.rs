@@ -1,10 +1,10 @@
 use std::hash::Hash;
 
 use hashbrown::HashMap;
+use korangar_container::{SecondarySimpleSlab, SimpleKey};
 
-use crate::collision::AABB;
-use crate::collision::aligned_plane::{AlignedPlane, Axis};
-use crate::container::{SecondarySimpleSlab, SimpleKey};
+use crate::AABB;
+use crate::aligned_plane::{AlignedPlane, Axis};
 
 /// Cost of traversing a kd-tree node.
 /// Default value in the paper: 15.0 (Section 5.2)
@@ -534,9 +534,9 @@ impl<K: Copy> Eq for Event<K> {}
 #[cfg(test)]
 mod tests {
     use cgmath::Point3;
+    use korangar_container::create_simple_key;
 
-    use crate::collision::{AABB, KDTree};
-    use crate::create_simple_key;
+    use crate::{AABB, KDTree};
 
     create_simple_key!(TestKey);
 

@@ -4,7 +4,7 @@ use korangar_interface::components::drop_down::DropDownItem;
 #[cfg(feature = "debug")]
 use korangar_interface::element::Element;
 use korangar_interface::element::StateElement;
-use korangar_util::FileLoader;
+use korangar_loaders::FileLoader;
 #[cfg(feature = "debug")]
 use ron::ser::PrettyConfig;
 use rust_state::RustState;

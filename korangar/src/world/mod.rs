@@ -9,6 +9,7 @@ mod map;
 mod model;
 mod object;
 mod particles;
+mod pathing;
 mod sound;
 mod video;
 
@@ -23,6 +24,7 @@ pub use self::map::*;
 pub use self::model::*;
 pub use self::object::*;
 pub use self::particles::*;
+pub use self::pathing::*;
 pub use self::sound::*;
 pub use self::video::*;
 

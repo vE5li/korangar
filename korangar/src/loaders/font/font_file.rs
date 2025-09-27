@@ -7,7 +7,7 @@ use hashbrown::HashMap;
 use image::{ImageFormat, ImageReader, RgbaImage};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, Timer, print_debug};
-use korangar_util::FileLoader;
+use korangar_loaders::FileLoader;
 
 use crate::loaders::GameFileLoader;
 use crate::loaders::font::GlyphCoordinate;

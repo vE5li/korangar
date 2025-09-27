@@ -6,10 +6,10 @@ use std::sync::{Arc, Mutex};
 use cgmath::SquareMatrix;
 use cgmath::{Array, Matrix4, Rad, Vector2};
 #[cfg(feature = "debug")]
-use korangar_debug::logging::{Colorize, print_debug};
+use korangar_container::CacheStatistics;
+use korangar_container::SimpleCache;
 #[cfg(feature = "debug")]
-use korangar_util::container::CacheStatistics;
-use korangar_util::container::SimpleCache;
+use korangar_debug::logging::{Colorize, print_debug};
 use num::Zero;
 
 use super::error::LoadError;

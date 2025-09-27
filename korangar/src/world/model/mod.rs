@@ -3,8 +3,8 @@ mod node;
 use std::ops::Mul;
 
 use cgmath::{EuclideanSpace, Matrix4, SquareMatrix, Vector3, Vector4, Zero};
+use korangar_collision::AABB;
 use korangar_interface::element::StateElement;
-use korangar_util::collision::AABB;
 #[cfg(feature = "debug")]
 use ragnarok_formats::model::ModelData;
 use ragnarok_formats::transform::Transform;

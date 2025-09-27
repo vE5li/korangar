@@ -1,8 +1,8 @@
 use cgmath::Point2;
 use hashbrown::HashMap;
-use korangar_util::Rectangle;
 
 use super::GlyphCoordinate;
+use crate::loaders::rectangle::Rectangle;
 
 /// The CSV file has the following columns:
 ///

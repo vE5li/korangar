@@ -13,16 +13,15 @@ use cosmic_text::{Attrs, Buffer, Family, FontSystem, Metrics, Shaping, fontdb};
 use hashbrown::HashMap;
 use image::{ImageBuffer, Rgba, RgbaImage, imageops};
 #[cfg(feature = "debug")]
+use korangar_container::CacheStatistics;
+use korangar_container::{Cacheable, SimpleCache};
+#[cfg(feature = "debug")]
 use korangar_debug::logging::Colorize;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::print_debug;
 use korangar_interface::application::TextLayouter;
 use korangar_interface::components::drop_down::DropDownItem;
 use korangar_interface::element::{ElementDisplay, StateElement};
-use korangar_util::Rectangle;
-#[cfg(feature = "debug")]
-use korangar_util::container::CacheStatistics;
-use korangar_util::container::{Cacheable, SimpleCache};
 use rust_state::RustState;
 use serde::{Deserialize, Serialize};
 
@@ -31,6 +30,7 @@ use super::{GameFileLoader, TextureLoader};
 use crate::graphics::{Color, MAX_TEXTURE_SIZE, ScreenSize, Texture};
 use crate::loaders::font::font_file::FontFile;
 use crate::loaders::font::layout_key::{LayoutKey, LayoutKeyRef};
+use crate::loaders::rectangle::Rectangle;
 use crate::state::ClientState;
 
 const MAX_CACHE_COUNT: u32 = 2048;

@@ -1,6 +1,22 @@
-//! Implements some commonly used math functions.
+//! A simple collision library.
+#![warn(missing_docs)]
+#![cfg_attr(feature = "interface", feature(negative_impls))]
+#![cfg_attr(feature = "interface", feature(impl_trait_in_assoc_type))]
 
+mod aabb;
+mod aligned_plane;
+mod frustum;
+mod kdtree;
+mod plane;
+mod sphere;
+
+pub use aabb::AABB;
+pub use aligned_plane::{AlignedPlane, Axis};
 use cgmath::{EuclideanSpace, Matrix4, Point3};
+pub use frustum::Frustum;
+pub use kdtree::{Insertable, KDTree, Query};
+pub use plane::{IntersectionClassification, Plane};
+pub use sphere::Sphere;
 
 /// Multiplies a 4x4 matrix with a 3 component vector, treating the vector as a
 /// point in 3D space.
@@ -18,7 +34,7 @@ pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
 mod tests {
     use cgmath::{EuclideanSpace, Matrix4, Point3, assert_relative_eq};
 
-    use crate::math::multiply_matrix4_and_point3;
+    use crate::multiply_matrix4_and_point3;
 
     #[test]
     fn test_multiply_matrix4_and_point3() {

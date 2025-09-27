@@ -1,4 +1,4 @@
-use crate::collision::AABB;
+use crate::AABB;
 
 /// An axis in 3D space
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
@@ -48,7 +48,7 @@ impl AlignedPlane {
 mod tests {
     use cgmath::Point3;
 
-    use crate::collision::{AABB, AlignedPlane, Axis};
+    use crate::{AABB, AlignedPlane, Axis};
 
     #[test]
     fn test_aligned_plane_creation() {

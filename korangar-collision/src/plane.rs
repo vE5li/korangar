@@ -130,7 +130,7 @@ pub enum IntersectionClassification {
 mod tests {
     use cgmath::{EuclideanSpace, InnerSpace, Point3, Vector3, Vector4, assert_relative_eq};
 
-    use crate::collision::{AABB, IntersectionClassification, Plane, Sphere};
+    use crate::{AABB, IntersectionClassification, Plane, Sphere};
 
     #[test]
     fn test_plane_new() {

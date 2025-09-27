@@ -7,12 +7,11 @@ use block_compression::{BC7Settings, CompressionVariant, GpuBlockCompressor};
 use hashbrown::HashMap;
 use image::{GrayImage, ImageBuffer, ImageFormat, ImageReader, Rgba, RgbaImage};
 #[cfg(feature = "debug")]
-use korangar_debug::logging::{Colorize, Timer, print_debug};
-use korangar_util::FileLoader;
-use korangar_util::color::contains_transparent_pixel;
+use korangar_container::CacheStatistics;
+use korangar_container::SimpleCache;
 #[cfg(feature = "debug")]
-use korangar_util::container::CacheStatistics;
-use korangar_util::container::SimpleCache;
+use korangar_debug::logging::{Colorize, Timer, print_debug};
+use korangar_loaders::FileLoader;
 use wgpu::{
     Buffer, BufferDescriptor, BufferUsages, CommandEncoderDescriptor, ComputePassDescriptor, Device, Extent3d, MapMode, PollError,
     PollStatus, PollType, Queue, TexelCopyBufferLayout, TextureAspect, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
@@ -27,6 +26,7 @@ use super::{
 use crate::SHUTDOWN_SIGNAL;
 use crate::graphics::{BindlessSupport, Capabilities, Lanczos3Drawer, MipMapRenderPassContext, Texture, TextureSet};
 use crate::loaders::GameFileLoader;
+use crate::loaders::color::contains_transparent_pixel;
 use crate::world::Video;
 
 const MAX_CACHE_COUNT: u32 = 4096;
@@ -764,7 +764,7 @@ fn premultiply_alpha(image_buffer: RgbaImage) -> ImageBuffer<Rgba<u8>, Vec<u8>> 
     let height = image_buffer.height();
     let mut bytes = image_buffer.into_raw();
 
-    korangar_util::color::premultiply_alpha(&mut bytes);
+    crate::loaders::color::premultiply_alpha(&mut bytes);
 
     RgbaImage::from_raw(width, height, bytes).unwrap()
 }

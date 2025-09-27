@@ -1,5 +1,5 @@
 #[cfg(feature = "debug")]
-use korangar_util::container::SimpleKey;
+use korangar_container::SimpleKey;
 use ragnarok_packets::EntityId;
 
 #[cfg(feature = "debug")]

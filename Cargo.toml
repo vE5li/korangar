@@ -25,10 +25,12 @@ heck = "0.5.0"
 image = { version = "0.25", default-features = false }
 kira = { version = "0.10", default-features = false }
 korangar-audio = { path = "korangar-audio" }
+korangar-collision = { path = "korangar-collision" }
+korangar-container = { path = "korangar-container" }
 korangar-debug = { path = "korangar-debug" }
 korangar-interface = { path = "korangar-interface" }
+korangar-loaders = { path = "korangar-loaders" }
 korangar-networking = { path = "korangar-networking" }
-korangar-util = { path = "korangar-util" }
 korangar-video = { path = "korangar-video" }
 libc = "0.2"
 lunify = "1"
@@ -91,19 +93,22 @@ opt-level = 0
 [profile.dev.package.korangar-audio]
 opt-level = 3
 
+[profile.dev.package.korangar-collision]
+opt-level = 3
+
+[profile.dev.package.korangar-container]
+opt-level = 3
+
 [profile.dev.package.korangar-debug]
 opt-level = 3
 
 [profile.dev.package.korangar-interface]
 opt-level = 3
 
-[profile.dev.package.ragnarok-macros]
-opt-level = 3
-
 [profile.dev.package.korangar-networking]
 opt-level = 3
 
-[profile.dev.package.korangar-util]
+[profile.dev.package.korangar-loaders]
 opt-level = 3
 
 [profile.dev.package.korangar-video]
@@ -113,6 +118,9 @@ opt-level = 3
 opt-level = 3
 
 [profile.dev.package.ragnarok-formats]
+opt-level = 3
+
+[profile.dev.package.ragnarok-macros]
 opt-level = 3
 
 [profile.dev.package.ragnarok-packets]

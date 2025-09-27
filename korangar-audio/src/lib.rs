@@ -21,11 +21,13 @@ use kira::sound::streaming::{StreamingSoundData, StreamingSoundHandle};
 use kira::sound::{FromFileError, PlaybackState};
 use kira::track::{MainTrackBuilder, SpatialTrackBuilder, SpatialTrackDistances, SpatialTrackHandle, TrackBuilder, TrackHandle};
 use kira::{AudioManager, AudioManagerSettings, Capacities, Decibels, Easing, Frame, Tween};
+use korangar_collision::{KDTree, Sphere};
+use korangar_container::{
+    CacheStatistics, Cacheable, GenerationalSlab, SimpleCache, SimpleSlab, create_generational_key, create_simple_key,
+};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, print_debug};
-use korangar_util::collision::{KDTree, Sphere};
-use korangar_util::container::{CacheStatistics, Cacheable, GenerationalSlab, SimpleCache, SimpleSlab};
-use korangar_util::{FileLoader, create_generational_key, create_simple_key};
+use korangar_loaders::FileLoader;
 use rayon::spawn;
 
 create_generational_key!(SoundEffectKey, "The key for a cached sound effect");

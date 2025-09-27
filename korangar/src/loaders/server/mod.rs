@@ -4,7 +4,7 @@ use encoding_rs::Encoding;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::Timer;
 use korangar_interface::element::StateElement;
-use korangar_util::FileLoader;
+use korangar_loaders::FileLoader;
 use quick_xml::Reader;
 use quick_xml::de::from_str;
 use quick_xml::events::Event;

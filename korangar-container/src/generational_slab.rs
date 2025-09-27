@@ -280,7 +280,7 @@ impl<'a, I: GenerationalKey, T> Iterator for GenerationalIter<'a, I, T> {
 mod tests {
     #![allow(clippy::unwrap_used)]
 
-    use crate::container::{GenerationalKey, GenerationalSlab, SecondaryGenerationalSlab};
+    use crate::{GenerationalKey, GenerationalSlab, SecondaryGenerationalSlab};
 
     create_generational_key!(TestKey);
 

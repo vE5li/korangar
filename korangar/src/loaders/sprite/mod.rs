@@ -3,13 +3,12 @@ use std::sync::{Arc, Mutex};
 
 use image::RgbaImage;
 #[cfg(feature = "debug")]
+use korangar_container::CacheStatistics;
+use korangar_container::{Cacheable, SimpleCache};
+#[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, Timer, print_debug};
 use korangar_interface::element::StateElement;
-use korangar_util::FileLoader;
-use korangar_util::color::premultiply_alpha;
-#[cfg(feature = "debug")]
-use korangar_util::container::CacheStatistics;
-use korangar_util::container::{Cacheable, SimpleCache};
+use korangar_loaders::FileLoader;
 use ragnarok_bytes::{ByteReader, FromBytes};
 use ragnarok_formats::sprite::{PaletteColor, RgbaImageData, SpriteData};
 use ragnarok_formats::version::InternalVersion;
@@ -18,6 +17,7 @@ use rust_state::RustState;
 use super::{FALLBACK_SPRITE_FILE, TextureLoader};
 use crate::graphics::Texture;
 use crate::loaders::GameFileLoader;
+use crate::loaders::color::premultiply_alpha;
 use crate::loaders::error::LoadError;
 
 const MAX_CACHE_COUNT: u32 = 4096;

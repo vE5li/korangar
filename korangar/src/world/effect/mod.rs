@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use cgmath::{Point3, Rad, Vector2, Vector3};
-use korangar_util::collision::{Frustum, Sphere};
-use korangar_util::container::Cacheable;
+use korangar_collision::{Frustum, Sphere};
+use korangar_container::Cacheable;
 use ragnarok_formats::map::EffectSource;
 use ragnarok_packets::EntityId;
 use wgpu::BlendFactor;

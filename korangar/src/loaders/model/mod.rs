@@ -2,11 +2,10 @@ use std::sync::Arc;
 
 use cgmath::{Array, EuclideanSpace, Matrix4, Point3, Rad, SquareMatrix, Vector2, Vector3};
 use hashbrown::{HashMap, HashSet};
+use korangar_collision::{AABB, multiply_matrix4_and_point3};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, Timer, print_debug};
-use korangar_util::FileLoader;
-use korangar_util::collision::AABB;
-use korangar_util::math::multiply_matrix4_and_point3;
+use korangar_loaders::FileLoader;
 use num::Zero;
 use ragnarok_bytes::{ByteReader, FromBytes};
 use ragnarok_formats::model::{ModelData, NodeData};

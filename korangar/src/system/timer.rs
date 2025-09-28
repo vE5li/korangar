@@ -1,6 +1,5 @@
 use std::time::Instant;
 
-use chrono::prelude::*;
 use ragnarok_packets::ClientTick;
 
 pub struct GameTimer {
@@ -10,24 +9,14 @@ pub struct GameTimer {
     frame_counter: usize,
     frames_per_second: usize,
     animation_timer_ms: f32,
-    day_timer: f64,
     last_packet_receive_time: Instant,
     first_tick_received: bool,
     base_client_tick: f64,
     frequency: f64,
 }
 
-/// Game time runs 12 times faster.
-pub const GAME_TIME_SCALE: f64 = 12.0;
-/// The time in seconds it takes to complete a full day-night cycle (24 hours).
-pub const GAME_TIME_DAY_CYCLE: f64 = 86400.0;
-
 impl GameTimer {
     pub fn new() -> Self {
-        let local: DateTime<Local> = Local::now();
-        let day_timer = (((local.hour() as f64 * 3600.0) + (local.minute() as f64 * 60.0) + local.second() as f64) * GAME_TIME_SCALE)
-            % GAME_TIME_DAY_CYCLE;
-
         Self {
             global_timer: Instant::now(),
             previous_elapsed: Default::default(),
@@ -35,7 +24,6 @@ impl GameTimer {
             frame_counter: Default::default(),
             frames_per_second: Default::default(),
             animation_timer_ms: Default::default(),
-            day_timer,
             last_packet_receive_time: Instant::now(),
             first_tick_received: false,
             base_client_tick: 0.0,
@@ -85,15 +73,6 @@ impl GameTimer {
         ClientTick(tick.round() as u32)
     }
 
-    #[cfg(feature = "debug")]
-    pub fn set_day_timer(&mut self, day_seconds: f32) {
-        self.day_timer = day_seconds as f64;
-    }
-
-    pub fn get_day_timer(&self) -> f32 {
-        self.day_timer as f32
-    }
-
     pub fn get_animation_timer_ms(&self) -> f32 {
         self.animation_timer_ms
     }
@@ -104,7 +83,6 @@ impl GameTimer {
 
         self.frame_counter += 1;
         self.accumulate_second += delta_time;
-        self.day_timer = (self.day_timer + (delta_time * GAME_TIME_SCALE)) % GAME_TIME_DAY_CYCLE;
         self.animation_timer_ms += 1000.0 * delta_time as f32;
         self.previous_elapsed = new_elapsed;
 
@@ -138,16 +116,13 @@ mod increment {
     fn update_increments_timers() {
         let mut game_timer = GameTimer::new();
 
-        let day_timer = game_timer.get_day_timer();
         let animation_timer_ms = game_timer.get_animation_timer_ms();
 
         std::thread::sleep(std::time::Duration::from_millis(10));
         game_timer.update();
 
-        let updated_day_timer = game_timer.get_day_timer();
         let updated_animation_timer_ms = game_timer.get_animation_timer_ms();
 
-        assert!(updated_day_timer > day_timer);
         assert!(updated_animation_timer_ms > animation_timer_ms);
     }
 }

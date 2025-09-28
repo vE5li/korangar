@@ -249,15 +249,6 @@ pub enum InputEvent {
     /// Open or close the commands window. Only works while playing.
     #[cfg(feature = "debug")]
     ToggleCommandsWindow,
-    /// Open or close the time window.
-    #[cfg(feature = "debug")]
-    ToggleTimeWindow,
-    /// Set the current time.
-    #[cfg(feature = "debug")]
-    SetTime {
-        /// New day timer in seconds.
-        day_seconds: f32,
-    },
     /// Open the theme inspector window.
     #[cfg(feature = "debug")]
     ToggleThemeInspectorWindow,

@@ -12,7 +12,6 @@ struct GlobalUniforms {
     interface_size: vec2<u32>,
     pointer_position: vec2<u32>,
     animation_timer: f32,
-    day_timer: f32,
     point_light_count: u32,
     enhanced_lighting: u32,
     shadow_quality: u32,

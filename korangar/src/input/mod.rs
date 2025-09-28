@@ -290,11 +290,6 @@ impl InputSystem {
         }
 
         #[cfg(feature = "debug")]
-        if control_down && self.get_key(KeyCode::KeyT).pressed() {
-            events.push(InputEvent::ToggleTimeWindow);
-        }
-
-        #[cfg(feature = "debug")]
         if control_down && self.get_key(KeyCode::KeyP).pressed() {
             events.push(InputEvent::ToggleProfilerWindow);
         }

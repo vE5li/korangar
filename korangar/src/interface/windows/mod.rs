@@ -38,8 +38,6 @@ mod skill_tree;
 mod stats;
 #[cfg(feature = "debug")]
 mod theme_inspector;
-#[cfg(feature = "debug")]
-mod time;
 
 use serde::{Deserialize, Serialize};
 
@@ -83,8 +81,6 @@ pub use self::skill_tree::SkillTreeWindow;
 pub use self::stats::StatsWindow;
 #[cfg(feature = "debug")]
 pub use self::theme_inspector::{ThemeInspectorWindow, ThemeInspectorWindowState};
-#[cfg(feature = "debug")]
-pub use self::time::TimeWindow;
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum WindowClass {
@@ -112,8 +108,6 @@ pub enum WindowClass {
     SelectServer,
     Sell,
     SellCart,
-    #[cfg(feature = "debug")]
-    Time,
     #[cfg(feature = "debug")]
     Maps,
     #[cfg(feature = "debug")]

@@ -92,11 +92,10 @@ pub(crate) struct GlobalUniforms {
     interface_size: [u32; 2],
     pointer_position: [u32; 2],
     animation_timer: f32,
-    day_timer: f32,
     point_light_count: u32,
     enhanced_lighting: u32,
     shadow_quality: u32,
-    padding: [u32; 1],
+    padding: [u32; 2],
 }
 
 #[derive(Copy, Clone, Default, Pod, Zeroable)]
@@ -304,7 +303,6 @@ impl Prepare for GlobalContext {
             interface_size: [self.interface_size.width as u32, self.interface_size.height as u32],
             pointer_position: [instructions.picker_position.left as u32, instructions.picker_position.top as u32],
             animation_timer: instructions.uniforms.animation_timer_ms / 1000.0,
-            day_timer: instructions.uniforms.day_timer,
             point_light_count: (instructions.point_light_with_shadows.len() + instructions.point_light.len()) as u32,
             enhanced_lighting: instructions.uniforms.enhanced_lighting as u32,
             shadow_quality: instructions.uniforms.shadow_quality.into(),

@@ -16,7 +16,6 @@ public struct GlobalUniforms {
     public var interface_size: uint2;
     public var pointer_position: uint2;
     public var animation_timer: float;
-    public var day_timer: float;
     public var point_light_count: uint;
     public var enhanced_lighting: uint;
     public var shadow_quality: uint;

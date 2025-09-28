@@ -30,9 +30,9 @@ public struct RectangleVertexInput {
 
 public struct RectangleVertexOutput {
     public float4 position : SV_Position;
-    public var fragment_position: float2;
-    public var texture_coordinates: float2;
-    public var instance_index: uint;
+    [[vk::location(0)]] public var fragment_position: float2;
+    [[vk::location(1)]] public var texture_coordinates: float2;
+    [[vk::location(2)]] public var instance_index: uint;
 };
 
 func vertex_data(vertex_index: uint) -> float4 {

@@ -1,7 +1,8 @@
 #language slang 2026
 
-import sdsm;
+import depth_texture;
 import globals;
+import sdsm;
 import transform;
 
 struct ComputeInput {
@@ -13,7 +14,7 @@ struct ComputeInput {
 
 [[vk::binding(0, 0)]] var global_uniforms: ConstantBuffer<GlobalUniforms>;
 [[vk::binding(0, 1)]] var directional_light: ConstantBuffer<DirectionalLightUniforms>;
-[[vk::binding(1, 1)]] var depth_texture: Texture2D;
+[[vk::binding(1, 1)]] var depth_texture: DepthTexture2D;
 [[vk::binding(2, 1)]] var partition_data: RWStructuredBuffer<Partition>;
 [[vk::binding(4, 1)]] var bounds_data: RWStructuredBuffer<Bounds>;
 
@@ -41,7 +42,7 @@ func main(ComputeInput input) {
             let coords = tile_start + uint2(tile_x, tile_y);
 
             if (coords.x < depth_dim.x && coords.y < depth_dim.y) {
-                let depth_value = depth_texture.Load(int3(coords.x, coords.y, 0)).r;
+                let depth_value = depth_texture.Load(int3(coords.x, coords.y, 0));
                 let linear_view_z = depth::nonLinearToLinear(depth_value);
 
                 // Check if sample falls within view frustum.

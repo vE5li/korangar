@@ -12,8 +12,8 @@ struct ModelVertexInput {
 
 struct ModelVertexOutput {
     float4 position : SV_Position;
-    var texture_coordinates: float2;
-    var texture_index: int;
+    [[vk::location(0)]] var texture_coordinates: float2;
+    [[vk::location(1)]] var texture_index: int;
 };
 
 [[vk::binding(2, 0)]] var linear_sampler: SamplerState;

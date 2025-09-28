@@ -21,13 +21,8 @@ struct WaveVertexInput {
 
 struct WaveVertexOutput {
     float4 position: SV_Position;
-    var world_position: float3;
-    var normal: float3;
-}
-
-struct WboitOutput {
-    [[vk::location(1)]] var accumulation: float4;
-    [[vk::location(2)]] var revealage: float;
+    [[vk::location(0)]] var world_position: float3;
+    [[vk::location(1)]] var normal: float3;
 }
 
 static const var TILE_SIZE: uint = 16;

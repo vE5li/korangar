@@ -10,7 +10,7 @@ struct IndicatorVertexInput {
 
 struct IndicatorVertexOutput {
     float4 position : SV_Position;
-    var texture_coordinates: float2;
+    [[vk::location(0)]] var texture_coordinates: float2;
 };
 
 [[vk::binding(0, 0)]] var global_uniforms: ConstantBuffer<GlobalUniforms>;

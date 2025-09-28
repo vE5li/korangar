@@ -4,8 +4,8 @@ import postprocessing;
 
 public struct DebugCircleVertexOutput {
     public float4 position : SV_Position;
-    public var fragment_position: float2;
-    public var instance_index: uint;
+    [[vk::location(0)]] public var fragment_position: float2;
+    [[vk::location(1)]] public var instance_index: uint;
 }
 
 public struct DebugCircleInstanceData {

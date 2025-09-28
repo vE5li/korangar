@@ -10,8 +10,8 @@ struct MarkerVertexInput {
 
 struct MarkerVertexOutput {
     float4 position: SV_Position;
-    var identifier_high: uint;
-    var identifier_low: uint;
+    [[vk::location(0)]] var identifier_high: uint;
+    [[vk::location(1)]] var identifier_low: uint;
 }
 
 public struct MarkerInstanceData {

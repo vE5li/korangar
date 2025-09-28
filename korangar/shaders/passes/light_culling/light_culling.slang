@@ -20,7 +20,7 @@ static const var MAX_LIGHTS_PER_TILE: uint = 256;
 
 [[vk::binding(0, 0)]] var global_uniforms: ConstantBuffer<GlobalUniforms>;
 [[vk::binding(0, 1)]] var lights: StructuredBuffer<PointLight>;
-[[vk::binding(1, 1)]] var light_count_texture: WTexture2D<uint>;
+[[vk::binding(1, 1)]] [[vk::image_format("r32ui")]] var light_count_texture: WTexture2D<uint>;
 [[vk::binding(2, 1)]] var tile_light_indices: RWStructuredBuffer<TileLightIndices>;
 
 [[shader("compute")]]

@@ -4,14 +4,14 @@ import directional_shadow;
 
 struct EntityVertexOutput {
     float4 position : SV_Position;
-    var world_position: float4;
-    var texture_coordinates: float2;
-    var depth_offset: float;
-    var curvature: float;
-    var original_depth_offset: float;
-    var original_curvature: float;
-    var texture_index: int;
-    var alpha: float;
+    [[vk::location(0)]] var world_position: float4;
+    [[vk::location(1)]] var texture_coordinates: float2;
+    [[vk::location(2)]] var depth_offset: float;
+    [[vk::location(3)]] var curvature: float;
+    [[vk::location(4)]] var original_depth_offset: float;
+    [[vk::location(5)]] var original_curvature: float;
+    [[vk::location(6)]] var texture_index: int;
+    [[vk::location(7)]] var alpha: float;
 };
 
 [[vk::binding(2, 0)]] var linear_sampler: SamplerState;

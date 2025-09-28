@@ -11,8 +11,8 @@ struct IndicatorVertexInput {
 
 struct IndicatorVertexOutput {
     float4 position: SV_Position;
-    var world_position: float4;
-    var texture_coordinates: float2;
+    [[vk::location(0)]] var world_position: float4;
+    [[vk::location(1)]] var texture_coordinates: float2;
 };
 
 struct IndicatorFragmentOutput {

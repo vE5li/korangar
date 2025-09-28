@@ -4,7 +4,7 @@ module screen_space;
 
 public struct FullscreenVertex {
     public float4 position : SV_Position;
-    public var uv: float2;
+    [[vk::location(0)]] public var uv: float2;
 
     public static func new(vertex_index: uint) -> FullscreenVertex {
         let uv = float2(float((vertex_index << 1) & 2), float(vertex_index & 2));

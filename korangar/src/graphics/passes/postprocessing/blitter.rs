@@ -1,8 +1,8 @@
 use hashbrown::HashMap;
 use wgpu::{
     BlendState, ColorTargetState, ColorWrites, Device, FragmentState, MultisampleState, PipelineCompilationOptions,
-    PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModule,
-    ShaderModuleDescriptor, TextureFormat, TextureSampleType, TextureViewDimension, VertexState, include_wgsl,
+    PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModule, TextureFormat,
+    TextureSampleType, TextureViewDimension, VertexState,
 };
 
 use crate::graphics::passes::{
@@ -11,7 +11,6 @@ use crate::graphics::passes::{
 use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::graphics::{AttachmentTexture, Capabilities, FXAA_COLOR_LUMA_TEXTURE_FORMAT, GlobalContext};
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/blitter.wgsl");
 const DRAWER_NAME: &str = "post processing blitter";
 
 pub(crate) struct PostProcessingBlitterDrawData<'a> {
@@ -40,11 +39,11 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
         _capabilities: &Capabilities,
         device: &Device,
         _queue: &Queue,
-        _shader_compiler: &ShaderCompiler,
+        shader_compiler: &ShaderCompiler,
         _global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {
-        let shader_module = device.create_shader_module(SHADER);
+        let shader_module = shader_compiler.create_shader_module("postprocessing", "blitter");
 
         let mut pipeline_cache = HashMap::new();
 
@@ -112,7 +111,10 @@ impl PostProcessingBlitterDrawer {
             push_constant_ranges: &[],
         });
 
-        let constants = &[("LUMA_IN_ALPHA", f64::from(luma_in_alpha))];
+        let constants = &[
+            // LUMA_IN_ALPHA
+            ("0", f64::from(luma_in_alpha)),
+        ];
 
         device.create_render_pipeline(&RenderPipelineDescriptor {
             label: Some(DRAWER_NAME),

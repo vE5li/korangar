@@ -20,8 +20,8 @@ use crate::graphics::passes::{
 use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::graphics::{BindlessSupport, Buffer, Capabilities, EntityInstruction, GlobalContext, Prepare, RenderInstruction, Texture};
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/entity.wgsl");
-const SHADER_BINDLESS: ShaderModuleDescriptor = include_wgsl!("shader/entity_bindless.wgsl");
+const SHADER: ShaderModuleDescriptor = include_wgsl!("../../../../shaders/passes/forward/entity.wgsl");
+const SHADER_BINDLESS: ShaderModuleDescriptor = include_wgsl!("../../../../shaders/passes/forward/entity_bindless.wgsl");
 const DRAWER_NAME: &str = "forward entity";
 const INITIAL_INSTRUCTION_SIZE: usize = 256;
 

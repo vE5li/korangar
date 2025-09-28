@@ -7,7 +7,7 @@ use wgpu::{
     BindingType, BlendComponent, BlendFactor, BlendOperation, BlendState, BufferBindingType, BufferUsages, ColorTargetState, ColorWrites,
     CommandEncoder, CompareFunction, DepthBiasState, DepthStencilState, Device, FragmentState, MultisampleState,
     PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor,
-    ShaderModuleDescriptor, ShaderStages, StencilState, TextureSampleType, TextureViewDimension, VertexState, include_wgsl,
+    ShaderStages, StencilState, TextureSampleType, TextureViewDimension, VertexState,
 };
 
 use crate::graphics::passes::{
@@ -16,7 +16,6 @@ use crate::graphics::passes::{
 use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::graphics::{Buffer, Capabilities, GlobalContext, Prepare, RenderInstruction, Texture, WaterInstruction, WaterVertex};
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/wave.wgsl");
 const DRAWER_NAME: &str = "water wave";
 
 #[derive(Copy, Clone, Default, Pod, Zeroable)]
@@ -45,11 +44,11 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
         _capabilities: &Capabilities,
         device: &Device,
         queue: &Queue,
-        _shader_compiler: &ShaderCompiler,
+        shader_compiler: &ShaderCompiler,
         global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {
-        let shader_module = device.create_shader_module(SHADER);
+        let shader_module = shader_compiler.create_shader_module("forward", "wave");
 
         let uniforms_buffer = Buffer::with_data(
             device,

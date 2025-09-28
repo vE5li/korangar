@@ -24,29 +24,6 @@ struct IndicatorFragmentOutput {
 [[vk::binding(0, 1)]] var pass_uniforms: ConstantBuffer<PassUniforms>;
 [[vk::binding(0, 2)]] var texture: Texture2D;
 
-func indicator_position_data(vertex_index: uint, indicator_positions: float4x4) -> float4 {
-    switch (vertex_index) {
-        case 0:
-            // upper_left
-            return indicator_positions.getColumn(0);
-        case 1:
-            // upper_right
-            return indicator_positions.getColumn(1);
-        case 2:
-            // lower_left
-            return indicator_positions.getColumn(2);
-        case 3:
-            // lower_left
-            return indicator_positions.getColumn(2);
-        case 4:
-            // upper_right
-            return indicator_positions.getColumn(1);
-        default:
-            // lower_right
-            return indicator_positions.getColumn(3);
-    }
-}
-
 [[shader("vertex")]]
 func vs_main(input: IndicatorVertexInput) -> IndicatorVertexOutput {
     var output: IndicatorVertexOutput;
@@ -69,6 +46,29 @@ func fs_main(input: IndicatorVertexOutput) -> IndicatorFragmentOutput {
     var output: IndicatorFragmentOutput;
     output.depth = depth.linearToNonLinear(light_distance);
     return output;
+}
+
+func indicator_position_data(vertex_index: uint, indicator_positions: float4x4) -> float4 {
+    switch (vertex_index) {
+        case 0:
+            // upper_left
+            return indicator_positions.getColumn(0);
+        case 1:
+            // upper_right
+            return indicator_positions.getColumn(1);
+        case 2:
+            // lower_left
+            return indicator_positions.getColumn(2);
+        case 3:
+            // lower_left
+            return indicator_positions.getColumn(2);
+        case 4:
+            // upper_right
+            return indicator_positions.getColumn(1);
+        default:
+            // lower_right
+            return indicator_positions.getColumn(3);
+    }
 }
 
 // Optimized version of the following truth table:

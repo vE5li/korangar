@@ -9,8 +9,8 @@ use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource,
     BindingType, BlendComponent, BlendFactor, BlendOperation, BlendState, BufferBindingType, BufferUsages, ColorTargetState, ColorWrites,
     CommandEncoder, Device, FragmentState, MultisampleState, PipelineCompilationOptions, PipelineLayout, PipelineLayoutDescriptor,
-    PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModule, ShaderModuleDescriptor, ShaderStages,
-    TextureFormat, TextureSampleType, TextureView, TextureViewDimension, VertexState, include_wgsl,
+    PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModule, ShaderStages, TextureFormat,
+    TextureSampleType, TextureView, TextureViewDimension, VertexState,
 };
 
 use crate::graphics::passes::{
@@ -19,8 +19,6 @@ use crate::graphics::passes::{
 use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::graphics::{BindlessSupport, Buffer, Capabilities, EffectInstruction, GlobalContext, Prepare, RenderInstruction, Texture};
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/effect.wgsl");
-const SHADER_BINDLESS: ShaderModuleDescriptor = include_wgsl!("shader/effect_bindless.wgsl");
 const DRAWER_NAME: &str = "post processing effect";
 const INITIAL_INSTRUCTION_SIZE: usize = 256;
 
@@ -83,16 +81,16 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
         capabilities: &Capabilities,
         device: &Device,
         _queue: &Queue,
-        _shader_compiler: &ShaderCompiler,
+        shader_compiler: &ShaderCompiler,
         global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {
         let color_attachment_format = render_pass_context.color_attachment_formats()[0];
 
         let shader_module = if capabilities.bindless_support() == BindlessSupport::Full {
-            device.create_shader_module(SHADER_BINDLESS)
+            shader_compiler.create_shader_module("postprocessing", "effect_bindless")
         } else {
-            device.create_shader_module(SHADER)
+            shader_compiler.create_shader_module("postprocessing", "effect")
         };
 
         let instance_data_buffer = Buffer::with_capacity(

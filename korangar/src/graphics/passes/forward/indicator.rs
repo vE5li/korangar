@@ -12,7 +12,7 @@ use crate::graphics::passes::{
 use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::graphics::{Capabilities, GlobalContext, IndicatorInstruction};
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/indicator.wgsl");
+const SHADER: ShaderModuleDescriptor = include_wgsl!("../../../../shaders/passes/forward/indicator.wgsl");
 const DRAWER_NAME: &str = "forward indicator";
 
 pub(crate) struct ForwardIndicatorDrawer {

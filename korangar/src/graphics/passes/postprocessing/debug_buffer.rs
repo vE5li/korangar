@@ -13,9 +13,8 @@ use crate::graphics::settings::RenderOptions;
 use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::graphics::{Capabilities, GlobalContext, Prepare, RenderInstruction, Texture};
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/debug_buffer.wgsl");
-const SHADER_MSAA: ShaderModuleDescriptor = include_wgsl!("shader/debug_buffer_msaa.wgsl");
-
+const SHADER: ShaderModuleDescriptor = include_wgsl!("../../../../shaders/passes/postprocessing/debug_buffer.wgsl");
+const SHADER_MSAA: ShaderModuleDescriptor = include_wgsl!("../../../../shaders/passes/postprocessing/debug_buffer_msaa.wgsl");
 const DRAWER_NAME: &str = "debug buffer";
 
 pub(crate) struct DebugBufferDrawData<'a> {

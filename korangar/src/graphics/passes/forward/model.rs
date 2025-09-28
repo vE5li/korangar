@@ -21,10 +21,8 @@ use crate::graphics::{
     BindlessSupport, Buffer, Capabilities, GlobalContext, ModelBatch, ModelVertex, Msaa, Prepare, RenderInstruction, Texture, TextureSet,
 };
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/model.wgsl");
-const SHADER_BINDLESS: ShaderModuleDescriptor = include_wgsl!("shader/model_bindless.wgsl");
-#[cfg(feature = "debug")]
-const SHADER_WIREFRAME: ShaderModuleDescriptor = include_wgsl!("shader/model_wireframe.wgsl");
+const SHADER: ShaderModuleDescriptor = include_wgsl!("../../../../shaders/passes/forward/model.wgsl");
+const SHADER_BINDLESS: ShaderModuleDescriptor = include_wgsl!("../../../../shaders/passes/forward/model_bindless.wgsl");
 const DRAWER_NAME: &str = "forward model";
 const INITIAL_INSTRUCTION_SIZE: usize = 256;
 
@@ -86,7 +84,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
         };
 
         #[cfg(feature = "debug")]
-        let shader_module_wireframe = device.create_shader_module(SHADER_WIREFRAME);
+        let shader_module_wireframe = _shader_compiler.create_shader_module("forward", "model_wireframe");
 
         let instance_data_buffer = Buffer::with_capacity(
             device,

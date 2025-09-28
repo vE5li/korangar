@@ -7,7 +7,7 @@ use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
     BufferBindingType, BufferUsages, ColorTargetState, ColorWrites, CommandEncoder, Device, FragmentState, IndexFormat, MultisampleState,
     PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, PrimitiveTopology, Queue, RenderPass, RenderPipeline,
-    RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderStages, VertexState, include_wgsl,
+    RenderPipelineDescriptor, ShaderStages, VertexState,
 };
 
 use crate::Buffer;
@@ -17,7 +17,6 @@ use crate::graphics::passes::{
 use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::graphics::{Capabilities, GlobalContext, Prepare, RenderInstruction, SimpleVertex};
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/debug_aabb.wgsl");
 const DRAWER_NAME: &str = "debug aabb";
 const INITIAL_INSTRUCTION_SIZE: usize = 256;
 const INDEX_COUNT: usize = 24;
@@ -48,11 +47,11 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
         _capabilities: &Capabilities,
         device: &Device,
         queue: &Queue,
-        _shader_compiler: &ShaderCompiler,
+        shader_compiler: &ShaderCompiler,
         _global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {
-        let shader_module = device.create_shader_module(SHADER);
+        let shader_module = shader_compiler.create_shader_module("postprocessing", "debug_aabb");
 
         // Vertices are defined in world coordinates (Same as WGPU's NDC).
         let vertex_data = [

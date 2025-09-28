@@ -13,6 +13,9 @@
 // OR ANY OTHER PECUNIARY LOSS) ARISING OUT OF THE USE OF OR INABILITY TO USE
 // THIS SOFTWARE, EVEN IF NVIDIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH
 // DAMAGES.
+#language slang 2026
+
+import screen_space;
 
 // Choose the amount of sub-pixel aliasing removal. This can effect sharpness.
 //   1.00 - upper limit (softer)
@@ -20,13 +23,13 @@
 //   0.50 - lower limit (sharper, less sub-pixel aliasing removal)
 //   0.25 - almost off
 //   0.00 - completely off
-const QUALITY_SUBPIX: f32 = 0.50;
+static const var QUALITY_SUBPIX: float = 0.50;
 
 // Trims the algorithm from processing darks.
 //   0.0833 - upper limit (default, the start of visible unfiltered edges)
 //   0.0625 - high quality (faster)
 //   0.0312 - visible limit (slower)
-const QUALITY_EDGE_THRESHOLD_MIN: f32 = 0.0833;
+static const var QUALITY_EDGE_THRESHOLD_MIN: float = 0.0833;
 
 // The minimum amount of local contrast required to apply algorithm.
 //   0.333 - too little (faster)
@@ -34,40 +37,40 @@ const QUALITY_EDGE_THRESHOLD_MIN: f32 = 0.0833;
 //   0.166 - default
 //   0.125 - high quality
 //   0.063 - overkill (slower)
-const QUALITY_EDGE_THRESHOLD_MAX: f32 = 0.125;
+static const var QUALITY_EDGE_THRESHOLD_MAX: float = 0.125;
 
 // FXAA_QUALITY__PRESET == 15
-const QUALITY_STEPS_LENGTH: i32 = 8;
-const QUALITY_STEPS = array<f32, QUALITY_STEPS_LENGTH>(1.0, 1.5, 2.0, 2.0, 2.0, 2.0, 4.0, 12.0);
+static const var QUALITY_STEPS_LENGTH: int = 8;
+static const var QUALITY_STEPS: float[8] = {1.0, 1.5, 2.0, 2.0, 2.0, 2.0, 4.0, 12.0};
 
-/// Input texture must be:
-///   - Luma must be stored in alpha channel from a previous pass
-///   - Luma should be calculates as: sqrt(dot(color.rgb, vec3<f32>(0.299, 0.587, 0.114)))
-@group(0) @binding(2) var linear_sampler: sampler;
-@group(1) @binding(0) var texture: texture_2d<f32>;
+// Input texture must be:
+//   - Luma must be stored in alpha channel from a previous pass
+//   - Luma should be calculates as: sqrt(dot(color.rgb, float3(0.299, 0.587, 0.114)))
+[[vk::binding(2, 0)]] var linear_sampler: SamplerState;
+[[vk::binding(0, 1)]] var texture: Texture2D;
 
-@vertex
-fn vs_main(@builtin(vertex_index) vertex_index: u32) -> @builtin(position) vec4<f32> {
-    // Full screen triangle.
-    let uv = vec2<f32>(f32((vertex_index << 1u) & 2u), f32(vertex_index & 2u));
-    return vec4<f32>(uv * vec2<f32>(2.0, -2.0) + vec2<f32>(-1.0, 1.0), 0.0, 1.0);
+[[shader("vertex")]]
+func vs_main(uint vertex_index : SV_VulkanVertexID) -> FullscreenVertex {
+    return FullscreenVertex::new(vertex_index);
 }
 
 // This section in "as close as" the original code, so that it can be compared
 // easier against the original implementation, in case there is a bug.
-@fragment
-fn fs_main(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
-    let resolution = vec2<f32>(textureDimensions(texture));
-    let rcpFrame = vec2<f32>(1.0) / resolution;
-    let posM = position.xy * rcpFrame;
+[[shader("pixel")]]
+func fs_main(FullscreenVertex input) -> float4 {
+    uint2 texDims;
+    texture.GetDimensions(texDims.x, texDims.y);
+    let resolution = float2(texDims);
+    let rcpFrame = float2(1.0) / resolution;
+    let posM = input.position.xy * rcpFrame;
 
-    let rgbyM = textureSample(texture, linear_sampler, posM);
+    let rgbyM = texture.Sample(linear_sampler, posM);
     let lumaM = rgbyM.a;
 
-    var lumaS = textureSample(texture, linear_sampler, posM, vec2<i32>( 0, 1)).a;
-    let lumaE = textureSample(texture, linear_sampler, posM, vec2<i32>( 1, 0)).a;
-    var lumaN = textureSample(texture, linear_sampler, posM, vec2<i32>( 0,-1)).a;
-    let lumaW = textureSample(texture, linear_sampler, posM, vec2<i32>(-1, 0)).a;
+    var lumaS = texture.Sample(linear_sampler, posM, int2( 0, 1)).a;
+    let lumaE = texture.Sample(linear_sampler, posM, int2( 1, 0)).a;
+    var lumaN = texture.Sample(linear_sampler, posM, int2( 0,-1)).a;
+    let lumaW = texture.Sample(linear_sampler, posM, int2(-1, 0)).a;
 
     let maxSM = max(lumaS, lumaM);
     let minSM = min(lumaS, lumaM);
@@ -82,13 +85,13 @@ fn fs_main(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
     let rangeMaxClamped = max(QUALITY_EDGE_THRESHOLD_MIN, rangeMaxScaled);
 
     if (range < rangeMaxClamped) {
-        return vec4<f32>(rgbyM.rgb, 1.0);
+        return float4(rgbyM.rgb, 1.0);
     }
 
-    let lumaNW = textureSample(texture, linear_sampler, posM, vec2<i32>(-1,-1)).a;
-    let lumaSE = textureSample(texture, linear_sampler, posM, vec2<i32>( 1, 1)).a;
-    let lumaNE = textureSample(texture, linear_sampler, posM, vec2<i32>( 1,-1)).a;
-    let lumaSW = textureSample(texture, linear_sampler, posM, vec2<i32>(-1, 1)).a;
+    let lumaNW = texture.Sample(linear_sampler, posM, int2(-1,-1)).a;
+    let lumaSE = texture.Sample(linear_sampler, posM, int2( 1, 1)).a;
+    let lumaNE = texture.Sample(linear_sampler, posM, int2( 1,-1)).a;
+    let lumaSW = texture.Sample(linear_sampler, posM, int2(-1, 1)).a;
 
     let lumaNS = lumaN + lumaS;
     let lumaWE = lumaW + lumaE;
@@ -116,9 +119,9 @@ fn fs_main(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
     let subpixA = subpixNSWE * 2.0 + subpixNWSWNESE;
     let subpixB = (subpixA * (1.0/12.0)) - lumaM;
 
-    lumaN = select(lumaN, lumaW, !isHorizontal);
-    lumaS = select(lumaS, lumaE, !isHorizontal);
-    var lengthSign = select(rcpFrame.x, rcpFrame.y, isHorizontal);
+    lumaN = !isHorizontal ? lumaW : lumaN;
+    lumaS = !isHorizontal ? lumaE : lumaS;
+    var lengthSign = isHorizontal ? rcpFrame.y : rcpFrame.x;
 
     let gradientN = lumaN - lumaM;
     let gradientS = lumaS - lumaM;
@@ -126,28 +129,28 @@ fn fs_main(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
     let lumaSS = lumaS + lumaM;
     let pairN = abs(gradientN) >= abs(gradientS);
     let gradient = max(abs(gradientN), abs(gradientS));
-    lengthSign = select(lengthSign, -lengthSign, pairN);
+    lengthSign = pairN ? -lengthSign : lengthSign;
     let subpixC = saturate(abs(subpixB) * subpixRcpRange);
 
-    let posB = vec2<f32>(
-        select(posM.x, posM.x + lengthSign * 0.5, !isHorizontal),
-        select(posM.y, posM.y + lengthSign * 0.5, isHorizontal)
+    let posB = float2(
+        !isHorizontal ? posM.x + lengthSign * 0.5 : posM.x,
+        isHorizontal ? posM.y + lengthSign * 0.5 : posM.y
     );
 
-    let offNP = vec2<f32>(
-        select(rcpFrame.x, 0.0, !isHorizontal),
-        select(rcpFrame.y, 0.0, isHorizontal)
+    let offNP = float2(
+        !isHorizontal ? 0.0 : rcpFrame.x,
+        isHorizontal ? 0.0 : rcpFrame.y
     );
 
     var posN = posB - offNP * QUALITY_STEPS[0];
     var posP = posB + offNP * QUALITY_STEPS[0];
 
     let subpixD = ((-2.0) * subpixC) + 3.0;
-    var lumaEndN = textureSample(texture, linear_sampler, posN).a;
+    var lumaEndN = texture.Sample(linear_sampler, posN).a;
     let subpixE = subpixC * subpixC;
-    var lumaEndP = textureSample(texture, linear_sampler, posP).a;
+    var lumaEndP = texture.Sample(linear_sampler, posP).a;
 
-    lumaNN = select(lumaNN, lumaSS, !pairN);
+    lumaNN = !pairN ? lumaSS : lumaNN;
     let gradientScaled = gradient * 1.0 / 4.0;
     let lumaMM = lumaM - lumaNN * 0.5;
     let subpixF = subpixD * subpixE;
@@ -158,17 +161,17 @@ fn fs_main(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
     var doneN = abs(lumaEndN) >= gradientScaled;
     var doneP = abs(lumaEndP) >= gradientScaled;
 
-    posN = select(posN, posN - offNP * QUALITY_STEPS[1], !doneN);
-    posP = select(posP, posP + offNP * QUALITY_STEPS[1], !doneP);
+    posN = !doneN ? posN - offNP * QUALITY_STEPS[1] : posN;
+    posP = !doneP ? posP + offNP * QUALITY_STEPS[1] : posP;
 
     if (!(doneN && doneP)) {
-        for (var i = 2; i < QUALITY_STEPS_LENGTH; i++) {
+        for (int i = 2; i < QUALITY_STEPS_LENGTH; i++) {
             if (!doneN) {
-                lumaEndN = textureSample(texture, linear_sampler, posN).a;
+                lumaEndN = texture.Sample(linear_sampler, posN).a;
             }
 
             if (!doneP) {
-                lumaEndP = textureSample(texture, linear_sampler, posP).a;
+                lumaEndP = texture.Sample(linear_sampler, posP).a;
             }
 
             if (!doneN) {
@@ -196,8 +199,8 @@ fn fs_main(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
         }
     }
 
-    let dstN = select(posM.x - posN.x, posM.y - posN.y, !isHorizontal);
-    let dstP = select(posP.x - posM.x, posP.y - posM.y, !isHorizontal);
+    let dstN = !isHorizontal ? posM.y - posN.y : posM.x - posN.x;
+    let dstP = !isHorizontal ? posP.y - posM.y : posP.x - posM.x;
 
     let goodSpanN = (lumaEndN < 0.0) != lumaMLTZero;
     let spanLength = dstP + dstN;
@@ -206,19 +209,19 @@ fn fs_main(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
 
     let directionN = dstN < dstP;
     let dst = min(dstN, dstP);
-    let goodSpan = select(goodSpanP, goodSpanN, directionN);
+    let goodSpan = directionN ? goodSpanN : goodSpanP;
     let subpixG = subpixF * subpixF;
     let pixelOffset = (dst * (-spanLengthRcp)) + 0.5;
     let subpixH = subpixG * QUALITY_SUBPIX;
 
-    let pixelOffsetGood = select(0.0, pixelOffset, goodSpan);
+    let pixelOffsetGood = goodSpan ? pixelOffset : 0.0;
     let pixelOffsetSubpix = max(pixelOffsetGood, subpixH);
 
-    let finalPos = vec2<f32>(
-        select(posM.x, posM.x + pixelOffsetSubpix * lengthSign, !isHorizontal),
-        select(posM.y, posM.y + pixelOffsetSubpix * lengthSign, isHorizontal)
+    let finalPos = float2(
+        !isHorizontal ? posM.x + pixelOffsetSubpix * lengthSign : posM.x,
+        isHorizontal ? posM.y + pixelOffsetSubpix * lengthSign : posM.y
     );
 
-    let finalColor = textureSample(texture, linear_sampler, finalPos);
-    return vec4<f32>(finalColor.rgb, 1.0);
+    let finalColor = texture.Sample(linear_sampler, finalPos);
+    return float4(finalColor.rgb, 1.0);
 }

@@ -42,7 +42,6 @@ struct VertexOutput {
 const TILE_SIZE: u32 = 16;
 const NEAR_PLANE: f32 = 0.1;
 const DEPTH_EPSILON: f32 = 1.0e-7;
-const PARTITION_COUNT: u32 = 2;
 
 @group(0) @binding(0) var<uniform> global_uniforms: GlobalUniforms;
 @group(0) @binding(1) var nearest_sampler: sampler;

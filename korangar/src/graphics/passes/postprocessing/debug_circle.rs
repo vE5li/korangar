@@ -5,8 +5,8 @@ use wgpu::util::StagingBelt;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
     BlendState, BufferBindingType, BufferUsages, ColorTargetState, ColorWrites, CommandEncoder, Device, FragmentState, MultisampleState,
-    PipelineCompilationOptions, PipelineLayoutDescriptor, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor,
-    ShaderModuleDescriptor, ShaderStages, VertexState, include_wgsl,
+    PipelineCompilationOptions, PipelineLayoutDescriptor, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderStages,
+    VertexState,
 };
 
 use crate::graphics::passes::{
@@ -15,7 +15,6 @@ use crate::graphics::passes::{
 use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::graphics::{Buffer, Capabilities, GlobalContext, Prepare, RenderInstruction};
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/debug_circle.wgsl");
 const DRAWER_NAME: &str = "debug circle";
 const INITIAL_INSTRUCTION_SIZE: usize = 256;
 
@@ -45,11 +44,11 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
         _capabilities: &Capabilities,
         device: &Device,
         _queue: &Queue,
-        _shader_compiler: &ShaderCompiler,
+        shader_compiler: &ShaderCompiler,
         _global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {
-        let shader_module = device.create_shader_module(SHADER);
+        let shader_module = shader_compiler.create_shader_module("postprocessing", "debug_circle");
 
         let instance_data_buffer = Buffer::with_capacity(
             device,

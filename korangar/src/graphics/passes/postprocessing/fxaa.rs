@@ -1,7 +1,6 @@
 use wgpu::{
     ColorTargetState, ColorWrites, Device, FragmentState, MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor,
-    PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, TextureSampleType,
-    TextureViewDimension, VertexState, include_wgsl,
+    PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, TextureSampleType, TextureViewDimension, VertexState,
 };
 
 use crate::graphics::passes::{
@@ -10,7 +9,6 @@ use crate::graphics::passes::{
 use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::graphics::{AttachmentTexture, Capabilities, GlobalContext};
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/fxaa.wgsl");
 const DRAWER_NAME: &str = "post processing fxaa";
 
 pub(crate) struct PostProcessingFxaaDrawer {
@@ -25,11 +23,11 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
         _capabilities: &Capabilities,
         device: &Device,
         _queue: &Queue,
-        _shader_compiler: &ShaderCompiler,
+        shader_compiler: &ShaderCompiler,
         _global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {
-        let shader_module = device.create_shader_module(SHADER);
+        let shader_module = shader_compiler.create_shader_module("postprocessing", "fxaa");
 
         let pass_bind_group_layouts = Self::Context::bind_group_layout(device);
 

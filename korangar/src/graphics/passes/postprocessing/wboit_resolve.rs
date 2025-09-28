@@ -10,9 +10,7 @@ use crate::graphics::passes::{
 use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::graphics::{AttachmentTexture, Capabilities, GlobalContext};
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/wboit_resolve.wgsl");
-const SHADER_MSAA: ShaderModuleDescriptor = include_wgsl!("shader/wboit_resolve_msaa.wgsl");
-
+const SHADER_MSAA: ShaderModuleDescriptor = include_wgsl!("../../../../shaders/passes/postprocessing/wboit_resolve_msaa.wgsl");
 const DRAWER_NAME: &str = "post processing wboit resolve";
 
 pub(crate) struct PostProcessingWboitResolveDrawData<'a> {
@@ -32,7 +30,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
         _capabilities: &Capabilities,
         device: &Device,
         _queue: &Queue,
-        _shader_compiler: &ShaderCompiler,
+        shader_compiler: &ShaderCompiler,
         global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {
@@ -41,7 +39,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
         let shader_module = if msaa_activated {
             device.create_shader_module(SHADER_MSAA)
         } else {
-            device.create_shader_module(SHADER)
+            shader_compiler.create_shader_module("postprocessing", "wboit_resolve")
         };
 
         let color_texture_format = render_pass_context.color_attachment_formats()[0];

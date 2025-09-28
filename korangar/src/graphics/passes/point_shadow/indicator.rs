@@ -1,8 +1,8 @@
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType,
     CompareFunction, DepthBiasState, DepthStencilState, Device, FragmentState, MultisampleState, PipelineCompilationOptions,
-    PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor,
-    ShaderStages, StencilState, TextureSampleType, TextureViewDimension, VertexState,
+    PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderStages, StencilState,
+    TextureSampleType, TextureViewDimension, VertexState,
 };
 
 use crate::graphics::passes::{

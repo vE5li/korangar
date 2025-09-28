@@ -32,7 +32,6 @@ use crate::graphics::{EntityInstruction, IndicatorInstruction, ModelInstruction,
 use crate::loaders::GAT_TILE_SIZE;
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
-use crate::settings::LightingMode;
 use crate::world::pathing::Traversable;
 use crate::{Buffer, Color, GameFileLoader, ModelVertex, TileVertex};
 
@@ -481,13 +480,13 @@ impl Map {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn ambient_light_color(&self, lighting_mode: LightingMode, day_timer: f32) -> Color {
-        self.lighting.ambient_light_color(lighting_mode, day_timer)
+    pub fn ambient_light_color(&self) -> Color {
+        self.lighting.ambient_light_color()
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn directional_light(&self, lighting_mode: LightingMode, day_timer: f32) -> (Vector3<f32>, Color) {
-        self.lighting.directional_light(lighting_mode, day_timer)
+    pub fn directional_light(&self) -> (Vector3<f32>, Color) {
+        self.lighting.directional_light()
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]

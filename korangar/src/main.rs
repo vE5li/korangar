@@ -145,7 +145,6 @@ const DEBUG_WINDOWS: &[WindowClass] = &[
     WindowClass::PacketInspector,
     WindowClass::Profiler,
     WindowClass::RenderOptions,
-    WindowClass::Time,
 ];
 
 // Create the `threads` module.
@@ -903,7 +902,6 @@ impl Client {
         let timer_measurement = Profiler::start_measurement("update timers");
 
         let delta_time = self.game_timer.update();
-        let day_timer = self.game_timer.get_day_timer();
         let animation_timer_ms = self.game_timer.get_animation_timer_ms();
         let client_tick = self.game_timer.get_client_tick();
 
@@ -2186,13 +2184,6 @@ impl Client {
                     }
                 }
                 #[cfg(feature = "debug")]
-                InputEvent::ToggleTimeWindow => match self.interface.is_window_with_class_open(WindowClass::Time) {
-                    true => self.interface.close_window_with_class(WindowClass::Time),
-                    false => self.interface.open_window(TimeWindow),
-                },
-                #[cfg(feature = "debug")]
-                InputEvent::SetTime { day_seconds } => self.game_timer.set_day_timer(day_seconds),
-                #[cfg(feature = "debug")]
                 InputEvent::ToggleThemeInspectorWindow => match self.interface.is_window_with_class_open(WindowClass::ThemeInspector) {
                     true => self.interface.close_window_with_class(WindowClass::ThemeInspector),
                     false => self.interface.open_window(ThemeInspectorWindow::new(
@@ -2435,9 +2426,9 @@ impl Client {
             let shadow_detail = *self.client_state.follow(client_state().graphics_settings().shadow_detail());
             let shadow_quality = *self.client_state.follow(client_state().graphics_settings().shadow_quality());
 
-            let ambient_light_color = map.ambient_light_color(lighting_mode, day_timer);
+            let ambient_light_color = map.ambient_light_color();
 
-            let (directional_light_direction, directional_light_color) = map.directional_light(lighting_mode, day_timer);
+            let (directional_light_direction, directional_light_color) = map.directional_light();
 
             match self.player_camera.is_rotating_or_zooming_fast() {
                 true => {
@@ -2977,7 +2968,6 @@ impl Client {
                     projection_matrix,
                     camera_position,
                     animation_timer_ms,
-                    day_timer,
                     ambient_light_color,
                     enhanced_lighting: lighting_mode == LightingMode::Enhanced,
                     shadow_quality,

@@ -81,14 +81,6 @@ impl CustomWindow<ClientState> for MenuWindow {
                 },
                 #[cfg(feature = "debug")]
                 button! {
-                    text: "Time",
-                    tooltip: "Time control (^000001only available in debug mode^000000)",
-                    event: InputEvent::ToggleTimeWindow,
-                    foreground_color: client_theme().debug_button().foreground_color(),
-                    hovered_background_color: client_theme().debug_button().hovered_background_color(),
-                },
-                #[cfg(feature = "debug")]
-                button! {
                     text: "Theme inspector",
                     tooltip: "Inspect and edit the theme (^000001only available in debug mode^000000)",
                     event: InputEvent::ToggleThemeInspectorWindow,

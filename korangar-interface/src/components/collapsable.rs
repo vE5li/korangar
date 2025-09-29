@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::Cell;
 use std::marker::PhantomData;
 
 use rust_state::{Context, RustState, Selector};
@@ -42,7 +42,7 @@ where
 }
 
 pub struct CollapsableData {
-    expanded: RefCell<bool>,
+    expanded: Cell<bool>,
 }
 
 impl PersistentData for CollapsableData {
@@ -50,7 +50,7 @@ impl PersistentData for CollapsableData {
 
     fn from_inputs(inputs: Self::Inputs) -> Self {
         Self {
-            expanded: RefCell::new(inputs),
+            expanded: Cell::new(inputs),
         }
     }
 }
@@ -60,8 +60,8 @@ where
     App: Application,
 {
     fn handle_click(&self, _: &Context<App>, _: &mut EventQueue<App>) {
-        let mut expanded = self.expanded.borrow_mut();
-        *expanded = !*expanded;
+        let expanded = self.expanded.get();
+        self.expanded.set(!expanded);
     }
 }
 
@@ -206,7 +206,7 @@ where
         resolver: &mut Resolver<'_, App>,
     ) -> Self::LayoutInfo {
         let persistent = self.get_persistent_data(&store, *state.get(&self.initially_expanded));
-        let expanded = *persistent.expanded.borrow();
+        let expanded = persistent.expanded.get();
 
         let text = state.get(&self.text).as_ref();
         let font_size = *state.get(&self.font_size);

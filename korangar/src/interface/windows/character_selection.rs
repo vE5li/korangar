@@ -13,7 +13,7 @@ use crate::state::theme::InterfaceThemeType;
 use crate::state::{ClientState, ClientStatePathExt, client_state};
 
 mod character_slot_preview {
-    use std::cell::UnsafeCell;
+    use std::cell::{Cell, UnsafeCell};
     use std::fmt::Display;
 
     use korangar_interface::element::store::{ElementStore, ElementStoreMut};
@@ -373,14 +373,14 @@ mod character_slot_preview {
     }
 
     struct PartialEqDisplayStr<T> {
-        last_value: UnsafeCell<Option<T>>,
+        last_value: Cell<Option<T>>,
         text: UnsafeCell<String>,
     }
 
     impl<T> PartialEqDisplayStr<T> {
         pub fn new() -> Self {
             Self {
-                last_value: UnsafeCell::default(),
+                last_value: Cell::default(),
                 text: UnsafeCell::default(),
             }
         }
@@ -388,23 +388,19 @@ mod character_slot_preview {
 
     impl<T> PartialEqDisplayStr<T>
     where
-        T: Clone + PartialEq + Display + 'static,
+        T: Copy + PartialEq + Display + 'static,
     {
         fn get_str<'a, P>(&'a self, path: P, state: &'a Context<ClientState>) -> &'a str
         where
             P: Path<ClientState, T>,
         {
-            // SAFETY
-            // `unnwrap` is safe here because the bound of `P` specifies a safe path.
             let value = state.get(&path);
 
-            unsafe {
-                let last_value = &mut *self.last_value.get();
+            let last_value = self.last_value.get();
 
-                if last_value.is_none() || last_value.as_ref().is_some_and(|last| last != value) {
-                    *self.text.get() = value.to_string();
-                    *last_value = Some(value.clone());
-                }
+            if last_value.is_none() || last_value.as_ref().is_some_and(|last| last != value) {
+                unsafe { *self.text.get() = value.to_string() };
+                self.last_value.set(Some(*value));
             }
 
             unsafe { self.text.as_ref_unchecked() }

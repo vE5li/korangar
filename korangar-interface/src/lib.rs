@@ -66,7 +66,7 @@ pub mod prelude {
 
 // TODO: Move
 pub mod selector_helpers {
-    use std::cell::UnsafeCell;
+    use std::cell::{Cell, UnsafeCell};
     use std::fmt::Display;
 
     use rust_state::{Path, Selector};
@@ -76,7 +76,7 @@ pub mod selector_helpers {
 
     pub struct PartialEqDisplaySelector<P, T> {
         path: P,
-        last_value: UnsafeCell<Option<T>>,
+        last_value: Cell<Option<T>>,
         text: UnsafeCell<String>,
     }
 
@@ -84,7 +84,7 @@ pub mod selector_helpers {
         pub fn new(path: P) -> Self {
             Self {
                 path,
-                last_value: UnsafeCell::default(),
+                last_value: Cell::default(),
                 text: UnsafeCell::default(),
             }
         }
@@ -94,20 +94,18 @@ pub mod selector_helpers {
     where
         App: Application,
         P: Path<App, T>,
-        T: Clone + PartialEq + Display + 'static,
+        T: Copy + PartialEq + Display + 'static,
     {
         fn select<'a>(&'a self, state: &'a App) -> Option<&'a String> {
             // SAFETY
-            // `unnwrap` is safe here because the bound of `P` specifies a safe path.
+            // `unwrap()` is safe here because the bound of `P` specifies a safe path.
             let value = self.path.follow(state).unwrap();
 
-            unsafe {
-                let last_value = &mut *self.last_value.get();
+            let last_value = self.last_value.get();
 
-                if last_value.is_none() || last_value.as_ref().is_some_and(|last| last != value) {
-                    *self.text.get() = value.to_string();
-                    *last_value = Some(value.clone());
-                }
+            if last_value.is_none() || last_value.as_ref().is_some_and(|last| last != value) {
+                unsafe { *self.text.get() = value.to_string() };
+                self.last_value.set(Some(*value));
             }
 
             unsafe { Some(self.text.as_ref_unchecked()) }

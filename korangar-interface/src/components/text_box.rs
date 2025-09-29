@@ -1,5 +1,5 @@
 use std::any::Any;
-use std::cell::{RefCell, UnsafeCell};
+use std::cell::{Cell, UnsafeCell};
 use std::marker::PhantomData;
 
 use rust_state::{Context, Path, RustState, Selector};
@@ -40,7 +40,7 @@ where
 }
 
 pub struct TextBoxData {
-    is_hidden: RefCell<bool>,
+    is_hidden: Cell<bool>,
     hidden_text: UnsafeCell<String>,
 }
 
@@ -49,7 +49,7 @@ impl PersistentData for TextBoxData {
 
     fn from_inputs(inputs: Self::Inputs) -> Self {
         Self {
-            is_hidden: RefCell::new(inputs),
+            is_hidden: Cell::new(inputs),
             hidden_text: UnsafeCell::new(String::new()),
         }
     }
@@ -60,8 +60,8 @@ where
     App: Application,
 {
     fn handle_click(&self, _: &Context<App>, _: &mut EventQueue<App>) {
-        let mut is_hidden = self.is_hidden.borrow_mut();
-        *is_hidden = !*is_hidden;
+        let is_hidden = self.is_hidden.get();
+        self.is_hidden.set(!is_hidden);
     }
 }
 
@@ -225,7 +225,7 @@ where
 
         if *state.get(&self.hidable) {
             let persistent_data = self.get_persistent_data(&store, true);
-            let is_hidden = *persistent_data.is_hidden.borrow();
+            let is_hidden = persistent_data.is_hidden.get();
 
             if is_hidden {
                 // SAFETY:
@@ -326,7 +326,7 @@ where
         let mut display_text = state.get(&self.state).as_str();
 
         if let Some((button_area, is_hovered, persistent_data)) = hide_button {
-            let is_hidden = *persistent_data.is_hidden.borrow();
+            let is_hidden = persistent_data.is_hidden.get();
 
             if is_hidden {
                 // SAFETY:

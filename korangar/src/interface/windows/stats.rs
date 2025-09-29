@@ -1,4 +1,4 @@
-use std::cell::UnsafeCell;
+use std::cell::{Cell, UnsafeCell};
 
 use korangar_interface::window::{CustomWindow, Window};
 use ragnarok_packets::StatUpType;
@@ -14,7 +14,7 @@ use crate::world::{Player, PlayerPathExt};
 
 struct StatTextSelector<A> {
     bonus_path: A,
-    last_value: UnsafeCell<Option<i32>>,
+    last_value: Cell<Option<i32>>,
     text: UnsafeCell<String>,
 }
 
@@ -22,7 +22,7 @@ impl<A> StatTextSelector<A> {
     pub fn new(bonus_path: A) -> Self {
         Self {
             bonus_path,
-            last_value: UnsafeCell::default(),
+            last_value: Cell::default(),
             text: UnsafeCell::default(),
         }
     }
@@ -38,11 +38,11 @@ where
         let bonus_value = self.bonus_path.follow(state).unwrap();
 
         unsafe {
-            let last_value = &mut *self.last_value.get();
+            let last_value = self.last_value.get();
 
             if last_value.is_none() || last_value.as_ref().is_some_and(|last| *last != *bonus_value) {
                 *self.text.get() = format!("^000001{bonus_value:+}^000000");
-                *last_value = Some(*bonus_value);
+                self.last_value.set(Some(*bonus_value));
             }
         }
 

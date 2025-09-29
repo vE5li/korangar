@@ -1,4 +1,4 @@
-use std::any::TypeId;
+use std::any::Any;
 
 use encoding_rs::{EUC_KR, Encoding};
 
@@ -63,7 +63,7 @@ where
 
 impl<'a, Meta> ByteReader<'a, Meta>
 where
-    Meta: 'static,
+    Meta: Any + 'static,
 {
     /// Create a new [`ByteReader`] with specific metadata.
     pub fn with_metadata(data: &'a [u8], metadata: Meta) -> Self {
@@ -140,26 +140,24 @@ where
 
     pub fn get_metadata<Caller, As>(&self) -> ConversionResult<&As>
     where
-        As: 'static,
+        As: Any + 'static,
     {
-        match TypeId::of::<Meta>() == TypeId::of::<As>() {
-            true => unsafe { Ok(std::mem::transmute::<&Meta, &As>(&self.metadata)) },
-            false => Err(ConversionError::from_error_type(ConversionErrorType::IncorrectMetadata {
+        (&self.metadata as &dyn Any).downcast_ref::<As>().ok_or_else(|| {
+            ConversionError::from_error_type(ConversionErrorType::IncorrectMetadata {
                 type_name: std::any::type_name::<Caller>(),
-            })),
-        }
+            })
+        })
     }
 
     pub fn get_metadata_mut<Caller, As>(&mut self) -> ConversionResult<&mut As>
     where
-        As: 'static,
+        As: Any + 'static,
     {
-        match TypeId::of::<Meta>() == TypeId::of::<As>() {
-            true => unsafe { Ok(std::mem::transmute::<&mut Meta, &mut As>(&mut self.metadata)) },
-            false => Err(ConversionError::from_error_type(ConversionErrorType::IncorrectMetadata {
+        (&mut self.metadata as &mut dyn Any).downcast_mut::<As>().ok_or_else(|| {
+            ConversionError::from_error_type(ConversionErrorType::IncorrectMetadata {
                 type_name: std::any::type_name::<Caller>(),
-            })),
-        }
+            })
+        })
     }
 
     pub fn into_metadata(self) -> Meta {

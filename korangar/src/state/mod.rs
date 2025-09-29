@@ -3,6 +3,7 @@ pub mod cache_statistics;
 pub mod localization;
 pub mod theme;
 
+use std::cell::Cell;
 use std::sync::Arc;
 
 use korangar_interface::application::Application;
@@ -396,9 +397,10 @@ impl ClientState {
     }
 }
 
-/// Static used to create a path without arguments that points the the current
-/// theme when creating the layout for a given window.
-static mut CURRENT_THEME: InterfaceThemeType = InterfaceThemeType::InGame;
+/// Thread local used to create a path without arguments that points to the
+/// current theme when creating the layout for a given window.
+#[thread_local]
+static CURRENT_THEME: Cell<InterfaceThemeType> = Cell::new(InterfaceThemeType::InGame);
 
 /// Path resolving to the selected theme for the window.
 #[derive(Clone, Copy)]
@@ -406,14 +408,14 @@ pub struct ThemePath;
 
 impl Path<ClientState, InterfaceTheme> for ThemePath {
     fn follow<'a>(&self, state: &'a ClientState) -> Option<&'a InterfaceTheme> {
-        match unsafe { CURRENT_THEME } {
+        match CURRENT_THEME.get() {
             InterfaceThemeType::Menu => Some(&state.menu_theme),
             InterfaceThemeType::InGame => Some(&state.in_game_theme),
         }
     }
 
     fn follow_mut<'a>(&self, state: &'a mut ClientState) -> Option<&'a mut InterfaceTheme> {
-        match unsafe { CURRENT_THEME } {
+        match CURRENT_THEME.get() {
             InterfaceThemeType::Menu => Some(&mut state.menu_theme),
             InterfaceThemeType::InGame => Some(&mut state.in_game_theme),
         }
@@ -491,9 +493,7 @@ impl Application for ClientState {
     type WindowClass = WindowClass;
 
     fn set_current_theme_type(theme: InterfaceThemeType) {
-        unsafe {
-            CURRENT_THEME = theme;
-        }
+        CURRENT_THEME.set(theme);
     }
 }
 

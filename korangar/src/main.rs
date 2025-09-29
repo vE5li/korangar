@@ -14,6 +14,7 @@
 #![feature(macro_metavar_expr)]
 #![feature(unsafe_cell_access)]
 #![feature(impl_trait_in_assoc_type)]
+#![feature(thread_local)]
 
 // Helper macro to time and print the startup time of Korangar
 macro_rules! time_phase {

@@ -7,7 +7,7 @@ public struct FullscreenVertex {
     public var uv: float2;
 
     public static func new(vertex_index: uint) -> FullscreenVertex {
-        let uv = float2(float((vertex_index << 1u) & 2u), float(vertex_index & 2u));
+        let uv = float2(float((vertex_index << 1) & 2), float(vertex_index & 2));
         let position = float4(uv * float2(2.0, -2.0) + float2(-1.0, 1.0), 0.0, 1.0);
 
         var vertex: FullscreenVertex;

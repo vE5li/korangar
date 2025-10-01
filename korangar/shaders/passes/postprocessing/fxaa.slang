@@ -58,7 +58,7 @@ func vs_main(uint vertex_index : SV_VulkanVertexID) -> FullscreenVertex {
 // easier against the original implementation, in case there is a bug.
 [[shader("pixel")]]
 func fs_main(FullscreenVertex input) -> float4 {
-    uint2 texDims;
+    var texDims: uint2;
     texture.GetDimensions(texDims.x, texDims.y);
     let resolution = float2(texDims);
     let rcpFrame = float2(1.0) / resolution;

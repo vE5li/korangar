@@ -101,7 +101,8 @@ fn compile_shader(shader_file: &Path, output_dir: &Path, modules_dir: &Path) -> 
         .arg("spirv_1_5")
         .arg("-I")
         .arg(modules_dir)
-        .arg("-O3")
+        // -03 is producing shaders that WGPU can't compile for Metal.
+        .arg("-O2")
         // Uses column major layout for matrices.
         .arg("-matrix-layout-column-major")
         // Use std430 layout instead of D3D buffer layout for raw buffer load/stores.

@@ -1,7 +1,7 @@
 use wgpu::{
     BlendComponent, BlendFactor, BlendOperation, BlendState, ColorTargetState, ColorWrites, Device, FragmentState, MultisampleState,
     PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor,
-    ShaderModuleDescriptor, TextureSampleType, TextureViewDimension, VertexState, include_wgsl,
+    TextureSampleType, TextureViewDimension, VertexState,
 };
 
 use crate::graphics::passes::{
@@ -10,7 +10,6 @@ use crate::graphics::passes::{
 use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::graphics::{AttachmentTexture, Capabilities, GlobalContext};
 
-const SHADER_MSAA: ShaderModuleDescriptor = include_wgsl!("../../../../shaders/passes/postprocessing/wboit_resolve_msaa.wgsl");
 const DRAWER_NAME: &str = "post processing wboit resolve";
 
 pub(crate) struct PostProcessingWboitResolveDrawData<'a> {
@@ -37,7 +36,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
         let msaa_activated = global_context.msaa.multisampling_activated();
 
         let shader_module = if msaa_activated {
-            device.create_shader_module(SHADER_MSAA)
+            shader_compiler.create_shader_module("postprocessing", "wboit_resolve_msaa")
         } else {
             shader_compiler.create_shader_module("postprocessing", "wboit_resolve")
         };
@@ -60,7 +59,10 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
             push_constant_ranges: &[],
         });
 
-        let constants = &[("MSAA_SAMPLE_COUNT", f64::from(global_context.msaa.sample_count()))];
+        let constants = &[
+            // MSAA_SAMPLE_COUNT
+            ("0", f64::from(global_context.msaa.sample_count())),
+        ];
 
         let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
             label: Some(DRAWER_NAME),

@@ -12,8 +12,7 @@ runtime. These shaders are compiled with `slangc` by the `build.rs` script:
 
 We still have some WGSL files left, until some issues are fixed upstream:
 
-- Shaders that sample depth textures: https://github.com/gfx-rs/wgpu/issues/7332
-- Shaders that sample multi-sampled textures: https://github.com/gfx-rs/wgpu/pull/8270
+- Problem sampling depth texture arrays and cubes (Don't know yet if Slang or WGPU problem. Needs more debugging).
 - Shaders tha sample integer based textures: https://github.com/shader-slang/slang/issues/8549
 
 All WGSL shaders will eventually be ported to Slang once the outstanding issues are fixed.

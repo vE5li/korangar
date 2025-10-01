@@ -1232,7 +1232,16 @@ impl GlobalContext {
                         binding: 1,
                         visibility: ShaderStages::COMPUTE,
                         ty: BindingType::Texture {
-                            sample_type: TextureSampleType::Depth,
+                            // Even though we sample a depth texture and in WGSL we would need to define
+                            // this binding as a depth sample type, since we ingest SPIR-V with slang,
+                            // the image is not marked as a depth texture. The workaround is, that
+                            // for shaders that don't use a compare sampler on the depth texture use
+                            // a float sample type. It's currently not clear it Slang/HLSL or WGPU
+                            // need to fix this.
+                            //
+                            // Tracking issue WGPU: https://github.com/gfx-rs/wgpu/issues/7332
+                            // Tracking issue Slang: https://github.com/shader-slang/slang/issues/8503
+                            sample_type: TextureSampleType::Float { filterable: false },
                             view_dimension: TextureViewDimension::D2,
                             multisampled: msaa.multisampling_activated(),
                         },
@@ -1490,7 +1499,7 @@ impl GlobalContext {
                 },
                 BindGroupEntry {
                     binding: 1,
-                    resource: BindingResource::TextureView(forward_depth_texture.get_texture_view()),
+                    resource: BindingResource::TextureView(&forward_depth_texture.get_texture_view()),
                 },
                 BindGroupEntry {
                     binding: 2,

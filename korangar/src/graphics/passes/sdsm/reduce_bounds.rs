@@ -1,14 +1,8 @@
-use wgpu::{
-    ComputePass, ComputePipeline, ComputePipelineDescriptor, Device, PipelineCompilationOptions, PipelineLayoutDescriptor, Queue,
-    ShaderModuleDescriptor, include_wgsl,
-};
+use wgpu::{ComputePass, ComputePipeline, ComputePipelineDescriptor, Device, PipelineCompilationOptions, PipelineLayoutDescriptor, Queue};
 
 use crate::graphics::passes::{BindGroupCount, ComputePassContext, Dispatch, SdsmPassContext};
 use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::graphics::{Capabilities, GlobalContext, ScreenSize};
-
-const SHADER: ShaderModuleDescriptor = include_wgsl!("../../../../shaders/passes/sdsm/reduce_bounds.wgsl");
-const SHADER_MSAA: ShaderModuleDescriptor = include_wgsl!("../../../../shaders/passes/sdsm/reduce_bounds_msaa.wgsl");
 
 const DISPATCHER_NAME: &str = "reduce bounds";
 
@@ -24,13 +18,13 @@ impl Dispatch<{ BindGroupCount::Two }> for ReduceBoundsDispatcher {
         _capabilities: &Capabilities,
         device: &Device,
         _queue: &Queue,
-        _shader_compiler: &ShaderCompiler,
+        shader_compiler: &ShaderCompiler,
         global_context: &GlobalContext,
         _compute_pass_context: &Self::Context,
     ) -> Self {
         let shader_module = match global_context.msaa.multisampling_activated() {
-            false => device.create_shader_module(SHADER),
-            true => device.create_shader_module(SHADER_MSAA),
+            false => shader_compiler.create_shader_module("sdsm", "reduce_bounds"),
+            true => shader_compiler.create_shader_module("sdsm", "reduce_bounds_msaa"),
         };
 
         let pass_bind_group_layouts = Self::Context::bind_group_layout(device, global_context.msaa);

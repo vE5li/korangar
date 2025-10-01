@@ -47,7 +47,7 @@ func main(ComputeInput input) {
                 // Check if sample falls within view frustum.
                 if (linear_view_z > near_z && linear_view_z < far_z) {
                     // Determine which partition this sample belongs to.
-                    uint partition_index = 0;
+                    var partition_index = 0;
                     for (uint i = 0; i < (PARTITION_COUNT - 1); i++) {
                         if (linear_view_z >= partition_data[i].interval_end) {
                             partition_index++;
@@ -85,7 +85,7 @@ func main(ComputeInput input) {
 
     if (input.local_invocation_index < PARTITION_COUNT) {
         // Apply the offset to move values into the positive range [0, 2]. We need to do this, since
-        // using u32's min/max only works when the f32 are positive.
+        // using uint's min/max only works when the float are positive.
         let offset_min_vec = sbounds_min[input.local_invocation_index] + ATOMIC_FLOAT_OFFSET;
         let offset_max_vec = sbounds_max[input.local_invocation_index] + ATOMIC_FLOAT_OFFSET;
 

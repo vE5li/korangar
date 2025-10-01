@@ -14,11 +14,11 @@ struct ComputeInput {
 [[numthreads(4, 1, 1)]]
 func main(ComputeInput input) {
     if (input.global_invocation_id.x < PARTITION_COUNT && input.global_invocation_id.y == 0 && input.global_invocation_id.z == 0) {
-        uint idx = input.global_invocation_id.x;
+        var idx = input.global_invocation_id.x;
 
         // Read the min/max z values from interval data.
-        float min_z = asfloat(interval_data[0].begin.load(MemoryOrder::Relaxed));
-        float max_z = asfloat(interval_data[PARTITION_COUNT - 1].end.load(MemoryOrder::Relaxed));
+        let min_z = asfloat(interval_data[0].begin.load(MemoryOrder::Relaxed));
+        let max_z = asfloat(interval_data[PARTITION_COUNT - 1].end.load(MemoryOrder::Relaxed));
 
         // We ensure that it still covers the whole range of the framebuffer (expand first and last).
         // This does not affect the solution at all since we derive the bounds based on the samples,

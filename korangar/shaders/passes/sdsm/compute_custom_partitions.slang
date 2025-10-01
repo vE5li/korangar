@@ -13,11 +13,11 @@ struct ComputeInput {
 [[numthreads(4, 1, 1)]]
 func main(ComputeInput input) {
     if (input.global_invocation_id.x < PARTITION_COUNT && input.global_invocation_id.y == 0 && input.global_invocation_id.z == 0) {
-        uint partition_index = input.global_invocation_id.x;
-        BoundsFloat bounds = read_bounds_as_float(partition_index, bounds_data);
+        let partition_index = input.global_invocation_id.x;
+        let bounds = read_bounds_as_float(partition_index, bounds_data);
 
-        float3 extents = (bounds.max_coord - bounds.min_coord) * 0.5;
-        float3 center = (bounds.max_coord + bounds.min_coord) * 0.5;
+        let extents = (bounds.max_coord - bounds.min_coord) * 0.5;
+        let center = (bounds.max_coord + bounds.min_coord) * 0.5;
 
         // Extents represents the half size of the bounding box in light space (NDC units).
         // e.g. a unit cube would have an extents of float3(0.5, 0.5, 0.5).

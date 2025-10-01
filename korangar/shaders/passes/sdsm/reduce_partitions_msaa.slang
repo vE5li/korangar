@@ -24,8 +24,8 @@ func main(ComputeInput input) {
     var sample_count: uint;
     depth_texture.GetDimensions(depth_dim.x, depth_dim.y, sample_count);
 
-    var min_z: float = VIRTUAL_FAR_PLANE;
-    var max_z: float = NEAR_PLANE;
+    var min_z = VIRTUAL_FAR_PLANE;
+    var max_z = NEAR_PLANE;
 
     let tile_start = input.workgroup_id.xy * REDUCE_TILE_DIM + input.local_invocation_id.xy;
 

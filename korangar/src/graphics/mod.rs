@@ -1499,7 +1499,7 @@ impl GlobalContext {
                 },
                 BindGroupEntry {
                     binding: 1,
-                    resource: BindingResource::TextureView(&forward_depth_texture.get_texture_view()),
+                    resource: BindingResource::TextureView(forward_depth_texture.get_texture_view()),
                 },
                 BindGroupEntry {
                     binding: 2,

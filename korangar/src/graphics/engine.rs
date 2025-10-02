@@ -1,6 +1,6 @@
 use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use cgmath::Vector2;
 #[cfg(feature = "debug")]
@@ -904,7 +904,10 @@ impl GraphicsEngine {
         // is ready to accept the command buffers for the next frame. This is the
         // best time to resolve async operations like reading the piker value that need
         // to be synced with the GPU.
-        let _ = self.device.poll(PollType::Wait);
+        let _ = self.device.poll(PollType::Wait {
+            submission_index: None,
+            timeout: Some(Duration::from_secs(10)),
+        });
         self.queue.submit([
             prepare_command_buffer,
             interface_command_buffer,

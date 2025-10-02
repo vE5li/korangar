@@ -6,12 +6,12 @@ members = ["korangar", "ragnarok-*", "korangar-*"]
 arrayvec = "0.7"
 bitflags = "2"
 blake3 = { version = "1", default-features = true }
-block_compression = { version = "0.6", default-features = false }
+block_compression = { version = "0.7", default-features = false }
 bumpalo = "3"
 bytemuck = "1"
 cgmath = "0.18"
 chrono = "0.4"
-clap = "4.5.46"
+clap = "4"
 cosmic-text = { version = "0.14", default-features = false }
 cpal = "0.15"
 ctrlc = "3"
@@ -21,7 +21,7 @@ etherparse = "0.19"
 fast-srgb8 = "1"
 flate2 = { version = "1", default-features = false }
 hashbrown = "0.16"
-heck = "0.5.0"
+heck = "0.5"
 image = { version = "0.25", default-features = false }
 kira = { version = "0.10", default-features = false }
 korangar-audio = { path = "korangar-audio" }
@@ -60,15 +60,8 @@ syn = "2"
 sys-locale = "0.3"
 tokio = { version = "1", default-features = false }
 walkdir = "2"
-wgpu = "26"
+wgpu = "27"
 winit = "0.30"
-
-[patch.crates-io]
-naga = { git = "https://github.com/gfx-rs/wgpu.git", rev = "06fc6f7345d70de8aca533f42c7f2cdc1f986b3c" }
-wgpu = { git = "https://github.com/gfx-rs/wgpu.git", rev = "06fc6f7345d70de8aca533f42c7f2cdc1f986b3c" }
-wgpu-hal = { git = "https://github.com/gfx-rs/wgpu.git", rev = "06fc6f7345d70de8aca533f42c7f2cdc1f986b3c" }
-wgpu-core = { git = "https://github.com/gfx-rs/wgpu.git", rev = "06fc6f7345d70de8aca533f42c7f2cdc1f986b3c" }
-wgpu-types = { git = "https://github.com/gfx-rs/wgpu.git", rev = "06fc6f7345d70de8aca533f42c7f2cdc1f986b3c" }
 
 [profile.release]
 lto = "thin"

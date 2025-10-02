@@ -2,6 +2,7 @@ use std::io::{Cursor, Read};
 use std::num::{NonZeroU32, NonZeroUsize};
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use block_compression::{BC7Settings, CompressionVariant, GpuBlockCompressor};
 use hashbrown::HashMap;
@@ -385,7 +386,10 @@ impl TextureLoader {
         }
 
         self.queue.submit([compression_encoder.finish()]);
-        let _ = self.device.poll(PollType::Wait);
+        let _ = self.device.poll(PollType::Wait {
+            submission_index: None,
+            timeout: Some(Duration::from_secs(10)),
+        });
 
         self.download_blocks_data(output_buffer, compressed_data);
     }
@@ -407,7 +411,10 @@ impl TextureLoader {
         download_encoder.copy_buffer_to_buffer(&block_buffer, 0, &staging_buffer, 0, size);
 
         self.queue.submit([download_encoder.finish()]);
-        let _ = self.device.poll(PollType::Wait);
+        let _ = self.device.poll(PollType::Wait {
+            submission_index: None,
+            timeout: Some(Duration::from_secs(10)),
+        });
 
         {
             let buffer_slice = staging_buffer.slice(..);

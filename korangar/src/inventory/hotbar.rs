@@ -4,28 +4,28 @@ use ragnarok_packets::handler::PacketCallback;
 use ragnarok_packets::{HotbarSlot, HotbarTab, HotkeyData};
 use rust_state::RustState;
 
-use super::Skill;
+use crate::inventory::LearnableSkill;
 
 #[derive(Default, RustState, StateElement)]
 pub struct Hotbar {
-    skills: [Option<Skill>; 10],
+    skills: [Option<LearnableSkill>; 10],
 }
 
 impl Hotbar {
     /// Set the slot without notifying the map server.
-    pub fn set_slot(&mut self, slot: HotbarSlot, skill: Skill) {
+    pub fn set_slot(&mut self, slot: HotbarSlot, skill: LearnableSkill) {
         self.skills[slot.0 as usize] = Some(skill);
     }
 
     /// Update the slot and notify the map server.
-    pub fn update_slot<Callback>(&mut self, networking_system: &mut NetworkingSystem<Callback>, slot: HotbarSlot, skill: Skill)
+    pub fn update_slot<Callback>(&mut self, networking_system: &mut NetworkingSystem<Callback>, slot: HotbarSlot, skill: LearnableSkill)
     where
         Callback: PacketCallback + Send,
     {
         let _ = networking_system.set_hotkey_data(HotbarTab(0), slot, HotkeyData {
             is_skill: true as u8,
             skill_id: skill.skill_id.0 as u32,
-            quantity_or_skill_level: skill.skill_level,
+            quantity_or_skill_level: skill.maximum_level,
         });
 
         self.skills[slot.0 as usize] = Some(skill);
@@ -49,7 +49,7 @@ impl Hotbar {
                 .map(|skill| HotkeyData {
                     is_skill: true as u8,
                     skill_id: skill.skill_id.0 as u32,
-                    quantity_or_skill_level: skill.skill_level,
+                    quantity_or_skill_level: skill.maximum_level,
                 })
                 .unwrap_or(HotkeyData::UNBOUND);
 
@@ -58,7 +58,7 @@ impl Hotbar {
                 .map(|skill| HotkeyData {
                     is_skill: true as u8,
                     skill_id: skill.skill_id.0 as u32,
-                    quantity_or_skill_level: skill.skill_level,
+                    quantity_or_skill_level: skill.maximum_level,
                 })
                 .unwrap_or(HotkeyData::UNBOUND);
 
@@ -85,7 +85,7 @@ impl Hotbar {
         self.skills[slot.0 as usize] = None;
     }
 
-    pub fn get_skill_in_slot(&self, slot: HotbarSlot) -> &Option<Skill> {
+    pub fn get_skill_in_slot(&self, slot: HotbarSlot) -> &Option<LearnableSkill> {
         &self.skills[slot.0 as usize]
     }
 }

@@ -148,6 +148,10 @@ pub struct Price(pub u32);
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct AttackRange(pub u16);
 
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub struct JobId(pub u16);
+
 #[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct ServerAddress(pub [u8; 4]);
@@ -347,6 +351,27 @@ pub struct Packet0b18 {
     pub unknown: u16,
 }
 
+#[derive(Debug, Clone, ByteConvertable)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[numeric_type(u16)]
+pub enum ConnectionRefusedReason {
+    #[numeric_value(1)]
+    Unknown1,
+    InvalidAccountId,
+    InvalidChracterId,
+    #[numeric_value(6)]
+    InvalidSex,
+    Unkown2,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x006A)]
+pub struct ConnectionRefusedPacket {
+    pub reason: ConnectionRefusedReason,
+    pub unknown: [u8; 19],
+}
+
 /// Sent by the map server as a response to [MapServerLoginPacket] succeeding.
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
@@ -534,9 +559,9 @@ pub struct CreateCharacterPacket {
     #[length(24)]
     pub name: String,
     pub slot: u8,
-    pub hair_color: u16, // TODO: HairColor
-    pub hair_style: u16, // TODO: HairStyle
-    pub start_job: u16,  // TODO: Job
+    pub hair_color: u16,     // TODO: HairColor
+    pub hair_style: u16,     // TODO: HairStyle
+    pub start_job_id: JobId, // TODO: Job
     #[new_default]
     pub unknown: [u8; 2],
     pub sex: Sex,
@@ -561,7 +586,7 @@ pub struct CharacterInformation {
     pub spell_points: i64,
     pub maximum_spell_points: i64,
     pub movement_speed: i16,
-    pub job: i16,
+    pub job_id: JobId,
     pub head: i16,
     pub body: i16,
     pub weapon: i16,
@@ -1689,7 +1714,7 @@ pub struct MovingEntityAppearedPacket {
     pub body_state: u16,
     pub health_state: u16,
     pub effect_state: u32,
-    pub job: u16,
+    pub job_id: JobId,
     pub head: u16,
     pub weapon: u32,
     pub shield: u32,
@@ -1742,7 +1767,7 @@ pub struct EntityAppearedPacket {
     pub body_state: u16,
     pub health_state: u16,
     pub effect_state: u32,
-    pub job: u16,
+    pub job_id: JobId,
     pub head: u16,
     pub weapon: u32,
     pub shield: u32,
@@ -1784,7 +1809,7 @@ pub struct EntityAppeared2Packet {
     pub body_state: u16,
     pub health_state: u16,
     pub effect_state: u32,
-    pub job: u16,
+    pub job_id: JobId,
     pub head: u16,
     pub weapon: u32,
     pub shield: u32,

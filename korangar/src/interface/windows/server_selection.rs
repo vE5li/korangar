@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use korangar_interface::element::store::{ElementStore, ElementStoreMut};
 use korangar_interface::element::{DefaultLayoutInfo, Element};
-use korangar_interface::layout::{Resolver, WindowLayout};
+use korangar_interface::layout::{Resolvers, WindowLayout, with_single_resolver};
 use korangar_interface::window::{CustomWindow, Window};
 use ragnarok_packets::{CharacterServerInformation, CharacterServerInformationPathExt};
 use rust_state::{Context, Path};
@@ -86,20 +86,22 @@ where
             fn create_layout_info(
                 &mut self,
                 state: &Context<ClientState>,
-                mut store: ElementStoreMut<'_>,
-                resolver: &mut Resolver<'_, ClientState>,
+                mut store: ElementStoreMut,
+                resolvers: &mut dyn Resolvers<ClientState>,
             ) -> Self::LayoutInfo {
-                self.correct_element_size(state);
+                with_single_resolver(resolvers, |resolver| {
+                    self.correct_element_size(state);
 
-                let (_area, layout_info) = resolver.with_derived(2.0, 4.0, |resolver| {
-                    self.item_boxes
-                        .iter_mut()
-                        .enumerate()
-                        .map(|(index, item_box)| item_box.create_layout_info(state, store.child_store(index as u64), resolver))
-                        .collect()
-                });
+                    let (_area, layout_info) = resolver.with_derived(2.0, 4.0, |resolver| {
+                        self.item_boxes
+                            .iter_mut()
+                            .enumerate()
+                            .map(|(index, item_box)| item_box.create_layout_info(state, store.child_store(index as u64), resolver))
+                            .collect()
+                    });
 
-                layout_info
+                    layout_info
+                })
             }
 
             fn lay_out<'a>(

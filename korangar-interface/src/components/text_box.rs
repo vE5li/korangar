@@ -11,7 +11,7 @@ use crate::element::store::{ElementStore, ElementStoreMut, Persistent, Persisten
 use crate::event::{ClickHandler, Event, EventQueue, InputHandler};
 use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
 use crate::layout::area::Area;
-use crate::layout::{Icon, MouseButton, Resolver, WindowLayout};
+use crate::layout::{Icon, MouseButton, Resolvers, WindowLayout, with_single_resolver};
 
 #[derive(RustState)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -211,55 +211,52 @@ where
     V: Selector<App, App::OverflowBehavior>,
     Id: Any,
 {
-    fn create_layout_info(
-        &mut self,
-        state: &Context<App>,
-        store: ElementStoreMut<'_>,
-        resolver: &mut Resolver<'_, App>,
-    ) -> Self::LayoutInfo {
-        let height = *state.get(&self.height);
+    fn create_layout_info(&mut self, state: &Context<App>, store: ElementStoreMut, resolvers: &mut dyn Resolvers<App>) -> Self::LayoutInfo {
+        with_single_resolver(resolvers, |resolver| {
+            let height = *state.get(&self.height);
 
-        let mut display_text = state.get(&self.state).as_str();
+            let mut display_text = state.get(&self.state).as_str();
 
-        self.focus_click.update(store.get_element_id());
+            self.focus_click.update(store.get_element_id());
 
-        if *state.get(&self.hidable) {
-            let persistent_data = self.get_persistent_data(&store, true);
-            let is_hidden = persistent_data.is_hidden.get();
+            if *state.get(&self.hidable) {
+                let persistent_data = self.get_persistent_data(&store, true);
+                let is_hidden = persistent_data.is_hidden.get();
 
-            if is_hidden {
-                // SAFETY:
-                //
-                // This is only used here to create a string with all '*' characters, so this
-                // should be perfectly safe.
-                let hidden_text = unsafe { &mut *persistent_data.hidden_text.get() };
+                if is_hidden {
+                    // SAFETY:
+                    //
+                    // This is only used here to create a string with all '*' characters, so this
+                    // should be perfectly safe.
+                    let hidden_text = unsafe { &mut *persistent_data.hidden_text.get() };
 
-                let display_text_length = display_text.len();
-                if hidden_text.len() != display_text_length {
-                    *hidden_text = "*".repeat(display_text_length);
+                    let display_text_length = display_text.len();
+                    if hidden_text.len() != display_text_length {
+                        *hidden_text = "*".repeat(display_text_length);
+                    }
+
+                    display_text = hidden_text;
                 }
-
-                display_text = hidden_text;
             }
-        }
 
-        if display_text.is_empty() {
-            display_text = state.get(&self.ghost_text).as_ref();
-        }
+            if display_text.is_empty() {
+                display_text = state.get(&self.ghost_text).as_ref();
+            }
 
-        let (size, font_size) = resolver.get_text_dimensions(
-            display_text,
-            *state.get(&self.foreground_color),
-            *state.get(&self.highlight_color),
-            *state.get(&self.font_size),
-            *state.get(&self.horizontal_alignment),
-            *state.get(&self.overflow_behavior),
-        );
+            let (size, font_size) = resolver.get_text_dimensions(
+                display_text,
+                *state.get(&self.foreground_color),
+                *state.get(&self.highlight_color),
+                *state.get(&self.font_size),
+                *state.get(&self.horizontal_alignment),
+                *state.get(&self.overflow_behavior),
+            );
 
-        Self::LayoutInfo {
-            area: resolver.with_height(height.max(size.height())),
-            font_size,
-        }
+            Self::LayoutInfo {
+                area: resolver.with_height(height.max(size.height())),
+                font_size,
+            }
+        })
     }
 
     fn lay_out<'a>(

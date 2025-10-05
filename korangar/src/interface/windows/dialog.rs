@@ -1,6 +1,8 @@
 use std::cell::UnsafeCell;
 
+use korangar_interface::element::store::ElementStoreMut;
 use korangar_interface::element::{Element, ElementBox, ErasedElement, StateElement};
+use korangar_interface::layout::{Resolvers, with_single_resolver};
 use korangar_interface::window::{CustomWindow, Window};
 use ragnarok_packets::EntityId;
 use rust_state::{Context, Path, RustState};
@@ -179,25 +181,20 @@ where
 {
     type LayoutInfo = ();
 
-    fn create_layout_info(
-        &mut self,
-        state: &Context<ClientState>,
-        mut store: korangar_interface::element::store::ElementStoreMut<'_>,
-        resolver: &mut korangar_interface::layout::Resolver<'_, ClientState>,
-    ) {
-        state
-            .get(&self.dialog_elements_path)
-            .iter()
-            .enumerate()
-            .for_each(|(index, dialog_element)| {
-                // SAFETY:
-                //
-                // We only create this mutable reference for the lifetime of this scope, and
-                // since nothing is captured from the element this is safe.
-                let element = unsafe { &mut *dialog_element.element.get() };
+    fn create_layout_info(&mut self, state: &Context<ClientState>, mut store: ElementStoreMut, resolvers: &mut dyn Resolvers<ClientState>) {
+        with_single_resolver(resolvers, |resolver| {
+            state
+                .get(&self.dialog_elements_path)
+                .iter()
+                .enumerate()
+                .for_each(|(index, dialog_element)| {
+                    // We only create this mutable reference for the lifetime of this scope, and
+                    // since nothing is captured from the element this is safe.
+                    let element = unsafe { &mut *dialog_element.element.get() };
 
-                element.create_layout_info(state, store.child_store(index as u64), resolver)
-            });
+                    element.create_layout_info(state, store.child_store(index as u64), resolver)
+                });
+        })
     }
 
     fn lay_out<'a>(
@@ -212,8 +209,6 @@ where
             .iter()
             .enumerate()
             .for_each(|(index, dialog_element)| {
-                // SAFETY:
-                //
                 // There are no mutable references at this point in time and the immutable
                 // reference will be dropped after the interface is rendered, making this safe.
                 let element = unsafe { &*dialog_element.element.get() };

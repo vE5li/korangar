@@ -3,7 +3,7 @@ use korangar_interface::components::text_box::DefaultHandler;
 use korangar_interface::element::store::{ElementStore, ElementStoreMut};
 use korangar_interface::element::{Element, StateElement};
 use korangar_interface::layout::area::Area;
-use korangar_interface::layout::{Resolver, WindowLayout};
+use korangar_interface::layout::{Resolvers, WindowLayout, with_single_resolver};
 use korangar_interface::prelude::{HorizontalAlignment, VerticalAlignment};
 use korangar_interface::window::{CustomWindow, Window};
 use korangar_networking::MessageColor;
@@ -48,52 +48,54 @@ where
     fn create_layout_info(
         &mut self,
         state: &Context<ClientState>,
-        _: ElementStoreMut<'_>,
-        resolver: &mut Resolver<'_, ClientState>,
+        _: ElementStoreMut,
+        resolvers: &mut dyn Resolvers<ClientState>,
     ) -> Self::LayoutInfo {
-        let chat_messages = state.get(&self.chat_messages_path);
-        // TODO: Theme this.
-        let message_spacing = 5.0;
+        with_single_resolver(resolvers, |resolver| {
+            let chat_messages = state.get(&self.chat_messages_path);
+            // TODO: Theme this.
+            let message_spacing = 5.0;
 
-        let mut total_height = 0.0;
-        let message_heights = chat_messages
-            .iter()
-            .map(|chat_message| {
-                let color = match chat_message.color {
-                    MessageColor::Rgb { red, green, blue } => Color::rgb_u8(red, green, blue),
-                    // TODO: Make the color right.
-                    MessageColor::Broadcast => Color::monochrome_u8(255),
-                    // TODO: Make the color right.
-                    MessageColor::Server => Color::monochrome_u8(255),
-                    // TODO: Make the color right.
-                    MessageColor::Error => Color::monochrome_u8(255),
-                    // TODO: Make the color right.
-                    MessageColor::Information => Color::monochrome_u8(255),
-                };
+            let mut total_height = 0.0;
+            let message_heights = chat_messages
+                .iter()
+                .map(|chat_message| {
+                    let color = match chat_message.color {
+                        MessageColor::Rgb { red, green, blue } => Color::rgb_u8(red, green, blue),
+                        // TODO: Make the color right.
+                        MessageColor::Broadcast => Color::monochrome_u8(255),
+                        // TODO: Make the color right.
+                        MessageColor::Server => Color::monochrome_u8(255),
+                        // TODO: Make the color right.
+                        MessageColor::Error => Color::monochrome_u8(255),
+                        // TODO: Make the color right.
+                        MessageColor::Information => Color::monochrome_u8(255),
+                    };
 
-                let (size, _) = resolver.get_text_dimensions(
-                    &chat_message.text,
-                    color,
-                    Color::rgb_u8(255, 160, 60),
-                    // TODO: Theme this.
-                    FontSize(14.0),
-                    HorizontalAlignment::Left { offset: 5.0, border: 3.0 },
-                    OverflowBehavior::LineBreak,
-                );
+                    let (size, _) = resolver.get_text_dimensions(
+                        &chat_message.text,
+                        color,
+                        Color::rgb_u8(255, 160, 60),
+                        // TODO: Theme this.
+                        FontSize(14.0),
+                        HorizontalAlignment::Left { offset: 5.0, border: 3.0 },
+                        OverflowBehavior::LineBreak,
+                    );
 
-                if total_height != 0.0 {
-                    total_height += message_spacing;
-                }
+                    if total_height != 0.0 {
+                        total_height += message_spacing;
+                    }
 
-                total_height += size.height();
+                    total_height += size.height();
 
-                size.height()
-            })
-            .collect();
+                    size.height()
+                })
+                .collect();
 
-        let area = resolver.with_height(total_height);
+            let area = resolver.with_height(total_height);
 
-        Self::LayoutInfo { area, message_heights }
+            Self::LayoutInfo { area, message_heights }
+        })
     }
 
     fn lay_out<'a>(
@@ -218,9 +220,7 @@ where
                 },
                 scroll_view! {
                     follow: true,
-                    children: (
-                        ChatElement::new(self.chat_messages_path),
-                    ),
+                    children: ChatElement::new(self.chat_messages_path),
                 },
             ),
         }

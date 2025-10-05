@@ -40,7 +40,7 @@ pub fn derive_state_window_struct(
                         theme: <#impl_for as korangar_interface::application::Application>::ThemeType::default(),
                         closable: true,
                         resizable: true,
-                        elements: (scroll_view! { children: (#(#initializers,)*), }, )
+                        elements: scroll_view! { children: (#(#initializers,)*), }
                     }
                 }
 
@@ -55,7 +55,7 @@ pub fn derive_state_window_struct(
                         theme: <#impl_for as korangar_interface::application::Application>::ThemeType::default(),
                         closable: true,
                         resizable: true,
-                        elements: (scroll_view! { children: (#(#initializers_mut,)*), }, )
+                        elements: scroll_view! { children: (#(#initializers_mut,)*), }
                     }
                 }
             }
@@ -79,7 +79,7 @@ pub fn derive_state_window_struct(
                     theme: App::ThemeType::default(),
                     closable: true,
                     resizable: true,
-                    elements: (scroll_view! { children: (#(#initializers,)*), }, )
+                    elements: scroll_view! { children: (#(#initializers,)*), }
                 }
             }
 
@@ -93,7 +93,7 @@ pub fn derive_state_window_struct(
                     theme: App::ThemeType::default(),
                     closable: true,
                     resizable: true,
-                    elements: (scroll_view! { children: (#(#initializers_mut,)*), }, )
+                    elements: scroll_view! { children: (#(#initializers_mut,)*), }
                 }
             }
         }

@@ -299,6 +299,11 @@ impl InputSystem {
         }
 
         #[cfg(feature = "debug")]
+        if control_down && self.get_key(KeyCode::KeyO).pressed() {
+            events.push(InputEvent::ToggleCommandsWindow);
+        }
+
+        #[cfg(feature = "debug")]
         if control_down && self.get_key(KeyCode::KeyN).pressed() {
             events.push(InputEvent::TogglePacketInspectorWindow);
         }

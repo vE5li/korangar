@@ -7,7 +7,7 @@ use korangar_interface::element::{BaseLayoutInfo, Element};
 use korangar_interface::event::{EventQueue, ScrollHandler};
 use korangar_interface::layout::area::Area;
 use korangar_interface::layout::tooltip::TooltipExt;
-use korangar_interface::layout::{Resolver, WindowLayout};
+use korangar_interface::layout::{Resolvers, WindowLayout, with_single_resolver};
 use korangar_interface::prelude::{HorizontalAlignment, VerticalAlignment};
 use korangar_interface::window::{CustomWindow, Window};
 use rust_state::Context;
@@ -230,12 +230,14 @@ impl Element<ClientState> for FrameInspectorView {
     fn create_layout_info(
         &mut self,
         _: &Context<ClientState>,
-        _: ElementStoreMut<'_>,
-        resolver: &mut Resolver<'_, ClientState>,
+        _: ElementStoreMut,
+        resolvers: &mut dyn Resolvers<ClientState>,
     ) -> Self::LayoutInfo {
-        let area = resolver.with_height(400.0);
+        with_single_resolver(resolvers, |resolver| {
+            let area = resolver.with_height(400.0);
 
-        Self::LayoutInfo { area }
+            Self::LayoutInfo { area }
+        })
     }
 
     fn lay_out<'a>(

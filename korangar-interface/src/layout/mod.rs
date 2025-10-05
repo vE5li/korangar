@@ -12,7 +12,7 @@ use area::Area;
 use rust_state::Context;
 use tooltip::{Tooltip, TooltipId};
 
-pub use self::resolver::{Resolver, ResolverSet};
+pub use self::resolver::{Resolver, Resolvers, with_nth_resolver, with_single_resolver};
 use crate::MouseMode;
 use crate::application::{Application, Clip, CornerDiameter, FontSize, Position, RenderLayer, ShadowPadding, Size, TextLayouter};
 use crate::element::id::{ElementId, FocusId};
@@ -25,6 +25,20 @@ pub enum MouseButton {
     Right,
     DoubleLeft,
     DoubleRight,
+}
+
+impl MouseButton {
+    pub fn is_double_click(self) -> bool {
+        matches!(self, Self::DoubleLeft | Self::DoubleRight)
+    }
+
+    pub fn as_single_click(self) -> Self {
+        match self {
+            Self::DoubleLeft => Self::Left,
+            Self::DoubleRight => Self::Right,
+            _ => self,
+        }
+    }
 }
 
 /// Different modes for resizing a window.
@@ -41,7 +55,11 @@ pub enum ResizeMode {
 /// Icons that can be rendered from the [`Layout`].
 #[derive(Clone, Copy)]
 pub enum Icon<App: Application> {
-    /// Arrow used for collapsable components.
+    /// Arrow pointing left.
+    ArrowLeft,
+    /// Arrow pointing right.
+    ArrowRight,
+    /// Arrow used for collapsible components.
     ExpandArrow { expanded: bool },
     /// Checkbox used for toggleable components.
     Checkbox { checked: bool },
@@ -619,6 +637,18 @@ impl<'a, App: Application> WindowLayout<'a, App> {
                 },
             );
         }
+    }
+
+    pub fn has_button_registered(&self, mouse_button: MouseButton) -> bool {
+        for layer in self.layers.iter().rev() {
+            for (registered_button, _) in &layer.click_handlers {
+                if *registered_button == mouse_button {
+                    return true;
+                }
+            }
+        }
+
+        false
     }
 
     pub fn handle_click(&self, state: &Context<App>, queue: &mut EventQueue<App>, mouse_button: MouseButton) {

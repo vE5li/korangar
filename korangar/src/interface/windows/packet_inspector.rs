@@ -1,6 +1,6 @@
 use korangar_interface::element::Element;
 use korangar_interface::element::store::{ElementStore, ElementStoreMut};
-use korangar_interface::layout::{Resolver, WindowLayout};
+use korangar_interface::layout::{Resolvers, WindowLayout, with_single_resolver};
 use korangar_interface::window::{CustomWindow, Window};
 use rust_state::{Context, Path};
 
@@ -43,20 +43,22 @@ where
             fn create_layout_info(
                 &mut self,
                 state: &Context<ClientState>,
-                mut store: ElementStoreMut<'_>,
-                resolver: &mut Resolver<'_, ClientState>,
+                mut store: ElementStoreMut,
+                resolvers: &mut dyn Resolvers<ClientState>,
             ) {
-                let packet_history = state.get(&self.packet_history_path);
+                with_single_resolver(resolvers, |resolver| {
+                    let packet_history = state.get(&self.packet_history_path);
 
-                packet_history.get_entries().iter().for_each(|entry| {
-                    if ((entry.is_incoming() && packet_history.show_incoming) || (entry.is_outgoing() && packet_history.show_outgoing))
-                        && (!entry.is_ping() || packet_history.show_pings)
-                    {
-                        let element = unsafe { &mut *entry.element.get() };
-                        let store = store.child_store(entry.unique_id);
-                        element.create_layout_info(state, store, resolver);
-                    }
-                });
+                    packet_history.get_entries().iter().for_each(|entry| {
+                        if ((entry.is_incoming() && packet_history.show_incoming) || (entry.is_outgoing() && packet_history.show_outgoing))
+                            && (!entry.is_ping() || packet_history.show_pings)
+                        {
+                            let element = unsafe { &mut *entry.element.get() };
+                            let store = store.child_store(entry.unique_id);
+                            element.create_layout_info(state, store, resolver);
+                        }
+                    });
+                })
             }
 
             fn lay_out<'a>(
@@ -116,11 +118,9 @@ where
                 },
                 scroll_view! {
                     follow: true,
-                    children: (
-                        BufferWrapper {
-                            packet_history_path: self.packet_history_path,
-                        },
-                    ),
+                    children: BufferWrapper {
+                        packet_history_path: self.packet_history_path,
+                    },
                 },
             ),
         }

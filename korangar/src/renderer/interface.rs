@@ -23,6 +23,8 @@ pub struct InterfaceRenderer {
     font_loader: Arc<FontLoader>,
     filled_box_texture: Arc<Texture>,
     unfilled_box_texture: Arc<Texture>,
+    arrow_left_texture: Arc<Texture>,
+    arrow_right_texture: Arc<Texture>,
     expanded_arrow_texture: Arc<Texture>,
     collapsed_arrow_texture: Arc<Texture>,
     eye_open_texture: Arc<Texture>,
@@ -56,6 +58,8 @@ impl InterfaceRenderer {
 
         let filled_box_texture = texture_loader.get_or_load("filled_box.png", ImageType::Sdf).unwrap();
         let unfilled_box_texture = texture_loader.get_or_load("unfilled_box.png", ImageType::Sdf).unwrap();
+        let arrow_left_texture = texture_loader.get_or_load("arrow_left.png", ImageType::Sdf).unwrap();
+        let arrow_right_texture = texture_loader.get_or_load("arrow_right.png", ImageType::Sdf).unwrap();
         let expanded_arrow_texture = texture_loader.get_or_load("expanded_arrow.png", ImageType::Sdf).unwrap();
         let collapsed_arrow_texture = texture_loader.get_or_load("collapsed_arrow.png", ImageType::Sdf).unwrap();
         let eye_open_texture = texture_loader.get_or_load("eye_open.png", ImageType::Sdf).unwrap();
@@ -79,6 +83,8 @@ impl InterfaceRenderer {
             font_loader,
             filled_box_texture,
             unfilled_box_texture,
+            arrow_left_texture,
+            arrow_right_texture,
             expanded_arrow_texture,
             collapsed_arrow_texture,
             eye_open_texture,
@@ -384,6 +390,16 @@ impl InterfaceRenderer {
         self.render_sdf(texture, position, size, clip, color);
     }
 
+    /// Render a left arrow icon using an SDF.
+    pub fn render_arrow_left(&self, position: ScreenPosition, size: ScreenSize, clip: ScreenClip, color: Color) {
+        self.render_sdf(self.arrow_left_texture.clone(), position, size, clip, color);
+    }
+
+    /// Render a right arrow icon using an SDF.
+    pub fn render_arrow_right(&self, position: ScreenPosition, size: ScreenSize, clip: ScreenClip, color: Color) {
+        self.render_sdf(self.arrow_right_texture.clone(), position, size, clip, color);
+    }
+
     /// Render an expand arrow icon using an SDF.
     pub fn render_expand_arrow(&self, position: ScreenPosition, size: ScreenSize, clip: ScreenClip, color: Color, expanded: bool) {
         let texture = match expanded {
@@ -616,6 +632,8 @@ impl RenderLayer<ClientState> for InterfaceRenderer {
 
     fn render_icon(&self, position: ScreenPosition, size: ScreenSize, clip: ScreenClip, icon: Icon<ClientState>, color: Color) {
         match icon {
+            Icon::ArrowLeft => self.render_arrow_left(position, size, clip, color),
+            Icon::ArrowRight => self.render_arrow_right(position, size, clip, color),
             Icon::ExpandArrow { expanded } => self.render_expand_arrow(position, size, clip, color, expanded),
             Icon::Checkbox { checked } => self.render_checkbox(position, size, clip, color, checked),
             Icon::Eye { open } => self.render_eye(position, size, clip, color, open),
@@ -673,7 +691,15 @@ pub trait LayoutExt<'a> {
     fn add_texture(&mut self, area: Area, texture: Arc<Texture>, color: Color, smooth: bool);
 
     /// Add an instruction to render a sprite.
-    fn add_sprite(&mut self, area: Area, actions: &'a Actions, sprite: &'a Sprite, animation_state: &'a SpriteAnimationState, color: Color);
+    fn add_sprite(
+        &mut self,
+        area: Area,
+        actions: &'a Actions,
+        sprite: &'a Sprite,
+        animation_state: &'a SpriteAnimationState,
+        color: Color,
+        scale: f32,
+    );
 }
 
 impl<'a> LayoutExt<'a> for WindowLayout<'a, ClientState> {
@@ -697,10 +723,11 @@ impl<'a> LayoutExt<'a> for WindowLayout<'a, ClientState> {
         sprite: &'a Sprite,
         animation_state: &'a SpriteAnimationState,
         color: Color,
+        scale: f32,
     ) {
         let clip_id = self.get_active_clip_id();
         let area = self.scale_area(area);
-        let scaling = self.get_interface_scaling();
+        let scaling = scale * self.get_interface_scaling();
 
         self.add_custom_instruction(CustomInstruction::Sprite(SpriteInstruction {
             actions,

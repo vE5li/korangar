@@ -2,7 +2,7 @@ use korangar_interface::components::text_box::DefaultHandler;
 use korangar_interface::element::StateElement;
 use korangar_interface::element::id::FocusIdExt;
 use korangar_interface::window::{CustomWindow, Window};
-use rust_state::{Context, Path, RustState};
+use rust_state::{Context, Path, PathExt, RustState};
 
 use crate::graphics::{Color, ShadowPadding};
 use crate::input::InputEvent;
@@ -64,8 +64,7 @@ where
         let remember_password_path = selected_service_path.remember_password();
 
         let disabled_selector = ComputedSelector::new_default(move |state: &ClientState| {
-            selected_service_path.username().follow(state).unwrap().is_empty()
-                || selected_service_path.password().follow(state).unwrap().is_empty()
+            selected_service_path.username().follow_safe(state).is_empty() || selected_service_path.password().follow_safe(state).is_empty()
         });
 
         let login_action = move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {

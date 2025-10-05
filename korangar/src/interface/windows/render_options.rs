@@ -42,7 +42,7 @@ where
         ];
 
         let elements = (
-            collapsable! {
+            collapsible! {
                 text: "General",
                 tooltip: "General tools for checking and debugging the rendering",
                 initially_expanded: true,
@@ -91,7 +91,7 @@ where
                     },
                 ),
             },
-            collapsable! {
+            collapsible! {
                 text: "World",
                 tooltip: "Tools for checking and debugging the ^000001world rendering^000000",
                 initially_expanded: true,
@@ -134,7 +134,7 @@ where
                     },
                 ),
             },
-            collapsable! {
+            collapsible! {
                 text: "Lighting",
                 tooltip: "Tools for checking and debugging the ^000001lighting^000000",
                 initially_expanded: true,
@@ -165,7 +165,7 @@ where
                     },
                 ),
             },
-            collapsable! {
+            collapsible! {
                 text: "Markers",
                 tooltip: "^000001Markers^000000 for checking the position of ^000001resources^000000 and ^000001entites^000000 in the world",
                 initially_expanded: true,
@@ -214,7 +214,7 @@ where
                     },
                 ),
             },
-            collapsable! {
+            collapsible! {
                 text: "Grid",
                 tooltip: "Tools for checking and debugging the map ^000001tile grid^000000",
                 initially_expanded: true,
@@ -233,7 +233,7 @@ where
                     },
                 ),
             },
-            collapsable! {
+            collapsible! {
                 text: "Interface",
                 tooltip: "Tools for checking and debugging the behavior of the ^000001user interface^000000",
                 initially_expanded: true,
@@ -264,7 +264,7 @@ where
                     },
                 ),
             },
-            collapsable! {
+            collapsible! {
                 text: "Buffers",
                 tooltip: "Tools for checking and debugging ^000001buffers^000000 used for rendering and mouse input",
                 initially_expanded: true,
@@ -329,7 +329,7 @@ where
             resizable: true,
             minimum_height: 300.0,
             maximum_height: 900.0,
-            elements: (scroll_view! { children: elements }, )
+            elements: scroll_view! { children: elements }
         }
     }
 }

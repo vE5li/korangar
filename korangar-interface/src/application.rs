@@ -132,7 +132,7 @@ pub trait Application: Sized + 'static {
 
     /// Application window classes.
     ///
-    /// The application can define classes for its windows to enable behaviour
+    /// The application can define classes for its windows to enable behavior
     /// such as allowing only one window of a given class to be open at any
     /// point in time, restoring window position and size when the window is
     /// opened again (see [`WindowCache`], checking if a window with a given

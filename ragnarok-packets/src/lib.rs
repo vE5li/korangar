@@ -104,49 +104,53 @@ pub trait MapServerPacket: Packet {}
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct ClientTick(pub u32);
 
-#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct AccountId(pub u32);
 
-#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct CharacterId(pub u32);
 
-#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct PartyId(pub u32);
 
-#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct EntityId(pub u32);
 
-#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct SkillId(pub u16);
 
-#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct SkillLevel(pub u16);
 
-#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct HotbarTab(pub u16);
 
-#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct HotbarSlot(pub u16);
 
-#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct ShopId(pub u32);
 
-#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct Price(pub u32);
 
-#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct AttackRange(pub u16);
+
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub struct JobId(pub u16);
 
 #[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
@@ -347,6 +351,27 @@ pub struct Packet0b18 {
     pub unknown: u16,
 }
 
+#[derive(Debug, Clone, ByteConvertable)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[numeric_type(u16)]
+pub enum ConnectionRefusedReason {
+    #[numeric_value(1)]
+    Unknown1,
+    InvalidAccountId,
+    InvalidChracterId,
+    #[numeric_value(6)]
+    InvalidSex,
+    Unkown2,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x006A)]
+pub struct ConnectionRefusedPacket {
+    pub reason: ConnectionRefusedReason,
+    pub unknown: [u8; 19],
+}
+
 /// Sent by the map server as a response to [MapServerLoginPacket] succeeding.
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
@@ -534,9 +559,9 @@ pub struct CreateCharacterPacket {
     #[length(24)]
     pub name: String,
     pub slot: u8,
-    pub hair_color: u16, // TODO: HairColor
-    pub hair_style: u16, // TODO: HairStyle
-    pub start_job: u16,  // TODO: Job
+    pub hair_color: u16,     // TODO: HairColor
+    pub hair_style: u16,     // TODO: HairStyle
+    pub start_job_id: JobId, // TODO: Job
     #[new_default]
     pub unknown: [u8; 2],
     pub sex: Sex,
@@ -561,7 +586,7 @@ pub struct CharacterInformation {
     pub spell_points: i64,
     pub maximum_spell_points: i64,
     pub movement_speed: i16,
-    pub job: i16,
+    pub job_id: JobId,
     pub head: i16,
     pub body: i16,
     pub weapon: i16,
@@ -1117,7 +1142,7 @@ pub enum StatType {
     Karma(u32),
     Manner(u32),
     StatPoints(u32),
-    SkillPoint(u32),
+    SkillPoints(u32),
     Hit(u32),
     Flee1(u32),
     Flee2(u32),
@@ -1202,7 +1227,7 @@ impl FromBytes for StatType {
             8 => u32::from_bytes(byte_reader).map(Self::MaximumSpellPoints),
             9 => u32::from_bytes(byte_reader).map(Self::StatPoints),
             11 => u32::from_bytes(byte_reader).map(Self::BaseLevel),
-            12 => u32::from_bytes(byte_reader).map(Self::SkillPoint),
+            12 => u32::from_bytes(byte_reader).map(Self::SkillPoints),
             13 => weirdly_formatted_stat(byte_reader).map(|(base, bonus)| Self::Strength(base, bonus)),
             14 => weirdly_formatted_stat(byte_reader).map(|(base, bonus)| Self::Agility(base, bonus)),
             15 => weirdly_formatted_stat(byte_reader).map(|(base, bonus)| Self::Vitality(base, bonus)),
@@ -1281,7 +1306,7 @@ impl std::fmt::Display for StatType {
             Self::Karma(value) => write!(f, "Karma: {}", value),
             Self::Manner(value) => write!(f, "Manner: {}", value),
             Self::StatPoints(value) => write!(f, "Stat Points: {}", value),
-            Self::SkillPoint(value) => write!(f, "Skill Point: {}", value),
+            Self::SkillPoints(value) => write!(f, "Skill Point: {}", value),
             Self::Hit(value) => write!(f, "Hit: {}", value),
             Self::Flee1(value) => write!(f, "Flee1: {}", value),
             Self::Flee2(value) => write!(f, "Flee2: {}", value),
@@ -1696,7 +1721,7 @@ pub struct MovingEntityAppearPacket {
     pub body_state: u16,
     pub health_state: u16,
     pub effect_state: u32,
-    pub job: u16,
+    pub job_id: JobId,
     pub head: u16,
     pub weapon: u32,
     pub shield: u32,
@@ -1749,7 +1774,7 @@ pub struct EntityAppearPacket {
     pub body_state: u16,
     pub health_state: u16,
     pub effect_state: u32,
-    pub job: u16,
+    pub job_id: JobId,
     pub head: u16,
     pub weapon: u32,
     pub shield: u32,
@@ -1791,7 +1816,7 @@ pub struct EntityAppear2Packet {
     pub body_state: u16,
     pub health_state: u16,
     pub effect_state: u32,
-    pub job: u16,
+    pub job_id: JobId,
     pub head: u16,
     pub weapon: u32,
     pub shield: u32,
@@ -1822,7 +1847,7 @@ pub struct EntityAppear2Packet {
     pub name: String,
 }
 
-#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, ByteConvertable, FixedByteSize)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[numeric_type(u32)]
 pub enum SkillType {
@@ -1850,7 +1875,8 @@ pub struct SkillInformation {
     pub attack_range: AttackRange,
     #[length(24)]
     pub skill_name: String,
-    pub upgraded: u8,
+    // TODO: bool
+    pub upgradable: u8,
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket)]
@@ -1864,17 +1890,24 @@ pub struct UpdateSkillTreePacket {
 
 #[derive(Debug, Clone, PartialEq, Eq, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub enum HotkeyType {
+    Item,
+    Skill,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, ByteConvertable)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct HotkeyData {
-    pub is_skill: u8,
-    pub skill_id: u32,
-    pub quantity_or_skill_level: SkillLevel,
+    pub hotkey_type: HotkeyType,
+    pub item_or_skill_id: u32,
+    pub quantity_or_skill_level: u16,
 }
 
 impl HotkeyData {
     pub const UNBOUND: Self = Self {
-        is_skill: 0,
-        skill_id: 0,
-        quantity_or_skill_level: SkillLevel(0),
+        hotkey_type: HotkeyType::Item,
+        item_or_skill_id: 0,
+        quantity_or_skill_level: 0,
     };
 }
 
@@ -4444,4 +4477,30 @@ pub enum SellItemsResult {
 #[header(0x00CB)]
 pub struct SellItemsResultPacket {
     pub result: SellItemsResult,
+}
+
+#[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0112)]
+pub struct LevelUpSkillPacket {
+    pub skill_id: SkillId,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x010E)]
+pub struct UpdateSkillPacket {
+    pub skill_id: SkillId,
+    pub skill_level: SkillLevel,
+    pub spell_point_cost: u16,
+    pub attack_range: AttackRange,
+    // TODO: bool,
+    pub upgradable: u8,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0441)]
+pub struct RemoveSkillPacket {
+    pub skill_id: SkillId,
 }

@@ -33,6 +33,30 @@ where
     }
 }
 
+pub struct SetToTrue<T>(pub T);
+
+impl<T, App> ClickHandler<App> for SetToTrue<T>
+where
+    App: Application,
+    T: Path<App, bool>,
+{
+    fn handle_click(&self, state: &Context<App>, _: &mut EventQueue<App>) {
+        state.update_value(self.0, true);
+    }
+}
+
+pub struct SetToFalse<T>(pub T);
+
+impl<T, App> ClickHandler<App> for SetToFalse<T>
+where
+    App: Application,
+    T: Path<App, bool>,
+{
+    fn handle_click(&self, state: &Context<App>, _: &mut EventQueue<App>) {
+        state.update_value(self.0, false);
+    }
+}
+
 /// Handler for dropping a resource.
 pub trait DropHandler<App: Application> {
     fn handle_drop(&self, state: &Context<App>, queue: &mut EventQueue<App>, mouse_mode: &MouseMode<App>);

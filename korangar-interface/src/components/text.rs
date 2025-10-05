@@ -6,7 +6,7 @@ use crate::application::{Application, Size};
 use crate::element::Element;
 use crate::element::store::{ElementStore, ElementStoreMut};
 use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
-use crate::layout::{Resolver, WindowLayout};
+use crate::layout::{Resolvers, WindowLayout, with_single_resolver};
 
 #[derive(RustState)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -77,20 +77,22 @@ where
     G: Selector<App, VerticalAlignment>,
     H: Selector<App, App::OverflowBehavior>,
 {
-    fn create_layout_info(&mut self, state: &Context<App>, _: ElementStoreMut<'_>, resolver: &mut Resolver<'_, App>) -> Self::LayoutInfo {
-        let height = *state.get(&self.height);
+    fn create_layout_info(&mut self, state: &Context<App>, _: ElementStoreMut, resolvers: &mut dyn Resolvers<App>) -> Self::LayoutInfo {
+        with_single_resolver(resolvers, |resolver| {
+            let height = *state.get(&self.height);
 
-        let (size, font_size) = resolver.get_text_dimensions(
-            state.get(&self.text).as_ref(),
-            *state.get(&self.color),
-            *state.get(&self.highlight_color),
-            *state.get(&self.font_size),
-            *state.get(&self.horizontal_alignment),
-            *state.get(&self.overflow_behavior),
-        );
-        let area = resolver.with_height(height.max(size.height()));
+            let (size, font_size) = resolver.get_text_dimensions(
+                state.get(&self.text).as_ref(),
+                *state.get(&self.color),
+                *state.get(&self.highlight_color),
+                *state.get(&self.font_size),
+                *state.get(&self.horizontal_alignment),
+                *state.get(&self.overflow_behavior),
+            );
+            let area = resolver.with_height(height.max(size.height()));
 
-        Self::LayoutInfo { area, font_size }
+            Self::LayoutInfo { area, font_size }
+        })
     }
 
     fn lay_out<'a>(

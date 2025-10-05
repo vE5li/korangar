@@ -4,7 +4,7 @@ use ragnarok_packets::*;
 pub struct EntityData {
     pub entity_id: EntityId,
     pub movement_speed: u16,
-    pub job: u16,
+    pub job_id: JobId,
     pub head: u16,
     pub position: WorldPosition,
     pub destination: Option<WorldPosition>,
@@ -19,7 +19,7 @@ impl EntityData {
         Self {
             entity_id: EntityId(account_id.0),
             movement_speed: character_information.movement_speed as u16,
-            job: character_information.job as u16,
+            job_id: character_information.job_id,
             head: character_information.head as u16,
             position,
             destination: None,
@@ -36,7 +36,7 @@ impl From<EntityAppearPacket> for EntityData {
         Self {
             entity_id: packet.entity_id,
             movement_speed: packet.movement_speed,
-            job: packet.job,
+            job_id: packet.job_id,
             head: packet.head,
             position: packet.position,
             destination: None,
@@ -53,7 +53,7 @@ impl From<EntityAppear2Packet> for EntityData {
         Self {
             entity_id: packet.entity_id,
             movement_speed: packet.movement_speed,
-            job: packet.job,
+            job_id: packet.job_id,
             head: packet.head,
             position: packet.position,
             destination: None,
@@ -72,7 +72,7 @@ impl From<MovingEntityAppearPacket> for EntityData {
         Self {
             entity_id: packet.entity_id,
             movement_speed: packet.movement_speed,
-            job: packet.job,
+            job_id: packet.job_id,
             head: packet.head,
             position: origin,
             destination: Some(destination),

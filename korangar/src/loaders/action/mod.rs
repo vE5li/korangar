@@ -43,7 +43,7 @@ impl ActionLoader {
         self.cache.lock().unwrap().statistics()
     }
 
-    fn load(&self, path: &str) -> Result<Arc<Actions>, LoadError> {
+    pub fn load(&self, path: &str) -> Result<Arc<Actions>, LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load actions from {}", path.magenta()));
 
@@ -126,8 +126,12 @@ impl ActionLoader {
         Ok(sprite)
     }
 
+    pub fn get(&self, path: &str) -> Option<Arc<Actions>> {
+        self.cache.lock().unwrap().get(path).cloned()
+    }
+
     pub fn get_or_load(&self, path: &str) -> Result<Arc<Actions>, LoadError> {
-        let Some(action) = self.cache.lock().unwrap().get(path).cloned() else {
+        let Some(action) = self.get(path) else {
             return self.load(path);
         };
 

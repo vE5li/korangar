@@ -1,7 +1,7 @@
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, Timer, print_debug};
 use korangar_interface::components::button::ButtonTheme;
-use korangar_interface::components::collapsable::CollapsableTheme;
+use korangar_interface::components::collapsible::CollapsibleTheme;
 use korangar_interface::components::drop_down::DropDownTheme;
 use korangar_interface::components::field::FieldTheme;
 use korangar_interface::components::state_button::StateButtonTheme;
@@ -38,6 +38,49 @@ pub struct ChatTheme {
     text_box_background_color: Color,
 }
 
+#[derive(Serialize, Deserialize, RustState, StateElement)]
+pub struct SkillTreeTheme {
+    /// Background color for an occupied slot.
+    slot_background_color: Color,
+    slot_outline: ShadowPadding,
+    /// Color used for showing level or skill requirements, both outlines and
+    /// text.
+    requirement_color: Color,
+    /// Outline color of a hovered slot.
+    hover_color: Color,
+    /// Corner diameter of the occupied and unoccupied slots.
+    slot_corner_diameter: CornerDiameter,
+    unoccupied_slot_color: Color,
+    unoccupied_slot_outline: ShadowPadding,
+    unlearned_skill_color: Color,
+    name_font_size: FontSize,
+    name_text_color: Color,
+    highlight_color: Color,
+    points_color: Color,
+    /// Color used for coloring pending skll points.
+    pending_points_color: Color,
+    points_font_size: FontSize,
+    arrow_color: Color,
+    /// Color used when the selected skill level is lower than the learned skill
+    /// level.
+    lower_level_color: Color,
+}
+
+#[derive(Serialize, Deserialize, RustState, StateElement)]
+pub struct GlobalTheme {
+    /// Color indicating that a grabbed resource can be dropped in the
+    /// highlighted area.
+    drop_area_color: Color,
+    /// Color indicating that a grabbed resource is inside the highlighted area
+    /// and can be dropped there.
+    hovered_drop_area_color: Color,
+    /// Alpha to multiply the area color by to get the fill color of the area.
+    /// The original color will be used for the outline only.
+    fill_alpha: f32,
+    /// Outline for the highlighted area.
+    drop_area_outline: ShadowPadding,
+}
+
 #[derive(Serialize, Deserialize, RustState, StateElement, StateWindow)]
 #[window_title("Theme Inspector")]
 pub struct InterfaceTheme {
@@ -52,7 +95,7 @@ pub struct InterfaceTheme {
     #[hidden_element]
     pub text_box: TextBoxTheme<ClientState>,
     #[hidden_element]
-    pub collapsable: CollapsableTheme<ClientState>,
+    pub collapsible: CollapsibleTheme<ClientState>,
     #[hidden_element]
     pub drop_down: DropDownTheme<ClientState>,
     #[hidden_element]
@@ -61,6 +104,8 @@ pub struct InterfaceTheme {
     pub tooltip: TooltipTheme<ClientState>,
     pub debug_button: DebugButtonTheme,
     pub chat: ChatTheme,
+    pub skill_tree: SkillTreeTheme,
+    pub global: GlobalTheme,
 }
 
 impl InterfaceTheme {
@@ -213,7 +258,7 @@ impl InterfaceTheme {
                 vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
                 overflow_behavior: OverflowBehavior::LineBreak,
             },
-            collapsable: CollapsableTheme {
+            collapsible: CollapsibleTheme {
                 background_color: Color::monochrome_u8(45),
                 secondary_background_color: Color::monochrome_u8(30),
                 foreground_color: Color::monochrome_u8(200),
@@ -300,6 +345,30 @@ impl InterfaceTheme {
             chat: ChatTheme {
                 window_color: Color::TRANSPARENT,
                 text_box_background_color: Color::TRANSPARENT,
+            },
+            skill_tree: SkillTreeTheme {
+                slot_background_color: Color::monochrome_u8(40),
+                slot_outline: ShadowPadding::uniform(3.0),
+                requirement_color: Color::rgba_u8(200, 100, 200, 255),
+                hover_color: Color::WHITE,
+                slot_corner_diameter: CornerDiameter::uniform(20.0),
+                unoccupied_slot_color: Color::rgba_u8(30, 30, 30, 160),
+                unoccupied_slot_outline: ShadowPadding::uniform(2.0),
+                unlearned_skill_color: Color::monochrome_u8(80),
+                name_font_size: FontSize(12.0),
+                name_text_color: Color::WHITE,
+                highlight_color: Color::rgb_u8(255, 160, 60),
+                points_color: Color::WHITE,
+                pending_points_color: Color::rgb_u8(0, 255, 220),
+                points_font_size: FontSize(12.0),
+                arrow_color: Color::monochrome_u8(160),
+                lower_level_color: Color::rgb_u8(255, 200, 255),
+            },
+            global: GlobalTheme {
+                drop_area_color: Color::rgba_u8(255, 60, 200, 120),
+                hovered_drop_area_color: Color::rgba_u8(0, 255, 200, 130),
+                fill_alpha: 0.1,
+                drop_area_outline: ShadowPadding::uniform(4.0),
             },
         }
     }
@@ -397,7 +466,7 @@ impl InterfaceTheme {
                 vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
                 overflow_behavior: OverflowBehavior::LineBreak,
             },
-            collapsable: CollapsableTheme {
+            collapsible: CollapsibleTheme {
                 background_color: Color::monochrome_u8(75),
                 secondary_background_color: Color::monochrome_u8(55),
                 foreground_color: Color::monochrome_u8(170),
@@ -484,6 +553,30 @@ impl InterfaceTheme {
             chat: ChatTheme {
                 window_color: Color::rgba_u8(0, 0, 0, 200),
                 text_box_background_color: Color::rgba_u8(0, 0, 0, 150),
+            },
+            skill_tree: SkillTreeTheme {
+                slot_background_color: Color::monochrome_u8(40),
+                slot_outline: ShadowPadding::uniform(3.0),
+                requirement_color: Color::rgba_u8(200, 100, 200, 255),
+                hover_color: Color::WHITE,
+                slot_corner_diameter: CornerDiameter::uniform(20.0),
+                unoccupied_slot_color: Color::rgba_u8(30, 30, 30, 160),
+                unoccupied_slot_outline: ShadowPadding::uniform(2.0),
+                unlearned_skill_color: Color::monochrome_u8(80),
+                name_font_size: FontSize(12.0),
+                name_text_color: Color::WHITE,
+                highlight_color: Color::rgb_u8(255, 160, 60),
+                points_color: Color::WHITE,
+                pending_points_color: Color::rgb_u8(0, 255, 220),
+                points_font_size: FontSize(12.0),
+                arrow_color: Color::monochrome_u8(160),
+                lower_level_color: Color::rgb_u8(255, 200, 255),
+            },
+            global: GlobalTheme {
+                drop_area_color: Color::rgba_u8(255, 60, 200, 120),
+                hovered_drop_area_color: Color::rgba_u8(0, 255, 200, 130),
+                fill_alpha: 0.1,
+                drop_area_outline: ShadowPadding::uniform(4.0),
             },
         }
     }

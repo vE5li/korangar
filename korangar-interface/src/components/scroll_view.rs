@@ -4,11 +4,11 @@ use num::Signed;
 use rust_state::{Context, Selector};
 
 use crate::application::Application;
+use crate::element::Element;
 use crate::element::store::{ElementStore, ElementStoreMut, Persistent, PersistentExt};
-use crate::element::{Element, ElementSet};
 use crate::event::ScrollHandler;
 use crate::layout::area::Area;
-use crate::layout::{Resolver, WindowLayout};
+use crate::layout::{Resolvers, WindowLayout, with_single_resolver};
 use crate::prelude::EventQueue;
 
 /// If the current scroll is this far away from the maximum scroll the scroll
@@ -87,62 +87,64 @@ impl<App, A, Children> Element<App> for ScrollView<A, Children>
 where
     A: Selector<App, bool>,
     App: Application,
-    Children: ElementSet<App>,
+    Children: Element<App>,
 {
     type LayoutInfo = ScrollViewLayoutInfo<Children::LayoutInfo>;
 
     fn create_layout_info(
         &mut self,
         state: &Context<App>,
-        mut store: ElementStoreMut<'_>,
-        resolver: &mut Resolver<'_, App>,
+        mut store: ElementStoreMut,
+        resolvers: &mut dyn Resolvers<App>,
     ) -> Self::LayoutInfo {
-        loop {
-            let persistent = self.get_persistent_data(&store, ());
-            let scroll = persistent.inner.borrow().scroll;
+        with_single_resolver(resolvers, |resolver| {
+            loop {
+                let persistent = self.get_persistent_data(&store, ());
+                let scroll = persistent.inner.borrow().scroll;
 
-            // In case that we need to resolve twice we don't want to start with the same
-            // resolver state as the first iteration, so we clone it here and adding it back
-            // as soon as a correct layout was found. This is a little bit
-            // ugly and might be improved in the future.
-            let mut cloned_resolver = resolver.clone();
+                // In case that we need to resolve twice we don't want to start with the same
+                // resolver state as the first iteration, so we clone it here and adding it back
+                // as soon as a correct layout was found. This is a little bit
+                // ugly and might be improved in the future.
+                let mut cloned_resolver = resolver.clone();
 
-            // HACK: Since this loop might run multiple times we need a new store every
-            // time. This is a bit wasteful and I would like to solve this more
-            // elegantly.
-            let child_store = store.child_store(0);
+                // HACK: Since this loop might run multiple times we need a new store every
+                // time. This is a bit wasteful and I would like to solve this more
+                // elegantly.
+                let child_store = store.child_store(0);
 
-            let (area, children_height, layout_info) = cloned_resolver.with_derived_scrolled(scroll, |resolver| {
-                self.children.create_layout_info(state, child_store, resolver)
-            });
+                let (area, children_height, layout_info) = cloned_resolver.with_derived_scrolled(scroll, |resolver| {
+                    self.children.create_layout_info(state, child_store, resolver)
+                });
 
-            let persistent = self.get_persistent_data(&store, ());
-            let mut inner = persistent.inner.borrow_mut();
+                let persistent = self.get_persistent_data(&store, ());
+                let mut inner = persistent.inner.borrow_mut();
 
-            let maximum_scroll = (children_height - area.height).max(0.0);
+                let maximum_scroll = (children_height - area.height).max(0.0);
 
-            // Check if the scroll is in bounds. If it is, we can just return, otherwise we
-            // need to adjust it and create the layout again.
-            if inner.scroll > maximum_scroll {
-                inner.scroll = maximum_scroll;
-                continue;
-            } else if inner.scroll < 0.0 {
-                inner.scroll = 0.0;
-                continue;
-            } else if *state.get(&self.follow) && inner.actively_following && inner.scroll <= maximum_scroll - FOLLOW_THRESHOLD {
-                inner.scroll = maximum_scroll;
-                continue;
+                // Check if the scroll is in bounds. If it is, we can just return, otherwise we
+                // need to adjust it and create the layout again.
+                if inner.scroll > maximum_scroll {
+                    inner.scroll = maximum_scroll;
+                    continue;
+                } else if inner.scroll < 0.0 {
+                    inner.scroll = 0.0;
+                    continue;
+                } else if *state.get(&self.follow) && inner.actively_following && inner.scroll <= maximum_scroll - FOLLOW_THRESHOLD {
+                    inner.scroll = maximum_scroll;
+                    continue;
+                }
+
+                inner.maximum_scroll = maximum_scroll;
+
+                *resolver = cloned_resolver;
+
+                return ScrollViewLayoutInfo {
+                    area,
+                    children: layout_info,
+                };
             }
-
-            inner.maximum_scroll = maximum_scroll;
-
-            *resolver = cloned_resolver;
-
-            return ScrollViewLayoutInfo {
-                area,
-                children: layout_info,
-            };
-        }
+        })
     }
 
     fn lay_out<'a>(

@@ -102,7 +102,9 @@ impl ScreenPosition {
 impl ElementDisplay for ScreenPosition {
     fn element_display(&self) -> String {
         format!(
-            "^000001↦^000000{} ^000001↧^000000{}",
+            "^000001→^000000{} ^000001↓^000000{}",
+            // TODO: Use this instead. Not supported by the font currently.
+            // "^000001↦^000000{} ^000001↧^000000{}",
             self.left.element_display(),
             self.top.element_display()
         )
@@ -346,6 +348,18 @@ impl ShadowPadding {
 
     pub fn components(&self) -> [f32; 4] {
         [self.left, self.right, self.top, self.bottom]
+    }
+}
+
+impl ElementDisplay for ShadowPadding {
+    fn element_display(&self) -> String {
+        format!(
+            "^000001←^000000{} ^000001→^000000{} ^000001↑^000000{} ^000001↓^000000{}",
+            self.left.element_display(),
+            self.right.element_display(),
+            self.top.element_display(),
+            self.bottom.element_display()
+        )
     }
 }
 

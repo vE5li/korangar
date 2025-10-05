@@ -25,7 +25,7 @@ jobs:
           - name: Linux
             os: ubuntu-24.04
             architecture: linux-x86_64
-            install-deps: sudo apt install libasound2-dev nasm
+            install-deps: sudo apt update && sudo apt install libasound2-dev nasm
             sed-command: sed -i
           - name: Windows
             os: windows-2025

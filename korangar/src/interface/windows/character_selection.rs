@@ -1,13 +1,13 @@
 use character_slot_preview::{CharacterSlotPreview, CharacterSlotPreviewHandler, OverlayHandler};
 use korangar_interface::element::store::{ElementStore, ElementStoreMut};
 use korangar_interface::element::{BaseLayoutInfo, Element};
-use korangar_interface::layout::{Resolver, WindowLayout};
+use korangar_interface::layout::{Resolvers, WindowLayout, with_single_resolver};
 use korangar_interface::window::{CustomWindow, Window};
 use rust_state::{Context, Path};
 
-use crate::character_slots::{CharacterSlots, CharacterSlotsExt};
 use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
+use crate::state::character_slots::{CharacterSlots, CharacterSlotsExt};
 use crate::state::localization::LocalizationPathExt;
 use crate::state::theme::InterfaceThemeType;
 use crate::state::{ClientState, ClientStatePathExt, client_state};
@@ -21,7 +21,7 @@ mod character_slot_preview {
     use korangar_interface::event::{ClickHandler, EventQueue};
     use korangar_interface::layout::alignment::{HorizontalAlignment, VerticalAlignment};
     use korangar_interface::layout::tooltip::TooltipExt;
-    use korangar_interface::layout::{MouseButton, Resolver, WindowLayout};
+    use korangar_interface::layout::{MouseButton, Resolvers, WindowLayout, with_single_resolver};
     use ragnarok_packets::{CharacterInformation, CharacterInformationPathExt};
     use rust_state::{Context, ManuallyAssertExt, Path};
 
@@ -76,7 +76,6 @@ mod character_slot_preview {
                     button! {
                         text: "Delete",
                         event: move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
-                            // SAFETY
                             // We should not be able to get here if the character is not present, so it's
                             // fine to unwrap.
                             let character_information = state.try_get(&character_information_path).unwrap();
@@ -153,24 +152,26 @@ mod character_slot_preview {
         fn create_layout_info(
             &mut self,
             _: &Context<ClientState>,
-            store: ElementStoreMut<'_>,
-            resolver: &mut Resolver<'_, ClientState>,
+            store: ElementStoreMut,
+            resolvers: &mut dyn Resolvers<ClientState>,
         ) -> Self::LayoutInfo {
-            let area = resolver.with_height(180.0);
+            with_single_resolver(resolvers, |resolver| {
+                let area = resolver.with_height(180.0);
 
-            self.overlay_handler.set_position_size(
-                ScreenPosition {
-                    left: area.left,
-                    top: area.top,
-                },
-                ScreenSize {
-                    width: area.width,
-                    height: area.height,
-                },
-                store.get_window_id(),
-            );
+                self.overlay_handler.set_position_size(
+                    ScreenPosition {
+                        left: area.left,
+                        top: area.top,
+                    },
+                    ScreenSize {
+                        width: area.width,
+                        height: area.height,
+                    },
+                    store.get_window_id(),
+                );
 
-            Self::LayoutInfo { area }
+                Self::LayoutInfo { area }
+            })
         }
 
         fn lay_out<'a>(
@@ -450,7 +451,6 @@ mod character_slot_preview {
         P: Path<ClientState, Option<usize>>,
     {
         fn handle_click(&self, state: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
-            // SAFETY
             // We should not be able to get here if there is no switch request, so it's
             // fine to unwrap.
             let origin_slot = state.get(&self.switch_request).unwrap();
@@ -602,19 +602,21 @@ where
             fn create_layout_info(
                 &mut self,
                 state: &Context<ClientState>,
-                mut store: ElementStoreMut<'_>,
-                resolver: &mut Resolver<'_, ClientState>,
+                mut store: ElementStoreMut,
+                resolvers: &mut dyn Resolvers<ClientState>,
             ) -> Self::LayoutInfo {
-                self.correct_element_size(state);
-                let (_area, layout_info) = resolver.with_derived(10.0, 0.0, |resolver| {
-                    self.item_boxes
-                        .iter_mut()
-                        .enumerate()
-                        .map(|(index, item_box)| item_box.create_layout_info(state, store.child_store(index as u64), resolver))
-                        .collect()
-                });
+                with_single_resolver(resolvers, |resolver| {
+                    self.correct_element_size(state);
+                    let (_area, layout_info) = resolver.with_derived(10.0, 0.0, |resolver| {
+                        self.item_boxes
+                            .iter_mut()
+                            .enumerate()
+                            .map(|(index, item_box)| item_box.create_layout_info(state, store.child_store(index as u64), resolver))
+                            .collect()
+                    });
 
-                layout_info
+                    layout_info
+                })
             }
 
             fn lay_out<'a>(

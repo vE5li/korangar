@@ -79,7 +79,7 @@ pub use self::respawn::RespawnWindow;
 pub use self::sell::SellWindow;
 pub use self::sell_cart::SellCartWindow;
 pub use self::server_selection::ServerSelectionWindow;
-pub use self::skill_tree::SkillTreeWindow;
+pub use self::skill_tree::{SkillTreeWindow, SkillTreeWindowState, SkillTreeWindowStatePathExt};
 pub use self::stats::StatsWindow;
 #[cfg(feature = "debug")]
 pub use self::theme_inspector::{ThemeInspectorWindow, ThemeInspectorWindowState};

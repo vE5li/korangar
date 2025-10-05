@@ -10,7 +10,7 @@ use store::WindowStore;
 
 use crate::MouseMode;
 use crate::application::{Application, CornerDiameter, Position, ShadowPadding, Size};
-use crate::element::ElementSet;
+use crate::element::Element;
 use crate::element::id::ElementIdGenerator;
 use crate::element::store::ElementStore;
 use crate::event::{ClickHandler, Event};
@@ -214,7 +214,7 @@ impl<App: Application> ClickHandler<App> for CloseClickHandler {
 pub struct WindowInternal<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, Elements>
 where
     App: Application,
-    Elements: ElementSet<App>,
+    Elements: Element<App>,
 {
     title_marker: PhantomData<Title>,
     title: A,
@@ -248,14 +248,14 @@ where
     horizontal_resize_click_action: ResizeClickHandler,
     vertical_resize_click_action: ResizeClickHandler,
     resize_click_action: ResizeClickHandler,
-    layout_info: Option<WindowLayoutInfoSet<<Elements as ElementSet<App>>::LayoutInfo>>,
+    layout_info: Option<WindowLayoutInfoSet<<Elements as Element<App>>::LayoutInfo>>,
 }
 
 impl<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, Elements>
     WindowInternal<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, Elements>
 where
     App: Application,
-    Elements: ElementSet<App>,
+    Elements: Element<App>,
 {
     #[allow(clippy::too_many_arguments)]
     pub fn component_new(
@@ -324,7 +324,7 @@ impl<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, 
     for WindowInternal<App, Title, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, Elements>
 where
     App: Application,
-    Elements: ElementSet<App>,
+    Elements: Element<App>,
 {
 }
 
@@ -354,8 +354,8 @@ where
     S: Selector<App, f32>,
     T: Selector<App, f32>,
     U: Selector<App, f32>,
-    Elements: ElementSet<App>,
-    <Elements as ElementSet<App>>::LayoutInfo: 'static,
+    Elements: Element<App>,
+    <Elements as Element<App>>::LayoutInfo: 'static,
 {
     fn get_class(&self) -> Option<App::WindowClass> {
         self.class

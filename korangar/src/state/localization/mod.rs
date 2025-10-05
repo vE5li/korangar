@@ -74,25 +74,23 @@ impl StateElement<ClientState> for LocalizationControls {
     {
         use korangar_interface::prelude::*;
 
-        collapsable! {
+        collapsible! {
             text: name,
-            children: (
-                split! {
-                    gaps: theme().window().gaps(),
-                    children: (
-                        button! {
-                            text: "Reload",
-                            tooltip: "Reload the language from disk",
-                            event: InputEvent::ReloadLanguage,
-                        },
-                        button! {
-                            text: "Save",
-                            tooltip: "Save the language to disk",
-                            event: InputEvent::SaveLanguage,
-                        },
-                    ),
-                },
-            ),
+            children: split! {
+                gaps: theme().window().gaps(),
+                children: (
+                    button! {
+                        text: "Reload",
+                        tooltip: "Reload the language from disk",
+                        event: InputEvent::ReloadLanguage,
+                    },
+                    button! {
+                        text: "Save",
+                        tooltip: "Save the language to disk",
+                        event: InputEvent::SaveLanguage,
+                    },
+                ),
+            },
         }
     }
 
@@ -102,7 +100,7 @@ impl StateElement<ClientState> for LocalizationControls {
     {
         use korangar_interface::prelude::*;
 
-        collapsable! {
+        collapsible! {
             text: name,
             children: (
                 split! {
@@ -197,6 +195,11 @@ pub struct Localization {
     dexterity_text: String,
     luck_text: String,
     auto_attack_button_text: String,
+    available_skill_points_text: String,
+    reset_skill_points_button_text: String,
+    cancel_skill_points_button_text: String,
+    apply_skill_points_button_text: String,
+    distribute_skill_points_button_text: String,
 }
 
 impl Localization {

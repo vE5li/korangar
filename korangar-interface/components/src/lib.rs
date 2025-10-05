@@ -133,27 +133,27 @@ pub fn drop_down(token_stream: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
-pub fn collapsable(token_stream: TokenStream) -> TokenStream {
-    create_component_macro!(korangar_interface::components::collapsable::Collapsable, {
+pub fn collapsible(token_stream: TokenStream) -> TokenStream {
+    create_component_macro!(korangar_interface::components::collapsible::Collapsible, {
         text: !,
         tooltip: { "" },
-        foreground_color: { korangar_interface::theme::theme().collapsable().foreground_color() },
-        highlight_color: { korangar_interface::theme::theme().collapsable().highlight_color() },
-        hovered_foreground_color: { korangar_interface::theme::theme().collapsable().hovered_foreground_color() },
-        background_color: { korangar_interface::theme::theme().collapsable().background_color() },
-        secondary_background_color: { korangar_interface::theme::theme().collapsable().secondary_background_color() },
-        icon_color: { korangar_interface::theme::theme().collapsable().icon_color() },
-        icon_size: { korangar_interface::theme::theme().collapsable().icon_size() },
-        shadow_color: { korangar_interface::theme::theme().collapsable().shadow_color() },
-        shadow_padding: { korangar_interface::theme::theme().collapsable().shadow_padding() },
-        gaps: { korangar_interface::theme::theme().collapsable().gaps() },
-        border: { korangar_interface::theme::theme().collapsable().border() },
-        corner_diameter: { korangar_interface::theme::theme().collapsable().corner_diameter() },
-        title_height: { korangar_interface::theme::theme().collapsable().title_height() },
-        font_size: { korangar_interface::theme::theme().collapsable().font_size() },
-        horizontal_alignment: { korangar_interface::theme::theme().collapsable().horizontal_alignment() },
-        vertical_alignment: { korangar_interface::theme::theme().collapsable().vertical_alignment() },
-        overflow_behavior: { korangar_interface::theme::theme().collapsable().overflow_behavior() },
+        foreground_color: { korangar_interface::theme::theme().collapsible().foreground_color() },
+        highlight_color: { korangar_interface::theme::theme().collapsible().highlight_color() },
+        hovered_foreground_color: { korangar_interface::theme::theme().collapsible().hovered_foreground_color() },
+        background_color: { korangar_interface::theme::theme().collapsible().background_color() },
+        secondary_background_color: { korangar_interface::theme::theme().collapsible().secondary_background_color() },
+        icon_color: { korangar_interface::theme::theme().collapsible().icon_color() },
+        icon_size: { korangar_interface::theme::theme().collapsible().icon_size() },
+        shadow_color: { korangar_interface::theme::theme().collapsible().shadow_color() },
+        shadow_padding: { korangar_interface::theme::theme().collapsible().shadow_padding() },
+        gaps: { korangar_interface::theme::theme().collapsible().gaps() },
+        border: { korangar_interface::theme::theme().collapsible().border() },
+        corner_diameter: { korangar_interface::theme::theme().collapsible().corner_diameter() },
+        title_height: { korangar_interface::theme::theme().collapsible().title_height() },
+        font_size: { korangar_interface::theme::theme().collapsible().font_size() },
+        horizontal_alignment: { korangar_interface::theme::theme().collapsible().horizontal_alignment() },
+        vertical_alignment: { korangar_interface::theme::theme().collapsible().vertical_alignment() },
+        overflow_behavior: { korangar_interface::theme::theme().collapsible().overflow_behavior() },
         initially_expanded: { false },
         extra_elements: { () },
         children: !,
@@ -240,6 +240,27 @@ pub fn text_box(token_stream: TokenStream) -> TokenStream {
         vertical_alignment: { korangar_interface::theme::theme().text_box().vertical_alignment() },
         overflow_behavior: { korangar_interface::theme::theme().text_box().overflow_behavior() },
         focus_id: !,
+    });
+
+    macro_impl(token_stream.into()).into()
+}
+
+#[proc_macro]
+pub fn tabs(token_stream: TokenStream) -> TokenStream {
+    create_component_macro!(korangar_interface::components::tabs::Tabs, {
+        selected_tab: !,
+        children: !,
+    });
+
+    macro_impl(token_stream.into()).into()
+}
+
+#[proc_macro]
+pub fn either(token_stream: TokenStream) -> TokenStream {
+    create_component_macro!(korangar_interface::components::either::Either, {
+        selector: !,
+        on_true: !,
+        on_false: !,
     });
 
     macro_impl(token_stream.into()).into()

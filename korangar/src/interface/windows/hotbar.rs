@@ -5,24 +5,26 @@ use rust_state::{ArrayLookupExt, OptionExt, Path};
 
 use crate::interface::resource::SkillSource;
 use crate::interface::windows::WindowClass;
-use crate::inventory::Skill;
 use crate::state::localization::LocalizationPathExt;
+use crate::state::skills::{LearnableSkill, LearnedSkill, LearnedSkillPath};
 use crate::state::theme::InterfaceThemeType;
 use crate::state::{ClientState, ClientStatePathExt, client_state};
 
-pub struct HotbarWindow<P, const N: usize> {
-    skills_path: P,
+pub struct HotbarWindow<A, B, const N: usize> {
+    hotbar_path: A,
+    skills_path: B,
 }
 
-impl<P, const N: usize> HotbarWindow<P, N> {
-    pub fn new(path: P) -> Self {
-        Self { skills_path: path }
+impl<A, B, const N: usize> HotbarWindow<A, B, N> {
+    pub fn new(hotbar_path: A, skills_path: B) -> Self {
+        Self { hotbar_path, skills_path }
     }
 }
 
-impl<P, const N: usize> CustomWindow<ClientState> for HotbarWindow<P, N>
+impl<A, B, const N: usize> CustomWindow<ClientState> for HotbarWindow<A, B, N>
 where
-    P: Path<ClientState, [Option<Skill>; N]>,
+    A: Path<ClientState, [Option<LearnableSkill>; N]>,
+    B: Path<ClientState, Vec<LearnedSkill>>,
 {
     fn window_class() -> Option<WindowClass> {
         Some(WindowClass::Hotbar)
@@ -39,10 +41,12 @@ where
                 split! {
                     gaps: theme().window().gaps(),
                     children: std::array::from_fn::<_, N, _>(|slot| {
-                        let path = self.skills_path.array_index(slot).unwrapped();
+                        let learnable_skill_path = self.hotbar_path.array_index(slot).unwrapped();
+                        let learned_skill_path = LearnedSkillPath::new(learnable_skill_path, self.skills_path);
 
                         skill_box! {
-                            skill_path: path,
+                            learnable_skill_path,
+                            learned_skill_path,
                             source: SkillSource::Hotbar { slot: HotbarSlot(slot as u16) },
                         }
                     }),

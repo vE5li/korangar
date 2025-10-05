@@ -1,9 +1,8 @@
 use hashbrown::HashMap;
-use korangar_loaders::FileLoader;
 use mlua::Lua;
 use ragnarok_packets::ItemId;
 
-use super::{ItemName, ItemResource, Library, Table, fix_encoding};
+use super::{HashMapExt, ItemName, ItemResource, Library, LuaExt, Table, fix_encoding};
 use crate::loaders::GameFileLoader;
 
 #[derive(Debug, Clone)]
@@ -19,12 +18,7 @@ impl Table for ItemInfo {
     type Storage = HashMap<ItemId, ItemInfo>;
 
     fn load(game_file_loader: &GameFileLoader) -> mlua::Result<Self::Storage> {
-        let state = Lua::new();
-
-        let data = game_file_loader
-            .get("data\\luafiles514\\lua files\\datainfo\\iteminfo.lub")
-            .unwrap();
-        state.load(&data).exec()?;
+        let state = Lua::load_from_game_files(game_file_loader, &["data\\luafiles514\\lua files\\datainfo\\iteminfo.lub"])?;
 
         let globals = state.globals();
         let mut result = HashMap::new();
@@ -42,9 +36,7 @@ impl Table for ItemInfo {
             }
         }
 
-        let compacted = HashMap::from_iter(result);
-
-        Ok(compacted)
+        Ok(result.compact())
     }
 
     fn try_get<'a, 'b>(library: &'a Library, key: Self::Key<'b>) -> Option<&'a Self> {

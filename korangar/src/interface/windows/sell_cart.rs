@@ -2,15 +2,15 @@ use std::cmp::Ordering;
 use std::fmt::Display;
 
 use korangar_interface::element::store::{ElementStore, ElementStoreMut};
-use korangar_interface::element::{Element, ElementBox, ElementSet};
+use korangar_interface::element::{Element, ElementBox};
 use korangar_interface::event::ClickHandler;
 use korangar_interface::layout::area::Area;
-use korangar_interface::layout::{Resolver, WindowLayout};
+use korangar_interface::layout::{Resolvers, WindowLayout, with_single_resolver};
 use korangar_interface::prelude::{HorizontalAlignment, VerticalAlignment};
 use korangar_interface::window::{CustomWindow, Window};
 use korangar_networking::SellItem;
 use ragnarok_packets::SoldItemInformation;
-use rust_state::{Context, ManuallyAssertExt, Path, Selector, VecIndexExt};
+use rust_state::{Context, ManuallyAssertExt, Path, PathExt, Selector, VecIndexExt};
 
 use super::WindowClass;
 use crate::InputEvent;
@@ -79,47 +79,49 @@ impl<A, B> ItemElement<A, B> {
 impl<A, B> Element<ClientState> for ItemElement<A, B>
 where
     A: Path<ClientState, SellItem<(ResourceMetadata, u16)>>,
-    B: ElementSet<ClientState>,
+    B: Element<ClientState>,
 {
     type LayoutInfo = ItemLayoutInfo<B::LayoutInfo>;
 
     fn create_layout_info(
         &mut self,
         state: &Context<ClientState>,
-        store: ElementStoreMut<'_>,
-        resolver: &mut Resolver<'_, ClientState>,
+        store: ElementStoreMut,
+        resolvers: &mut dyn Resolvers<ClientState>,
     ) -> Self::LayoutInfo {
-        let (area, (texture_area, text_area, children)) = resolver.with_derived(3.0, 3.0, |resolver| {
-            let area = resolver.with_height(34.0);
+        with_single_resolver(resolvers, |resolver| {
+            let (area, (texture_area, text_area, children)) = resolver.with_derived(3.0, 3.0, |resolver| {
+                let area = resolver.with_height(34.0);
 
-            let texture_area = Area {
-                width: 34.0,
-                height: 34.0,
-                ..area
-            };
+                let texture_area = Area {
+                    width: 34.0,
+                    height: 34.0,
+                    ..area
+                };
 
-            let text_area = Area {
-                left: area.left + 43.0,
-                width: area.width - 43.0,
-                ..area
-            };
+                let text_area = Area {
+                    left: area.left + 43.0,
+                    width: area.width - 43.0,
+                    ..area
+                };
 
-            let children = self.children.create_layout_info(state, store, resolver);
+                let children = self.children.create_layout_info(state, store, resolver);
 
-            (texture_area, text_area, children)
-        });
+                (texture_area, text_area, children)
+            });
 
-        let item = state.get(&self.item_path);
+            let item = state.get(&self.item_path);
 
-        self.amount_string.update(item.metadata.1);
-        self.price_string.update(item.price.0 * item.metadata.1 as u32);
+            self.amount_string.update(item.metadata.1);
+            self.price_string.update(item.price.0 * item.metadata.1 as u32);
 
-        Self::LayoutInfo {
-            area,
-            texture_area,
-            text_area,
-            children,
-        }
+            Self::LayoutInfo {
+                area,
+                texture_area,
+                text_area,
+                children,
+            }
+        })
     }
 
     fn lay_out<'a>(
@@ -203,106 +205,105 @@ where
     fn create_layout_info(
         &mut self,
         state: &Context<ClientState>,
-        mut store: ElementStoreMut<'_>,
-        resolver: &mut Resolver<'_, ClientState>,
+        mut store: ElementStoreMut,
+        resolvers: &mut dyn Resolvers<ClientState>,
     ) -> Self::LayoutInfo {
-        use korangar_interface::prelude::*;
+        with_single_resolver(resolvers, |resolver| {
+            use korangar_interface::prelude::*;
 
-        let cart = state.get(&self.cart_path);
+            let cart = state.get(&self.cart_path);
 
-        match cart.len().cmp(&self.elements.len()) {
-            Ordering::Less => {
-                self.elements.truncate(cart.len());
-            }
-            Ordering::Equal => {}
-            Ordering::Greater => {
-                for index in self.elements.len()..cart.len() {
-                    let item_path = self.cart_path.index(index).manually_asserted();
+            match cart.len().cmp(&self.elements.len()) {
+                Ordering::Less => {
+                    self.elements.truncate(cart.len());
+                }
+                Ordering::Equal => {}
+                Ordering::Greater => {
+                    for index in self.elements.len()..cart.len() {
+                        let item_path = self.cart_path.index(index).manually_asserted();
 
-                    fn disabled_cutoff<A>(item_path: A, amount: u16) -> impl Selector<ClientState, bool>
-                    where
-                        A: Path<ClientState, SellItem<(ResourceMetadata, u16)>>,
-                    {
-                        ComputedSelector::new_default(move |state: &ClientState| {
-                            // SAFETY:
-                            //
-                            // Unwrap is safe here because of the bounds.
-                            let item = item_path.follow(state).unwrap();
+                        fn disabled_cutoff<A>(item_path: A, amount: u16) -> impl Selector<ClientState, bool>
+                        where
+                            A: Path<ClientState, SellItem<(ResourceMetadata, u16)>>,
+                        {
+                            ComputedSelector::new_default(move |state: &ClientState| {
+                                let item = item_path.follow_safe(state);
 
-                            item.metadata.1 < amount
-                        })
-                    }
+                                item.metadata.1 < amount
+                            })
+                        }
 
-                    struct RemoveAction<A, B> {
-                        item_path: A,
-                        cart_path: B,
-                        amount: u16,
-                    }
+                        struct RemoveAction<A, B> {
+                            item_path: A,
+                            cart_path: B,
+                            amount: u16,
+                        }
 
-                    impl<A, B> RemoveAction<A, B> {
-                        fn new(item_path: A, cart_path: B, amount: u16) -> Self {
-                            Self {
-                                item_path,
-                                cart_path,
-                                amount,
+                        impl<A, B> RemoveAction<A, B> {
+                            fn new(item_path: A, cart_path: B, amount: u16) -> Self {
+                                Self {
+                                    item_path,
+                                    cart_path,
+                                    amount,
+                                }
                             }
                         }
-                    }
 
-                    impl<A, B> ClickHandler<ClientState> for RemoveAction<A, B>
-                    where
-                        A: Path<ClientState, SellItem<(ResourceMetadata, u16)>>,
-                        B: Path<ClientState, Vec<SellItem<(ResourceMetadata, u16)>>>,
-                    {
-                        fn handle_click(&self, state: &Context<ClientState>, _: &mut EventQueue<ClientState>) {
-                            let inventory_index = state.get(&self.item_path).inventory_index;
-                            let amount = self.amount;
+                        impl<A, B> ClickHandler<ClientState> for RemoveAction<A, B>
+                        where
+                            A: Path<ClientState, SellItem<(ResourceMetadata, u16)>>,
+                            B: Path<ClientState, Vec<SellItem<(ResourceMetadata, u16)>>>,
+                        {
+                            fn handle_click(&self, state: &Context<ClientState>, _: &mut EventQueue<ClientState>) {
+                                let inventory_index = state.get(&self.item_path).inventory_index;
+                                let amount = self.amount;
 
-                            state.update_value_with(self.cart_path, move |cart| {
-                                if let Some(index) = cart.iter_mut().position(|purchase| purchase.inventory_index == inventory_index) {
-                                    if cart[index].metadata.1 > amount {
-                                        cart[index].metadata.1 -= amount;
-                                    } else {
-                                        cart.remove(index);
+                                state.update_value_with(self.cart_path, move |cart| {
+                                    if let Some(index) = cart.iter_mut().position(|purchase| purchase.inventory_index == inventory_index) {
+                                        if cart[index].metadata.1 > amount {
+                                            cart[index].metadata.1 -= amount;
+                                        } else {
+                                            cart.remove(index);
+                                        }
                                     }
-                                }
-                            });
+                                });
+                            }
                         }
+
+                        let buttons = (split! {
+                            gaps: theme().window().gaps(),
+                            children: (
+                                button! {
+                                    text: "-1",
+                                    disabled: disabled_cutoff(item_path, 1),
+                                    event: RemoveAction::new(item_path, self.cart_path, 1),
+                                },
+                                button! {
+                                    text: "-10",
+                                    disabled: disabled_cutoff(item_path, 10),
+                                    event: RemoveAction::new(item_path, self.cart_path, 10),
+                                },
+                                button! {
+                                    text: "-100",
+                                    disabled: disabled_cutoff(item_path, 100),
+                                    event: RemoveAction::new(item_path, self.cart_path, 100),
+                                },
+                                button! {
+                                    text: "-All",
+                                    event: RemoveAction::new(item_path, self.cart_path, u16::MAX),
+                                },
+                            ),
+                        },);
+
+                        self.elements.push(ErasedElement::new(ItemElement::new(item_path, buttons)));
                     }
-
-                    let buttons = (split! {
-                        gaps: theme().window().gaps(),
-                        children: (
-                            button! {
-                                text: "-1",
-                                disabled: disabled_cutoff(item_path, 1),
-                                event: RemoveAction::new(item_path, self.cart_path, 1),
-                            },
-                            button! {
-                                text: "-10",
-                                disabled: disabled_cutoff(item_path, 10),
-                                event: RemoveAction::new(item_path, self.cart_path, 10),
-                            },
-                            button! {
-                                text: "-100",
-                                disabled: disabled_cutoff(item_path, 100),
-                                event: RemoveAction::new(item_path, self.cart_path, 100),
-                            },
-                            button! {
-                                text: "-All",
-                                event: RemoveAction::new(item_path, self.cart_path, u16::MAX),
-                            },
-                        ),
-                    },);
-
-                    self.elements.push(ErasedElement::new(ItemElement::new(item_path, buttons)));
                 }
             }
-        }
 
-        self.elements.iter_mut().enumerate().for_each(|(index, element)| {
-            element.create_layout_info(state, store.child_store(index as u64), resolver);
-        });
+            self.elements.iter_mut().enumerate().for_each(|(index, element)| {
+                element.create_layout_info(state, store.child_store(index as u64), resolver);
+            });
+        })
     }
 
     fn lay_out<'a>(
@@ -370,9 +371,7 @@ where
                     ),
                 },
                 scroll_view! {
-                    children: (
-                        ItemList::new(self.cart_path),
-                    ),
+                    children: ItemList::new(self.cart_path),
                 },
             ),
         }

@@ -8,7 +8,7 @@ use ragnarok_packets::handler::{HandlerResult, PacketCallback, PacketHandler};
 use ragnarok_packets::*;
 
 // Adjust this to change which packets will print their content!
-const EXPAND_BEHAVIOUR: ExpandBehaviour = ExpandBehaviour::Blacklist(&[
+const EXPAND_BEHAVIOR: ExpandBehavior = ExpandBehavior::Blacklist(&[
     TypeId::of::<LoginServerKeepalivePacket>(),
     TypeId::of::<CharacterServerKeepalivePacket>(),
     TypeId::of::<RequestServerTickPacket>(),
@@ -17,7 +17,7 @@ const EXPAND_BEHAVIOUR: ExpandBehaviour = ExpandBehaviour::Blacklist(&[
 ]);
 
 #[allow(dead_code)]
-enum ExpandBehaviour {
+enum ExpandBehavior {
     None,
     All,
     Whitelist(&'static [TypeId]),
@@ -132,10 +132,10 @@ fn handler<P: Packet + 'static>(server_type: ServerType, direction: Direction) -
             header.green()
         );
 
-        match EXPAND_BEHAVIOUR {
-            ExpandBehaviour::None => {}
-            ExpandBehaviour::Whitelist(types) if !types.contains(&TypeId::of::<P>()) => {}
-            ExpandBehaviour::Blacklist(types) if types.contains(&TypeId::of::<P>()) => {}
+        match EXPAND_BEHAVIOR {
+            ExpandBehavior::None => {}
+            ExpandBehavior::Whitelist(types) if !types.contains(&TypeId::of::<P>()) => {}
+            ExpandBehavior::Blacklist(types) if types.contains(&TypeId::of::<P>()) => {}
             _ => {
                 let arrow = match direction {
                     Direction::Incoming => ARROW.green(),

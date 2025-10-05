@@ -32,6 +32,7 @@ pub enum MouseCursorState {
     /// more ergonomic. Will likely be refactored with this entire module at
     /// some point.
     HoverItem = 900,
+    GrabResource,
     PickUpItem,
 }
 
@@ -93,6 +94,7 @@ impl MouseCursor {
 
                         usize::from(MouseCursorState::Grab)
                     }
+                    MouseCursorState::GrabResource => usize::from(MouseCursorState::Grab),
                     MouseCursorState::HoverItem => usize::from(MouseCursorState::Grab),
                     regular => usize::from(regular),
                 };
@@ -166,6 +168,7 @@ impl MouseCursor {
         let frame_index = match self.cursor_state {
             MouseCursorState::HoverItem => Some(HOVER_ITEM_FRAME),
             MouseCursorState::PickUpItem => Some(PICKUP_FRAME),
+            MouseCursorState::GrabResource => Some(PICKUP_FRAME),
             _ => None,
         };
 

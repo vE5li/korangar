@@ -9,7 +9,7 @@ use crate::event::ClickHandler;
 use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
 use crate::layout::area::Area;
 use crate::layout::tooltip::TooltipExt;
-use crate::layout::{Icon, MouseButton, Resolver, WindowLayout};
+use crate::layout::{Icon, MouseButton, Resolvers, WindowLayout, with_single_resolver};
 
 #[derive(RustState)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -160,28 +160,30 @@ where
     W: Selector<App, VerticalAlignment>,
     X: Selector<App, App::OverflowBehavior>,
 {
-    fn create_layout_info(&mut self, state: &Context<App>, _: ElementStoreMut<'_>, resolver: &mut Resolver<'_, App>) -> Self::LayoutInfo {
-        let height = *state.get(&self.height);
+    fn create_layout_info(&mut self, state: &Context<App>, _: ElementStoreMut, resolvers: &mut dyn Resolvers<App>) -> Self::LayoutInfo {
+        with_single_resolver(resolvers, |resolver| {
+            let height = *state.get(&self.height);
 
-        let text = state.get(&self.text).as_ref();
-        let font_color = *state.get(&self.foreground_color);
-        let highlight_color = *state.get(&self.highlight_color);
-        let font_size = *state.get(&self.font_size);
-        let horizontal_alignment = *state.get(&self.horizontal_alignment);
-        let overflow_behavior = *state.get(&self.overflow_behavior);
+            let text = state.get(&self.text).as_ref();
+            let font_color = *state.get(&self.foreground_color);
+            let highlight_color = *state.get(&self.highlight_color);
+            let font_size = *state.get(&self.font_size);
+            let horizontal_alignment = *state.get(&self.horizontal_alignment);
+            let overflow_behavior = *state.get(&self.overflow_behavior);
 
-        let (size, font_size) = resolver.get_text_dimensions(
-            text,
-            font_color,
-            highlight_color,
-            font_size,
-            horizontal_alignment,
-            overflow_behavior,
-        );
+            let (size, font_size) = resolver.get_text_dimensions(
+                text,
+                font_color,
+                highlight_color,
+                font_size,
+                horizontal_alignment,
+                overflow_behavior,
+            );
 
-        let area = resolver.with_height(height.max(size.height()));
+            let area = resolver.with_height(height.max(size.height()));
 
-        Self::LayoutInfo { area, font_size }
+            Self::LayoutInfo { area, font_size }
+        })
     }
 
     fn lay_out<'a>(

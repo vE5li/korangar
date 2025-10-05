@@ -63,4 +63,9 @@
     dexterity_text: "Geschicklichkeit",
     luck_text: "Glück",
     auto_attack_button_text: "Automatisch angreifen",
+    available_skill_points_text: "Verfügbare Punkte",
+    reset_skill_points_button_text: "Zurücksetzen",
+    cancel_skill_points_button_text: "Abbrechen",
+    apply_skill_points_button_text: "Anwenden",
+    distribute_skill_points_button_text: "Verteilen",
 )

@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use korangar_interface::components::text_box::DefaultHandler;
 use korangar_interface::element::store::{ElementStore, ElementStoreMut};
 use korangar_interface::element::{Element, ElementBox, StateElement};
-use korangar_interface::layout::{Resolver, WindowLayout};
+use korangar_interface::layout::{Resolvers, WindowLayout, with_single_resolver};
 use korangar_interface::window::{CustomWindow, Window};
 use ragnarok_packets::{Friend, FriendPathExt};
 use rust_state::{Context, ManuallyAssertExt, Path, RustState, VecIndexExt};
@@ -42,27 +42,27 @@ where
     fn create_layout_info(
         &mut self,
         state: &Context<ClientState>,
-        mut store: ElementStoreMut<'_>,
-        resolver: &mut Resolver<'_, ClientState>,
+        mut store: ElementStoreMut,
+        resolvers: &mut dyn Resolvers<ClientState>,
     ) -> Self::LayoutInfo {
-        use korangar_interface::prelude::*;
+        with_single_resolver(resolvers, |resolver| {
+            use korangar_interface::prelude::*;
 
-        let friend_list = state.get(&self.friend_list_path);
+            let friend_list = state.get(&self.friend_list_path);
 
-        match friend_list.len().cmp(&self.elements.len()) {
-            Ordering::Less => {
-                self.elements.truncate(friend_list.len());
-            }
-            Ordering::Equal => {}
-            Ordering::Greater => {
-                for index in self.elements.len()..friend_list.len() {
-                    let friend_path = self.friend_list_path.index(index).manually_asserted();
-                    let name_path = friend_path.name();
+            match friend_list.len().cmp(&self.elements.len()) {
+                Ordering::Less => {
+                    self.elements.truncate(friend_list.len());
+                }
+                Ordering::Equal => {}
+                Ordering::Greater => {
+                    for index in self.elements.len()..friend_list.len() {
+                        let friend_path = self.friend_list_path.index(index).manually_asserted();
+                        let name_path = friend_path.name();
 
-                    self.elements.push(ErasedElement::new(collapsable! {
-                        text: name_path,
-                        children: (
-                            button! {
+                        self.elements.push(ErasedElement::new(collapsible! {
+                            text: name_path,
+                            children: button! {
                                 text: client_state().localization().remove_button_text(),
                                 event: move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
                                     let &Friend { account_id, character_id, .. } = state.get(&friend_path);
@@ -72,15 +72,15 @@ where
                                     );
                                 },
                             },
-                        ),
-                    }));
+                        }));
+                    }
                 }
             }
-        }
 
-        self.elements.iter_mut().zip(friend_list.iter()).for_each(|(element, friend)| {
-            element.create_layout_info(state, store.child_store(friend.character_id.0 as u64), resolver);
-        });
+            self.elements.iter_mut().zip(friend_list.iter()).for_each(|(element, friend)| {
+                element.create_layout_info(state, store.child_store(friend.character_id.0 as u64), resolver);
+            });
+        })
     }
 
     fn lay_out<'a>(

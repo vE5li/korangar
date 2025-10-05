@@ -49,14 +49,16 @@ pub mod prelude {
     pub use interface_components::*;
 
     pub use crate::components::button::ButtonThemePathExt;
-    pub use crate::components::collapsable::CollapsableThemePathExt;
+    pub use crate::components::collapsible::CollapsibleThemePathExt;
     pub use crate::components::drop_down::DropDownThemePathExt;
+    pub use crate::components::either::Either;
     pub use crate::components::field::FieldThemePathExt;
     pub use crate::components::state_button::StateButtonThemePathExt;
+    pub use crate::components::tabs::Tabs;
     pub use crate::components::text::TextThemePathExt;
     pub use crate::components::text_box::TextBoxThemePathExt;
-    pub use crate::element::ErasedElement;
-    pub use crate::event::{Event, EventQueue, Toggle};
+    pub use crate::element::{EmptyElement, ErasedElement};
+    pub use crate::event::{Event, EventQueue, SetToFalse, SetToTrue, Toggle};
     pub use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
     pub use crate::layout::tooltip::TooltipThemePathExt;
     pub use crate::selector_helpers::*;
@@ -69,7 +71,7 @@ pub mod selector_helpers {
     use std::cell::{Cell, UnsafeCell};
     use std::fmt::Display;
 
-    use rust_state::{Path, Selector};
+    use rust_state::{Path, PathExt, Selector};
 
     use crate::application::Application;
     use crate::element::ElementDisplay;
@@ -97,9 +99,7 @@ pub mod selector_helpers {
         T: Copy + PartialEq + Display + 'static,
     {
         fn select<'a>(&'a self, state: &'a App) -> Option<&'a String> {
-            // SAFETY
-            // `unwrap()` is safe here because the bound of `P` specifies a safe path.
-            let value = self.path.follow(state).unwrap();
+            let value = self.path.follow_safe(state);
 
             let last_value = self.last_value.get();
 
@@ -135,9 +135,7 @@ pub mod selector_helpers {
         T: ElementDisplay,
     {
         fn select<'a>(&'a self, state: &'a App) -> Option<&'a String> {
-            // SAFETY
-            // `unnwrap` is safe here because the bound of `P` specifies a safe path.
-            let value = self.path.follow(state).unwrap();
+            let value = self.path.follow_safe(state);
 
             unsafe {
                 let last_value = &mut *self.last_value.get();
@@ -585,8 +583,6 @@ where
             #[cfg(feature = "debug")]
             korangar_debug::profile_block!("lay out overlay element");
 
-            // SAFETY:
-            //
             // Window is guaranteed to exist since we check for that when creating the
             // layout info for the overlay.
             let wrapper = this
@@ -850,11 +846,21 @@ impl<App: Application> InterfaceFrame<'_, App> {
         }
 
         if let Some(layout) = &self.overlay_layout {
+            let mouse_button = match mouse_button.is_double_click() && !layout.has_button_registered(mouse_button) {
+                true => mouse_button.as_single_click(),
+                false => mouse_button,
+            };
+
             layout.handle_click(state, self.event_queue, mouse_button);
         }
 
         if let Some(window_id) = &self.hovered_window {
             let layout = self.window_layouts.get(window_id).unwrap();
+
+            let mouse_button = match mouse_button.is_double_click() && !layout.has_button_registered(mouse_button) {
+                true => mouse_button.as_single_click(),
+                false => mouse_button,
+            };
 
             layout.handle_click(state, self.event_queue, mouse_button);
         }

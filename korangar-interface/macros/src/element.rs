@@ -69,7 +69,7 @@ pub fn derive_state_element_struct(
                 {
                     use korangar_interface::prelude::*;
 
-                    collapsable! {
+                    collapsible! {
                         text: name,
                         children: (#(#initializers,)*),
                     }
@@ -80,7 +80,7 @@ pub fn derive_state_element_struct(
                 {
                     use korangar_interface::prelude::*;
 
-                    collapsable! {
+                    collapsible! {
                         text: name,
                         children: (#(#initializers_mut,)*),
                     }
@@ -138,7 +138,7 @@ pub fn derive_state_element_struct(
             {
                 use korangar_interface::prelude::*;
 
-                collapsable! {
+                collapsible! {
                     text: name,
                     children: (#(#initializers,)*),
                 }
@@ -149,7 +149,7 @@ pub fn derive_state_element_struct(
             {
                 use korangar_interface::prelude::*;
 
-                collapsable! {
+                collapsible! {
                     text: name,
                     children: (#(#initializers_mut,)*),
                 }
@@ -286,13 +286,13 @@ pub fn derive_state_element_enum(_data_enum: DataEnum, generics: Generics, name:
                 //     fn create_layout_info(
                 //         &mut self,
                 //         state: &rust_state::Context<App>,
-                //         mut store: korangar_interface::element::store::ElementStoreMut<'_>,
-                //         resolver: &mut korangar_interface::layout::Resolver<'_, App>,
+                //         mut store: korangar_interface::element::store::ElementStoreMut,
+                //         resolvers: &mut korangar_interface::layout::Resolver<App>,
                 //     ) -> Self::LayoutInfo {
                 //         match state.get(&self.path) {
                 //             #(
                 //                 #name::#variant_names #variant_matchers => {
-                //                     InnerLayoutInfo::#variant_names(self.#element_names.create_layout_info(state, store.child_store(#store_indices), resolver))
+                //                     InnerLayoutInfo::#variant_names(self.#element_names.create_layout_info(state, store.child_store(#store_indices), resolvers))
                 //                 },
                 //             )*
                 //         }
@@ -355,13 +355,13 @@ pub fn derive_state_element_enum(_data_enum: DataEnum, generics: Generics, name:
                 //     fn create_layout_info(
                 //         &mut self,
                 //         state: &rust_state::Context<App>,
-                //         mut store: korangar_interface::element::store::ElementStoreMut<'_>,
-                //         resolver: &mut korangar_interface::layout::Resolver<'_, App>,
+                //         mut store: korangar_interface::element::store::ElementStoreMut,
+                //         resolvers: &mut korangar_interface::layout::Resolver<App>,
                 //     ) -> Self::LayoutInfo {
                 //         match state.get(&self.path) {
                 //             #(
                 //                 #name::#variant_names #variant_matchers => {
-                //                     InnerLayoutInfo::#variant_names(self.#element_names.create_layout_info(state, store.child_store(#store_indices), resolver))
+                //                     InnerLayoutInfo::#variant_names(self.#element_names.create_layout_info(state, store.child_store(#store_indices), resolvers))
                 //                 },
                 //             )*
                 //         }

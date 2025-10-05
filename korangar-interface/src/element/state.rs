@@ -7,11 +7,11 @@ use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use interface_components::collapsable;
-use rust_state::{ArrayLookupExt, Context, ManuallyAssertExt, OptionExt, Path, Selector, VecIndexExt};
+use interface_components::collapsible;
+use rust_state::{ArrayLookupExt, Context, ManuallyAssertExt, OptionExt, Path, PathExt, Selector, VecIndexExt};
 
+use super::Element;
 use super::store::ElementStoreMut;
-use super::{Element, ElementSet};
 use crate::application::Application;
 use crate::components::text_box::DefaultHandler;
 use crate::element::BaseLayoutInfo;
@@ -19,8 +19,8 @@ use crate::element::store::ElementStore;
 use crate::event::ClickHandler;
 use crate::layout::area::Area;
 use crate::layout::tooltip::TooltipExt;
-use crate::layout::{Icon, MouseButton, Resolver, ResolverSet, WindowLayout};
-use crate::prelude::CollapsableThemePathExt;
+use crate::layout::{Icon, MouseButton, Resolvers, WindowLayout, with_single_resolver};
+use crate::prelude::CollapsibleThemePathExt;
 use crate::theme::{ThemePathGetter, theme};
 
 pub trait StateElement<App: Application> {
@@ -226,9 +226,7 @@ where
             P: Path<App, bool>,
         {
             fn select<'a>(&'a self, state: &'a App) -> Option<&'a &'static str> {
-                // SAFETY:
-                // It is safe to unwrap here because of the bound.
-                match *self.0.follow(state).unwrap() {
+                match *self.0.follow_safe(state) {
                     true => Some(&"True"),
                     false => Some(&"False"),
                 }
@@ -434,20 +432,15 @@ where
 {
     type LayoutInfo = OptionLayoutInfo<E::LayoutInfo, T::LayoutInfoMut>;
 
-    fn create_layout_info(
-        &mut self,
-        state: &Context<App>,
-        store: ElementStoreMut<'_>,
-        resolver: &mut Resolver<'_, App>,
-    ) -> Self::LayoutInfo {
+    fn create_layout_info(&mut self, state: &Context<App>, store: ElementStoreMut, resolvers: &mut dyn Resolvers<App>) -> Self::LayoutInfo {
         if state.get(&self.option_path).is_some() {
             let element = self
                 .element
                 .get_or_insert_with(|| T::to_element_mut(self.inner_path, self.name.take().unwrap()));
 
-            OptionLayoutInfo::Some(element.create_layout_info(state, store, resolver))
+            OptionLayoutInfo::Some(element.create_layout_info(state, store, resolvers))
         } else {
-            OptionLayoutInfo::None(self.none_element.create_layout_info(state, store, resolver))
+            OptionLayoutInfo::None(self.none_element.create_layout_info(state, store, resolvers))
         }
     }
 
@@ -557,7 +550,7 @@ where
             T::to_element(item_path, index.to_string())
         });
 
-        collapsable! { text: name, children: elements }
+        collapsible! { text: name, children: elements }
     }
 
     fn to_element_mut<P>(self_path: P, name: String) -> Self::ReturnMut<P>
@@ -569,7 +562,7 @@ where
             T::to_element_mut(item_path, index.to_string())
         });
 
-        collapsable! { text: name, children: elements }
+        collapsible! { text: name, children: elements }
     }
 }
 
@@ -583,10 +576,7 @@ where
     _marker: PhantomData<T>,
 }
 
-// NOTE: We implement `ElementSet` rather than `Element` so that the collapsable
-// can check if the number of elements is larger than zero. That way empty
-// `collapsable`s will be rendered correctly.
-impl<App, T, P> ElementSet<App> for VecWrapper<App, T, P>
+impl<App, T, P> Element<App> for VecWrapper<App, T, P>
 where
     App: Application,
     T: StateElement<App> + 'static,
@@ -602,31 +592,32 @@ where
     fn create_layout_info(
         &mut self,
         state: &Context<App>,
-        mut store: ElementStoreMut<'_>,
-        mut resolver_set: impl ResolverSet<'_, App>,
+        mut store: ElementStoreMut,
+        resolvers: &mut dyn Resolvers<App>,
     ) -> Self::LayoutInfo {
-        let vector = state.get(&self.self_path);
+        with_single_resolver(resolvers, |resolver| {
+            let vector = state.get(&self.self_path);
 
-        match self.item_boxes.len().cmp(&vector.len()) {
-            Ordering::Greater => {
-                // Delete excess elements.
-                self.item_boxes.truncate(vector.len());
-            }
-            Ordering::Less => {
-                // Add new elements.
-                for index in self.item_boxes.len()..vector.len() {
-                    self.item_boxes.push({
-                        let item_path = self.self_path.index(index).manually_asserted();
-                        let item_element = StateElement::to_element_mut(item_path, index.to_string());
-                        let item_box: Box<dyn Element<App, LayoutInfo = <T as StateElement<App>>::LayoutInfoMut>> = Box::new(item_element);
-                        item_box
-                    });
+            match self.item_boxes.len().cmp(&vector.len()) {
+                Ordering::Greater => {
+                    // Delete excess elements.
+                    self.item_boxes.truncate(vector.len());
                 }
+                Ordering::Less => {
+                    // Add new elements.
+                    for index in self.item_boxes.len()..vector.len() {
+                        self.item_boxes.push({
+                            let item_path = self.self_path.index(index).manually_asserted();
+                            let item_element = StateElement::to_element_mut(item_path, index.to_string());
+                            let item_box: Box<dyn Element<App, LayoutInfo = <T as StateElement<App>>::LayoutInfoMut>> =
+                                Box::new(item_element);
+                            item_box
+                        });
+                    }
+                }
+                Ordering::Equal => {}
             }
-            Ordering::Equal => {}
-        }
 
-        resolver_set.with_index(0, |resolver| {
             let (_area, layout_info) = resolver.with_derived(2.0, 4.0, |resolver| {
                 self.item_boxes
                     .iter_mut()
@@ -680,7 +671,7 @@ where
     where
         P: Path<App, Self>,
     {
-        collapsable! {
+        collapsible! {
             text: name,
             children: VecWrapper {
                 self_path,
@@ -708,11 +699,11 @@ where
             fn create_layout_info(
                 &mut self,
                 state: &Context<App>,
-                _: ElementStoreMut<'_>,
-                resolver: &mut Resolver<'_, App>,
+                _: ElementStoreMut,
+                resolvers: &mut dyn Resolvers<App>,
             ) -> Self::LayoutInfo {
-                let height = *state.get(&theme().collapsable().title_height());
-                let mut area = resolver.with_height(height);
+                let height = *state.get(&theme().collapsible().title_height());
+                let mut area = with_single_resolver(resolvers, |resolver| resolver.with_height(height));
 
                 // This is making the button square and sit to the right of the title.
                 // It's a bit hacky but it does the job for now.
@@ -747,15 +738,15 @@ where
                 };
 
                 let icon_color = match is_hoverered {
-                    true => *state.get(&theme().collapsable().hovered_foreground_color()),
-                    false => *state.get(&theme().collapsable().foreground_color()),
+                    true => *state.get(&theme().collapsible().hovered_foreground_color()),
+                    false => *state.get(&theme().collapsible().foreground_color()),
                 };
 
                 layout.add_icon(icon_area, Icon::TrashCan, icon_color);
             }
         }
 
-        collapsable! {
+        collapsible! {
             text: name,
             children: VecWrapper {
                 self_path,

@@ -1,6 +1,10 @@
 #[cfg(feature = "debug")]
 pub mod cache_statistics;
+pub mod character_slots;
+pub mod hotbar;
+pub mod inventory;
 pub mod localization;
+pub mod skills;
 pub mod theme;
 
 use std::cell::Cell;
@@ -8,7 +12,7 @@ use std::sync::Arc;
 
 use korangar_interface::application::Application;
 use korangar_interface::components::button::ButtonTheme;
-use korangar_interface::components::collapsable::CollapsableTheme;
+use korangar_interface::components::collapsible::CollapsibleTheme;
 use korangar_interface::components::drop_down::DropDownTheme;
 use korangar_interface::components::field::FieldTheme;
 use korangar_interface::components::state_button::StateButtonTheme;
@@ -25,29 +29,32 @@ use ragnarok_formats::map::{EffectSource, LightSource, MapData, SoundSource};
 use ragnarok_packets::{CharacterId, CharacterServerInformation, EntityId, Friend};
 #[cfg(feature = "debug")]
 use rust_state::{ManuallyAssertExt, VecIndexExt};
-use rust_state::{Path, RustState, Selector};
+use rust_state::{Path, PathExt, RustState, Selector};
 use theme::{InterfaceTheme, InterfaceThemePathExt, InterfaceThemeType};
 
 #[cfg(feature = "debug")]
 use self::cache_statistics::CacheStatistics;
 #[cfg(feature = "debug")]
 use crate::PacketHistory;
-use crate::character_slots::CharacterSlots;
 #[cfg(feature = "debug")]
 use crate::graphics::RenderOptions;
 use crate::graphics::{Color, CornerDiameter, ScreenClip, ScreenPosition, ScreenSize, ShadowPadding};
 use crate::input::{InputEvent, MouseInputMode};
 use crate::interface::windows::{
-    ChatWindowState, DialogWindowState, FriendListWindowState, LoginWindowState, LoginWindowStatePathExt, WindowCache, WindowClass,
+    ChatWindowState, DialogWindowState, FriendListWindowState, LoginWindowState, LoginWindowStatePathExt, SkillTreeWindowState,
+    WindowCache, WindowClass,
 };
 #[cfg(feature = "debug")]
 use crate::interface::windows::{ProfilerWindowState, ThemeInspectorWindowState};
-use crate::inventory::{Hotbar, Inventory, SkillTree};
 use crate::loaders::{ClientInfo, FontLoader, FontSize, GameFileLoader, OverflowBehavior, load_client_info};
 use crate::renderer::InterfaceRenderer;
 use crate::settings::{
     GameSettings, GraphicsSettingsCapabilities, InterfaceSettings, InterfaceSettingsCapabilities, LoginSettings, ServiceSettings,
 };
+use crate::state::character_slots::CharacterSlots;
+use crate::state::hotbar::Hotbar;
+use crate::state::inventory::Inventory;
+use crate::state::skills::SkillTree;
 use crate::state::theme::WorldTheme;
 #[cfg(feature = "debug")]
 use crate::world::Object;
@@ -132,6 +139,8 @@ pub struct ClientState {
     friend_list_window: FriendListWindowState,
     /// Internal state of the dialog window.
     dialog_window: DialogWindowState,
+    /// Internal state of the skill tree window.
+    skill_tree_window: SkillTreeWindowState,
 
     /// All entities on the map.
     entities: Vec<Entity>,
@@ -322,6 +331,7 @@ impl ClientState {
             let hotbar = Hotbar::default();
             let inventory = Inventory::default();
             let skill_tree = SkillTree::default();
+            let skill_tree_window = SkillTreeWindowState::default();
         });
 
         time_phase!("create window resources", {
@@ -376,6 +386,7 @@ impl ClientState {
             chat_window,
             friend_list_window,
             dialog_window,
+            skill_tree_window,
             entities: Vec::new(),
             dead_entities: Vec::new(),
             ground_items: Vec::new(),
@@ -480,8 +491,8 @@ impl ThemePathGetter<ClientState> for ClientThemeGetter {
         ThemePath.text_box()
     }
 
-    fn collapsable(self) -> impl Path<ClientState, CollapsableTheme<ClientState>> {
-        ThemePath.collapsable()
+    fn collapsible(self) -> impl Path<ClientState, CollapsibleTheme<ClientState>> {
+        ThemePath.collapsible()
     }
 
     fn drop_down(self) -> impl Path<ClientState, DropDownTheme<ClientState>> {
@@ -641,38 +652,17 @@ where
 {
     fn follow<'a>(&self, state: &'a ClientState) -> Option<&'a ServiceSettings> {
         let selected_service_path = self.window_state_path.selected_service();
-        // SAFETY:
-        //
-        // Unwrapping here is safe because of the bounds.
-        let selected_service = selected_service_path.follow(state).unwrap();
+        let selected_service = selected_service_path.follow_safe(state);
 
-        // SAFETY:
-        //
-        // First unwrap here is safe because of the bounds.
-        // Second unwrap guaranteed to be safe by the ClientState. When it loads, it
-        // makes sure each available service has a settings entry.
-        self.service_settings_path
-            .follow(state)
-            .unwrap()
-            .service_settings
-            .get(selected_service)
+        self.service_settings_path.follow_safe(state).service_settings.get(selected_service)
     }
 
     fn follow_mut<'a>(&self, state: &'a mut ClientState) -> Option<&'a mut ServiceSettings> {
         let selected_service_path = self.window_state_path.selected_service();
-        // SAFETY:
-        //
-        // Unwrapping here is safe because of the bounds.
-        let selected_service = *selected_service_path.follow_mut(state).unwrap();
+        let selected_service = *selected_service_path.follow_mut_safe(state);
 
-        // SAFETY:
-        //
-        // First unwrap here is safe because of the bounds.
-        // Second unwrap guaranteed to be safe by the ClientState. When it loads, it
-        // makes sure each available service has a settings entry.
         self.service_settings_path
-            .follow_mut(state)
-            .unwrap()
+            .follow_mut_safe(state)
             .service_settings
             .get_mut(&selected_service)
     }

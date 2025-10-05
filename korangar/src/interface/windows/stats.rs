@@ -2,7 +2,7 @@ use std::cell::{Cell, UnsafeCell};
 
 use korangar_interface::window::{CustomWindow, Window};
 use ragnarok_packets::StatUpType;
-use rust_state::{Path, Selector};
+use rust_state::{Path, PathExt, Selector};
 
 use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
@@ -33,9 +33,7 @@ where
     A: Path<ClientState, i32>,
 {
     fn select<'a>(&'a self, state: &'a ClientState) -> Option<&'a String> {
-        // SAFETY
-        // `unnwrap` is safe here because the bound of `A` specifies a safe path.
-        let bonus_value = self.bonus_path.follow(state).unwrap();
+        let bonus_value = self.bonus_path.follow_safe(state);
 
         unsafe {
             let last_value = self.last_value.get();
@@ -71,9 +69,7 @@ where
     A: Path<ClientState, u8>,
 {
     fn select<'a>(&'a self, state: &'a ClientState) -> Option<&'a String> {
-        // SAFETY
-        // `unnwrap` is safe here because the bound of `A` specifies a safe path.
-        let cost = self.cost_path.follow(state).unwrap();
+        let cost = self.cost_path.follow_safe(state);
 
         unsafe {
             let last_value = &mut *self.last_value.get();
@@ -120,15 +116,8 @@ where
             B: Path<ClientState, u8>,
         {
             ComputedSelector::new_default(move |state: &ClientState| {
-                // SAFETY:
-                //
-                // Unwrap is safe here because of the bounds.
-                let stat_points = stat_points_path.follow(state).unwrap();
-
-                // SAFETY:
-                //
-                // Unwrap is safe here because of the bounds.
-                let cost = cost_path.follow(state).unwrap();
+                let stat_points = stat_points_path.follow_safe(state);
+                let cost = cost_path.follow_safe(state);
 
                 // The cost is 0 if the the player is at the maximum level.
                 *cost == 0 || *stat_points < *cost as u32

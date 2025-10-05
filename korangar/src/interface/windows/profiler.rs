@@ -6,7 +6,7 @@ use korangar_interface::element::store::{ElementStore, ElementStoreMut};
 use korangar_interface::element::{BaseLayoutInfo, Element, StateElement};
 use korangar_interface::event::ClickHandler;
 use korangar_interface::layout::area::Area;
-use korangar_interface::layout::{MouseButton, Resolver, WindowLayout};
+use korangar_interface::layout::{MouseButton, Resolvers, WindowLayout, with_single_resolver};
 use korangar_interface::prelude::EventQueue;
 use korangar_interface::window::{CustomWindow, Window};
 use rust_state::{Context, Path, RustState};
@@ -139,11 +139,13 @@ where
     fn create_layout_info(
         &mut self,
         _: &Context<ClientState>,
-        _: ElementStoreMut<'_>,
-        resolver: &mut Resolver<'_, ClientState>,
+        _: ElementStoreMut,
+        resolvers: &mut dyn Resolvers<ClientState>,
     ) -> Self::LayoutInfo {
-        let area = resolver.with_height(200.0);
-        Self::LayoutInfo { area }
+        with_single_resolver(resolvers, |resolver| {
+            let area = resolver.with_height(200.0);
+            Self::LayoutInfo { area }
+        })
     }
 
     fn lay_out<'a>(

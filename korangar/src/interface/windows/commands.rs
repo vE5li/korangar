@@ -142,24 +142,39 @@ impl CustomWindow<ClientState> for CommandsWindow {
                     text: "Stats",
                     overflow_behavior: OverflowBehavior::Shrink,
                 },
-                button! {
-                    text: "Set all to max",
-                    tooltip: "Set all stats to the maximum [^000001@allstats^000000]",
-                    event: InputEvent::SendMessage { text: "@allstats".to_string() },
-                },
-                button! {
-                    text: "Reset all stats",
-                    tooltip: "Resets all stats back to 1 [^000001@reset^000000]",
-                    event: InputEvent::SendMessage { text: "@reset".to_string() },
+                split! {
+                    gaps: theme().window().gaps(),
+                    children: (
+                        button! {
+                            text: "Set all to max",
+                            tooltip: "Set all stats to the maximum [^000001@allstats^000000]",
+                            event: InputEvent::SendMessage { text: "@allstats".to_string() },
+                        },
+                        button! {
+                            text: "Reset all",
+                            tooltip: "Resets all stats back to 1 [^000001@reset^000000]",
+                            event: InputEvent::SendMessage { text: "@reset".to_string() },
+                        },
+                    ),
                 },
                 text! {
                     text: "Skills",
                     overflow_behavior: OverflowBehavior::Shrink,
                 },
-                button! {
-                    text: "Unlock all",
-                    tooltip: "Unlock all learnable skills [^000001@allskill^000000]",
-                    event: InputEvent::SendMessage { text: "@allskill".to_string() },
+                split! {
+                    gaps: theme().window().gaps(),
+                    children: (
+                        button! {
+                            text: "Unlock all",
+                            tooltip: "Unlock all learnable skills [^000001@allskill^000000]",
+                            event: InputEvent::SendMessage { text: "@allskill".to_string() },
+                        },
+                        button! {
+                            text: "Reset all",
+                            tooltip: "Reset all learnable skills [^000001@resetskill^000000]",
+                            event: InputEvent::SendMessage { text: "@resetskill".to_string() },
+                        },
+                    ),
                 },
                 text! {
                     text: "Resources",

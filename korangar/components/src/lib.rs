@@ -14,7 +14,8 @@ pub fn item_box(token_stream: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn skill_box(token_stream: TokenStream) -> TokenStream {
     create_component_macro!(crate::interface::components::skill_box::SkillBox, {
-        skill_path: !,
+        learnable_skill_path: !,
+        learned_skill_path: !,
         source: !,
     });
 

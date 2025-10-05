@@ -5,15 +5,15 @@ use korangar_debug::profiling::FrameMeasurement;
 use korangar_interface::event::{ClickHandler, Event, EventQueue};
 use korangar_networking::{InventoryItem, ShopItem};
 use ragnarok_packets::{
-    AccountId, BuyOrSellOption, CharacterId, CharacterServerInformation, EntityId, HotbarSlot, ShopId, SoldItemInformation, StatUpType,
-    TilePosition,
+    AccountId, BuyOrSellOption, CharacterId, CharacterServerInformation, EntityId, HotbarSlot, ShopId, SkillId, SoldItemInformation,
+    StatUpType, TilePosition,
 };
 use rust_state::Context;
 
 use crate::interface::resource::{ItemSource, SkillSource};
-use crate::inventory::Skill;
 use crate::loaders::ServiceId;
 use crate::state::ClientState;
+use crate::state::skills::LearnableSkill;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 use crate::world::ResourceMetadata;
@@ -162,7 +162,7 @@ pub enum InputEvent {
         /// Destination of the move.
         destination: SkillSource,
         /// Skill to move.
-        skill: Skill,
+        skill: LearnableSkill,
     },
     /// Cast a skill.
     CastSkill {
@@ -221,6 +221,21 @@ pub enum InputEvent {
     },
     /// Up a stat.
     StatUp { stat_type: StatUpType },
+    /// Distribute skill points to meet all requirements for a given skill and
+    /// put a single point into the provided skill. If the player does not
+    /// have enough skill points, this will skill as much of the
+    /// dependencies as possible.
+    DistributePointsForSkill {
+        /// Id of the skill to level up.
+        skill_id: SkillId,
+    },
+    /// Level up a skill.
+    LevelUpSkills {
+        /// List of skills to level up by one. This list is allowed to contain
+        /// the same skill id multiple times and they will be applied
+        /// sequentially from start to end.
+        skill_ids: Vec<SkillId>,
+    },
     /// Reload the language from disk.
     #[cfg(feature = "debug")]
     ReloadLanguage,

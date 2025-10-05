@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install test dependencies
-        run: sudo apt install libpcap-dev libasound2-dev nasm
+        run: sudo apt update && sudo apt install libpcap-dev libasound2-dev nasm
 
       - name: Cache slangc
         id: cache-slangc
@@ -39,14 +39,14 @@ jobs:
         run: |
           mkdir -p ~/slangc
           cd ~/slangc
-          
+
           VERSION_NO_V=${SLANG_VERSION#v}
           curl -L -o slang-linux-x86_64.tar.gz \
             "https://github.com/shader-slang/slang/releases/download/${{ env.SLANG_VERSION }}/slang-${VERSION_NO_V}-linux-x86_64.tar.gz"
-          
+
           tar -xzf slang-linux-x86_64.tar.gz
           rm slang-linux-x86_64.tar.gz
-          
+
           chmod +x bin/slangc bin/slangd
 
       - name: Add slangc to PATH

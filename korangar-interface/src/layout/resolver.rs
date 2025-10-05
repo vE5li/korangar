@@ -189,6 +189,11 @@ where
         (returned, layout_info)
     }
 
+    #[cfg_attr(feature = "debug", korangar_debug::profile("derived"))]
+    pub fn with_derived_unchanged<L>(&mut self, f: impl FnOnce(&mut Resolver<'a, App>) -> L) -> (Area, L) {
+        self.with_derived(self.gaps, 0.0, f)
+    }
+
     pub fn with_derived_scrolled<L>(&mut self, scroll: f32, f: impl FnOnce(&mut Resolver<'a, App>) -> L) -> (Area, f32, L) {
         self.push_gaps();
 
@@ -243,15 +248,61 @@ where
     }
 }
 
-pub trait ResolverSet<'a, App: Application> {
-    fn with_index<C>(&mut self, index: usize, f: impl FnMut(&mut Resolver<'a, App>) -> C) -> C;
+/// A producer of resolvers.
+///
+/// In most cases, this will simply be a [`Resolver`] but it can also be used to
+/// change the way elements are positioned.
+///
+/// Check the [split component](crate::components::split) for an example.
+pub trait Resolvers<'a, App: Application> {
+    /// Returns a resolver for an element at the given index.
+    ///
+    /// In most cases, this will be a simple [`Clone::clone`] of a resolver.
+    fn for_index(&self, index: usize) -> Resolver<'a, App>;
+
+    /// Give the resolver back to the producer.
+    ///
+    /// The returned resolver can be used to adjust the internal state of the
+    /// resolvers, e.g. by advancing the used height.
+    ///
+    /// In most cases, this will be a simple override of the current resolver.
+    fn give_back(&mut self, resolver: Resolver<'a, App>);
 }
 
-impl<'a, App> ResolverSet<'a, App> for &mut Resolver<'a, App>
+// Simplest case impl where `Resolvers` is just a single `Resolver`.
+impl<'a, App> Resolvers<'a, App> for Resolver<'a, App>
 where
     App: Application,
 {
-    fn with_index<C>(&mut self, _: usize, mut f: impl FnMut(&mut Resolver<'a, App>) -> C) -> C {
-        f(*self)
+    fn for_index(&self, _: usize) -> Resolver<'a, App> {
+        self.clone()
     }
+
+    fn give_back(&mut self, resolver: Resolver<'a, App>) {
+        *self = resolver;
+    }
+}
+
+/// Helper function to call a closure with the first resolver and give the
+/// resolver back afterwards.
+pub fn with_single_resolver<'a, App, R>(resolvers: &mut dyn Resolvers<'a, App>, f: impl FnOnce(&mut Resolver<'a, App>) -> R) -> R
+where
+    App: Application,
+{
+    let mut resolver = resolvers.for_index(0);
+    let result = f(&mut resolver);
+    resolvers.give_back(resolver);
+    result
+}
+
+/// Helper function to call a closure with the nth resolver and give the
+/// resolver back afterwards.
+pub fn with_nth_resolver<'a, App, R>(resolvers: &mut dyn Resolvers<'a, App>, index: usize, f: impl FnOnce(&mut Resolver<'a, App>) -> R) -> R
+where
+    App: Application,
+{
+    let mut resolver = resolvers.for_index(index);
+    let result = f(&mut resolver);
+    resolvers.give_back(resolver);
+    result
 }

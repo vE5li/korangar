@@ -63,4 +63,9 @@
     dexterity_text: "Dexterity",
     luck_text: "Luck",
     auto_attack_button_text: "Auto attack",
+    available_skill_points_text: "Available points",
+    reset_skill_points_button_text: "Reset",
+    cancel_skill_points_button_text: "Cancel",
+    apply_skill_points_button_text: "Apply",
+    distribute_skill_points_button_text: "Distribute",
 )

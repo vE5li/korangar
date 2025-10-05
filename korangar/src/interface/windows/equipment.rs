@@ -2,7 +2,7 @@ use korangar_interface::element::Element;
 use korangar_interface::window::{CustomWindow, Window};
 use korangar_networking::{InventoryItem, InventoryItemDetails};
 use ragnarok_packets::EquipPosition;
-use rust_state::{Path, Selector};
+use rust_state::{Path, PathExt, Selector};
 
 use crate::ItemSource;
 use crate::interface::windows::WindowClass;
@@ -38,10 +38,7 @@ where
     P: Path<ClientState, Vec<InventoryItem<ResourceMetadata>>>,
 {
     fn follow<'a>(&self, state: &'a ClientState) -> Option<&'a InventoryItem<ResourceMetadata>> {
-        // SAFETY:
-        //
-        // It is safe to unwrap here since its guaranteed to be `Some` by the bounds.
-        self.path.follow(state).unwrap().iter().find(|item| {
+        self.path.follow_safe(state).iter().find(|item| {
             if let InventoryItemDetails::Equippable { equipped_position, .. } = &item.details {
                 return equipped_position.contains(self.equip_position);
             }
@@ -51,10 +48,7 @@ where
     }
 
     fn follow_mut<'a>(&self, state: &'a mut ClientState) -> Option<&'a mut InventoryItem<ResourceMetadata>> {
-        // SAFETY:
-        //
-        // It is safe to unwrap here since its guaranteed to be `Some` by the bounds.
-        self.path.follow_mut(state).unwrap().iter_mut().find(|item| {
+        self.path.follow_mut_safe(state).iter_mut().find(|item| {
             if let InventoryItemDetails::Equippable { equipped_position, .. } = item.details {
                 return equipped_position.contains(self.equip_position);
             }

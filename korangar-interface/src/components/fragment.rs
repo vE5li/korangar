@@ -1,9 +1,9 @@
 use rust_state::{Context, Selector};
 
 use crate::application::Application;
+use crate::element::Element;
 use crate::element::store::{ElementStore, ElementStoreMut};
-use crate::element::{Element, ElementSet};
-use crate::layout::{Resolver, WindowLayout};
+use crate::layout::{Resolvers, WindowLayout, with_single_resolver};
 
 pub struct Fragment<A, B, Children> {
     gaps: A,
@@ -25,21 +25,18 @@ where
     App: Application,
     A: Selector<App, f32>,
     B: Selector<App, f32>,
-    Children: ElementSet<App>,
+    Children: Element<App>,
 {
     type LayoutInfo = Children::LayoutInfo;
 
-    fn create_layout_info(
-        &mut self,
-        state: &Context<App>,
-        store: ElementStoreMut<'_>,
-        resolver: &mut Resolver<'_, App>,
-    ) -> Self::LayoutInfo {
-        let (_, children) = resolver.with_derived(*state.get(&self.gaps), *state.get(&self.border), |resolver| {
-            self.children.create_layout_info(state, store, resolver)
-        });
+    fn create_layout_info(&mut self, state: &Context<App>, store: ElementStoreMut, resolvers: &mut dyn Resolvers<App>) -> Self::LayoutInfo {
+        with_single_resolver(resolvers, |resolver| {
+            let (_, children) = resolver.with_derived(*state.get(&self.gaps), *state.get(&self.border), |resolver| {
+                self.children.create_layout_info(state, store, resolver)
+            });
 
-        children
+            children
+        })
     }
 
     fn lay_out<'a>(

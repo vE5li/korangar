@@ -4,13 +4,13 @@ use std::marker::PhantomData;
 use rust_state::{Context, RustState, Selector};
 
 use crate::application::{Application, Size};
+use crate::element::Element;
 use crate::element::store::{ElementStore, ElementStoreMut, Persistent, PersistentData, PersistentExt};
-use crate::element::{Element, ElementSet};
 use crate::event::ClickHandler;
 use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
 use crate::layout::area::Area;
 use crate::layout::tooltip::TooltipExt;
-use crate::layout::{Icon, MouseButton, Resolver, WindowLayout};
+use crate::layout::{Icon, MouseButton, Resolver, Resolvers, WindowLayout, with_single_resolver};
 use crate::prelude::EventQueue;
 
 const CHILDREN_STORE_ID: u64 = 0;
@@ -18,7 +18,7 @@ const EXTRA_STORE_ID: u64 = 1;
 
 #[derive(RustState)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-pub struct CollapsableTheme<App>
+pub struct CollapsibleTheme<App>
 where
     App: Application,
 {
@@ -41,11 +41,11 @@ where
     pub overflow_behavior: App::OverflowBehavior,
 }
 
-pub struct CollapsableData {
+pub struct CollapsibleData {
     expanded: Cell<bool>,
 }
 
-impl PersistentData for CollapsableData {
+impl PersistentData for CollapsibleData {
     type Inputs = bool;
 
     fn from_inputs(inputs: Self::Inputs) -> Self {
@@ -55,7 +55,7 @@ impl PersistentData for CollapsableData {
     }
 }
 
-impl<App> ClickHandler<App> for CollapsableData
+impl<App> ClickHandler<App> for CollapsibleData
 where
     App: Application,
 {
@@ -66,9 +66,9 @@ where
 }
 
 impl<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, Children> Persistent
-    for Collapsable<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, Children>
+    for Collapsible<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, Children>
 {
-    type Data = CollapsableData;
+    type Data = CollapsibleData;
 }
 
 pub struct CollapseableLayoutInfo<App, C, E>
@@ -83,7 +83,7 @@ where
     extra_elements: E,
 }
 
-pub struct Collapsable<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, Children> {
+pub struct Collapsible<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, Children> {
     text_marker: PhantomData<(Text, Tooltip)>,
     text: A,
     tooltip: B,
@@ -110,7 +110,7 @@ pub struct Collapsable<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, 
 }
 
 impl<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, Children>
-    Collapsable<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, Children>
+    Collapsible<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, Children>
 {
     /// This function is supposed to be called from a component macro and not
     /// intended to be called manually.
@@ -169,7 +169,7 @@ impl<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, 
 }
 
 impl<App, Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, Children> Element<App>
-    for Collapsable<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, Children>
+    for Collapsible<Text, Tooltip, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, Children>
 where
     App: Application,
     Text: AsRef<str>,
@@ -194,77 +194,79 @@ where
     R: Selector<App, VerticalAlignment>,
     S: Selector<App, App::OverflowBehavior>,
     T: Selector<App, bool>,
-    U: ElementSet<App>,
-    Children: ElementSet<App>,
+    U: Element<App>,
+    Children: Element<App>,
 {
     type LayoutInfo = CollapseableLayoutInfo<App, Children::LayoutInfo, U::LayoutInfo>;
 
     fn create_layout_info(
         &mut self,
         state: &Context<App>,
-        mut store: ElementStoreMut<'_>,
-        resolver: &mut Resolver<'_, App>,
+        mut store: ElementStoreMut,
+        resolvers: &mut dyn Resolvers<App>,
     ) -> Self::LayoutInfo {
-        let persistent = self.get_persistent_data(&store, *state.get(&self.initially_expanded));
-        let expanded = persistent.expanded.get();
+        with_single_resolver(resolvers, |resolver| {
+            let persistent = self.get_persistent_data(&store, *state.get(&self.initially_expanded));
+            let expanded = persistent.expanded.get();
 
-        let text = state.get(&self.text).as_ref();
-        let font_size = *state.get(&self.font_size);
-        let foreground_color = *state.get(&self.foreground_color);
-        let highlight_color = *state.get(&self.highlight_color);
+            let text = state.get(&self.text).as_ref();
+            let font_size = *state.get(&self.font_size);
+            let foreground_color = *state.get(&self.foreground_color);
+            let highlight_color = *state.get(&self.highlight_color);
 
-        let horizontal_alignment = *state.get(&self.horizontal_alignment);
-        let overflow_behavior = *state.get(&self.overflow_behavior);
+            let horizontal_alignment = *state.get(&self.horizontal_alignment);
+            let overflow_behavior = *state.get(&self.overflow_behavior);
 
-        let (size, font_size) = resolver.get_text_dimensions(
-            text,
-            foreground_color,
-            highlight_color,
-            font_size,
-            horizontal_alignment,
-            overflow_behavior,
-        );
+            let (size, font_size) = resolver.get_text_dimensions(
+                text,
+                foreground_color,
+                highlight_color,
+                font_size,
+                horizontal_alignment,
+                overflow_behavior,
+            );
 
-        let title_height = state.get(&self.title_height).max(size.height());
+            let title_height = state.get(&self.title_height).max(size.height());
 
-        let (area, children) = match expanded && self.children.get_element_count(state) > 0 {
-            true => resolver.with_derived_borderless(*state.get(&self.gaps), *state.get(&self.border), 0.0, |resolver| {
-                resolver.push_top(title_height);
+            let (area, children) = match expanded && self.children.get_element_count(state) > 0 {
+                true => resolver.with_derived_borderless(*state.get(&self.gaps), *state.get(&self.border), 0.0, |resolver| {
+                    resolver.push_top(title_height);
 
-                // We need to create a separate store so that the children and the extra
-                // elements don't interfere. We need to make sure they both have
-                // different ids.
-                let children_store = store.child_store(CHILDREN_STORE_ID);
+                    // We need to create a separate store so that the children and the extra
+                    // elements don't interfere. We need to make sure they both have
+                    // different ids.
+                    let children_store = store.child_store(CHILDREN_STORE_ID);
 
-                Some(self.children.create_layout_info(state, children_store, resolver))
-            }),
-            false => (resolver.with_height(title_height), None),
-        };
+                    Some(self.children.create_layout_info(state, children_store, resolver))
+                }),
+                false => (resolver.with_height(title_height), None),
+            };
 
-        // TODO: Figure out a better way to space the elements from the right.
-        let extra_space = 40.0;
-        let extra_area = Area {
-            left: area.left + area.width - extra_space,
-            top: area.top,
-            width: extra_space,
-            height: title_height,
-        };
-        let mut extra_resolver = Resolver::new(extra_area, 0.0, resolver.get_text_layouter());
+            // TODO: Figure out a better way to space the elements from the right.
+            let extra_space = 40.0;
+            let extra_area = Area {
+                left: area.left + area.width - extra_space,
+                top: area.top,
+                width: extra_space,
+                height: title_height,
+            };
+            let mut extra_resolver = Resolver::new(extra_area, 0.0, resolver.get_text_layouter());
 
-        // We need to create a separate store so that the children and the extra
-        // elements don't interfere. We need to make sure they both have
-        // different ids.
-        let extra_store = store.child_store(EXTRA_STORE_ID);
-        let extra_elements = self.extra_elements.create_layout_info(state, extra_store, &mut extra_resolver);
+            // We need to create a separate store so that the children and the extra
+            // elements don't interfere. We need to make sure they both have
+            // different ids.
+            let extra_store = store.child_store(EXTRA_STORE_ID);
+            let extra_elements = self.extra_elements.create_layout_info(state, extra_store, &mut extra_resolver as _);
 
-        Self::LayoutInfo {
-            area,
-            title_height,
-            expanded,
-            font_size,
-            children,
-            extra_elements,
-        }
+            Self::LayoutInfo {
+                area,
+                title_height,
+                expanded,
+                font_size,
+                children,
+                extra_elements,
+            }
+        })
     }
 
     fn lay_out<'a>(
@@ -331,9 +333,9 @@ where
         if is_title_hovered {
             let tooltip = state.get(&self.tooltip).as_ref();
             if !tooltip.is_empty() {
-                struct CollapsableTooltip;
+                struct CollapsibleTooltip;
 
-                layout.add_tooltip(tooltip, CollapsableTooltip.tooltip_id());
+                layout.add_tooltip(tooltip, CollapsibleTooltip.tooltip_id());
             }
 
             let persistent = self.get_persistent_data(&store, *state.get(&self.initially_expanded));

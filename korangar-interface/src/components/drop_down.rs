@@ -11,7 +11,7 @@ use crate::element::{DefaultLayoutInfo, Element, ErasedElement};
 use crate::event::{ClickHandler, Event, EventQueue};
 use crate::layout::alignment::{HorizontalAlignment, VerticalAlignment};
 use crate::layout::area::Area;
-use crate::layout::{MouseButton, Resolver, WindowLayout};
+use crate::layout::{MouseButton, Resolvers, WindowLayout, with_single_resolver};
 use crate::theme::{ThemePathGetter, theme};
 
 pub trait DropDownItem<T> {
@@ -95,29 +95,31 @@ where
     N: Selector<App, VerticalAlignment>,
     O: Selector<App, App::OverflowBehavior>,
 {
-    fn create_layout_info(&mut self, state: &Context<App>, _: ElementStoreMut<'_>, resolver: &mut Resolver<'_, App>) -> Self::LayoutInfo {
-        let height = *state.get(&self.height);
-        let option = &state.get(&self.options)[self.option_index];
+    fn create_layout_info(&mut self, state: &Context<App>, _: ElementStoreMut, resolvers: &mut dyn Resolvers<App>) -> Self::LayoutInfo {
+        with_single_resolver(resolvers, |resolver| {
+            let height = *state.get(&self.height);
+            let option = &state.get(&self.options)[self.option_index];
 
-        let text = option.text();
-        let font_size = *state.get(&self.font_size);
-        let foreground_color = *state.get(&self.foreground_color);
-        let highlight_color = *state.get(&self.highlight_color);
-        let horizontal_alignment = *state.get(&self.horizontal_alignment);
-        let overflow_behavior = *state.get(&self.overflow_behavior);
+            let text = option.text();
+            let font_size = *state.get(&self.font_size);
+            let foreground_color = *state.get(&self.foreground_color);
+            let highlight_color = *state.get(&self.highlight_color);
+            let horizontal_alignment = *state.get(&self.horizontal_alignment);
+            let overflow_behavior = *state.get(&self.overflow_behavior);
 
-        let (size, font_size) = resolver.get_text_dimensions(
-            text,
-            foreground_color,
-            highlight_color,
-            font_size,
-            horizontal_alignment,
-            overflow_behavior,
-        );
+            let (size, font_size) = resolver.get_text_dimensions(
+                text,
+                foreground_color,
+                highlight_color,
+                font_size,
+                horizontal_alignment,
+                overflow_behavior,
+            );
 
-        let area = resolver.with_height(height.max(size.height()));
+            let area = resolver.with_height(height.max(size.height()));
 
-        Self::LayoutInfo { area, font_size }
+            Self::LayoutInfo { area, font_size }
+        })
     }
 
     fn lay_out<'a>(
@@ -190,68 +192,70 @@ where
     fn create_layout_info(
         &mut self,
         state: &Context<App>,
-        mut store: ElementStoreMut<'_>,
-        resolver: &mut Resolver<'_, App>,
+        mut store: ElementStoreMut,
+        resolvers: &mut dyn Resolvers<App>,
     ) -> Self::LayoutInfo {
-        let vector = state.get(&self.options);
+        with_single_resolver(resolvers, |resolver| {
+            let vector = state.get(&self.options);
 
-        match self.item_boxes.len().cmp(&vector.len()) {
-            Ordering::Greater => {
-                // Delete excess elements.
-                self.item_boxes.truncate(vector.len());
-            }
-            Ordering::Less => {
-                // Add new elements.
-                for index in self.item_boxes.len()..vector.len() {
-                    self.item_boxes.push({
-                        let value_path = self.value_path;
-                        let options = self.options.clone();
-
-                        let item_box: Box<dyn Element<App, LayoutInfo = DefaultLayoutInfo<App>>> = Box::new(InnerButton {
-                            text_marker: PhantomData,
-                            options: options.clone(),
-                            option_index: index,
-                            event: move |state: &Context<App>, queue: &mut EventQueue<App>| {
-                                let options = state.get(&options);
-                                let value = options[index].value();
-                                state.update_value(value_path, value);
-                                queue.queue(Event::CloseOverlay);
-                            },
-                            // TODO: These currently cannot be overwritten from the outside. This
-                            // may be fine but also may be something that we want to change.
-                            foreground_color: theme().drop_down().item_foreground_color(),
-                            background_color: theme().drop_down().item_background_color(),
-                            highlight_color: theme().drop_down().item_highlight_color(),
-                            hovered_foreground_color: theme().drop_down().item_hovered_foreground_color(),
-                            hovered_background_color: theme().drop_down().item_hovered_background_color(),
-                            shadow_color: theme().drop_down().item_shadow_color(),
-                            shadow_padding: theme().drop_down().item_shadow_padding(),
-                            height: theme().drop_down().item_height(),
-                            corner_diameter: theme().drop_down().item_corner_diameter(),
-                            font_size: theme().drop_down().item_font_size(),
-                            horizontal_alignment: theme().drop_down().item_horizontal_alignment(),
-                            vertical_alignment: theme().drop_down().item_vertical_alignment(),
-                            overflow_behavior: theme().drop_down().item_overflow_behavior(),
-                        });
-                        item_box
-                    });
+            match self.item_boxes.len().cmp(&vector.len()) {
+                Ordering::Greater => {
+                    // Delete excess elements.
+                    self.item_boxes.truncate(vector.len());
                 }
+                Ordering::Less => {
+                    // Add new elements.
+                    for index in self.item_boxes.len()..vector.len() {
+                        self.item_boxes.push({
+                            let value_path = self.value_path;
+                            let options = self.options.clone();
+
+                            let item_box: Box<dyn Element<App, LayoutInfo = DefaultLayoutInfo<App>>> = Box::new(InnerButton {
+                                text_marker: PhantomData,
+                                options: options.clone(),
+                                option_index: index,
+                                event: move |state: &Context<App>, queue: &mut EventQueue<App>| {
+                                    let options = state.get(&options);
+                                    let value = options[index].value();
+                                    state.update_value(value_path, value);
+                                    queue.queue(Event::CloseOverlay);
+                                },
+                                // TODO: These currently cannot be overwritten from the outside. This
+                                // may be fine but also may be something that we want to change.
+                                foreground_color: theme().drop_down().item_foreground_color(),
+                                background_color: theme().drop_down().item_background_color(),
+                                highlight_color: theme().drop_down().item_highlight_color(),
+                                hovered_foreground_color: theme().drop_down().item_hovered_foreground_color(),
+                                hovered_background_color: theme().drop_down().item_hovered_background_color(),
+                                shadow_color: theme().drop_down().item_shadow_color(),
+                                shadow_padding: theme().drop_down().item_shadow_padding(),
+                                height: theme().drop_down().item_height(),
+                                corner_diameter: theme().drop_down().item_corner_diameter(),
+                                font_size: theme().drop_down().item_font_size(),
+                                horizontal_alignment: theme().drop_down().item_horizontal_alignment(),
+                                vertical_alignment: theme().drop_down().item_vertical_alignment(),
+                                overflow_behavior: theme().drop_down().item_overflow_behavior(),
+                            });
+                            item_box
+                        });
+                    }
+                }
+                Ordering::Equal => {}
             }
-            Ordering::Equal => {}
-        }
 
-        let gaps = *state.get(&theme().drop_down().list_gaps());
-        let border = *state.get(&theme().drop_down().list_border());
+            let gaps = *state.get(&theme().drop_down().list_gaps());
+            let border = *state.get(&theme().drop_down().list_border());
 
-        let (area, layout_info) = resolver.with_derived(gaps, border, |resolver| {
-            self.item_boxes
-                .iter_mut()
-                .enumerate()
-                .map(|(index, item_box)| item_box.create_layout_info(state, store.child_store(index as u64), resolver))
-                .collect()
-        });
+            let (area, layout_info) = resolver.with_derived(gaps, border, |resolver| {
+                self.item_boxes
+                    .iter_mut()
+                    .enumerate()
+                    .map(|(index, item_box)| item_box.create_layout_info(state, store.child_store(index as u64), resolver))
+                    .collect()
+            });
 
-        (area, layout_info)
+            (area, layout_info)
+        })
     }
 
     fn lay_out<'a>(
@@ -297,14 +301,12 @@ where
 {
     fn handle_click(&self, _: &Context<App>, queue: &mut EventQueue<App>) {
         let element = ErasedElement::new(scroll_view! {
-            children: (
-                InnerElement {
-                    value_path: self.value_path,
-                    options: self.options.clone(),
-                    item_boxes: Vec::new(),
-                    _marker: PhantomData,
-                },
-            ),
+            children: InnerElement {
+                value_path: self.value_path,
+                options: self.options.clone(),
+                item_boxes: Vec::new(),
+                _marker: PhantomData,
+            },
         });
 
         queue.queue(Event::OpenOverlay {
@@ -484,50 +486,47 @@ where
     N: Selector<App, VerticalAlignment>,
     O: Selector<App, App::OverflowBehavior>,
 {
-    fn create_layout_info(
-        &mut self,
-        state: &Context<App>,
-        store: ElementStoreMut<'_>,
-        resolver: &mut Resolver<'_, App>,
-    ) -> Self::LayoutInfo {
-        let mut height = *state.get(&self.height);
-        let mut font_size = *state.get(&self.font_size);
-        let foreground_color = *state.get(&self.foreground_color);
-        let highlight_color = *state.get(&self.highlight_color);
+    fn create_layout_info(&mut self, state: &Context<App>, store: ElementStoreMut, resolvers: &mut dyn Resolvers<App>) -> Self::LayoutInfo {
+        with_single_resolver(resolvers, |resolver| {
+            let mut height = *state.get(&self.height);
+            let mut font_size = *state.get(&self.font_size);
+            let foreground_color = *state.get(&self.foreground_color);
+            let highlight_color = *state.get(&self.highlight_color);
 
-        let selected = state.get(&self.selected);
-        if let Some(index) = state.get(&self.options).iter().position(|value| value.value() == *selected)
-            && let Some(selected_option) = state.get(&self.options).get(index)
-        {
-            let text = selected_option.text();
-            let horizontal_alignment = *state.get(&self.horizontal_alignment);
-            let overflow_behavior = *state.get(&self.overflow_behavior);
+            let selected = state.get(&self.selected);
+            if let Some(index) = state.get(&self.options).iter().position(|value| value.value() == *selected)
+                && let Some(selected_option) = state.get(&self.options).get(index)
+            {
+                let text = selected_option.text();
+                let horizontal_alignment = *state.get(&self.horizontal_alignment);
+                let overflow_behavior = *state.get(&self.overflow_behavior);
 
-            let (size, new_font_size) = resolver.get_text_dimensions(
-                text,
-                foreground_color,
-                highlight_color,
-                font_size,
-                horizontal_alignment,
-                overflow_behavior,
+                let (size, new_font_size) = resolver.get_text_dimensions(
+                    text,
+                    foreground_color,
+                    highlight_color,
+                    font_size,
+                    horizontal_alignment,
+                    overflow_behavior,
+                );
+
+                height = height.max(size.height());
+                font_size = new_font_size;
+            };
+
+            let area = resolver.with_height(height);
+
+            let list_maximum_height = *state.get(&theme().drop_down().list_maximum_height());
+            let border = *state.get(&theme().drop_down().list_border());
+
+            self.click_handler.set_position_size(
+                App::Position::new(area.left - border, area.top - border),
+                App::Size::new(area.width + border * 2.0, list_maximum_height + border * 2.0),
+                store.get_window_id(),
             );
 
-            height = height.max(size.height());
-            font_size = new_font_size;
-        };
-
-        let area = resolver.with_height(height);
-
-        let list_maximum_height = *state.get(&theme().drop_down().list_maximum_height());
-        let border = *state.get(&theme().drop_down().list_border());
-
-        self.click_handler.set_position_size(
-            App::Position::new(area.left - border, area.top - border),
-            App::Size::new(area.width + border * 2.0, list_maximum_height + border * 2.0),
-            store.get_window_id(),
-        );
-
-        Self::LayoutInfo { area, font_size }
+            Self::LayoutInfo { area, font_size }
+        })
     }
 
     fn lay_out<'a>(

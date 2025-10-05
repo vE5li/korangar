@@ -61,7 +61,7 @@ impl SpriteLoader {
         self.cache.lock().unwrap().statistics()
     }
 
-    fn load(&self, path: &str) -> Result<Arc<Sprite>, LoadError> {
+    pub fn load(&self, path: &str) -> Result<Arc<Sprite>, LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load sprite from {}", path.magenta()));
 
@@ -189,8 +189,12 @@ impl SpriteLoader {
         Ok(sprite)
     }
 
+    pub fn get(&self, path: &str) -> Option<Arc<Sprite>> {
+        self.cache.lock().unwrap().get(path).cloned()
+    }
+
     pub fn get_or_load(&self, path: &str) -> Result<Arc<Sprite>, LoadError> {
-        let Some(sprite) = self.cache.lock().unwrap().get(path).cloned() else {
+        let Some(sprite) = self.get(path) else {
             return self.load(path);
         };
 

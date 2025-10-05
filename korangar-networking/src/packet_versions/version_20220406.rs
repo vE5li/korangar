@@ -322,7 +322,7 @@ where
     packet_handler.register(|packet: SpriteChangePacket| match packet.sprite_type {
         SpriteChangeType::Base => Some(NetworkEvent::ChangeJob {
             account_id: packet.account_id,
-            job_id: packet.value,
+            job_id: JobId(packet.value as u16),
         }),
         SpriteChangeType::Hair => Some(NetworkEvent::ChangeHair {
             account_id: packet.account_id,
@@ -724,6 +724,7 @@ where
     })?;
     packet_handler.register_noop::<Packet8302>()?;
     packet_handler.register_noop::<Packet0b18>()?;
+    packet_handler.register_noop::<ConnectionRefusedPacket>()?;
     packet_handler.register(|packet: MapServerLoginSuccessPacket| NetworkEvent::UpdateClientTick {
         client_tick: packet.client_tick,
         received_at: Instant::now(),
@@ -825,6 +826,24 @@ where
     packet_handler.register_noop::<RequestStatUpResponsePacket>()?;
     packet_handler.register_noop::<EquipAmmunitionPacket>()?;
     packet_handler.register_noop::<AmmunitionActionPacket>()?;
+    packet_handler.register(|packet: UpdateSkillPacket| {
+        let UpdateSkillPacket {
+            skill_id,
+            skill_level,
+            spell_point_cost,
+            attack_range,
+            upgradable,
+        } = packet;
+
+        NetworkEvent::UpdateSkill {
+            skill_id,
+            skill_level,
+            spell_point_cost,
+            attack_range,
+            upgradable: upgradable != 0,
+        }
+    })?;
+    packet_handler.register(|packet: RemoveSkillPacket| NetworkEvent::RemoveSkill { skill_id: packet.skill_id })?;
 
     Ok(())
 }

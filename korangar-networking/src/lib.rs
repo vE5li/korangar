@@ -641,12 +641,17 @@ where
     pub fn create_character(&mut self, slot: usize, name: String) -> Result<(), NotConnectedError> {
         let hair_color = 0;
         let hair_style = 0;
-        let start_job = 0;
+        let start_job_id = JobId(0);
         let sex = Sex::Male;
 
         match self.character_server_packet_version()? {
             SupportedPacketVersion::_20220406 => self.send_character_server_packet(CreateCharacterPacket::new(
-                name, slot as u8, hair_color, hair_style, start_job, sex,
+                name,
+                slot as u8,
+                hair_color,
+                hair_style,
+                start_job_id,
+                sex,
             )),
         }
     }
@@ -880,6 +885,12 @@ where
     pub fn request_stat_up(&mut self, stat_type: StatUpType) -> Result<(), NotConnectedError> {
         match self.map_server_packet_version()? {
             SupportedPacketVersion::_20220406 => self.send_map_server_packet(RequestStatUpPacket::new(stat_type)),
+        }
+    }
+
+    pub fn level_up_skill(&mut self, skill_id: SkillId) -> Result<(), NotConnectedError> {
+        match self.map_server_packet_version()? {
+            SupportedPacketVersion::_20220406 => self.send_map_server_packet(LevelUpSkillPacket::new(skill_id)),
         }
     }
 }

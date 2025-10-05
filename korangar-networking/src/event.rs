@@ -202,7 +202,7 @@ pub enum NetworkEvent {
     },
     ChangeJob {
         account_id: AccountId,
-        job_id: u32,
+        job_id: JobId,
     },
     ChangeHair {
         account_id: AccountId,
@@ -263,6 +263,17 @@ pub enum NetworkEvent {
         target_position: TilePosition,
         player_position: TilePosition,
         attack_range: AttackRange,
+    },
+    UpdateSkill {
+        skill_id: SkillId,
+        skill_level: SkillLevel,
+        spell_point_cost: u16,
+        attack_range: AttackRange,
+        upgradable: bool,
+    },
+    /// Delete a skill from the skill tree.
+    RemoveSkill {
+        skill_id: SkillId,
     },
 }
 

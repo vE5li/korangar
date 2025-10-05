@@ -6,9 +6,9 @@ use ragnarok_packets::TilePosition;
 
 use crate::graphics::Texture;
 use crate::interface::resource::{ItemSource, SkillSource};
-use crate::inventory::Skill;
 use crate::loaders::Sprite;
 use crate::state::ClientState;
+use crate::state::skills::LearnableSkill;
 use crate::world::{Actions, ResourceMetadata, SpriteAnimationState};
 
 #[derive(Debug, Clone)]
@@ -23,7 +23,7 @@ pub enum MouseInputMode {
     },
     MoveSkill {
         source: SkillSource,
-        skill: Skill,
+        skill: LearnableSkill,
     },
 }
 
@@ -42,6 +42,8 @@ pub trait MouseModeExt {
     fn is_rotating_camera(&self) -> bool;
 
     fn walk_destination(&self) -> Option<TilePosition>;
+
+    fn is_grabbing(&self) -> bool;
 
     fn grabbed(&self) -> Option<Grabbed>;
 }
@@ -62,6 +64,17 @@ impl MouseModeExt for MouseMode<ClientState> {
         }
     }
 
+    fn is_grabbing(&self) -> bool {
+        matches!(
+            self,
+            MouseMode::Custom {
+                mode: MouseInputMode::MoveItem { .. },
+            } | MouseMode::Custom {
+                mode: MouseInputMode::MoveSkill { .. },
+            }
+        )
+    }
+
     fn grabbed(&self) -> Option<Grabbed> {
         match self {
             MouseMode::Custom {
@@ -70,8 +83,8 @@ impl MouseModeExt for MouseMode<ClientState> {
             MouseMode::Custom {
                 mode: MouseInputMode::MoveSkill { skill, .. },
             } => Some(Grabbed::Action(
-                skill.sprite.clone(),
-                skill.actions.clone(),
+                skill.sprite.clone()?,
+                skill.actions.clone()?,
                 skill.animation_state.clone(),
             )),
             _ => None,

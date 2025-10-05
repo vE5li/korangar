@@ -6,7 +6,7 @@ use korangar_debug::logging::{Colorize, print_debug};
 use korangar_interface::application::{Application, Size};
 use korangar_interface::element::store::{ElementStore, ElementStoreMut};
 use korangar_interface::element::{Element, StateElement};
-use korangar_interface::layout::{Resolver, WindowLayout};
+use korangar_interface::layout::{Resolvers, WindowLayout, with_single_resolver};
 use korangar_interface::prelude::*;
 use korangar_interface::theme::theme;
 use ragnarok_bytes::{ByteReader, ByteWriter, ConversionError, ConversionResult};
@@ -41,39 +41,41 @@ where
     fn create_layout_info(
         &mut self,
         state: &rust_state::Context<App>,
-        _: ElementStoreMut<'_>,
-        resolver: &mut Resolver<'_, App>,
+        _: ElementStoreMut,
+        resolvers: &mut dyn Resolvers<App>,
     ) -> Self::LayoutInfo {
-        let height = *state.get(&theme().text().height());
+        with_single_resolver(resolvers, |resolver| {
+            let height = *state.get(&theme().text().height());
 
-        let data = state.get(&self.path);
-        if data.len() >= 2 {
-            if self.cached.is_none_or(|cached| cached[0..2] != data[0..2]) {
-                self.text = format!("0x{:0>4x}", u16::from_le_bytes([data[0], data[1]]));
-                self.cached = Some([data[0], data[1]]);
+            let data = state.get(&self.path);
+            if data.len() >= 2 {
+                if self.cached.is_none_or(|cached| cached[0..2] != data[0..2]) {
+                    self.text = format!("0x{:0>4x}", u16::from_le_bytes([data[0], data[1]]));
+                    self.cached = Some([data[0], data[1]]);
+                }
+            } else if self.cached.is_some() || self.text.is_empty() {
+                self.text = "<cut off>".to_owned();
+                self.cached = None;
             }
-        } else if self.cached.is_some() || self.text.is_empty() {
-            self.text = "<cut off>".to_owned();
-            self.cached = None;
-        }
 
-        let font_size = *state.get(&theme().text().font_size());
-        let color = *state.get(&theme().text().color());
-        let highlight_color = *state.get(&theme().text().highlight_color());
-        let horizontal_alignment = *state.get(&theme().text().horizontal_alignment());
-        let overflow_behavior = *state.get(&theme().text().overflow_behavior());
+            let font_size = *state.get(&theme().text().font_size());
+            let color = *state.get(&theme().text().color());
+            let highlight_color = *state.get(&theme().text().highlight_color());
+            let horizontal_alignment = *state.get(&theme().text().horizontal_alignment());
+            let overflow_behavior = *state.get(&theme().text().overflow_behavior());
 
-        let (size, font_size) = resolver.get_text_dimensions(
-            &self.text,
-            color,
-            highlight_color,
-            font_size,
-            horizontal_alignment,
-            overflow_behavior,
-        );
-        let area = resolver.with_height(height.max(size.height()));
+            let (size, font_size) = resolver.get_text_dimensions(
+                &self.text,
+                color,
+                highlight_color,
+                font_size,
+                horizontal_alignment,
+                overflow_behavior,
+            );
+            let area = resolver.with_height(height.max(size.height()));
 
-        Self::LayoutInfo { area, font_size }
+            Self::LayoutInfo { area, font_size }
+        })
     }
 
     fn lay_out<'a>(
@@ -123,34 +125,36 @@ where
     fn create_layout_info(
         &mut self,
         state: &rust_state::Context<App>,
-        _: ElementStoreMut<'_>,
-        resolver: &mut Resolver<'_, App>,
+        _: ElementStoreMut,
+        resolvers: &mut dyn Resolvers<App>,
     ) -> Self::LayoutInfo {
-        let height = *state.get(&theme().text().height());
+        with_single_resolver(resolvers, |resolver| {
+            let height = *state.get(&theme().text().height());
 
-        let error = state.get(&self.path);
-        if !self.cached.as_ref().is_some_and(|cached| cached == error) {
-            self.text = format!("{error:?}");
-            self.cached = Some(error.clone());
-        }
+            let error = state.get(&self.path);
+            if !self.cached.as_ref().is_some_and(|cached| cached == error) {
+                self.text = format!("{error:?}");
+                self.cached = Some(error.clone());
+            }
 
-        let font_size = *state.get(&theme().text().font_size());
-        let color = *state.get(&theme().text().color());
-        let highlight_color = *state.get(&theme().text().highlight_color());
-        let horizontal_alignment = *state.get(&theme().text().horizontal_alignment());
-        let overflow_behavior = *state.get(&theme().text().overflow_behavior());
+            let font_size = *state.get(&theme().text().font_size());
+            let color = *state.get(&theme().text().color());
+            let highlight_color = *state.get(&theme().text().highlight_color());
+            let horizontal_alignment = *state.get(&theme().text().horizontal_alignment());
+            let overflow_behavior = *state.get(&theme().text().overflow_behavior());
 
-        let (size, font_size) = resolver.get_text_dimensions(
-            &self.text,
-            color,
-            highlight_color,
-            font_size,
-            horizontal_alignment,
-            overflow_behavior,
-        );
-        let area = resolver.with_height(height.max(size.height()));
+            let (size, font_size) = resolver.get_text_dimensions(
+                &self.text,
+                color,
+                highlight_color,
+                font_size,
+                horizontal_alignment,
+                overflow_behavior,
+            );
+            let area = resolver.with_height(height.max(size.height()));
 
-        Self::LayoutInfo { area, font_size }
+            Self::LayoutInfo { area, font_size }
+        })
     }
 
     fn lay_out<'a>(
@@ -200,7 +204,7 @@ impl Packet for UnknownPacket {
     ) -> Box<dyn korangar_interface::element::Element<App, LayoutInfo = ()>> {
         use korangar_interface::prelude::*;
 
-        ErasedElement::new(collapsable! {
+        ErasedElement::new(collapsible! {
             text: name,
             children: (
                 split! {
@@ -245,7 +249,7 @@ impl Packet for ErrorPacket {
     ) -> Box<dyn korangar_interface::element::Element<App, LayoutInfo = ()>> {
         use korangar_interface::prelude::*;
 
-        ErasedElement::new(collapsable! {
+        ErasedElement::new(collapsible! {
             text: name,
             children: (
                 split! {

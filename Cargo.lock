@@ -2172,7 +2172,7 @@ dependencies = [
 [[package]]
 name = "macros"
 version = "0.1.0"
-source = "git+https://github.com/vE5li/rust-state#cfc3103be9d74bd3b7a15c54a2d9fbb19d1a4a8e"
+source = "git+https://github.com/vE5li/rust-state#e4034c9a35473ad01e5a2d0c12ca5684c20a0958"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3537,7 +3537,7 @@ checksum = "ad8388ea1a9e0ea807e442e8263a699e7edcb320ecbcd21b4fa8ff859acce3ba"
 [[package]]
 name = "rust-state"
 version = "0.1.0"
-source = "git+https://github.com/vE5li/rust-state#cfc3103be9d74bd3b7a15c54a2d9fbb19d1a4a8e"
+source = "git+https://github.com/vE5li/rust-state#e4034c9a35473ad01e5a2d0c12ca5684c20a0958"
 dependencies = [
  "macros",
 ]

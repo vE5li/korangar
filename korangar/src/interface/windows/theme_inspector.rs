@@ -55,121 +55,123 @@ where
             class: Self::window_class(),
             theme: InterfaceThemeType::InGame,
             closable: true,
-            elements: (
-                collapsable! {
-                    text: "Controls",
-                    children: (
-                        collapsable! {
-                            text: "Menu theme",
-                            children: (
-                                text_box! {
-                                    ghost_text: "Menu theme name",
-                                    state: self.window_state_path.menu_theme_name(),
-                                    input_handler: DefaultHandler::<_, _, MAXIMUM_NAME_LENGTH>::new(self.window_state_path.menu_theme_name(), Event::Unfocus),
-                                    focus_id: DummyTextBox,
-                                },
-                                split! {
-                                    gaps: theme().window().gaps(),
-                                    children: (
-                                        button! {
-                                            text: "Load",
-                                            event: move |state: &Context<ClientState>, _: &mut EventQueue<ClientState>| {
-                                                let name = state.get(&self.window_state_path.menu_theme_name()).clone();
+            elements: scroll_view! {
+                children: (
+                    collapsible! {
+                        text: "Controls",
+                        children: (
+                            collapsible! {
+                                text: "Menu theme",
+                                children: (
+                                    text_box! {
+                                        ghost_text: "Menu theme name",
+                                        state: self.window_state_path.menu_theme_name(),
+                                        input_handler: DefaultHandler::<_, _, MAXIMUM_NAME_LENGTH>::new(self.window_state_path.menu_theme_name(), Event::Unfocus),
+                                        focus_id: DummyTextBox,
+                                    },
+                                    split! {
+                                        gaps: theme().window().gaps(),
+                                        children: (
+                                            button! {
+                                                text: "Load",
+                                                event: move |state: &Context<ClientState>, _: &mut EventQueue<ClientState>| {
+                                                    let name = state.get(&self.window_state_path.menu_theme_name()).clone();
 
-                                                state.update_value_with(self.menu_theme_path, move |theme| {
-                                                    *theme = InterfaceTheme::load(InterfaceThemeType::Menu, &name);
-                                                });
+                                                    state.update_value_with(self.menu_theme_path, move |theme| {
+                                                        *theme = InterfaceTheme::load(InterfaceThemeType::Menu, &name);
+                                                    });
+                                                },
                                             },
-                                        },
-                                        button! {
-                                            text: "Save",
-                                            event: move |state: &Context<ClientState>, _: &mut EventQueue<ClientState>| {
-                                                let name_path = self.window_state_path.menu_theme_name();
-                                                let theme_name = state.get(&name_path);
+                                            button! {
+                                                text: "Save",
+                                                event: move |state: &Context<ClientState>, _: &mut EventQueue<ClientState>| {
+                                                    let name_path = self.window_state_path.menu_theme_name();
+                                                    let theme_name = state.get(&name_path);
 
-                                                state.get(&self.menu_theme_path).save(InterfaceThemeType::Menu, theme_name);
+                                                    state.get(&self.menu_theme_path).save(InterfaceThemeType::Menu, theme_name);
+                                                },
                                             },
-                                        },
-                                    ),
-                                },
-                            ),
-                        },
-                        collapsable! {
-                            text: "In-game theme",
-                            children: (
-                                text_box! {
-                                    ghost_text: "In-game theme name",
-                                    state: self.window_state_path.in_game_theme_name(),
-                                    input_handler: DefaultHandler::<_, _, MAXIMUM_NAME_LENGTH>::new(self.window_state_path.in_game_theme_name(), Event::Unfocus),
-                                    focus_id: DummyTextBox,
-                                },
-                                split! {
-                                    gaps: theme().window().gaps(),
-                                    children: (
-                                        button! {
-                                            text: "Load",
-                                            event: move |state: &Context<ClientState>, _: &mut EventQueue<ClientState>| {
-                                                let name = state.get(&self.window_state_path.in_game_theme_name()).clone();
+                                        ),
+                                    },
+                                ),
+                            },
+                            collapsible! {
+                                text: "In-game theme",
+                                children: (
+                                    text_box! {
+                                        ghost_text: "In-game theme name",
+                                        state: self.window_state_path.in_game_theme_name(),
+                                        input_handler: DefaultHandler::<_, _, MAXIMUM_NAME_LENGTH>::new(self.window_state_path.in_game_theme_name(), Event::Unfocus),
+                                        focus_id: DummyTextBox,
+                                    },
+                                    split! {
+                                        gaps: theme().window().gaps(),
+                                        children: (
+                                            button! {
+                                                text: "Load",
+                                                event: move |state: &Context<ClientState>, _: &mut EventQueue<ClientState>| {
+                                                    let name = state.get(&self.window_state_path.in_game_theme_name()).clone();
 
-                                                state.update_value_with(self.in_game_theme_path, move |theme| {
-                                                    *theme = InterfaceTheme::load(InterfaceThemeType::InGame, &name);
-                                                });
+                                                    state.update_value_with(self.in_game_theme_path, move |theme| {
+                                                        *theme = InterfaceTheme::load(InterfaceThemeType::InGame, &name);
+                                                    });
+                                                },
                                             },
-                                        },
-                                        button! {
-                                            text: "Save",
-                                            event: move |state: &Context<ClientState>, _: &mut EventQueue<ClientState>| {
-                                                let name_path = self.window_state_path.in_game_theme_name();
-                                                let theme_name = state.get(&name_path);
+                                            button! {
+                                                text: "Save",
+                                                event: move |state: &Context<ClientState>, _: &mut EventQueue<ClientState>| {
+                                                    let name_path = self.window_state_path.in_game_theme_name();
+                                                    let theme_name = state.get(&name_path);
 
-                                                state.get(&self.in_game_theme_path).save(InterfaceThemeType::InGame, theme_name);
+                                                    state.get(&self.in_game_theme_path).save(InterfaceThemeType::InGame, theme_name);
+                                                },
                                             },
-                                        },
-                                    ),
-                                },
-                            ),
-                        },
-                        collapsable! {
-                            text: "World theme",
-                            children: (
-                                text_box! {
-                                    ghost_text: "World theme name",
-                                    state: self.window_state_path.world_theme_name(),
-                                    input_handler: DefaultHandler::<_, _, MAXIMUM_NAME_LENGTH>::new(self.window_state_path.world_theme_name(), Event::Unfocus),
-                                    focus_id: DummyTextBox,
-                                },
-                                split! {
-                                    gaps: theme().window().gaps(),
-                                    children: (
-                                        button! {
-                                            text: "Load",
-                                            event: move |state: &Context<ClientState>, _: &mut EventQueue<ClientState>| {
-                                                let name = state.get(&self.window_state_path.world_theme_name()).clone();
+                                        ),
+                                    },
+                                ),
+                            },
+                            collapsible! {
+                                text: "World theme",
+                                children: (
+                                    text_box! {
+                                        ghost_text: "World theme name",
+                                        state: self.window_state_path.world_theme_name(),
+                                        input_handler: DefaultHandler::<_, _, MAXIMUM_NAME_LENGTH>::new(self.window_state_path.world_theme_name(), Event::Unfocus),
+                                        focus_id: DummyTextBox,
+                                    },
+                                    split! {
+                                        gaps: theme().window().gaps(),
+                                        children: (
+                                            button! {
+                                                text: "Load",
+                                                event: move |state: &Context<ClientState>, _: &mut EventQueue<ClientState>| {
+                                                    let name = state.get(&self.window_state_path.world_theme_name()).clone();
 
-                                                state.update_value_with(self.world_theme_path, move |theme| {
-                                                    *theme = WorldTheme::load(&name);
-                                                });
+                                                    state.update_value_with(self.world_theme_path, move |theme| {
+                                                        *theme = WorldTheme::load(&name);
+                                                    });
+                                                },
                                             },
-                                        },
-                                        button! {
-                                            text: "Save",
-                                            event: move |state: &Context<ClientState>, _: &mut EventQueue<ClientState>| {
-                                                let name_path = self.window_state_path.world_theme_name();
-                                                let theme_name = state.get(&name_path);
+                                            button! {
+                                                text: "Save",
+                                                event: move |state: &Context<ClientState>, _: &mut EventQueue<ClientState>| {
+                                                    let name_path = self.window_state_path.world_theme_name();
+                                                    let theme_name = state.get(&name_path);
 
-                                                state.get(&self.world_theme_path).save(theme_name);
+                                                    state.get(&self.world_theme_path).save(theme_name);
+                                                },
                                             },
-                                        },
-                                    ),
-                                },
-                            ),
-                        },
-                    ),
-                },
-                InterfaceTheme::to_element(self.menu_theme_path, "Menu theme".to_owned()),
-                InterfaceTheme::to_element(self.in_game_theme_path, "In-game theme".to_owned()),
-                WorldTheme::to_element(self.world_theme_path, "World theme".to_owned())
-            ),
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                    },
+                    InterfaceTheme::to_element(self.menu_theme_path, "Menu theme".to_owned()),
+                    InterfaceTheme::to_element(self.in_game_theme_path, "In-game theme".to_owned()),
+                    WorldTheme::to_element(self.world_theme_path, "World theme".to_owned())
+                ),
+            },
         }
     }
 }

@@ -2,7 +2,7 @@ use std::ops::{Add, Mul, Sub};
 
 use korangar_interface::element::store::{ElementStore, ElementStoreMut};
 use korangar_interface::element::{BaseLayoutInfo, Element, StateElement};
-use korangar_interface::layout::{Resolver, WindowLayout};
+use korangar_interface::layout::{Resolvers, WindowLayout, with_single_resolver};
 use mlua::{Lua, Value};
 use ragnarok_formats::color::{ColorBGRA, ColorRGB};
 use rust_state::{Context, Path};
@@ -101,7 +101,6 @@ impl Color {
         (self.alpha * 255.0) as u8
     }
 
-    #[cfg(feature = "debug")]
     pub const fn multiply_alpha(mut self, alpha: f32) -> Self {
         self.alpha *= alpha;
         self
@@ -276,12 +275,14 @@ impl StateElement<ClientState> for Color {
             fn create_layout_info(
                 &mut self,
                 _: &Context<ClientState>,
-                _: ElementStoreMut<'_>,
-                resolver: &mut Resolver<'_, ClientState>,
+                _: ElementStoreMut,
+                resolvers: &mut dyn Resolvers<ClientState>,
             ) -> Self::LayoutInfo {
-                let area = resolver.with_height(18.0);
+                with_single_resolver(resolvers, |resolver| {
+                    let area = resolver.with_height(18.0);
 
-                Self::LayoutInfo { area }
+                    Self::LayoutInfo { area }
+                })
             }
 
             fn lay_out<'a>(
@@ -330,12 +331,14 @@ impl StateElement<ClientState> for Color {
             fn create_layout_info(
                 &mut self,
                 _: &Context<ClientState>,
-                _: ElementStoreMut<'_>,
-                resolver: &mut Resolver<'_, ClientState>,
+                _: ElementStoreMut,
+                resolvers: &mut dyn Resolvers<ClientState>,
             ) -> Self::LayoutInfo {
-                let area = resolver.with_height(18.0);
+                with_single_resolver(resolvers, |resolver| {
+                    let area = resolver.with_height(18.0);
 
-                Self::LayoutInfo { area }
+                    Self::LayoutInfo { area }
+                })
             }
 
             fn lay_out<'a>(

@@ -68,7 +68,7 @@ impl korangar_interface::application::FontSize for FontSize {
 
 impl ElementDisplay for FontSize {
     fn element_display(&self) -> String {
-        format!("^000001F^000000{}", self.0.element_display())
+        format!("^000001ₐ^000000{}", self.0.element_display())
     }
 }
 

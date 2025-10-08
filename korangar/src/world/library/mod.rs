@@ -1,3 +1,4 @@
+use std::hash::Hash;
 use std::sync::Arc;
 
 use encoding_rs::EUC_KR;
@@ -10,6 +11,19 @@ use ragnarok_packets::{ClientTick, ItemId, JobId, SkillId, SkillLevel};
 use crate::graphics::{Color, Texture};
 use crate::inventory::LearnableSkill;
 use crate::loaders::{ActionLoader, AsyncLoader, GameFileLoader, ImageType, ItemLocation, SpriteLoader};
+
+trait HashMapExt {
+    fn compact(self) -> Self;
+}
+
+impl<K, V> HashMapExt for HashMap<K, V>
+where
+    K: Eq + Hash,
+{
+    fn compact(self) -> Self {
+        HashMap::from_iter(self)
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct ResourceMetadata {
@@ -170,9 +184,7 @@ impl Library {
             }
         }
 
-        let compacted = HashMap::from_iter(result);
-
-        Ok(compacted)
+        Ok(result.compact())
     }
 
     fn load_item_table(state: Lua) -> mlua::Result<HashMap<ItemId, ItemInfo>> {
@@ -192,9 +204,7 @@ impl Library {
             }
         }
 
-        let compacted = HashMap::from_iter(result);
-
-        Ok(compacted)
+        Ok(result.compact())
     }
 
     fn load_skill_list_table(state: Lua) -> mlua::Result<HashMap<SkillId, SkillListEntry>> {
@@ -261,9 +271,7 @@ impl Library {
             }
         }
 
-        let compacted = HashMap::from_iter(result);
-
-        Ok(compacted)
+        Ok(result.compact())
     }
 
     fn load_skill_tree_table(state: Lua) -> mlua::Result<HashMap<JobId, HashMap<usize, SkillId>>> {
@@ -278,14 +286,11 @@ impl Library {
                     view_result.insert(slot, SkillId(skill_id));
                 }
 
-                let compacted = HashMap::from_iter(view_result);
-                result.insert(JobId(job_id), compacted);
+                result.insert(JobId(job_id), view_result.compact());
             }
         }
 
-        let compacted = HashMap::from_iter(result);
-
-        Ok(compacted)
+        Ok(result.compact())
     }
 
     fn load_map_sky_data_table(state: Lua) -> mlua::Result<HashMap<String, MapSkyData>> {
@@ -300,9 +305,7 @@ impl Library {
             }
         }
 
-        let compacted = HashMap::from_iter(result);
-
-        Ok(compacted)
+        Ok(result.compact())
     }
 
     fn parse_map_sky_data(table: &mlua::Table) -> MapSkyData {

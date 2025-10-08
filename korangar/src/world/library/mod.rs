@@ -1,3 +1,4 @@
+use std::hash::Hash;
 use std::sync::Arc;
 
 use encoding_rs::EUC_KR;
@@ -5,10 +6,24 @@ use hashbrown::HashMap;
 use korangar_loaders::FileLoader;
 use korangar_networking::{InventoryItem, NoMetadata, ShopItem};
 use mlua::{Lua, Value};
-use ragnarok_packets::ItemId;
+use ragnarok_packets::{ClientTick, ItemId, JobId, SkillId, SkillLevel};
 
 use crate::graphics::{Color, Texture};
-use crate::loaders::{AsyncLoader, GameFileLoader, ImageType, ItemLocation};
+use crate::inventory::LearnableSkill;
+use crate::loaders::{ActionLoader, AsyncLoader, GameFileLoader, ImageType, ItemLocation, SpriteLoader};
+
+trait HashMapExt {
+    fn compact(self) -> Self;
+}
+
+impl<K, V> HashMapExt for HashMap<K, V>
+where
+    K: Eq + Hash,
+{
+    fn compact(self) -> Self {
+        HashMap::from_iter(self)
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct ResourceMetadata {
@@ -53,71 +68,103 @@ pub struct CloudEffect {
     height_extra: usize,
 }
 
+pub struct SkillListEntry {
+    pub file_name: String,
+    pub name: String,
+    pub maximum_level: SkillLevel,
+    // TODO: Remove allow
+    #[allow(dead_code)]
+    pub generic_required_skills: HashMap<SkillId, SkillLevel>,
+    // TODO: Remove allow
+    #[allow(dead_code)]
+    pub job_required_skills: HashMap<JobId, HashMap<SkillId, SkillLevel>>,
+    // TODO: Additional fields.
+}
+
 pub struct Library {
-    job_identity_table: HashMap<usize, String>,
+    job_identity_table: HashMap<JobId, String>,
     item_table: HashMap<ItemId, ItemInfo>,
+    skill_list_table: HashMap<SkillId, SkillListEntry>,
+    skill_tree_table: HashMap<JobId, HashMap<usize, SkillId>>,
     map_sky_data_table: HashMap<String, MapSkyData>,
 }
 
 impl Library {
+    fn load_state(game_file_loader: &GameFileLoader, files: &[&str]) -> mlua::Result<Lua> {
+        let state = Lua::new();
+
+        for file in files {
+            // TODO: Handle this better.
+            let data = game_file_loader.get(file).unwrap();
+            state.load(&data).exec()?;
+        }
+
+        Ok(state)
+    }
+
     pub fn new(game_file_loader: &GameFileLoader) -> mlua::Result<Self> {
-        let state = Lua::new();
+        let state = Self::load_state(game_file_loader, &[
+            "data\\luafiles514\\lua files\\datainfo\\jobidentity.lub",
+            "data\\luafiles514\\lua files\\datainfo\\npcidentity.lub",
+        ])?;
+        let job_identity_table = Self::load_job_identity_table(state)?;
 
-        let data = game_file_loader
-            .get("data\\luafiles514\\lua files\\datainfo\\jobidentity.lub")
-            .unwrap();
-        state.load(&data).exec()?;
+        let state = Self::load_state(game_file_loader, &["data\\luafiles514\\lua files\\datainfo\\iteminfo.lub"])?;
+        let item_table = Self::load_item_table(state)?;
 
-        let data = game_file_loader
-            .get("data\\luafiles514\\lua files\\datainfo\\npcidentity.lub")
-            .unwrap();
-        state.load(&data).exec()?;
+        let state = Self::load_state(game_file_loader, &[
+            // Needed to get the `LOBID` table.
+            "data\\luafiles514\\lua files\\skillinfoz\\jobinheritlist.lub",
+            // Needed to get the `SKID` table.
+            "data\\luafiles514\\lua files\\skillinfoz\\skillid.lub",
+            "data\\luafiles514\\lua files\\skillinfoz\\skillinfolist.lub",
+        ])?;
+        let skill_list_table = Self::load_skill_list_table(state)?;
 
-        let job_identity_table = Self::load_job_identity_table(&state)?;
+        let state = Self::load_state(game_file_loader, &[
+            // Needed to get the `LOBID` table.
+            "data\\luafiles514\\lua files\\skillinfoz\\jobinheritlist.lub",
+            // Needed to get the `SKID` table.
+            "data\\luafiles514\\lua files\\skillinfoz\\skillid.lub",
+            // Needed to get the `JobSkillTable.ChangeSkillTabName` function.
+            "data\\luafiles514\\lua files\\skillinfoz\\skillinfo_f.lub",
+            "data\\luafiles514\\lua files\\skillinfoz\\skilltreeview.lub",
+            // "data\\luafiles514\\lua files\\skillinfoz\\skilltreeview 20180621.lub",
+        ])?;
+        let skill_tree_table = Self::load_skill_tree_table(state)?;
 
-        let state = Lua::new();
-
-        let data = game_file_loader
-            .get("data\\luafiles514\\lua files\\datainfo\\iteminfo.lub")
-            .unwrap();
-        state.load(&data).exec()?;
-
-        let item_table = Self::load_item_table(&state)?;
-
-        let map_sky_data_table = match game_file_loader.get("data\\luafiles514\\lua files\\mapskydata\\mapskydata.lub") {
-            Ok(data) => {
-                let state = Lua::new();
-                state.load(&data).exec()?;
-                Self::load_map_sky_data_table(&state)?
-            }
+        let map_sky_data_table = match Self::load_state(game_file_loader, &["data\\luafiles514\\lua files\\mapskydata\\mapskydata.lub"]) {
+            Ok(state) => Self::load_map_sky_data_table(state)?,
             Err(_) => HashMap::new(),
         };
 
         Ok(Self {
             job_identity_table,
             item_table,
+            skill_list_table,
+            skill_tree_table,
             map_sky_data_table,
         })
     }
 
-    pub fn load_job_identity_table(state: &Lua) -> mlua::Result<HashMap<usize, String>> {
+    pub fn load_job_identity_table(state: Lua) -> mlua::Result<HashMap<JobId, String>> {
         let globals = state.globals();
         let mut result = HashMap::new();
 
         if let Ok(jobtbl) = globals.get::<mlua::Table>("jobtbl") {
-            for (key, value) in jobtbl.pairs::<String, usize>().flatten() {
+            for (key, value) in jobtbl.pairs::<String, u16>().flatten() {
                 let cleaned_key = if let Some(end) = key.strip_prefix("JT_G_") {
                     end.to_string()
                 } else {
                     key[3..].to_string()
                 };
 
-                result.insert(value, cleaned_key);
+                result.insert(JobId(value), cleaned_key);
             }
         }
 
         if let Ok(jttbl) = globals.get::<mlua::Table>("JTtbl") {
-            for (key, value) in jttbl.pairs::<String, usize>().flatten() {
+            for (key, value) in jttbl.pairs::<String, u16>().flatten() {
                 let cleaned_key = if let Some(end) = key.strip_prefix("JT_G_") {
                     end.to_string()
                 } else if key.starts_with("JT_C1_")
@@ -133,16 +180,14 @@ impl Library {
 
                 let cleaned_key = cleaned_key.replace("CHONCHON", "chocho");
 
-                result.insert(value, cleaned_key);
+                result.insert(JobId(value), cleaned_key);
             }
         }
 
-        let compacted = HashMap::from_iter(result);
-
-        Ok(compacted)
+        Ok(result.compact())
     }
 
-    fn load_item_table(state: &Lua) -> mlua::Result<HashMap<ItemId, ItemInfo>> {
+    fn load_item_table(state: Lua) -> mlua::Result<HashMap<ItemId, ItemInfo>> {
         let globals = state.globals();
         let mut result = HashMap::new();
 
@@ -159,12 +204,96 @@ impl Library {
             }
         }
 
-        let compacted = HashMap::from_iter(result);
-
-        Ok(compacted)
+        Ok(result.compact())
     }
 
-    fn load_map_sky_data_table(state: &Lua) -> mlua::Result<HashMap<String, MapSkyData>> {
+    fn load_skill_list_table(state: Lua) -> mlua::Result<HashMap<SkillId, SkillListEntry>> {
+        let globals = state.globals();
+        let mut result = HashMap::new();
+
+        if let Ok(table) = globals.get::<mlua::Table>("SKILL_INFO_LIST") {
+            for (skill_id, table) in table.pairs::<u16, mlua::Table>().flatten() {
+                let file_name = table.get(1)?;
+                let name = table.get("SkillName")?;
+                let maximum_level = table.get("MaxLv")?;
+
+                let generic_required_skills = match table.get::<mlua::Table>("_NeedSkillList") {
+                    Ok(sequence) => {
+                        let mut required_skills = HashMap::new();
+
+                        for required_skill in sequence.sequence_values::<mlua::Table>() {
+                            let required_skill = required_skill?;
+                            let skill_id = required_skill.get::<u16>(1)?;
+                            // TODO: At least one skill does not have a level set. I am just
+                            // assuming that that means level 1 is required but should be
+                            // confirmed.
+                            let skill_level = required_skill.get::<u16>(2).unwrap_or(1);
+                            required_skills.insert(SkillId(skill_id), SkillLevel(skill_level));
+                        }
+
+                        required_skills
+                    }
+                    Err(..) => HashMap::new(),
+                };
+
+                let job_required_skills = match table.get::<mlua::Table>("NeedSkillList") {
+                    Ok(table) => {
+                        let mut job_specific = HashMap::new();
+
+                        for (job_id, sequence) in table.pairs::<u16, mlua::Table>().flatten() {
+                            let mut required_skills = HashMap::new();
+
+                            for required_skill in sequence.sequence_values::<mlua::Table>() {
+                                let required_skill = required_skill?;
+                                let skill_id = required_skill.get::<u16>(1)?;
+                                // TODO: At least one skill does not have a level set. I am just
+                                // assuming that that means level 1 is required but should be
+                                // confirmed.
+                                let skill_level = required_skill.get::<u16>(2).unwrap_or(1);
+                                required_skills.insert(SkillId(skill_id), SkillLevel(skill_level));
+                            }
+
+                            job_specific.insert(JobId(job_id), required_skills);
+                        }
+
+                        job_specific
+                    }
+                    Err(..) => HashMap::new(),
+                };
+
+                result.insert(SkillId(skill_id), SkillListEntry {
+                    file_name,
+                    name,
+                    maximum_level: SkillLevel(maximum_level),
+                    generic_required_skills,
+                    job_required_skills,
+                });
+            }
+        }
+
+        Ok(result.compact())
+    }
+
+    fn load_skill_tree_table(state: Lua) -> mlua::Result<HashMap<JobId, HashMap<usize, SkillId>>> {
+        let globals = state.globals();
+        let mut result = HashMap::new();
+
+        if let Ok(table) = globals.get::<mlua::Table>("SKILL_TREEVIEW_FOR_JOB") {
+            for (job_id, view_table) in table.pairs::<u16, mlua::Table>().flatten() {
+                let mut view_result = HashMap::new();
+
+                for (slot, skill_id) in view_table.pairs::<usize, u16>().flatten() {
+                    view_result.insert(slot, SkillId(skill_id));
+                }
+
+                result.insert(JobId(job_id), view_result.compact());
+            }
+        }
+
+        Ok(result.compact())
+    }
+
+    fn load_map_sky_data_table(state: Lua) -> mlua::Result<HashMap<String, MapSkyData>> {
         let globals = state.globals();
         let mut result = HashMap::new();
 
@@ -176,9 +305,7 @@ impl Library {
             }
         }
 
-        let compacted = HashMap::from_iter(result);
-
-        Ok(compacted)
+        Ok(result.compact())
     }
 
     fn parse_map_sky_data(table: &mlua::Table) -> MapSkyData {
@@ -217,7 +344,7 @@ impl Library {
         }
     }
 
-    pub fn get_job_identity_from_id(&self, job_id: usize) -> &str {
+    pub fn get_job_identity_from_id(&self, job_id: JobId) -> &str {
         self.job_identity_table
             .get(&job_id)
             .map(|name| name.as_str())
@@ -238,6 +365,38 @@ impl Library {
             false => self.item_table.get(&item_id).and_then(|info| info.unidentified_resource.as_deref()),
         }
         .unwrap_or("사과") // Apple
+    }
+
+    pub fn get_skill_list_entry(&self, skill_id: SkillId) -> &SkillListEntry {
+        // TODO: Handle this better.
+        self.skill_list_table.get(&skill_id).unwrap()
+    }
+
+    pub fn get_skill_tree_layout_from_job_id(
+        &self,
+        sprite_loader: &SpriteLoader,
+        action_loader: &ActionLoader,
+        job_id: JobId,
+        client_tick: ClientTick,
+    ) -> HashMap<usize, LearnableSkill> {
+        match self.skill_tree_table.get(&job_id) {
+            Some(layout) => HashMap::from_iter(layout.iter().map(|(slot, skill_id)| {
+                let skill_entry = self.get_skill_list_entry(*skill_id);
+                let skill = LearnableSkill::load(
+                    sprite_loader,
+                    action_loader,
+                    *skill_id,
+                    skill_entry.maximum_level,
+                    skill_entry.file_name.clone(),
+                    skill_entry.name.clone(),
+                    client_tick,
+                );
+
+                (*slot, skill)
+            })),
+            // TODO: Replicate the default behavior of the lua files
+            None => HashMap::new(),
+        }
     }
 
     pub fn get_map_sky_data_from_resource_file(&self, resource_file: &str) -> Option<&MapSkyData> {

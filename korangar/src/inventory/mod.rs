@@ -9,7 +9,7 @@ use ragnarok_packets::{EquipPosition, InventoryIndex, ItemId};
 use rust_state::RustState;
 
 pub use self::hotbar::{Hotbar, HotbarPathExt};
-pub use self::skills::{Skill, SkillTree, SkillTreePathExt};
+pub use self::skills::{LearnableSkill, LearnedSkill, LearnedSkillPath, SkillTree, SkillTreePathExt};
 use crate::graphics::Texture;
 use crate::loaders::AsyncLoader;
 use crate::world::{Library, ResourceMetadata};

@@ -10,8 +10,8 @@ struct MarkerVertexInput {
 
 struct MarkerVertexOutput {
     float4 position: SV_Position;
-    var identifier_high: uint;
-    var identifier_low: uint;
+    [[vk::location(0)]] var identifier_high: uint;
+    [[vk::location(1)]] var identifier_low: uint;
 }
 
 public struct MarkerInstanceData {
@@ -55,6 +55,7 @@ func fs_main(input: MarkerVertexOutput) -> uint2 {
 // 5             0  0
 //
 // (x,y) are the vertex position
+[ForceInline]
 public func vertex_data(vertex_index: uint) -> float2 {
     let index = 1 << vertex_index;
     let x = float((index & 0x0E) != 0u);

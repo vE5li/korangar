@@ -63,6 +63,13 @@ walkdir = "2"
 wgpu = "27"
 winit = "0.30"
 
+[patch.crates-io]
+wgpu = { git = "https://github.com/hasenbanck/wgpu", branch = "spec-constant-op" }
+wgpu-types = { git = "https://github.com/hasenbanck/wgpu", branch = "spec-constant-op" }
+wgpu-core = { git = "https://github.com/hasenbanck/wgpu", branch = "spec-constant-op" }
+wgpu-hal = { git = "https://github.com/hasenbanck/wgpu", branch = "spec-constant-op" }
+naga = { git = "https://github.com/hasenbanck/wgpu", branch = "spec-constant-op" }
+
 [profile.release]
 lto = "thin"
 

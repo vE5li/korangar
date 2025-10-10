@@ -30,11 +30,12 @@ public struct RectangleVertexInput {
 
 public struct RectangleVertexOutput {
     public float4 position : SV_Position;
-    public var fragment_position: float2;
-    public var texture_coordinates: float2;
-    public var instance_index: uint;
+    [[vk::location(0)]] public var fragment_position: float2;
+    [[vk::location(1)]] public var texture_coordinates: float2;
+    [[vk::location(2)]] public var instance_index: uint;
 };
 
+[ForceInline]
 func vertex_data(vertex_index: uint) -> float4 {
     let index = 1 << vertex_index;
     let x = float((index & 0x0E) != 0);
@@ -42,6 +43,7 @@ func vertex_data(vertex_index: uint) -> float4 {
     return float4(x, -y, x, y);
 }
 
+[ForceInline]
 func rectangle_sdf(relative_position: float2, half_size: float2, corner_diameter: float) -> float {
     let shrunk_corner_position = half_size - corner_diameter;
     let pixel_to_shrunk_corner = max(float2(0.0), abs(relative_position) - shrunk_corner_position);
@@ -66,6 +68,7 @@ func rectangle_sdf(relative_position: float2, half_size: float2, corner_diameter
 // This gives us the final gradient:
 //   ∇sdf = (d / |d|) * sign(p)
 // where d = max(0, abs(p) - shrunk_corner_position)
+[ForceInline]
 func rectangle_sdf_gradient(relative_position: float2, half_size: float2, corner_diameter: float) -> float2 {
     let shrunk_corner_position = half_size - corner_diameter;
     let distance_to_shrunk_corner_unclipped = abs(relative_position) - shrunk_corner_position;
@@ -74,10 +77,12 @@ func rectangle_sdf_gradient(relative_position: float2, half_size: float2, corner
     return (distance_to_shrunk_corner / distance_magnitude) * sign(relative_position);
 }
 
+[ForceInline]
 public func median(r: float, g: float, b: float) -> float {
     return max(min(r, g), min(max(r, g), b));
 }
 
+[ForceInline]
 public func calculate_msdf(
     distance: float,
     texture_size: float2,
@@ -90,6 +95,7 @@ public func calculate_msdf(
     return color * saturate(distance * screen_px_range + EDGE_VALUE);
 }
 
+[ForceInline]
 public func calculate_rounded_rectangle_alpha(
     pixel_position: float2,
     rectangle_origin: float2,
@@ -135,6 +141,7 @@ public func calculate_rounded_rectangle_alpha(
     }
 }
 
+[ForceInline]
 public func render_rectangle_with_shadow(
     corner_diameter: float4,
     screen_position: float2,
@@ -193,6 +200,7 @@ public func render_rectangle_with_shadow(
     }
 }
 
+[ForceInline]
 public func rectangle_with_rounded_edges(
     corner_diameter: float4,
     screen_position: float2,

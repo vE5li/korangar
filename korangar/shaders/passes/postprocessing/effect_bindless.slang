@@ -4,9 +4,9 @@ import postprocessing;
 
 public struct EffectVertexOutput {
     public float4 position : SV_Position;
-    public var texture_coordinates: float2;
-    public var color: float4;
-    public var texture_index: int;
+    [[vk::location(0)]] public var texture_coordinates: float2;
+    [[vk::location(1)]] public var color: float4;
+    [[vk::location(2)]] public var texture_index: int;
 }
 
 [[vk::binding(2, 0)]] var linear_sampler: SamplerState;

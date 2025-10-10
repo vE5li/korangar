@@ -1,5 +1,6 @@
 #language slang 2026
 
+import depth_texture;
 import sdsm;
 import transform;
 
@@ -10,7 +11,7 @@ struct ComputeInput {
     uint local_invocation_index : SV_GroupIndex;
 }
 
-[[vk::binding(1, 1)]] var depth_texture: Texture2D;
+[[vk::binding(1, 1)]] var depth_texture: DepthTexture2D;
 [[vk::binding(2, 1)]] var partition_data: RWStructuredBuffer<Partition>;
 [[vk::binding(3, 1)]] var interval_data: RWStructuredBuffer<Interval>;
 
@@ -33,7 +34,7 @@ func main(ComputeInput input) {
             let coords = tile_start + uint2(tile_x, tile_y);
 
             if (coords.x < depth_dim.x && coords.y < depth_dim.y) {
-                let depth_value = depth_texture.Load(int3(coords.x, coords.y, 0)).r;
+                let depth_value = depth_texture.Load(int3(coords.x, coords.y, 0));
                 let linear_view_z = depth::nonLinearToLinear(depth_value);
 
                 if (linear_view_z >= NEAR_PLANE && linear_view_z < VIRTUAL_FAR_PLANE) {

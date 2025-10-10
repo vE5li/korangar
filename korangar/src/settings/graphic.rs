@@ -7,7 +7,7 @@ use rust_state::RustState;
 use serde::{Deserialize, Serialize};
 
 use crate::graphics::{
-    LimitFramerate, Msaa, PresentModeInfo, ScreenSpaceAntiAliasing, ShadowDetail, ShadowQuality, Ssaa, TextureSamplerType,
+    LimitFramerate, Msaa, PresentModeInfo, ScreenSpaceAntiAliasing, ShadowDetail, ShadowMethod, ShadowResolution, Ssaa, TextureSamplerType,
 };
 
 #[derive(Clone, Serialize, Deserialize, RustState, StateElement)]
@@ -20,8 +20,10 @@ pub struct GraphicsSettings {
     pub msaa: Msaa,
     pub ssaa: Ssaa,
     pub screen_space_anti_aliasing: ScreenSpaceAntiAliasing,
+    pub shadow_method: ShadowMethod,
+    pub shadow_resolution: ShadowResolution,
     pub shadow_detail: ShadowDetail,
-    pub shadow_quality: ShadowQuality,
+    pub sdsm: bool,
     pub high_quality_interface: bool,
 }
 
@@ -36,8 +38,10 @@ impl Default for GraphicsSettings {
             msaa: Msaa::X4,
             ssaa: Ssaa::Off,
             screen_space_anti_aliasing: ScreenSpaceAntiAliasing::Off,
-            shadow_detail: ShadowDetail::Normal,
-            shadow_quality: ShadowQuality::SoftPCSSx16,
+            shadow_method: ShadowMethod::SoftPCSS,
+            shadow_resolution: ShadowResolution::Normal,
+            shadow_detail: ShadowDetail::Medium,
+            sdsm: true,
             high_quality_interface: true,
         }
     }
@@ -117,7 +121,8 @@ pub struct GraphicsSettingsCapabilities {
     supported_msaa: Vec<Msaa>,
     ssaa_options: Vec<Ssaa>,
     screen_space_anti_aliasing_options: Vec<ScreenSpaceAntiAliasing>,
-    shadow_quality_options: Vec<ShadowQuality>,
+    shadow_method_options: Vec<ShadowMethod>,
+    shadow_resolution_options: Vec<ShadowResolution>,
     shadow_detail_options: Vec<ShadowDetail>,
     vsync_setting_disabled: bool,
 }
@@ -144,15 +149,9 @@ impl Default for GraphicsSettingsCapabilities {
             supported_msaa: Vec::new(),
             ssaa_options: vec![Ssaa::Off, Ssaa::X2, Ssaa::X3, Ssaa::X4],
             screen_space_anti_aliasing_options: vec![ScreenSpaceAntiAliasing::Off, ScreenSpaceAntiAliasing::Fxaa],
-            shadow_quality_options: vec![
-                ShadowQuality::Hard,
-                ShadowQuality::SoftPCF,
-                ShadowQuality::SoftPCSSx8,
-                ShadowQuality::SoftPCSSx16,
-                ShadowQuality::SoftPCSSx32,
-                ShadowQuality::SoftPCSSx64,
-            ],
-            shadow_detail_options: vec![ShadowDetail::Normal, ShadowDetail::Ultra, ShadowDetail::Insane],
+            shadow_method_options: vec![ShadowMethod::Hard, ShadowMethod::SoftPCF, ShadowMethod::SoftPCSS],
+            shadow_resolution_options: vec![ShadowResolution::Normal, ShadowResolution::Ultra, ShadowResolution::Insane],
+            shadow_detail_options: vec![ShadowDetail::Low, ShadowDetail::Medium, ShadowDetail::High, ShadowDetail::Ultra],
             vsync_setting_disabled: true,
         }
     }

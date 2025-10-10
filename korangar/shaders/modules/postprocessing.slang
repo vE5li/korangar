@@ -9,18 +9,18 @@ public struct PostprocessingVertexInput {
 
 public struct PostprocessingVertexOutput {
     public float4 position : SV_Position;
-    public var texture_coordinates: float2;
-    public var instance_index: uint;
+    [[vk::location(0)]] public var texture_coordinates: float2;
+    [[vk::location(1)]] public var instance_index: uint;
 }
 
 public struct DebugVertexOutput {
     public float4 position : SV_Position;
-    public var color: float4;
+    [[vk::location(0)]] public var color: float4;
 }
 
 public struct DebugBufferVertexOutput {
     public float4 position : SV_Position;
-    public var fragment_position: float2;
+    [[vk::location(0)]] public var fragment_position: float2;
 }
 
 public struct EffectInstanceData {
@@ -74,6 +74,7 @@ public static const var TILE_SIZE: uint = 16;
 //
 // (x,y) are the vertex position
 // (z,w) are the UV coordinates
+[ForceInline]
 public func rectangle_vertex_data(vertex_index: uint) -> float4 {
     let index = 1u << vertex_index;
     let x = float((index & 0xEu) != 0u);
@@ -81,6 +82,7 @@ public func rectangle_vertex_data(vertex_index: uint) -> float4 {
     return float4(x, -y, x, y);
 }
 
+[ForceInline]
 public func effect_position_data(instance: EffectInstanceData, vertex_index: uint) -> float4 {
     switch (vertex_index) {
         case 0:
@@ -98,10 +100,12 @@ public func effect_position_data(instance: EffectInstanceData, vertex_index: uin
     }
 }
 
+[ForceInline]
 public func median(r: float, g: float, b: float) -> float {
     return max(min(r, g), min(max(r, g), b));
 }
 
+[ForceInline]
 public func calculate_shadowed_sdf(
     distance: float,
     texture_size: float2,
@@ -122,12 +126,14 @@ public func calculate_shadowed_sdf(
     return lerp(shadow_color, text_color, text_alpha);
 }
 
+[ForceInline]
 public func screen_to_clip_space(screen_coords: float2) -> float2 {
     let x = (screen_coords.x * 2.0) - 1.0;
     let y = -(screen_coords.y * 2.0) + 1.0;
     return float2(x, y);
 }
 
+[ForceInline]
 public func clip_to_uv(clip_space_position: float2) -> float2 {
     return float2((clip_space_position.x + 1.0) * 0.5, (1.0 - clip_space_position.y) * 0.5);
 }

@@ -1,7 +1,8 @@
 #language slang 2026
 
-import sdsm;
+import depth_texture;
 import globals;
+import sdsm;
 import transform;
 
 struct ComputeInput {
@@ -13,7 +14,7 @@ struct ComputeInput {
 
 [[vk::binding(0, 0)]] var global_uniforms: ConstantBuffer<GlobalUniforms>;
 [[vk::binding(0, 1)]] var directional_light: ConstantBuffer<DirectionalLightUniforms>;
-[[vk::binding(1, 1)]] var depth_texture: Texture2DMS;
+[[vk::binding(1, 1)]] var depth_texture: DepthTexture2DMS;
 [[vk::binding(2, 1)]] var partition_data: RWStructuredBuffer<Partition>;
 [[vk::binding(4, 1)]] var bounds_data: RWStructuredBuffer<Bounds>;
 
@@ -28,6 +29,7 @@ func main(ComputeInput input) {
     depth_texture.GetDimensions(depth_dim.x, depth_dim.y, sample_count);
 
     var bounds_reduce: BoundsFloat[PARTITION_COUNT];
+    [unroll]
     for (uint partition_index = 0; partition_index < PARTITION_COUNT; partition_index++) {
         bounds_reduce[partition_index] = empty_bounds_float();
     }
@@ -42,13 +44,14 @@ func main(ComputeInput input) {
             let coords = tile_start + uint2(tile_x, tile_y);
 
             if (coords.x < depth_dim.x && coords.y < depth_dim.y) {
-                let depth_value = depth_texture.Load(int2(coords.x, coords.y), 0).r;
+                let depth_value = depth_texture.Load(int2(coords.x, coords.y), 0);
                 let linear_view_z = depth::nonLinearToLinear(depth_value);
 
                 // Check if sample falls within view frustum.
                 if (linear_view_z > near_z && linear_view_z < far_z) {
                     // Determine which partition this sample belongs to.
                     var partition_index = 0;
+                    [unroll]
                     for (uint i = 0; i < (PARTITION_COUNT - 1); i++) {
                         if (linear_view_z >= partition_data[i].interval_end) {
                             partition_index++;
@@ -67,6 +70,7 @@ func main(ComputeInput input) {
         }
     }
 
+    [unroll]
     for (uint partition_index = 0; partition_index < PARTITION_COUNT; partition_index++) {
         let index = input.local_invocation_index * PARTITION_COUNT + partition_index;
         sbounds_min[index] = bounds_reduce[partition_index].min_coord;

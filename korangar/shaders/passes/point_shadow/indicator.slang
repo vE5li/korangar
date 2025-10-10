@@ -11,8 +11,8 @@ struct IndicatorVertexInput {
 
 struct IndicatorVertexOutput {
     float4 position: SV_Position;
-    var world_position: float4;
-    var texture_coordinates: float2;
+    [[vk::location(0)]] var world_position: float4;
+    [[vk::location(1)]] var texture_coordinates: float2;
 };
 
 struct IndicatorFragmentOutput {
@@ -48,6 +48,7 @@ func fs_main(input: IndicatorVertexOutput) -> IndicatorFragmentOutput {
     return output;
 }
 
+[ForceInline]
 func indicator_position_data(vertex_index: uint, indicator_positions: float4x4) -> float4 {
     switch (vertex_index) {
         case 0:
@@ -82,6 +83,7 @@ func indicator_position_data(vertex_index: uint, indicator_positions: float4x4) 
 // 5             1  1
 //
 // (x,y) are the UV coordinates
+[ForceInline]
 public func indicator_uv_data(vertex_index: uint) -> float2 {
     let index = 1 << vertex_index;
     let x = float((index & 0x2C) != 0);

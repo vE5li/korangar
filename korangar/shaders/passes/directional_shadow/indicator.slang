@@ -10,7 +10,7 @@ struct IndicatorVertexInput {
 
 struct IndicatorVertexOutput {
     float4 position : SV_Position;
-    var texture_coordinates: float2;
+    [[vk::location(0)]] var texture_coordinates: float2;
 };
 
 [[vk::binding(0, 0)]] var global_uniforms: ConstantBuffer<GlobalUniforms>;
@@ -37,6 +37,7 @@ func fs_main(input: IndicatorVertexOutput) -> float4 {
     return fragment_color;
 }
 
+[ForceInline]
 func position_data(vertex_index: uint) -> float4 {
     switch (vertex_index) {
         case 0: {
@@ -77,6 +78,7 @@ func position_data(vertex_index: uint) -> float4 {
 // 5             1  1
 //
 // (x,y) are the UV coordinates
+[ForceInline]
 func uv_data(vertex_index: uint) -> float2 {
     let index = 1 << vertex_index;
     let x = float((index & 0x2C) != 0);

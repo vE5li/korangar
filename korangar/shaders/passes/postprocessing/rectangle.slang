@@ -2,7 +2,6 @@
 
 import postprocessing;
 
-
 [[vk::binding(1, 0)]] var nearest_sampler: SamplerState;
 [[vk::binding(2, 0)]] var linear_sampler: SamplerState;
 [[vk::binding(0, 1)]] var instance_data: StructuredBuffer<RectangleInstanceData>;

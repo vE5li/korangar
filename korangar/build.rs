@@ -22,6 +22,7 @@ fn check_slangc_availability() {
             eprintln!("  1. Or downloading slang directly from https://github.com/shader-slang/slang/releases");
             eprintln!("  2. Installing the Vulkan SDK from https://vulkan.lunarg.com/");
             eprintln!("After installation, ensure slangc is in your PATH.");
+            eprintln!("At least version v2025.18.2 is needed to compile shaders.");
             std::process::exit(1);
         }
     }
@@ -95,18 +96,29 @@ fn compile_shader(shader_file: &Path, output_dir: &Path, modules_dir: &Path) -> 
     let output_file = output_dir.join(format!("{base_name}.spv"));
 
     let mut cmd = Command::new("slangc");
+
     cmd.arg("-target")
         .arg("spirv")
-        .arg("-profile")
-        .arg("spirv_1_5")
         .arg("-I")
         .arg(modules_dir)
-        // -03 is producing shaders that WGPU can't compile for Metal.
-        .arg("-O2")
         // Uses column major layout for matrices.
         .arg("-matrix-layout-column-major")
         // Use std430 layout instead of D3D buffer layout for raw buffer load/stores.
-        .arg("-fvk-use-gl-layout");
+        .arg("-fvk-use-gl-layout")
+        // This fixes this issue: https://github.com/shader-slang/slang/issues/8549
+        // This forces us to define the texture format for a storage texture.
+        .arg("-default-image-format-unknown");
+
+    #[cfg(target_os = "macos")]
+    {
+        // -02 and higher is producing shaders that WGPU can't compile for Metal.
+        cmd.arg("-O1");
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        cmd.arg("-O3");
+    }
 
     cmd.arg("-o").arg(&output_file).arg(shader_file);
 

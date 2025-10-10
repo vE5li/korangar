@@ -21,13 +21,8 @@ struct WaveVertexInput {
 
 struct WaveVertexOutput {
     float4 position: SV_Position;
-    var world_position: float3;
-    var normal: float3;
-}
-
-struct WboitOutput {
-    [[vk::location(1)]] var accumulation: float4;
-    [[vk::location(2)]] var revealage: float;
+    [[vk::location(0)]] var world_position: float3;
+    [[vk::location(1)]] var normal: float3;
 }
 
 static const var TILE_SIZE: uint = 16;
@@ -71,6 +66,7 @@ func fs_main(input: WaveVertexOutput) -> WboitOutput {
     return output;
 }
 
+[ForceInline]
 func getDistanceFromSamplingOrigin(vertexIndex: uint) -> int {
     // Vertices are pushed in order SW, SE, NW, NE (repeating pattern for the entire grid).
     let corner = vertexIndex % 4;
@@ -85,6 +81,7 @@ func getDistanceFromSamplingOrigin(vertexIndex: uint) -> int {
     }
 }
 
+[ForceInline]
 func phaseShiftAtSampledPoint(grid_u: int, grid_v: int, relative_distance_from_wave_crest: int) -> float {
     let phase_shift_at_sampling_origin = int(water_wave_uniforms.waveform_phase_shift);
     let phaseDeltaToSampledPoint = grid_u + grid_v + relative_distance_from_wave_crest;
@@ -93,10 +90,12 @@ func phaseShiftAtSampledPoint(grid_u: int, grid_v: int, relative_distance_from_w
     return radians(float(phase_shift_in_degrees));
 }
 
+[ForceInline]
 func sampleWaveHeight(phase_shift: float) -> float {
     return sin(phase_shift) * water_wave_uniforms.waveform_amplitude;
 }
 
+[ForceInline]
 func calculateWaveNormal(phase_shift: float, grid_u: int, grid_v: int) -> float3 {
     let phase_change_per_grid_unit = radians(float(int(water_wave_uniforms.waveform_frequency)));
 
@@ -113,6 +112,7 @@ func calculateWaveNormal(phase_shift: float, grid_u: int, grid_v: int) -> float3
     return normalize(normal);
 }
 
+[ForceInline]
 func calculate_wave_color(world_position: float3, normal: float3) -> float4 {
     let tile_x = world_position.x * MAP_TILE_SIZE_RCP;
     let tile_z = world_position.z * MAP_TILE_SIZE_RCP;

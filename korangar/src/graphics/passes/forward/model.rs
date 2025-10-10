@@ -8,8 +8,7 @@ use wgpu::{
     BlendComponent, BlendFactor, BlendOperation, BlendState, BufferAddress, BufferBindingType, BufferUsages, ColorTargetState, ColorWrites,
     CommandEncoder, CompareFunction, DepthBiasState, DepthStencilState, Device, Face, FragmentState, FrontFace, IndexFormat,
     MultisampleState, PipelineCompilationOptions, PipelineLayout, PipelineLayoutDescriptor, PolygonMode, PrimitiveState, Queue, RenderPass,
-    RenderPipeline, RenderPipelineDescriptor, ShaderModule, ShaderModuleDescriptor, ShaderStages, StencilState, TextureFormat, VertexState,
-    include_wgsl,
+    RenderPipeline, RenderPipelineDescriptor, ShaderModule, ShaderStages, StencilState, TextureFormat, VertexState,
 };
 
 use crate::graphics::passes::forward::ForwardRenderPassContext;
@@ -21,8 +20,6 @@ use crate::graphics::{
     BindlessSupport, Buffer, Capabilities, GlobalContext, ModelBatch, ModelVertex, Msaa, Prepare, RenderInstruction, Texture, TextureSet,
 };
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("../../../../shaders/passes/forward/model.wgsl");
-const SHADER_BINDLESS: ShaderModuleDescriptor = include_wgsl!("../../../../shaders/passes/forward/model_bindless.wgsl");
 const DRAWER_NAME: &str = "forward model";
 const INITIAL_INSTRUCTION_SIZE: usize = 256;
 
@@ -74,17 +71,17 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
         capabilities: &Capabilities,
         device: &Device,
         _queue: &Queue,
-        _shader_compiler: &ShaderCompiler,
+        shader_compiler: &ShaderCompiler,
         global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {
         let shader_module = match capabilities.bindless_support() {
-            BindlessSupport::Full | BindlessSupport::Limited => device.create_shader_module(SHADER_BINDLESS),
-            BindlessSupport::None => device.create_shader_module(SHADER),
+            BindlessSupport::Full | BindlessSupport::Limited => shader_compiler.create_shader_module("forward", "model_bindless"),
+            BindlessSupport::None => shader_compiler.create_shader_module("forward", "model"),
         };
 
         #[cfg(feature = "debug")]
-        let shader_module_wireframe = _shader_compiler.create_shader_module("forward", "model_wireframe");
+        let shader_module_wireframe = shader_compiler.create_shader_module("forward", "model_wireframe");
 
         let instance_data_buffer = Buffer::with_capacity(
             device,
@@ -530,8 +527,10 @@ impl ForwardModelDrawer {
         let alpha_to_coverage_activated = msaa.multisampling_activated() && opaque;
 
         let constants = &[
-            ("ALPHA_TO_COVERAGE_ACTIVATED", f64::from(u32::from(alpha_to_coverage_activated))),
-            ("PASS_MODE", f64::from(pass_mode as u32)),
+            // ALPHA_TO_COVERAGE_ACTIVATED
+            ("0", f64::from(u32::from(alpha_to_coverage_activated))),
+            // PASS_MODE
+            ("1", f64::from(pass_mode as u32)),
         ];
 
         device.create_render_pipeline(&RenderPipelineDescriptor {

@@ -12,15 +12,15 @@ struct EntityVertexInput {
 
 struct EntityVertexOutput {
     float4 position: SV_Position;
-    var texture_coordinates: float2;
-    var texture_index: int;
-    var identifier_high: uint;
-    var identifier_low: uint;
+    [[vk::location(0)]] var texture_coordinates: float2;
+    [[vk::location(1)]] var texture_index: int;
+    [[vk::location(2)]] var identifier_high: uint;
+    [[vk::location(3)]] var identifier_low: uint;
 }
 
 struct EntityFragmentOutput {
-    [[vk::location(0)]] var identifier: uint2;
     float depth: SV_Depth;
+    [[vk::location(0)]] var identifier: uint2;
 }
 
 [[vk::binding(0, 0)]] var global_uniforms: ConstantBuffer<GlobalUniforms>;

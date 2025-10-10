@@ -15,7 +15,7 @@ struct TileVertexOutput {
 
 [[vk::binding(0, 0)]] var global_uniforms: ConstantBuffer<GlobalUniforms>;
 
-[[vk::constant_id(0)]] const var tile_enum_value: float;
+[[vk::constant_id(0)]] const var TILE_ENUM_VALUE: float;
 
 [[shader("vertex")]]
 func vs_main(input: TileVertexInput) -> TileVertexOutput {
@@ -27,5 +27,5 @@ func vs_main(input: TileVertexInput) -> TileVertexOutput {
 
 [[shader("pixel")]]
 func fs_main(input: TileVertexOutput) -> uint2 {
-    return uint2(input.identifier, uint(tile_enum_value));
+    return uint2(input.identifier, uint(TILE_ENUM_VALUE));
 }

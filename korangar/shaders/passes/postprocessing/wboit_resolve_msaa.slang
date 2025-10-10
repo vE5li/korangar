@@ -17,6 +17,7 @@ func fs_main(input: FullscreenVertex) -> float4 {
     let pixel_coord = int2(input.position.xy);
     var color = float4(0.0);
 
+    [unroll]
     for (var index: int = 0; index < MSAA_SAMPLE_COUNT; index++) {
         let accumulation = accumulation_texture.Load(pixel_coord, index);
         let revealage = revealage_texture.Load(pixel_coord, index).r;

@@ -13,7 +13,7 @@ struct WireframeVertexInput {
 
 struct WireframeVertexOutput {
     float4 position: SV_Position;
-    var normal: float4;
+    [[vk::location(0)]] var normal: float4;
 }
 
 public struct WaveFragmentOutput {

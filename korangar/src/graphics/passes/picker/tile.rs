@@ -43,7 +43,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
         });
 
         let constants = &[
-            // tile_enum_value
+            // TILE_ENUM_VALUE
             ("0", PickerValueType::Tile as u32 as f64),
         ];
 

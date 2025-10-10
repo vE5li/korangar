@@ -13,7 +13,7 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   BINARY_NAME: korangar
-  SLANG_VERSION: v2025.17.2
+  SLANG_VERSION: v2025.18.2
 
 jobs:
   build-release:

@@ -8,7 +8,7 @@ use super::color::Color;
 #[cfg(feature = "debug")]
 use super::settings::RenderOptions;
 use super::vertices::ModelVertex;
-use super::{Buffer, ShadowQuality, Texture, TextureSet, TileVertex, WaterVertex};
+use super::{Buffer, ShadowDetail, ShadowMethod, Texture, TextureSet, TileVertex, WaterVertex};
 use crate::graphics::{CornerDiameter, ScreenClip, ScreenPosition, ScreenSize, ShadowPadding};
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
@@ -63,7 +63,10 @@ pub struct Uniforms {
     pub animation_timer_ms: f32,
     pub ambient_light_color: Color,
     pub enhanced_lighting: bool,
-    pub shadow_quality: ShadowQuality,
+    pub shadow_method: ShadowMethod,
+    pub shadow_detail: ShadowDetail,
+    pub use_sdsm: bool,
+    pub sdsm_enabled: bool,
 }
 
 impl Default for Uniforms {
@@ -75,7 +78,10 @@ impl Default for Uniforms {
             animation_timer_ms: 0.0,
             ambient_light_color: Color::default(),
             enhanced_lighting: false,
-            shadow_quality: ShadowQuality::Hard,
+            shadow_method: ShadowMethod::Hard,
+            shadow_detail: ShadowDetail::Low,
+            use_sdsm: false,
+            sdsm_enabled: false,
         }
     }
 }

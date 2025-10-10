@@ -122,12 +122,12 @@ where
             split! {
                 children: (
                     text! {
-                        text: "Shadow quality",
+                        text: "Shadow method",
                         overflow_behavior: OverflowBehavior::Shrink,
                     },
                     drop_down! {
-                        selected: self.settings_path.shadow_quality(),
-                        options: self.capabilities_path.shadow_quality_options(),
+                        selected: self.settings_path.shadow_method(),
+                        options: self.capabilities_path.shadow_method_options(),
                     }
                 )
             },
@@ -142,6 +142,23 @@ where
                         options: self.capabilities_path.shadow_detail_options(),
                     }
                 )
+            },
+            split! {
+                children: (
+                    text! {
+                        text: "Shadow resolution",
+                        overflow_behavior: OverflowBehavior::Shrink,
+                    },
+                    drop_down! {
+                        selected: self.settings_path.shadow_resolution(),
+                        options: self.capabilities_path.shadow_resolution_options(),
+                    }
+                )
+            },
+            state_button! {
+                text: "Sample Distribution Shadow Maps",
+                state: self.settings_path.sdsm(),
+                event: Toggle(self.settings_path.sdsm()),
             },
             state_button! {
                 text: "High quality interface",

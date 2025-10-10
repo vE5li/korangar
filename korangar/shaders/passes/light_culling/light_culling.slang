@@ -20,7 +20,7 @@ static const var MAX_LIGHTS_PER_TILE: uint = 256;
 
 [[vk::binding(0, 0)]] var global_uniforms: ConstantBuffer<GlobalUniforms>;
 [[vk::binding(0, 1)]] var lights: StructuredBuffer<PointLight>;
-[[vk::binding(1, 1)]] var light_count_texture: WTexture2D<uint>;
+[[vk::binding(1, 1)]] [[vk::image_format("r32ui")]] var light_count_texture: WTexture2D<uint>;
 [[vk::binding(2, 1)]] var tile_light_indices: RWStructuredBuffer<TileLightIndices>;
 
 [[shader("compute")]]
@@ -103,6 +103,7 @@ func main(uint3 global_id : SV_DispatchThreadID) {
 ///
 /// Based on an original idea from Jonathan W. Hale's bachelor thesis
 /// "Dual-Cone View Culling for Virtual Reality Applications" (2018).
+[ForceInline]
 func intersect_cone_sphere_aligned(
     sphere_center: float3,
     sphere_radius: float,
@@ -114,6 +115,7 @@ func intersect_cone_sphere_aligned(
     return extends_past_cone_tip && intersects_cone;
 }
 
+[ForceInline]
 func calculate_tile_vectors(tile_x: uint, tile_y: uint) -> float4x4 {
     let forward_size = float2(global_uniforms.forward_size);
 
@@ -172,6 +174,7 @@ func calculate_tile_vectors(tile_x: uint, tile_y: uint) -> float4x4 {
 ///
 /// The resulting 3x3 matrix transforms from the standard basis to this new basis,
 /// effectively rotating any vector into the cone's coordinate system.
+[ForceInline]
 func create_cone_rotation_matrix(cone_axis: float3) -> float3x3 {
     let forward_axis = normalize(cone_axis);
     let reference_vector = abs(forward_axis.x) > 0.9 ? float3(0.0, 1.0, 0.0) : float3(1.0, 0.0, 0.0);

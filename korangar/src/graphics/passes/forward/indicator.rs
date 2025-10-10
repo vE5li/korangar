@@ -2,8 +2,8 @@ use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType,
     BlendComponent, BlendFactor, BlendOperation, BlendState, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState,
     DepthStencilState, Device, Face, FragmentState, FrontFace, MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor,
-    PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderStages, StencilState,
-    TextureSampleType, TextureViewDimension, VertexState, include_wgsl,
+    PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderStages, StencilState, TextureSampleType,
+    TextureViewDimension, VertexState,
 };
 
 use crate::graphics::passes::{
@@ -12,7 +12,6 @@ use crate::graphics::passes::{
 use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::graphics::{Capabilities, GlobalContext, IndicatorInstruction};
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("../../../../shaders/passes/forward/indicator.wgsl");
 const DRAWER_NAME: &str = "forward indicator";
 
 pub(crate) struct ForwardIndicatorDrawer {
@@ -28,11 +27,11 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
         _capabilities: &Capabilities,
         device: &Device,
         _queue: &Queue,
-        _shader_compiler: &ShaderCompiler,
+        shader_compiler: &ShaderCompiler,
         global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {
-        let shader_module = device.create_shader_module(SHADER);
+        let shader_module = shader_compiler.create_shader_module("forward", "indicator");
 
         let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: Some(DRAWER_NAME),

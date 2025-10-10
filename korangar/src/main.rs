@@ -2577,29 +2577,32 @@ impl Client {
             let update_shadow_camera_measurement = Profiler::start_measurement("update directional shadow camera");
 
             let lighting_mode = *self.client_state.follow(client_state().graphics_settings().lighting_mode());
+            let shadow_resolution = *self.client_state.follow(client_state().graphics_settings().shadow_resolution());
+            let shadow_method = *self.client_state.follow(client_state().graphics_settings().shadow_method());
             let shadow_detail = *self.client_state.follow(client_state().graphics_settings().shadow_detail());
-            let shadow_quality = *self.client_state.follow(client_state().graphics_settings().shadow_quality());
+            let sdsm_enabled = *self.client_state.follow(client_state().graphics_settings().sdsm());
+            let use_sdsm = sdsm_enabled & !self.player_camera.is_rotating_or_zooming_fast();
 
             let ambient_light_color = map.ambient_light_color();
 
             let (directional_light_direction, directional_light_color) = map.directional_light();
 
-            match self.player_camera.is_rotating_or_zooming_fast() {
+            match use_sdsm {
                 true => {
-                    self.directional_shadow_camera.update_camera_pssm(
-                        directional_light_direction,
-                        &view_matrix,
-                        &projection_matrix,
-                        shadow_detail.directional_shadow_resolution(),
-                    );
-                }
-                false => {
                     self.directional_shadow_camera.update_camera_sdsm(
                         directional_light_direction,
                         &view_matrix,
                         &projection_matrix,
-                        shadow_detail.directional_shadow_resolution(),
+                        shadow_resolution.directional_shadow_resolution(),
                         self.directional_shadow_partitions.lock().unwrap().deref(),
+                    );
+                }
+                false => {
+                    self.directional_shadow_camera.update_camera_pssm(
+                        directional_light_direction,
+                        &view_matrix,
+                        &projection_matrix,
+                        shadow_resolution.directional_shadow_resolution(),
                     );
                 }
             }
@@ -3160,7 +3163,10 @@ impl Client {
                     animation_timer_ms,
                     ambient_light_color,
                     enhanced_lighting: lighting_mode == LightingMode::Enhanced,
-                    shadow_quality,
+                    shadow_method,
+                    shadow_detail,
+                    use_sdsm,
+                    sdsm_enabled,
                 },
                 indicator: indicator_instruction,
                 interface: interface_instructions.as_slice(),
@@ -3258,9 +3264,9 @@ impl Client {
             self.active_graphics_settings.screen_space_anti_aliasing = graphics_settings.screen_space_anti_aliasing;
         }
 
-        if self.active_graphics_settings.shadow_detail != graphics_settings.shadow_detail {
-            self.graphics_engine.set_shadow_detail(graphics_settings.shadow_detail);
-            self.active_graphics_settings.shadow_detail = graphics_settings.shadow_detail;
+        if self.active_graphics_settings.shadow_resolution != graphics_settings.shadow_resolution {
+            self.graphics_engine.set_shadow_resolution(graphics_settings.shadow_resolution);
+            self.active_graphics_settings.shadow_resolution = graphics_settings.shadow_resolution;
         }
 
         if self.active_graphics_settings.high_quality_interface != graphics_settings.high_quality_interface {
@@ -3352,7 +3358,7 @@ impl ApplicationHandler for Client {
                 graphics_settings.triple_buffering,
                 graphics_settings.vsync,
                 graphics_settings.limit_framerate,
-                graphics_settings.shadow_detail,
+                graphics_settings.shadow_resolution,
                 graphics_settings.texture_filtering,
                 graphics_settings.msaa,
                 graphics_settings.ssaa,

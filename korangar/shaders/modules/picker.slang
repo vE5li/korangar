@@ -30,6 +30,7 @@ public struct EntityVertex {
 //
 // (x,y,z) are the vertex position
 // (u,v) are the UV coordinates
+[ForceInline]
 public func entity_vertex_data(vertex_index: uint) -> EntityVertex {
     let index = 1u << vertex_index;
 

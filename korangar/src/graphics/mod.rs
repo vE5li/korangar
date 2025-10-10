@@ -94,8 +94,174 @@ pub(crate) struct GlobalUniforms {
     animation_timer: f32,
     point_light_count: u32,
     enhanced_lighting: u32,
-    shadow_quality: u32,
-    padding: [u32; 2],
+    shadow_method: u32,
+    shadow_detail: u32,
+    use_sdsm: u32,
+}
+
+#[derive(Copy, Clone, Pod, Zeroable)]
+#[repr(C)]
+pub(crate) struct KernelUniforms {
+    // Packed as vec4 for std140 layout: vec4(point1.xy, point2.xy)
+    sample_points_8: [[f32; 4]; 4],
+    sample_points_16: [[f32; 4]; 8],
+    sample_points_32: [[f32; 4]; 16],
+    sample_points_64: [[f32; 4]; 32],
+}
+
+impl KernelUniforms {
+    const fn pack_vec2_to_vec4<const INPUT_LEN: usize, const OUTPUT_LEN: usize>(points: &[[f32; 2]; INPUT_LEN]) -> [[f32; 4]; OUTPUT_LEN] {
+        let mut packed = [[0.0f32; 4]; OUTPUT_LEN];
+
+        let mut i = 0;
+        while i < OUTPUT_LEN {
+            packed[i] = [points[i * 2][0], points[i * 2][1], points[i * 2 + 1][0], points[i * 2 + 1][1]];
+            i += 1;
+        }
+
+        packed
+    }
+
+    const fn initialize() -> Self {
+        let points_8 = [
+            [0.125, -0.375],
+            [-0.125, 0.375],
+            [0.625, 0.125],
+            [-0.375, -0.625],
+            [-0.625, 0.625],
+            [-0.875, -0.125],
+            [0.375, 0.875],
+            [0.875, -0.875],
+        ];
+
+        let points_16 = [
+            [-0.875, -0.875],
+            [-0.750, -0.125],
+            [-0.625, 0.625],
+            [-0.500, -0.375],
+            [-0.375, 0.875],
+            [-0.250, 0.125],
+            [-0.125, -0.625],
+            [0.000, 0.375],
+            [0.125, -0.750],
+            [0.250, 0.500],
+            [0.375, -0.250],
+            [0.500, 0.750],
+            [0.625, 0.000],
+            [0.750, -0.500],
+            [0.875, 0.250],
+            [1.000, -1.000],
+        ];
+
+        let points_32 = [
+            [0.06407013, 0.05409927],
+            [0.7366577, 0.5789394],
+            [-0.6270542, -0.5320278],
+            [-0.4096107, 0.8411095],
+            [0.6849564, -0.4990818],
+            [-0.874181, -0.04579735],
+            [0.9989998, 0.0009880066],
+            [-0.004920578, -0.9151649],
+            [0.1805763, 0.9747483],
+            [-0.2138451, 0.2635818],
+            [0.109845, 0.3884785],
+            [0.06876755, -0.3581074],
+            [0.374073, -0.7661266],
+            [0.3079132, -0.1216763],
+            [-0.3794335, -0.8271583],
+            [-0.203878, -0.07715034],
+            [0.5912697, 0.1469799],
+            [-0.88069, 0.3031784],
+            [0.5040108, 0.8283722],
+            [-0.5844124, 0.5494877],
+            [0.6017799, -0.1726654],
+            [-0.5554981, 0.1559997],
+            [-0.3016369, -0.3900928],
+            [-0.5550632, -0.1723762],
+            [0.925029, 0.2995041],
+            [-0.2473137, 0.5538505],
+            [0.9183037, -0.2862392],
+            [0.2469421, 0.6718712],
+            [0.3916397, -0.4328209],
+            [-0.03576927, -0.6220032],
+            [-0.04661255, 0.7995201],
+            [0.4402924, 0.3640312],
+        ];
+
+        let points_64 = [
+            [-0.5119625, -0.4827938],
+            [-0.2171264, -0.4768726],
+            [-0.7552931, -0.2426507],
+            [-0.7136765, -0.4496614],
+            [-0.5938849, -0.6895654],
+            [-0.3148003, -0.7047654],
+            [-0.42215, -0.2024607],
+            [-0.9466816, -0.2014508],
+            [-0.8409063, -0.03465778],
+            [-0.6517572, -0.07476326],
+            [-0.1041822, -0.02521214],
+            [-0.3042712, -0.02195431],
+            [-0.5082307, 0.1079806],
+            [-0.08429877, -0.2316298],
+            [-0.9879128, 0.1113683],
+            [-0.3859636, 0.3363545],
+            [-0.1925334, 0.1787288],
+            [0.003256182, 0.138135],
+            [-0.8706837, 0.3010679],
+            [-0.6982038, 0.1904326],
+            [0.1975043, 0.2221317],
+            [0.1507788, 0.4204168],
+            [0.3514056, 0.09865579],
+            [0.1558783, -0.08460935],
+            [-0.0684978, 0.4461993],
+            [0.3780522, 0.3478679],
+            [0.3956799, -0.1469177],
+            [0.5838975, 0.1054943],
+            [0.6155105, 0.3245716],
+            [0.3928624, -0.4417621],
+            [0.1749884, -0.4202175],
+            [0.6813727, -0.2424808],
+            [-0.6707711, 0.4912741],
+            [0.0005130528, -0.8058334],
+            [0.02703013, -0.6010728],
+            [-0.1658188, -0.9695674],
+            [0.4060591, -0.7100726],
+            [0.7713396, -0.4713659],
+            [0.573212, -0.51544],
+            [-0.3448896, -0.9046497],
+            [0.1268544, -0.9874692],
+            [0.7418533, -0.6667366],
+            [0.3492522, 0.5924662],
+            [0.5679897, 0.5343465],
+            [0.5663417, 0.7708698],
+            [0.7375497, 0.6691415],
+            [0.2271994, -0.6163502],
+            [0.2312844, 0.8725659],
+            [0.4216993, 0.9002838],
+            [0.4262091, -0.9013284],
+            [0.2001408, -0.808381],
+            [0.149394, 0.6650763],
+            [-0.09640376, 0.9843736],
+            [0.7682328, -0.07273844],
+            [0.04146584, 0.8313184],
+            [0.9705266, -0.1143304],
+            [0.9670017, 0.1293385],
+            [0.9015037, -0.3306949],
+            [-0.5085648, 0.7534177],
+            [0.9055501, 0.3758393],
+            [0.7599946, 0.1809109],
+            [-0.2483695, 0.7942952],
+            [-0.4241052, 0.5581087],
+            [-0.1020106, 0.6724468],
+        ];
+
+        Self {
+            sample_points_8: Self::pack_vec2_to_vec4(&points_8),
+            sample_points_16: Self::pack_vec2_to_vec4(&points_16),
+            sample_points_32: Self::pack_vec2_to_vec4(&points_32),
+            sample_points_64: Self::pack_vec2_to_vec4(&points_64),
+        }
+    }
 }
 
 #[derive(Copy, Clone, Default, Pod, Zeroable)]
@@ -211,6 +377,7 @@ pub(crate) struct GlobalContext {
     pub(crate) point_shadow_map_textures: CubeArrayTexture,
     pub(crate) tile_light_count_texture: StorageTexture,
     pub(crate) global_uniforms_buffer: Buffer<GlobalUniforms>,
+    pub(crate) kernel_uniforms_buffer: Buffer<KernelUniforms>,
     pub(crate) directional_light_uniforms_buffer: Buffer<DirectionalLightUniforms>,
     pub(crate) directional_light_partitions_buffer: Buffer<DirectionalLightPartition>,
     pub(crate) point_light_data_buffer: Buffer<PointLightData>,
@@ -305,8 +472,9 @@ impl Prepare for GlobalContext {
             animation_timer: instructions.uniforms.animation_timer_ms / 1000.0,
             point_light_count: (instructions.point_light_with_shadows.len() + instructions.point_light.len()) as u32,
             enhanced_lighting: instructions.uniforms.enhanced_lighting as u32,
-            shadow_quality: instructions.uniforms.shadow_quality.into(),
-            padding: Default::default(),
+            shadow_method: instructions.uniforms.shadow_method.into(),
+            shadow_detail: instructions.uniforms.shadow_detail.into(),
+            use_sdsm: instructions.uniforms.use_sdsm as u32,
         };
 
         self.directional_light_uniforms = DirectionalLightUniforms {
@@ -418,6 +586,7 @@ impl Prepare for GlobalContext {
                 &self.directional_shadow_map_texture,
                 &self.point_shadow_map_textures,
                 &self.directional_light_partitions_buffer,
+                &self.kernel_uniforms_buffer,
             );
 
             self.sdsm_bind_group = Self::create_sdsm_bind_group(
@@ -459,14 +628,14 @@ impl GlobalContext {
         ssaa: Ssaa,
         screen_space_anti_aliasing: ScreenSpaceAntiAliasing,
         screen_size: ScreenSize,
-        shadow_detail: ShadowDetail,
+        shadow_resolution: ShadowResolution,
         texture_sampler: TextureSamplerType,
         high_quality_interface: bool,
     ) -> Self {
         let forward_size = ssaa.calculate_size(screen_size);
         let interface_size = if high_quality_interface { screen_size * 2.0 } else { screen_size };
-        let directional_shadow_size = ScreenSize::uniform(shadow_detail.directional_shadow_resolution() as f32);
-        let point_shadow_size = ScreenSize::uniform(shadow_detail.point_shadow_resolution() as f32);
+        let directional_shadow_size = ScreenSize::uniform(shadow_resolution.directional_shadow_resolution() as f32);
+        let point_shadow_size = ScreenSize::uniform(shadow_resolution.point_shadow_resolution() as f32);
 
         let solid_pixel_texture = Arc::new(Texture::new_with_data(
             device,
@@ -506,6 +675,15 @@ impl GlobalContext {
             BufferUsages::COPY_DST | BufferUsages::UNIFORM,
             size_of::<GlobalUniforms>() as _,
         );
+
+        let kernel_uniforms_buffer = Buffer::with_capacity(
+            device,
+            "kernel uniforms",
+            BufferUsages::COPY_DST | BufferUsages::UNIFORM,
+            size_of::<KernelUniforms>() as _,
+        );
+        // The data is static and only needs to be uploaded once.
+        kernel_uniforms_buffer.write_exact(queue, &[KernelUniforms::initialize()]);
 
         let directional_light_uniforms_buffer = Buffer::with_capacity(
             device,
@@ -598,6 +776,7 @@ impl GlobalContext {
             &directional_shadow_map_texture,
             &point_shadow_map_textures,
             &directional_light_partitions_buffer,
+            &kernel_uniforms_buffer,
         );
 
         let sdsm_bind_group = Self::create_sdsm_bind_group(
@@ -644,6 +823,7 @@ impl GlobalContext {
             point_shadow_map_textures,
             tile_light_count_texture: forward_textures.tile_light_count_texture,
             global_uniforms_buffer,
+            kernel_uniforms_buffer,
             forward_bind_group,
             sdsm_bind_group,
             #[cfg(feature = "debug")]
@@ -895,6 +1075,7 @@ impl GlobalContext {
             &self.directional_shadow_map_texture,
             &self.point_shadow_map_textures,
             &self.directional_light_partitions_buffer,
+            &self.kernel_uniforms_buffer,
         );
 
         self.sdsm_bind_group = Self::create_sdsm_bind_group(
@@ -923,9 +1104,9 @@ impl GlobalContext {
         }
     }
 
-    fn update_shadow_size_textures(&mut self, device: &Device, shadow_detail: ShadowDetail) {
-        self.directional_shadow_size = ScreenSize::uniform(shadow_detail.directional_shadow_resolution() as f32);
-        self.point_shadow_size = ScreenSize::uniform(shadow_detail.point_shadow_resolution() as f32);
+    fn update_shadow_size_textures(&mut self, device: &Device, shadow_resolution: ShadowResolution) {
+        self.directional_shadow_size = ScreenSize::uniform(shadow_resolution.directional_shadow_resolution() as f32);
+        self.point_shadow_size = ScreenSize::uniform(shadow_resolution.point_shadow_resolution() as f32);
 
         self.directional_shadow_map_texture = Self::create_directional_shadow_textures(device, self.directional_shadow_size);
         self.point_shadow_map_textures = Self::create_point_shadow_textures(device, self.point_shadow_size);
@@ -941,6 +1122,7 @@ impl GlobalContext {
             &self.directional_shadow_map_texture,
             &self.point_shadow_map_textures,
             &self.directional_light_partitions_buffer,
+            &self.kernel_uniforms_buffer,
         );
 
         #[cfg(feature = "debug")]
@@ -1199,6 +1381,16 @@ impl GlobalContext {
                         },
                         count: None,
                     },
+                    BindGroupLayoutEntry {
+                        binding: 7,
+                        visibility: ShaderStages::FRAGMENT,
+                        ty: BindingType::Buffer {
+                            ty: BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: NonZeroU64::new(size_of::<KernelUniforms>() as _),
+                        },
+                        count: None,
+                    },
                 ],
             })
         })
@@ -1232,16 +1424,7 @@ impl GlobalContext {
                         binding: 1,
                         visibility: ShaderStages::COMPUTE,
                         ty: BindingType::Texture {
-                            // Even though we sample a depth texture and in WGSL we would need to define
-                            // this binding as a depth sample type, since we ingest SPIR-V with slang,
-                            // the image is not marked as a depth texture. The workaround is, that
-                            // for shaders that don't use a compare sampler on the depth texture use
-                            // a float sample type. It's currently not clear it Slang/HLSL or WGPU
-                            // need to fix this.
-                            //
-                            // Tracking issue WGPU: https://github.com/gfx-rs/wgpu/issues/7332
-                            // Tracking issue Slang: https://github.com/shader-slang/slang/issues/8503
-                            sample_type: TextureSampleType::Float { filterable: false },
+                            sample_type: TextureSampleType::Depth,
                             view_dimension: TextureViewDimension::D2,
                             multisampled: msaa.multisampling_activated(),
                         },
@@ -1443,6 +1626,7 @@ impl GlobalContext {
         directional_shadow_map_texture: &AttachmentTexture,
         point_shadow_maps_texture: &CubeArrayTexture,
         directional_light_partition: &Buffer<DirectionalLightPartition>,
+        kernel_uniforms_buffer: &Buffer<KernelUniforms>,
     ) -> BindGroup {
         device.create_bind_group(&BindGroupDescriptor {
             label: Some("forward"),
@@ -1475,6 +1659,10 @@ impl GlobalContext {
                 BindGroupEntry {
                     binding: 6,
                     resource: directional_light_partition.as_entire_binding(),
+                },
+                BindGroupEntry {
+                    binding: 7,
+                    resource: kernel_uniforms_buffer.as_entire_binding(),
                 },
             ],
         })

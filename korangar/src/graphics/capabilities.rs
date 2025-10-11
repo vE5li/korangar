@@ -54,7 +54,7 @@ impl Capabilities {
             texture_compression: false,
             #[cfg(feature = "debug")]
             polygon_mode_line: false,
-            required_features: Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES,
+            required_features: Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES | Features::TEXTURE_FORMAT_16BIT_NORM,
             required_limits,
         };
 
@@ -77,8 +77,10 @@ impl Capabilities {
                 adapter_features,
                 Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING,
             );
+            Self::check_feature(adapter_features, Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES);
             Self::check_feature(adapter_features, Features::TEXTURE_COMPRESSION_BC);
             Self::check_feature(adapter_features, Features::TEXTURE_BINDING_ARRAY);
+            Self::check_feature(adapter_features, Features::TEXTURE_FORMAT_16BIT_NORM);
             Self::check_feature(adapter_features, Features::POLYGON_MODE_LINE);
         }
 

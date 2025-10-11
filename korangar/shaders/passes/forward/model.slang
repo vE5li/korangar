@@ -38,6 +38,7 @@ struct ModelVertexOutput {
 [[vk::binding(5, 1)]] var point_shadow_maps: DepthTextureCubeArray;
 [[vk::binding(6, 1)]] var directional_light_partitions: StructuredBuffer<DirectionalLightPartition>;
 [[vk::binding(7, 1)]] var kernel_uniforms: ConstantBuffer<KernelUniforms>;
+[[vk::binding(8, 1)]] var shadow_translucence: Texture2DArray;
 [[vk::binding(0, 2)]] var instance_data: StructuredBuffer<ModelInstanceData>;
 [[vk::binding(0, 3)]] var texture: Texture2D;
 
@@ -151,7 +152,7 @@ func fragment(input: ModelVertexOutput) -> float4 {
             max(shadow_coords.z, 0.0) + depth_bias
         );
 
-        var visibility: float = 0.0;
+        var visibility: float = 1.0;
 
         switch (global_uniforms.shadow_method) {
             case 0: {
@@ -175,6 +176,9 @@ func fragment(input: ModelVertexOutput) -> float4 {
             }
         }
 
+        let translucence = shadow_translucence.SampleLevel(linear_sampler, float3(shadow_coords.xy, partition_index), 0.0).r;
+        visibility *= translucence;
+
         let directional_light_contribution = directional_light.color.rgb * light_percent * visibility;
 
         var point_light_contribution = float3(0.0);
@@ -186,21 +190,20 @@ func fragment(input: ModelVertexOutput) -> float4 {
             let light_distance = length(light.position.xyz - input.world_position.xyz);
             var visibility = 1.0;
 
-            // if (light.texture_index != 0) {
-            //     let bias = 1.2;
-            //     let distance_to_light = depth::linearToNonLinear(light_distance - bias);
+            if (light.texture_index != 0) {
+                let bias = 1.2;
+                let distance_to_light = depth::linearToNonLinear(light_distance - bias);
+                let closest_distance = point_shadow_maps.Sample(
+                    linear_sampler,
+                    float4(light_direction, light.texture_index - 1)
+                );
 
-            //     let closest_distance = point_shadow_maps.Sample(
-            //         linear_sampler,
-            //         float4(light_direction, light.texture_index - 1)
-            //     );
+                visibility = float(distance_to_light > closest_distance);
+            }
 
-            //     visibility = float(distance_to_light > closest_distance);
-            // }
-
-            // let intensity = 10.0;
-            // let attenuation = calculate_attenuation(light_distance, light.range);
-            // point_light_contribution += (light.color.rgb * intensity) * light_percent * attenuation * visibility;
+            let intensity = 10.0;
+            let attenuation = calculate_attenuation(light_distance, light.range);
+            point_light_contribution += (light.color.rgb * intensity) * light_percent * attenuation * visibility;
         }
 
         let base_color = diffuse_color.rgb * input.color;

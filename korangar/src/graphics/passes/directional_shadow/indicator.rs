@@ -1,8 +1,8 @@
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType,
-    CompareFunction, DepthBiasState, DepthStencilState, Device, FragmentState, MultisampleState, PipelineCompilationOptions,
-    PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderStages, StencilState,
-    TextureSampleType, TextureViewDimension, VertexState,
+    ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Device, FragmentState, MultisampleState,
+    PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor,
+    ShaderStages, StencilState, TextureSampleType, TextureViewDimension, VertexState,
 };
 
 use crate::graphics::passes::{
@@ -18,7 +18,7 @@ pub(crate) struct DirectionalShadowIndicatorDrawer {
     pipeline: RenderPipeline,
 }
 
-impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAttachmentCount::One }> for DirectionalShadowIndicatorDrawer {
+impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttachmentCount::One }> for DirectionalShadowIndicatorDrawer {
     type Context = DirectionalShadowRenderPassContext;
     type DrawData<'data> = Option<&'data IndicatorInstruction>;
 
@@ -78,7 +78,11 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
                 module: &shader_module,
                 entry_point: Some("fs_main"),
                 compilation_options: PipelineCompilationOptions::default(),
-                targets: &[],
+                targets: &[Some(ColorTargetState {
+                    format: render_pass_context.color_attachment_formats()[0],
+                    blend: None,
+                    write_mask: ColorWrites::empty(),
+                })],
             }),
             multiview: None,
             primitive: PrimitiveState::default(),

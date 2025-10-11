@@ -459,7 +459,7 @@ impl AttachmentTexture {
                 array_texture_views.push(texture.create_view(&TextureViewDescriptor {
                     label: descriptor.label,
                     format: None,
-                    dimension: None,
+                    dimension: Some(TextureViewDimension::D2),
                     usage: None,
                     aspect: TextureAspect::default(),
                     base_mip_level: 0,

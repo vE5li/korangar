@@ -13,6 +13,10 @@ struct IndicatorVertexOutput {
     [[vk::location(0)]] var texture_coordinates: float2;
 };
 
+struct IndicatorFragmentOutput {
+    [[vk::location(0)]] var translucence: float;
+};
+
 [[vk::binding(0, 0)]] var global_uniforms: ConstantBuffer<GlobalUniforms>;
 [[vk::binding(2, 0)]] var linear_sampler: SamplerState;
 [[vk::binding(0, 1)]] var pass_uniforms: ConstantBuffer<PassUniforms>;
@@ -27,14 +31,16 @@ func vs_main(input: IndicatorVertexInput) -> IndicatorVertexOutput {
 }
 
 [[shader("pixel")]]
-func fs_main(input: IndicatorVertexOutput) -> float4 {
+func fs_main(input: IndicatorVertexOutput) -> IndicatorFragmentOutput {
     let fragment_color = texture.SampleLevel(linear_sampler, input.texture_coordinates, 0.0);
 
-    if (fragment_color.a < 0.1) {
+    if (fragment_color.a == 0.0) {
         discard;
     }
 
-    return fragment_color;
+    var output: IndicatorFragmentOutput;
+    output.translucence = 1.0;
+    return output;
 }
 
 [ForceInline]

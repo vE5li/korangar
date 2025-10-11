@@ -36,6 +36,7 @@ public struct EntityVertexInput {
 };
 
 public struct EntityFragmentOutput {
+    [[vk::location(0)]] public var translucence: float;
     public float depth : SV_Depth;
 };
 
@@ -73,4 +74,30 @@ public func entity_vertex_data(vertex_index: uint) -> EntityVertex {
     vertex.position = float3(x, y, z);
     vertex.texture_coordinates = float2(u, v);
     return vertex;
+}
+
+[ForceInline]
+public func calculate_adjusted_clip_position(
+    world_position: float4,
+    depth_offset: float,
+    curvature: float,
+    original_depth_offset: float,
+    original_curvature: float,
+    pass_uniforms: PassUniforms
+) -> float4 {
+    // Adjust the sprite as if it was standing upright.
+    let depth_offset_adjusted = depth_offset * original_depth_offset;
+    let curvature_offset = (0.5 - pow(curvature, 2.0)) * original_curvature;
+    let view_position = mul(pass_uniforms.view, world_position);
+    let adjusted_view_position = view_position - float4(0.0, 0.0, depth_offset_adjusted + curvature_offset, 0.0);
+    let adjusted_world_position = mul(pass_uniforms.inverse_view, adjusted_view_position);
+    return mul(pass_uniforms.view_projection, adjusted_world_position);
+}
+
+[ForceInline]
+public func create_shadow_output(combined_alpha: float, clip_position: float4) -> EntityFragmentOutput {
+    var output: EntityFragmentOutput;
+    output.translucence = 1.0 - combined_alpha;
+    output.depth = saturate(clip_position.z / clip_position.w);
+    return output;
 }

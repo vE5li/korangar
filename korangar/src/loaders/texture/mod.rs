@@ -63,12 +63,13 @@ impl TextureLoader {
     ) -> Self {
         let lanczos3_drawer = Lanczos3Drawer::new(&device, shader_compiler);
         let block_compressor = Mutex::new(GpuBlockCompressor::new(device.clone(), queue.clone()));
+        let mip_map_render_context = MipMapRenderPassContext::new(&device, &queue);
 
         Self {
             device,
             queue,
             game_file_loader,
-            mip_map_render_context: MipMapRenderPassContext::default(),
+            mip_map_render_context,
             lanczos3_drawer,
             block_compressor,
             cache: Mutex::new(SimpleCache::new(

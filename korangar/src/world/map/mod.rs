@@ -19,7 +19,7 @@ use ragnarok_formats::map::MapData;
 use ragnarok_formats::map::{LightSource, SoundSource, Tile, TileFlags};
 #[cfg(feature = "debug")]
 use ragnarok_formats::transform::Transform;
-use ragnarok_packets::TilePosition;
+use ragnarok_packets::{ClientTick, TilePosition};
 use rust_state::RustState;
 use wgpu::Queue;
 
@@ -401,16 +401,30 @@ impl Map {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn render_entities(&self, instructions: &mut Vec<EntityInstruction>, entities: &[Entity], camera: &dyn Camera) {
+    pub fn render_entities(
+        &self,
+        instructions: &mut Vec<EntityInstruction>,
+        entities: &[Entity],
+        camera: &dyn Camera,
+        client_tick: ClientTick,
+    ) {
         entities
             .iter()
             .enumerate()
-            .for_each(|(index, entity)| entity.render(instructions, camera, index != 0));
+            .for_each(|(index, entity)| entity.render(instructions, camera, index != 0, client_tick));
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn render_dead_entities(&self, instructions: &mut Vec<EntityInstruction>, entities: &[Entity], camera: &dyn Camera) {
-        entities.iter().for_each(|entity| entity.render(instructions, camera, false));
+    pub fn render_dead_entities(
+        &self,
+        instructions: &mut Vec<EntityInstruction>,
+        entities: &[Entity],
+        camera: &dyn Camera,
+        client_tick: ClientTick,
+    ) {
+        entities
+            .iter()
+            .for_each(|entity| entity.render(instructions, camera, false, client_tick));
     }
 
     #[cfg(feature = "debug")]

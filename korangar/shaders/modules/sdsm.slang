@@ -52,6 +52,7 @@ public struct DirectionalLightUniforms {
 
 // PSSM partitioning scheme: Blend between logarithmic and uniform distribution
 // GPU Gems 3: Parallel-Split Shadow Maps on Programmable GPUs (2008)
+[ForceInline]
 public func pssm_partition_from_range(partition_index: uint, min_z: float, max_z: float) -> float {
     static const var BLEND_FACTOR: float = 0.5;
     let ratio = max_z / min_z;
@@ -62,12 +63,14 @@ public func pssm_partition_from_range(partition_index: uint, min_z: float, max_z
 }
 
 // Transform world position to light space.
+[ForceInline]
 public func transform_to_light_space(world_pos: float3, light_view_projection: float4x4) -> float3 {
     let light_clip = mul(light_view_projection, float4(world_pos, 1.0));
     return light_clip.xyz;
 }
 
 // Reconstruct world position from depth buffer.
+[ForceInline]
 public func reconstruct_position_from_depth(coords: uint2, depth: float, depth_dim: uint2, global_uniforms: GlobalUniforms) -> float3 {
     // Convert screen coordinates to NDC.
     let uv = float2(coords) / float2(depth_dim);
@@ -85,6 +88,7 @@ public func reconstruct_position_from_depth(coords: uint2, depth: float, depth_d
 }
 
 // Read bounds as float from atomic bounds.
+[ForceInline]
 public func read_bounds_as_float(partition_index: uint, bounds_data: RWStructuredBuffer<Bounds>) -> BoundsFloat {
     let min_coord_offset = float3(
         asfloat(bounds_data[partition_index].min_coord_x.load(MemoryOrder::Relaxed)),
@@ -106,6 +110,7 @@ public func read_bounds_as_float(partition_index: uint, bounds_data: RWStructure
 }
 
 // Create empty bounds for initialization.
+[ForceInline]
 public func empty_bounds_float() -> BoundsFloat {
     return BoundsFloat(
         float3(1e30, 1e30, 1e30), // Very large value instead of f32::MAX

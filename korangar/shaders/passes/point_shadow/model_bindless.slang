@@ -13,9 +13,9 @@ struct ModelVertexInput {
 
 struct ModelVertexOutput {
     float4 position: SV_Position;
-    var world_position: float4;
-    var texture_coordinates: float2;
-    var texture_index: int;
+    [[vk::location(0)]] var world_position: float4;
+    [[vk::location(1)]] var texture_coordinates: float2;
+    [[vk::location(2)]] var texture_index: int;
 };
 
 [[vk::binding(1, 0)]] var nearest_sampler: SamplerState;

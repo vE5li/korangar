@@ -20,8 +20,8 @@ use winit::window::Window;
 use super::BindlessSupport;
 use super::{
     AntiAliasingResources, Capabilities, DirectionalShadowPartition, FramePacer, FrameStage, GlobalContext, LimitFramerate, Msaa,
-    PARTITION_COUNT, Partition, Prepare, PresentModeInfo, RENDER_TO_TEXTURE_FORMAT, ScreenSpaceAntiAliasing, ShadowDetail, Ssaa, Surface,
-    TextureSamplerType,
+    PARTITION_COUNT, Partition, Prepare, PresentModeInfo, RENDER_TO_TEXTURE_FORMAT, ScreenSpaceAntiAliasing, ShadowResolution, Ssaa,
+    Surface, TextureSamplerType,
 };
 use crate::graphics::ScreenSize;
 use crate::graphics::instruction::RenderInstruction;
@@ -178,7 +178,7 @@ impl GraphicsEngine {
         triple_buffering: bool,
         vsync: bool,
         limit_framerate: LimitFramerate,
-        shadow_detail: ShadowDetail,
+        shadow_resolution: ShadowResolution,
         texture_sampler_type: TextureSamplerType,
         msaa: Msaa,
         ssaa: Ssaa,
@@ -221,7 +221,7 @@ impl GraphicsEngine {
                             ssaa,
                             screen_space_anti_aliasing,
                             screen_size,
-                            shadow_detail,
+                            shadow_resolution,
                             texture_sampler_type,
                             high_quality_interface,
                         );
@@ -722,11 +722,11 @@ impl GraphicsEngine {
         }
     }
 
-    pub fn set_shadow_detail(&mut self, shadow_detail: ShadowDetail) {
+    pub fn set_shadow_resolution(&mut self, shadow_resolution: ShadowResolution) {
         if let Some(engine_context) = self.engine_context.as_mut() {
             engine_context
                 .global_context
-                .update_shadow_size_textures(&self.device, shadow_detail);
+                .update_shadow_size_textures(&self.device, shadow_resolution);
         }
     }
 
@@ -868,6 +868,21 @@ impl GraphicsEngine {
     fn sort_instructions(&mut self, instructions: &mut RenderInstruction) {
         // Front to back for entities.
         instructions.entities.sort_unstable_by(|a, b| a.distance.total_cmp(&b.distance));
+
+        // Shadow rendering of entities is done in two ways for opaque and transparent
+        // entities. This is way we render opaque first then transparent.
+        for batch in instructions.directional_shadow_entities.iter_mut() {
+            batch.sort_unstable_by(|a, b| {
+                let a_opaque = a.color.alpha == 1.0;
+                let b_opaque = b.color.alpha == 1.0;
+
+                match (a_opaque, b_opaque) {
+                    (true, true) | (false, false) => std::cmp::Ordering::Equal,
+                    (true, false) => std::cmp::Ordering::Less,
+                    (false, true) => std::cmp::Ordering::Greater,
+                }
+            })
+        }
 
         for batch in instructions.model_batches {
             let start = batch.offset;
@@ -1119,6 +1134,7 @@ impl GraphicsEngine {
                         partition_index,
                     );
 
+                    // Opaque pass
                     if let Some(batches) = instruction.directional_shadow_model_batches.get(partition_index) {
                         let draw_data = ModelBatchDrawData {
                             batches,
@@ -1134,11 +1150,23 @@ impl GraphicsEngine {
                         .draw(&mut render_pass, instruction.indicator.as_ref());
 
                     if let Some(entity_instructions) = instruction.directional_shadow_entities.get(partition_index) {
+                        let opaque_count = entity_instructions.partition_point(|e| e.color.alpha == 1.0);
+
                         engine_context
                             .directional_shadow_entity_drawer
                             .draw(&mut render_pass, DirectionalShadowEntityDrawData {
-                                partition_index,
                                 instructions: entity_instructions,
+                                pass_mode: DirectionalShadowEntityPassMode::Opaque,
+                                instance_range: 0..opaque_count,
+                            });
+
+                        // Transparent pass
+                        engine_context
+                            .directional_shadow_entity_drawer
+                            .draw(&mut render_pass, DirectionalShadowEntityDrawData {
+                                instructions: entity_instructions,
+                                pass_mode: DirectionalShadowEntityPassMode::Transparent,
+                                instance_range: opaque_count..entity_instructions.len(),
                             });
                     }
                 }
@@ -1240,36 +1268,38 @@ impl GraphicsEngine {
                 }
 
                 // SDSM Pass
-                let mut compute_pass =
+                if instruction.uniforms.sdsm_enabled {
+                    let mut compute_pass =
+                        engine_context
+                            .sdsm_pass_context
+                            .create_pass(&mut sdsm_encoder, &engine_context.global_context, None);
+
+                    engine_context.clear_partitions_dispatcher.dispatch(&mut compute_pass, ());
+
                     engine_context
-                        .sdsm_pass_context
-                        .create_pass(&mut sdsm_encoder, &engine_context.global_context, None);
+                        .reduce_partitions_dispatcher
+                        .dispatch(&mut compute_pass, engine_context.global_context.forward_size);
 
-                engine_context.clear_partitions_dispatcher.dispatch(&mut compute_pass, ());
+                    engine_context.compute_partitions_dispatcher.dispatch(&mut compute_pass, ());
 
-                engine_context
-                    .reduce_partitions_dispatcher
-                    .dispatch(&mut compute_pass, engine_context.global_context.forward_size);
+                    engine_context.clear_bounds_dispatcher.dispatch(&mut compute_pass, ());
 
-                engine_context.compute_partitions_dispatcher.dispatch(&mut compute_pass, ());
+                    engine_context
+                        .reduce_bounds_dispatcher
+                        .dispatch(&mut compute_pass, engine_context.global_context.forward_size);
 
-                engine_context.clear_bounds_dispatcher.dispatch(&mut compute_pass, ());
+                    engine_context.compute_custom_partitions_dispatcher.dispatch(&mut compute_pass, ());
 
-                engine_context
-                    .reduce_bounds_dispatcher
-                    .dispatch(&mut compute_pass, engine_context.global_context.forward_size);
+                    drop(compute_pass);
 
-                engine_context.compute_custom_partitions_dispatcher.dispatch(&mut compute_pass, ());
-
-                drop(compute_pass);
-
-                sdsm_encoder.copy_buffer_to_buffer(
-                    engine_context.global_context.partition_data_buffer.get_buffer(),
-                    0,
-                    engine_context.global_context.partition_value_buffer.get_buffer(),
-                    0,
-                    Some(size_of::<[Partition; PARTITION_COUNT]>() as BufferAddress),
-                );
+                    sdsm_encoder.copy_buffer_to_buffer(
+                        engine_context.global_context.partition_data_buffer.get_buffer(),
+                        0,
+                        engine_context.global_context.partition_value_buffer.get_buffer(),
+                        0,
+                        Some(size_of::<[Partition; PARTITION_COUNT]>() as BufferAddress),
+                    );
+                }
             });
 
             // Post Processing Passes

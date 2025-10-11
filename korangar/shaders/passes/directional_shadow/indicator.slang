@@ -10,7 +10,11 @@ struct IndicatorVertexInput {
 
 struct IndicatorVertexOutput {
     float4 position : SV_Position;
-    var texture_coordinates: float2;
+    [[vk::location(0)]] var texture_coordinates: float2;
+};
+
+struct IndicatorFragmentOutput {
+    [[vk::location(0)]] var translucence: float;
 };
 
 [[vk::binding(0, 0)]] var global_uniforms: ConstantBuffer<GlobalUniforms>;
@@ -27,16 +31,19 @@ func vs_main(input: IndicatorVertexInput) -> IndicatorVertexOutput {
 }
 
 [[shader("pixel")]]
-func fs_main(input: IndicatorVertexOutput) -> float4 {
+func fs_main(input: IndicatorVertexOutput) -> IndicatorFragmentOutput {
     let fragment_color = texture.SampleLevel(linear_sampler, input.texture_coordinates, 0.0);
 
-    if (fragment_color.a < 0.1) {
+    if (fragment_color.a == 0.0) {
         discard;
     }
 
-    return fragment_color;
+    var output: IndicatorFragmentOutput;
+    output.translucence = 1.0;
+    return output;
 }
 
+[ForceInline]
 func position_data(vertex_index: uint) -> float4 {
     switch (vertex_index) {
         case 0: {
@@ -77,6 +84,7 @@ func position_data(vertex_index: uint) -> float4 {
 // 5             1  1
 //
 // (x,y) are the UV coordinates
+[ForceInline]
 func uv_data(vertex_index: uint) -> float2 {
     let index = 1 << vertex_index;
     let x = float((index & 0x2C) != 0);

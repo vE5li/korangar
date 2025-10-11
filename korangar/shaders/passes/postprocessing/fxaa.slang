@@ -165,6 +165,7 @@ func fs_main(FullscreenVertex input) -> float4 {
     posP = !doneP ? posP + offNP * QUALITY_STEPS[1] : posP;
 
     if (!(doneN && doneP)) {
+        [unroll]
         for (int i = 2; i < QUALITY_STEPS_LENGTH; i++) {
             if (!doneN) {
                 lumaEndN = texture.Sample(linear_sampler, posN).a;

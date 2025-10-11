@@ -3,7 +3,7 @@ use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource,
     BindingType, BlendState, ColorTargetState, ColorWrites, CommandEncoder, Device, FragmentState, MultisampleState,
     PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor,
-    ShaderModuleDescriptor, ShaderStages, TextureSampleType, TextureViewDimension, VertexState, include_wgsl,
+    ShaderStages, TextureSampleType, TextureViewDimension, VertexState,
 };
 
 use crate::graphics::passes::{
@@ -13,8 +13,6 @@ use crate::graphics::settings::RenderOptions;
 use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::graphics::{Capabilities, GlobalContext, Prepare, RenderInstruction, Texture};
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("../../../../shaders/passes/postprocessing/debug_buffer.wgsl");
-const SHADER_MSAA: ShaderModuleDescriptor = include_wgsl!("../../../../shaders/passes/postprocessing/debug_buffer_msaa.wgsl");
 const DRAWER_NAME: &str = "debug buffer";
 
 pub(crate) struct DebugBufferDrawData<'a> {
@@ -36,13 +34,13 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
         _capabilities: &Capabilities,
         device: &Device,
         _queue: &Queue,
-        _shader_compiler: &ShaderCompiler,
+        shader_compiler: &ShaderCompiler,
         global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {
         let shader_module = match global_context.msaa.multisampling_activated() {
-            false => device.create_shader_module(SHADER),
-            true => device.create_shader_module(SHADER_MSAA),
+            false => shader_compiler.create_shader_module("postprocessing", "debug_buffer"),
+            true => shader_compiler.create_shader_module("postprocessing", "debug_buffer_msaa"),
         };
 
         let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {

@@ -374,6 +374,7 @@ pub(crate) struct GlobalContext {
     pub(crate) supersampled_color_texture: Option<AttachmentTexture>,
     pub(crate) interface_buffer_texture: AttachmentTexture,
     pub(crate) directional_shadow_map_texture: AttachmentTexture,
+    pub(crate) directional_shadow_translucence_texture: AttachmentTexture,
     pub(crate) point_shadow_map_textures: CubeArrayTexture,
     pub(crate) tile_light_count_texture: StorageTexture,
     pub(crate) global_uniforms_buffer: Buffer<GlobalUniforms>,
@@ -584,6 +585,7 @@ impl Prepare for GlobalContext {
                 &self.tile_light_count_texture,
                 &self.tile_light_indices_buffer,
                 &self.directional_shadow_map_texture,
+                &self.directional_shadow_translucence_texture,
                 &self.point_shadow_map_textures,
                 &self.directional_light_partitions_buffer,
                 &self.kernel_uniforms_buffer,
@@ -657,6 +659,8 @@ impl GlobalContext {
         let forward_textures = Self::create_forward_textures(device, forward_size, msaa);
         let picker_textures = Self::create_picker_textures(device, screen_size);
         let directional_shadow_map_texture = Self::create_directional_shadow_textures(device, directional_shadow_size);
+        let directional_shadow_translucence_texture =
+            Self::create_directional_shadow_translucence_textures(device, directional_shadow_size);
         let point_shadow_map_textures = Self::create_point_shadow_textures(device, point_shadow_size);
         let resolved_color_texture = Self::create_resolved_color_texture(device, forward_size, msaa);
         let supersampled_color_texture = Self::create_supersampled_texture(device, screen_size, ssaa);
@@ -774,6 +778,7 @@ impl GlobalContext {
             &forward_textures.tile_light_count_texture,
             &tile_light_indices_buffer,
             &directional_shadow_map_texture,
+            &directional_shadow_translucence_texture,
             &point_shadow_map_textures,
             &directional_light_partitions_buffer,
             &kernel_uniforms_buffer,
@@ -820,6 +825,7 @@ impl GlobalContext {
             supersampled_color_texture,
             interface_buffer_texture,
             directional_shadow_map_texture,
+            directional_shadow_translucence_texture,
             point_shadow_map_textures,
             tile_light_count_texture: forward_textures.tile_light_count_texture,
             global_uniforms_buffer,
@@ -973,6 +979,17 @@ impl GlobalContext {
         )
     }
 
+    fn create_directional_shadow_translucence_textures(device: &Device, shadow_size: ScreenSize) -> AttachmentTexture {
+        let shadow_factory = AttachmentTextureFactory::new(device, shadow_size, 1, None);
+
+        shadow_factory.new_attachment_array(
+            "directional shadow translucence",
+            TextureFormat::R8Unorm,
+            AttachmentTextureType::ColorAttachment,
+            PARTITION_COUNT as u32,
+        )
+    }
+
     fn create_tile_light_indices_buffer(device: &Device, forward_size: ScreenSize) -> Buffer<TileLightIndices> {
         let (tile_count_x, tile_count_y) = calculate_light_tile_count(forward_size);
 
@@ -1073,6 +1090,7 @@ impl GlobalContext {
             &self.tile_light_count_texture,
             &self.tile_light_indices_buffer,
             &self.directional_shadow_map_texture,
+            &self.directional_shadow_translucence_texture,
             &self.point_shadow_map_textures,
             &self.directional_light_partitions_buffer,
             &self.kernel_uniforms_buffer,
@@ -1109,6 +1127,8 @@ impl GlobalContext {
         self.point_shadow_size = ScreenSize::uniform(shadow_resolution.point_shadow_resolution() as f32);
 
         self.directional_shadow_map_texture = Self::create_directional_shadow_textures(device, self.directional_shadow_size);
+        self.directional_shadow_translucence_texture =
+            Self::create_directional_shadow_translucence_textures(device, self.directional_shadow_size);
         self.point_shadow_map_textures = Self::create_point_shadow_textures(device, self.point_shadow_size);
 
         // We need to update this bind group, because it's content changed, and it isn't
@@ -1120,6 +1140,7 @@ impl GlobalContext {
             &self.tile_light_count_texture,
             &self.tile_light_indices_buffer,
             &self.directional_shadow_map_texture,
+            &self.directional_shadow_translucence_texture,
             &self.point_shadow_map_textures,
             &self.directional_light_partitions_buffer,
             &self.kernel_uniforms_buffer,
@@ -1391,6 +1412,16 @@ impl GlobalContext {
                         },
                         count: None,
                     },
+                    BindGroupLayoutEntry {
+                        binding: 8,
+                        visibility: ShaderStages::FRAGMENT,
+                        ty: BindingType::Texture {
+                            sample_type: TextureSampleType::Float { filterable: true },
+                            view_dimension: TextureViewDimension::D2Array,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
                 ],
             })
         })
@@ -1624,6 +1655,7 @@ impl GlobalContext {
         tile_light_count_texture: &StorageTexture,
         tile_light_indices_buffer: &Buffer<TileLightIndices>,
         directional_shadow_map_texture: &AttachmentTexture,
+        directional_shadow_translucence_texture: &AttachmentTexture,
         point_shadow_maps_texture: &CubeArrayTexture,
         directional_light_partition: &Buffer<DirectionalLightPartition>,
         kernel_uniforms_buffer: &Buffer<KernelUniforms>,
@@ -1663,6 +1695,10 @@ impl GlobalContext {
                 BindGroupEntry {
                     binding: 7,
                     resource: kernel_uniforms_buffer.as_entire_binding(),
+                },
+                BindGroupEntry {
+                    binding: 8,
+                    resource: BindingResource::TextureView(directional_shadow_translucence_texture.get_texture_view()),
                 },
             ],
         })

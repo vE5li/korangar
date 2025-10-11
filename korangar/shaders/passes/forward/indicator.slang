@@ -26,6 +26,7 @@ struct IndicatorVertexOutput {
 [[vk::binding(5, 1)]] var point_shadow_maps: DepthTextureCubeArray;
 [[vk::binding(6, 1)]] var directional_light_partitions: StructuredBuffer<DirectionalLightPartition>;
 [[vk::binding(7, 1)]] var kernel_uniforms: ConstantBuffer<KernelUniforms>;
+[[vk::binding(8, 1)]] var shadow_translucence: Texture2DArray;
 [[vk::binding(0, 2)]] var texture: Texture2D;
 
 static const var INDICATOR_CONSTANT_DEPTH_BIAS: float = 0.0005;
@@ -90,7 +91,7 @@ func fs_main(input: IndicatorVertexOutput) -> float4 {
         max(shadow_coords.z, 0.0) + INDICATOR_CONSTANT_DEPTH_BIAS
     );
 
-    var visibility: float = 0.0;
+    var visibility: float = 1.0;
 
     switch (global_uniforms.shadow_method) {
         case 0: {
@@ -113,6 +114,9 @@ func fs_main(input: IndicatorVertexOutput) -> float4 {
             break;
         }
     }
+
+    let translucence = shadow_translucence.SampleLevel(linear_sampler, float3(shadow_coords.xy, partition_index), 0.0).r;
+    visibility *= translucence;
 
     let directional_light_contribution = directional_light.color.rgb * light_percent * visibility;
 

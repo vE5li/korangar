@@ -7,27 +7,6 @@ use std::{env, fs};
 use sevenz_rust2::encoder_options::{EncoderOptions, LzmaOptions};
 use sevenz_rust2::{ArchiveEntry, ArchiveWriter, EncoderConfiguration, EncoderMethod};
 
-fn check_slangc_availability() {
-    let result = Command::new("slangc").arg("-version").output();
-
-    match result {
-        Ok(output) => {
-            if !output.status.success() {
-                println!("cargo:warning=slangc is installed but failed to report version");
-            }
-        }
-        Err(_) => {
-            eprintln!("Error: slangc is not available in PATH.");
-            eprintln!("slangc is required to compile shaders. You can install it by:");
-            eprintln!("  1. Or downloading slang directly from https://github.com/shader-slang/slang/releases");
-            eprintln!("  2. Installing the Vulkan SDK from https://vulkan.lunarg.com/");
-            eprintln!("After installation, ensure slangc is in your PATH.");
-            eprintln!("At least version v2025.18.2 is needed to compile shaders.");
-            std::process::exit(1);
-        }
-    }
-}
-
 fn discover_module_files(modules_dir: &Path) -> Vec<PathBuf> {
     let mut module_files = Vec::new();
 
@@ -186,6 +165,7 @@ fn add_file_to_archive(writer: &mut ArchiveWriter<BufWriter<File>>, file_path: &
 }
 
 fn main() {
+    check_rustc_version();
     check_slangc_availability();
 
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
@@ -240,4 +220,135 @@ fn main() {
     }
 
     create_shader_archive(&output_dir, &passes_output_dir);
+}
+
+fn check_rustc_version() {
+    const MIN_YEAR: u32 = 2025;
+    const MIN_MONTH: u32 = 8;
+    const MIN_DAY: u32 = 17;
+
+    let result = Command::new("rustc").arg("--version").output();
+
+    match result {
+        Ok(output) => {
+            if !output.status.success() {
+                eprintln!("Error: rustc is installed but failed to report version");
+                std::process::exit(1);
+            }
+
+            let version_output = String::from_utf8_lossy(&output.stdout);
+
+            match parse_rustc_nightly_date(&version_output) {
+                Some((year, month, day)) => {
+                    let is_valid = year > MIN_YEAR
+                        || (year == MIN_YEAR && month > MIN_MONTH)
+                        || (year == MIN_YEAR && month == MIN_MONTH && day >= MIN_DAY);
+
+                    if !is_valid {
+                        eprintln!("Error: rustc nightly version ({year:04}-{month:02}-{day:02}) is too old.");
+                        eprintln!("At least nightly-{MIN_YEAR:04}-{MIN_MONTH:02}-{MIN_DAY:02} is required.");
+                        eprintln!("Please update your Rust toolchain using:");
+                        eprintln!("  rustup update nightly");
+                        std::process::exit(1);
+                    }
+                }
+                None => {
+                    eprintln!("Warning: Failed to parse rustc nightly date from output:");
+                    eprintln!("{version_output}");
+                    eprintln!("Proceeding anyway, but at least nightly-{MIN_YEAR:04}-{MIN_MONTH:02}-{MIN_DAY:02} is required.",);
+                }
+            }
+        }
+        Err(_) => {
+            eprintln!("Error: rustc is not available in PATH.");
+            eprintln!("Please ensure Rust is installed via rustup: https://rustup.rs/");
+            std::process::exit(1);
+        }
+    }
+}
+
+fn parse_rustc_nightly_date(version_output: &str) -> Option<(u32, u32, u32)> {
+    let line = version_output.lines().next()?;
+
+    let date_start = line.rfind('(')?;
+    let date_end = line.rfind(')')?;
+    let date_section = &line[date_start + 1..date_end];
+
+    let date_str = date_section.split_whitespace().last()?;
+
+    let parts: Vec<&str> = date_str.split('-').collect();
+
+    if parts.len() < 3 {
+        return None;
+    }
+
+    let year = parts[0].parse::<u32>().ok()?;
+    let month = parts[1].parse::<u32>().ok()?;
+    let day = parts[2].parse::<u32>().ok()?;
+
+    Some((year, month, day))
+}
+
+fn check_slangc_availability() {
+    const MIN_YEAR: u32 = 2025;
+    const MIN_MAJOR: u32 = 18;
+    const MIN_MINOR: u32 = 2;
+
+    let result = Command::new("slangc").arg("-version").output();
+
+    match result {
+        Ok(output) => {
+            if !output.status.success() {
+                eprintln!("Error: slangc is installed but failed to report version");
+                std::process::exit(1);
+            }
+
+            let version_output = String::from_utf8_lossy(&output.stdout);
+
+            match parse_slangc_version(&version_output) {
+                Some((year, major, minor)) => {
+                    let is_valid = year > MIN_YEAR
+                        || (year == MIN_YEAR && major > MIN_MAJOR)
+                        || (year == MIN_YEAR && major == MIN_MAJOR && minor >= MIN_MINOR);
+
+                    if !is_valid {
+                        eprintln!("Error: slangc version {year}.{major}.{minor} is too old.");
+                        eprintln!("At least version {MIN_YEAR}.{MIN_MAJOR}.{MIN_MINOR} is required to compile shaders.");
+                        eprintln!("Please update slangc by:");
+                        eprintln!("  1. Downloading slang directly from https://github.com/shader-slang/slang/releases");
+                        eprintln!("  2. Installing the Vulkan SDK from https://vulkan.lunarg.com/");
+                        std::process::exit(1);
+                    }
+                }
+                None => {
+                    eprintln!("Warning: Failed to parse slangc version from output:");
+                    eprintln!("{version_output}");
+                    eprintln!("Proceeding anyway, but at least version {MIN_YEAR}.{MIN_MAJOR}.{MIN_MINOR} is required.",);
+                }
+            }
+        }
+        Err(_) => {
+            eprintln!("Error: slangc is not available in PATH.");
+            eprintln!("slangc is required to compile shaders. You can install it by:");
+            eprintln!("  1. Downloading slang directly from https://github.com/shader-slang/slang/releases");
+            eprintln!("  2. Installing the Vulkan SDK from https://vulkan.lunarg.com/");
+            eprintln!("After installation, ensure slangc is in your PATH.");
+            eprintln!("At least version {MIN_YEAR}.{MIN_MAJOR}.{MIN_MINOR} is needed to compile shaders.",);
+            std::process::exit(1);
+        }
+    }
+}
+
+fn parse_slangc_version(version_output: &str) -> Option<(u32, u32, u32)> {
+    let parts: Vec<&str> = version_output.split('.').collect();
+
+    if parts.len() < 3 {
+        return None;
+    }
+
+    let first = parts[0].parse::<u32>().ok()?;
+    let second = parts[1].parse::<u32>().ok()?;
+    let third = parts[2].parse::<u32>().ok()?;
+
+    Some((first, second, third))
 }

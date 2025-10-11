@@ -869,6 +869,21 @@ impl GraphicsEngine {
         // Front to back for entities.
         instructions.entities.sort_unstable_by(|a, b| a.distance.total_cmp(&b.distance));
 
+        // Shadow rendering of entities is done in two ways for opaque and transparent
+        // entities. This is way we render opaque first then transparent.
+        for batch in instructions.directional_shadow_entities.iter_mut() {
+            batch.sort_unstable_by(|a, b| {
+                let a_opaque = a.color.alpha == 1.0;
+                let b_opaque = b.color.alpha == 1.0;
+
+                match (a_opaque, b_opaque) {
+                    (true, true) | (false, false) => std::cmp::Ordering::Equal,
+                    (true, false) => std::cmp::Ordering::Less,
+                    (false, true) => std::cmp::Ordering::Greater,
+                }
+            })
+        }
+
         for batch in instructions.model_batches {
             let start = batch.offset;
             let end = batch.offset + batch.count;
@@ -1119,6 +1134,7 @@ impl GraphicsEngine {
                         partition_index,
                     );
 
+                    // Opaque pass
                     if let Some(batches) = instruction.directional_shadow_model_batches.get(partition_index) {
                         let draw_data = ModelBatchDrawData {
                             batches,
@@ -1134,11 +1150,23 @@ impl GraphicsEngine {
                         .draw(&mut render_pass, instruction.indicator.as_ref());
 
                     if let Some(entity_instructions) = instruction.directional_shadow_entities.get(partition_index) {
+                        let opaque_count = entity_instructions.partition_point(|e| e.color.alpha == 1.0);
+
                         engine_context
                             .directional_shadow_entity_drawer
                             .draw(&mut render_pass, DirectionalShadowEntityDrawData {
-                                partition_index,
                                 instructions: entity_instructions,
+                                pass_mode: DirectionalShadowEntityPassMode::Opaque,
+                                instance_range: 0..opaque_count,
+                            });
+
+                        // Transparent pass
+                        engine_context
+                            .directional_shadow_entity_drawer
+                            .draw(&mut render_pass, DirectionalShadowEntityDrawData {
+                                instructions: entity_instructions,
+                                pass_mode: DirectionalShadowEntityPassMode::Transparent,
+                                instance_range: opaque_count..entity_instructions.len(),
                             });
                     }
                 }

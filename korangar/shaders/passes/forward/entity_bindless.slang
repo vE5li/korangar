@@ -182,7 +182,7 @@ func fragment(input: ForwardEntityBindlessVertexOutput) -> ForwardEntityFragment
             max(shadow_coords.z, 0.0) + bias
         );
 
-        var visibility: float = 0.0;
+        var visibility: float = 1.0;
 
         switch (global_uniforms.shadow_method) {
             case 0: {

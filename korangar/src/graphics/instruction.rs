@@ -35,7 +35,7 @@ pub struct RenderInstruction<'a> {
     pub entities: &'a mut [EntityInstruction],
     pub directional_shadow_model_batches: &'a [Vec<ModelBatch>],
     pub directional_shadow_models: &'a [ModelInstruction],
-    pub directional_shadow_entities: &'a [Vec<EntityInstruction>],
+    pub directional_shadow_entities: &'a mut [Vec<EntityInstruction>],
     pub point_shadow_models: &'a [ModelInstruction],
     pub point_shadow_entities: &'a [EntityInstruction],
     pub effects: &'a [EffectInstruction],

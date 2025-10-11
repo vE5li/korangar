@@ -53,22 +53,41 @@ func vs_main(input: EntityVertexInput) -> EntityVertexOutput {
 }
 
 [[shader("pixel")]]
-func fs_main(input: EntityVertexOutput) -> EntityFragmentOutput {
+func fs_main_opaque(input: EntityVertexOutput) -> EntityFragmentOutput {
     let diffuse_color = texture.SampleLevel(linear_sampler, input.texture_coordinates, 0.0);
 
     if (diffuse_color.a != 1.0 || input.alpha != 1.0) {
         discard;
     }
 
-    // Adjust the sprite as if it was standing upright.
-    let depth_offset = input.depth_offset * input.original_depth_offset;
-    let curvature_offset = (0.5 - pow(input.curvature, 2.0)) * input.original_curvature;
-    let view_position = mul(pass_uniforms.view, input.world_position);
-    let adjusted_view_position = view_position - float4(0.0, 0.0, depth_offset + curvature_offset, 0.0);
-    let adjusted_world_position = mul(pass_uniforms.inverse_view, adjusted_view_position);
-    let clip_position = mul(pass_uniforms.view_projection, adjusted_world_position);
-    
-    var output: EntityFragmentOutput;
-    output.depth = saturate(clip_position.z / clip_position.w);
-    return output;
+    let clip_position = calculate_adjusted_clip_position(
+        input.world_position,
+        input.depth_offset,
+        input.curvature,
+        input.original_depth_offset,
+        input.original_curvature,
+        pass_uniforms
+    );
+
+    return create_shadow_output(1.0, clip_position);
+}
+
+[[shader("pixel")]]
+func fs_main_transparent(input: EntityVertexOutput) -> EntityFragmentOutput {
+    let diffuse_color = texture.SampleLevel(linear_sampler, input.texture_coordinates, 0.0);
+
+    if (diffuse_color.a != 1.0 || input.alpha < 0.05) {
+        discard;
+    }
+
+    let clip_position = calculate_adjusted_clip_position(
+        input.world_position,
+        input.depth_offset,
+        input.curvature,
+        input.original_depth_offset,
+        input.original_curvature,
+        pass_uniforms
+    );
+
+    return create_shadow_output(diffuse_color.a * input.alpha, clip_position);
 }

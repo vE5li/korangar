@@ -7,10 +7,10 @@ use hashbrown::HashMap;
 use wgpu::util::StagingBelt;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource,
-    BindingType, BufferBindingType, BufferUsages, CommandEncoder, CompareFunction, DepthBiasState, DepthStencilState, Device,
-    FragmentState, MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass,
-    RenderPipeline, RenderPipelineDescriptor, ShaderStages, StencilState, TextureSampleType, TextureView, TextureViewDimension,
-    VertexState,
+    BindingType, BlendComponent, BlendFactor, BlendOperation, BlendState, BufferBindingType, BufferUsages, ColorTargetState, ColorWrites,
+    CommandEncoder, CompareFunction, DepthBiasState, DepthStencilState, Device, FragmentState, MultisampleState,
+    PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor,
+    ShaderStages, StencilState, TextureSampleType, TextureView, TextureViewDimension, VertexState,
 };
 
 use crate::graphics::passes::{
@@ -40,9 +40,16 @@ struct InstanceData {
     alpha: f32,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) enum EntityPassMode {
+    Opaque,
+    Transparent,
+}
+
 pub(crate) struct DirectionalShadowEntityDrawData<'data> {
-    pub(crate) partition_index: usize,
     pub(crate) instructions: &'data [EntityInstruction],
+    pub(crate) pass_mode: EntityPassMode,
+    pub(crate) instance_range: std::ops::Range<usize>,
 }
 
 pub(crate) struct DirectionalShadowEntityDrawer {
@@ -51,14 +58,15 @@ pub(crate) struct DirectionalShadowEntityDrawer {
     instance_data_buffer: Buffer<InstanceData>,
     bind_group_layout: BindGroupLayout,
     bind_group: BindGroup,
-    pipeline: RenderPipeline,
+    opaque_pipeline: RenderPipeline,
+    transparent_pipeline: RenderPipeline,
     draw_counts: [usize; PARTITION_COUNT],
     instance_data: Vec<InstanceData>,
     bump: Bump,
     lookup: HashMap<u64, i32>,
 }
 
-impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAttachmentCount::One }> for DirectionalShadowEntityDrawer {
+impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttachmentCount::One }> for DirectionalShadowEntityDrawer {
     type Context = DirectionalShadowRenderPassContext;
     type DrawData<'data> = DirectionalShadowEntityDrawData<'data>;
 
@@ -151,8 +159,8 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
             push_constant_ranges: &[],
         });
 
-        let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
-            label: Some(DRAWER_NAME),
+        let opaque_pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
+            label: Some(&format!("{DRAWER_NAME} opaque")),
             layout: Some(&pipeline_layout),
             vertex: VertexState {
                 module: &shader_module,
@@ -162,9 +170,24 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
             },
             fragment: Some(FragmentState {
                 module: &shader_module,
-                entry_point: Some("fs_main"),
+                entry_point: Some("fs_main_opaque"),
                 compilation_options: PipelineCompilationOptions::default(),
-                targets: &[],
+                targets: &[Some(ColorTargetState {
+                    format: render_pass_context.color_attachment_formats()[0],
+                    blend: Some(BlendState {
+                        color: BlendComponent {
+                            src_factor: BlendFactor::Zero,
+                            dst_factor: BlendFactor::Src,
+                            operation: BlendOperation::Add,
+                        },
+                        alpha: BlendComponent {
+                            src_factor: BlendFactor::Zero,
+                            dst_factor: BlendFactor::SrcAlpha,
+                            operation: BlendOperation::Add,
+                        },
+                    }),
+                    write_mask: ColorWrites::RED,
+                })],
             }),
             multiview: None,
             primitive: PrimitiveState::default(),
@@ -179,13 +202,57 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
             cache: None,
         });
 
+        let transparent_pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
+            label: Some(&format!("{DRAWER_NAME} transparent")),
+            layout: Some(&pipeline_layout),
+            vertex: VertexState {
+                module: &shader_module,
+                entry_point: Some("vs_main"),
+                compilation_options: PipelineCompilationOptions::default(),
+                buffers: &[],
+            },
+            fragment: Some(FragmentState {
+                module: &shader_module,
+                entry_point: Some("fs_main_transparent"),
+                compilation_options: PipelineCompilationOptions::default(),
+                targets: &[Some(ColorTargetState {
+                    format: render_pass_context.color_attachment_formats()[0],
+                    blend: Some(BlendState {
+                        color: BlendComponent {
+                            src_factor: BlendFactor::Zero,
+                            dst_factor: BlendFactor::Src,
+                            operation: BlendOperation::Add,
+                        },
+                        alpha: BlendComponent {
+                            src_factor: BlendFactor::Zero,
+                            dst_factor: BlendFactor::SrcAlpha,
+                            operation: BlendOperation::Add,
+                        },
+                    }),
+                    write_mask: ColorWrites::RED,
+                })],
+            }),
+            multiview: None,
+            primitive: PrimitiveState::default(),
+            multisample: MultisampleState::default(),
+            depth_stencil: Some(DepthStencilState {
+                format: render_pass_context.depth_attachment_output_format()[0],
+                depth_write_enabled: false,
+                depth_compare: CompareFunction::Greater,
+                stencil: StencilState::default(),
+                bias: DepthBiasState::default(),
+            }),
+            cache: None,
+        });
+
         Self {
             bindless_support: capabilities.bindless_support() == BindlessSupport::Full,
             solid_pixel_texture: global_context.solid_pixel_texture.clone(),
             instance_data_buffer,
             bind_group_layout,
             bind_group,
-            pipeline,
+            opaque_pipeline,
+            transparent_pipeline,
             draw_counts: [0; PARTITION_COUNT],
             instance_data: Vec::default(),
             bump: Bump::default(),
@@ -194,27 +261,32 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
     }
 
     fn draw(&mut self, pass: &mut RenderPass<'_>, draw_data: Self::DrawData<'_>) {
-        let draw_count = self.draw_counts[draw_data.partition_index];
+        let range = draw_data.instance_range.clone();
 
-        if draw_count == 0 {
+        if range.is_empty() {
             return;
         }
 
-        pass.set_pipeline(&self.pipeline);
+        let pipeline = match draw_data.pass_mode {
+            EntityPassMode::Opaque => &self.opaque_pipeline,
+            EntityPassMode::Transparent => &self.transparent_pipeline,
+        };
+
+        pass.set_pipeline(pipeline);
         pass.set_bind_group(2, &self.bind_group, &[]);
 
         if self.bindless_support {
-            pass.draw(0..6, 0..draw_count as u32);
+            pass.draw(0..6, range.start as u32..range.end as u32);
         } else {
             let mut current_texture_id = self.solid_pixel_texture.get_id();
             pass.set_bind_group(3, self.solid_pixel_texture.get_bind_group(), &[]);
 
-            for (index, instruction) in draw_data.instructions[0..draw_count].iter().enumerate() {
+            for (index, instruction) in draw_data.instructions[range.clone()].iter().enumerate() {
                 if instruction.texture.get_id() != current_texture_id {
                     current_texture_id = instruction.texture.get_id();
                     pass.set_bind_group(3, instruction.texture.get_bind_group(), &[]);
                 }
-                let index = index as u32;
+                let index = (range.start + index) as u32;
 
                 pass.draw(0..6, index..index + 1);
             }

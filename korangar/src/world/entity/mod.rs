@@ -143,6 +143,61 @@ impl SoundState {
     }
 }
 
+const FADE_DURATION: u32 = 500;
+
+#[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
+pub enum FadeDirection {
+    In,
+    Out,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum FadeState {
+    Opaque,
+    Fading { direction: FadeDirection, start_time: ClientTick },
+}
+
+impl FadeState {
+    pub fn calculate_alpha(&self, client_tick: ClientTick) -> f32 {
+        match self {
+            FadeState::Opaque => 1.0,
+            FadeState::Fading { direction, start_time } => match *direction {
+                FadeDirection::In => {
+                    let elapsed = client_tick.0.wrapping_sub(start_time.0);
+                    (elapsed as f32 / FADE_DURATION as f32).min(1.0)
+                }
+                FadeDirection::Out => {
+                    let elapsed = client_tick.0.wrapping_sub(start_time.0);
+                    1.0 - (elapsed as f32 / FADE_DURATION as f32).min(1.0)
+                }
+            },
+        }
+    }
+
+    pub fn is_complete(&self, client_tick: ClientTick) -> bool {
+        match self {
+            FadeState::Opaque => true,
+            FadeState::Fading { start_time, .. } => {
+                let elapsed = client_tick.0.wrapping_sub(start_time.0);
+                elapsed >= FADE_DURATION
+            }
+        }
+    }
+
+    /// Creates a new fade state starting from a specific alpha value.
+    /// This allows smooth transitions between fade states by preserving the
+    /// current alpha.
+    pub fn from_alpha(alpha: f32, direction: FadeDirection, client_tick: ClientTick) -> Self {
+        let alpha = alpha.clamp(0.0, 1.0);
+        let elapsed = match direction {
+            FadeDirection::In => (alpha * FADE_DURATION as f32) as u32,
+            FadeDirection::Out => ((1.0 - alpha) * FADE_DURATION as f32) as u32,
+        };
+        let start_time = ClientTick(client_tick.0.wrapping_sub(elapsed));
+        FadeState::Fading { direction, start_time }
+    }
+}
+
 #[derive(Clone, RustState, StateElement)]
 pub struct Common {
     pub entity_id: EntityId,
@@ -167,6 +222,8 @@ pub struct Common {
     stopped_moving: bool,
     #[hidden_element]
     sound_state: SoundState,
+    #[hidden_element]
+    fade_state: FadeState,
 }
 
 #[cfg_attr(feature = "debug", korangar_debug::profile)]
@@ -394,6 +451,10 @@ impl Common {
             animation_state,
             stopped_moving: false,
             sound_state: SoundState::default(),
+            fade_state: FadeState::Fading {
+                direction: FadeDirection::In,
+                start_time: client_tick,
+            },
         }
     }
 
@@ -404,6 +465,13 @@ impl Common {
     pub fn update(&mut self, audio_engine: &AudioEngine<GameFileLoader>, map: &Map, camera: &dyn Camera, client_tick: ClientTick) {
         self.update_movement(map, client_tick);
         self.animation_state.update(client_tick);
+
+        if let FadeState::Fading { direction, .. } = self.fade_state
+            && direction == FadeDirection::In
+            && self.fade_state.is_complete(client_tick)
+        {
+            self.fade_state = FadeState::Opaque;
+        }
 
         if let Some(animation_data) = self.animation_data.as_ref() {
             if animation_data.is_animation_over(&self.animation_state) && self.animation_state.is_attack() {
@@ -807,8 +875,9 @@ impl Common {
         }
     }
 
-    pub fn render(&self, instructions: &mut Vec<EntityInstruction>, camera: &dyn Camera, add_to_picker: bool) {
+    pub fn render(&self, instructions: &mut Vec<EntityInstruction>, camera: &dyn Camera, add_to_picker: bool, client_tick: ClientTick) {
         if let Some(animation_data) = self.animation_data.as_ref() {
+            let fade_alpha = self.fade_state.calculate_alpha(client_tick);
             animation_data.render(
                 instructions,
                 camera,
@@ -817,6 +886,7 @@ impl Common {
                 self.world_position,
                 &self.animation_state,
                 self.direction,
+                fade_alpha,
             );
         }
     }
@@ -898,7 +968,9 @@ impl Player {
         let tile_position = TilePosition::new(0, 0);
         let position = Point3::origin();
 
-        let common = Common::new(&entity_data, tile_position, position, client_tick);
+        let mut common = Common::new(&entity_data, tile_position, position, client_tick);
+        // Player's own character should not fade in.
+        common.fade_state = FadeState::Opaque;
 
         Self {
             common,
@@ -1160,6 +1232,23 @@ impl Entity {
         self.get_common().entity_type
     }
 
+    pub fn get_fade_state(&self) -> FadeState {
+        self.get_common().fade_state
+    }
+
+    pub fn set_fade_state(&mut self, fade_state: FadeState) {
+        self.get_common_mut().fade_state = fade_state;
+    }
+
+    pub fn is_fading_out_complete(&self, client_tick: ClientTick) -> bool {
+        let fade_state = self.get_common().fade_state;
+
+        match fade_state {
+            FadeState::Opaque => false,
+            FadeState::Fading { direction, .. } => direction == FadeDirection::Out && fade_state.is_complete(client_tick),
+        }
+    }
+
     pub fn are_details_unavailable(&self) -> bool {
         match &self.get_common().details {
             ResourceState::Unavailable => true,
@@ -1276,8 +1365,8 @@ impl Entity {
         self.get_common_mut().generate_pathing_mesh(device, queue, bindless_support, map);
     }
 
-    pub fn render(&self, instructions: &mut Vec<EntityInstruction>, camera: &dyn Camera, add_to_picker: bool) {
-        self.get_common().render(instructions, camera, add_to_picker);
+    pub fn render(&self, instructions: &mut Vec<EntityInstruction>, camera: &dyn Camera, add_to_picker: bool, client_tick: ClientTick) {
+        self.get_common().render(instructions, camera, add_to_picker, client_tick);
     }
 
     #[cfg(feature = "debug")]

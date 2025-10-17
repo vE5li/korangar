@@ -29,7 +29,7 @@ use crate::renderer::GameInterfaceRenderer;
 use crate::renderer::MarkerRenderer;
 use crate::state::ClientState;
 use crate::state::theme::{InterfaceThemeType, WorldTheme};
-use crate::world::{ActionEvent, AnimationData, AnimationState, Camera, Library, MAX_WALK_PATH_SIZE, Map, PathFinder};
+use crate::world::{ActionEvent, AnimationData, AnimationState, Camera, JobIdentity, Library, MAX_WALK_PATH_SIZE, Map, PathFinder};
 #[cfg(feature = "debug")]
 use crate::world::{MarkerIdentifier, SubMesh};
 #[cfg(feature = "debug")]
@@ -352,9 +352,9 @@ fn get_entity_part_files(library: &Library, entity_type: EntityType, job_id: usi
             player_body_path(sex_sprite_path, job_id),
             player_head_path(sex_sprite_path, head_id),
         ],
-        EntityType::Npc => vec![format!("npc\\{}", library.get_job_identity_from_id(job_id))],
-        EntityType::Monster => vec![format!("몬스터\\{}", library.get_job_identity_from_id(job_id))],
-        EntityType::Warp | EntityType::Hidden => vec![format!("npc\\{}", library.get_job_identity_from_id(job_id))], // TODO: change
+        EntityType::Npc => vec![format!("npc\\{}", library.get::<JobIdentity>(job_id).to_string())],
+        EntityType::Monster => vec![format!("몬스터\\{}", library.get::<JobIdentity>(job_id).to_string())],
+        EntityType::Warp | EntityType::Hidden => vec![format!("npc\\{}", library.get::<JobIdentity>(job_id).to_string())], // TODO: change
     }
 }
 

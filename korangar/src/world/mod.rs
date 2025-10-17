@@ -13,6 +13,8 @@ mod pathing;
 mod sound;
 mod video;
 
+use std::sync::Arc;
+
 pub use self::action::*;
 pub use self::animation::*;
 pub use self::cameras::*;
@@ -27,6 +29,7 @@ pub use self::particles::*;
 pub use self::pathing::*;
 pub use self::sound::*;
 pub use self::video::*;
+use crate::graphics::Texture;
 
 pub struct ResourceSetBuffer<K> {
     visible: Vec<K>,
@@ -57,4 +60,10 @@ impl<K> ResourceSet<'_, K> {
     pub(super) fn iterate_visible(&self) -> std::slice::Iter<'_, K> {
         self.visible.iter()
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct ResourceMetadata {
+    pub texture: Option<Arc<Texture>>,
+    pub name: String,
 }

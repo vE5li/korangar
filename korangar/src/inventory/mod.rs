@@ -12,7 +12,7 @@ pub use self::hotbar::{Hotbar, HotbarPathExt};
 pub use self::skills::{Skill, SkillTree, SkillTreePathExt};
 use crate::graphics::Texture;
 use crate::loaders::AsyncLoader;
-use crate::world::{Library, ResourceMetadata};
+use crate::world::ResourceMetadata;
 
 #[derive(Default, RustState, StateElement)]
 pub struct Inventory {
@@ -22,14 +22,14 @@ pub struct Inventory {
 }
 
 impl Inventory {
-    pub fn fill(&mut self, async_loader: &AsyncLoader, library: &Library, items: Vec<InventoryItem<NoMetadata>>) {
+    pub fn fill(&mut self, async_loader: &AsyncLoader, items: Vec<InventoryItem<NoMetadata>>) {
         self.items = items
             .into_iter()
-            .map(|item| library.load_inventory_item_metadata(async_loader, item))
+            .map(|item| async_loader.request_inventory_item_metadata_load(item))
             .collect();
     }
 
-    pub fn add_item(&mut self, async_loader: &AsyncLoader, library: &Library, item: InventoryItem<NoMetadata>) {
+    pub fn add_item(&mut self, async_loader: &AsyncLoader, item: InventoryItem<NoMetadata>) {
         if let Some(found_item) = self.items.iter_mut().find(|inventory_item| inventory_item.index == item.index) {
             let InventoryItemDetails::Regular { amount, .. } = &mut found_item.details else {
                 panic!();
@@ -41,7 +41,7 @@ impl Inventory {
 
             *amount += added_amount;
         } else {
-            let item = library.load_inventory_item_metadata(async_loader, item);
+            let item = async_loader.request_inventory_item_metadata_load(item);
 
             self.items.push(item);
         }

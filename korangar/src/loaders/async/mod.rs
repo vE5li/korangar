@@ -6,6 +6,7 @@ use hashbrown::HashMap;
 use korangar_debug::logging::print_debug;
 #[cfg(feature = "debug")]
 use korangar_debug::profiling::Profiler;
+use korangar_networking::{InventoryItem, NoMetadata, ShopItem};
 use ragnarok_packets::{EntityId, ItemId, TilePosition};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
@@ -15,7 +16,7 @@ use crate::loaders::error::LoadError;
 use crate::loaders::{ActionLoader, AnimationLoader, ImageType, MapLoader, ModelLoader, SpriteLoader, TextureLoader, VideoLoader};
 #[cfg(feature = "debug")]
 use crate::threads;
-use crate::world::{AnimationData, EntityType, Library, Map};
+use crate::world::{AnimationData, EntityType, ItemName, ItemNameKey, ItemResource, ItemResourceKey, Library, Map, ResourceMetadata};
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
 pub enum ItemLocation {
@@ -154,6 +155,48 @@ impl AsyncLoader {
                 None
             }
         }
+    }
+
+    pub fn request_inventory_item_metadata_load(&self, item: InventoryItem<NoMetadata>) -> InventoryItem<ResourceMetadata> {
+        let is_identified = item.is_identified();
+
+        let resource_name = self.library.get::<ItemResource>(ItemResourceKey {
+            item_id: item.item_id,
+            is_identified,
+        });
+        let full_path = format!("유저인터페이스\\item\\{resource_name}.bmp");
+        let texture = self.request_item_sprite_load(ItemLocation::Inventory, item.item_id, &full_path, ImageType::Color);
+        let name = self
+            .library
+            .get::<ItemName>(ItemNameKey {
+                item_id: item.item_id,
+                is_identified,
+            })
+            .to_string();
+
+        let metadata = ResourceMetadata { texture, name };
+
+        InventoryItem { metadata, ..item }
+    }
+
+    pub fn request_shop_item_metadata_load(&self, item: ShopItem<NoMetadata>) -> ShopItem<ResourceMetadata> {
+        let resource_name = self.library.get::<ItemResource>(ItemResourceKey {
+            item_id: item.item_id,
+            is_identified: true,
+        });
+        let full_path = format!("유저인터페이스\\item\\{resource_name}.bmp");
+        let texture = self.request_item_sprite_load(ItemLocation::Shop, item.item_id, &full_path, ImageType::Color);
+        let name = self
+            .library
+            .get::<ItemName>(ItemNameKey {
+                item_id: item.item_id,
+                is_identified: true,
+            })
+            .to_string();
+
+        let metadata = ResourceMetadata { texture, name };
+
+        ShopItem { metadata, ..item }
     }
 
     pub fn request_map_load(&self, map_name: String, position: Option<TilePosition>) {

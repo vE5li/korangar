@@ -22,7 +22,7 @@ use self::water_plane::generate_water_plane;
 use super::error::LoadError;
 use crate::graphics::{BindlessSupport, Buffer, ModelVertex, TextureSet};
 use crate::loaders::{GameFileLoader, ModelLoader, TextureLoader, TextureSetBuilder, VideoLoader, split_mesh_by_texture};
-use crate::world::{Library, LightSourceKey, Lighting, Model, SubMesh, Video};
+use crate::world::{Library, LightSourceKey, Lighting, MapSkyData, Model, SubMesh, Video};
 use crate::{EffectSourceExt, LightSourceExt, Map, Object, ObjectKey, SoundSourceExt};
 
 pub const GROUND_TILE_SIZE: f32 = 10.0;
@@ -85,7 +85,7 @@ impl MapLoader {
         let mut map_data: MapData = parse_generic_data(&map_file_name, &self.game_file_loader)?;
 
         // TODO: NHA Implement sky rendering
-        let _map_sky_data = library.get_map_sky_data_from_resource_file(&resource_file);
+        let _map_sky_data = library.get::<MapSkyData>(&resource_file);
 
         let ground_file = format!("data\\{}", map_data.ground_file);
         let ground_data: GroundData = parse_generic_data(&ground_file, &self.game_file_loader)?;

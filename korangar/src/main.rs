@@ -1487,12 +1487,12 @@ impl Client {
                 NetworkEvent::SetInventory { items } => {
                     self.client_state
                         .follow_mut(client_state().inventory())
-                        .fill(&self.async_loader, &self.library, items);
+                        .fill(&self.async_loader, items);
                 }
                 NetworkEvent::IventoryItemAdded { item } => {
                     self.client_state
                         .follow_mut(client_state().inventory())
-                        .add_item(&self.async_loader, &self.library, item);
+                        .add_item(&self.async_loader, item);
 
                     // TODO: Update the selling items. If you pick up an item
                     // that you already have the sell window
@@ -1701,7 +1701,7 @@ impl Client {
 
                     *self.client_state.follow_mut(client_state().shop_items()) = items
                         .into_iter()
-                        .map(|item| self.library.load_shop_item_metadata(&self.async_loader, item))
+                        .map(|item| self.async_loader.request_shop_item_metadata_load(item))
                         .collect();
 
                     self.interface

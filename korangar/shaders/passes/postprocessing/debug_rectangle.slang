@@ -4,7 +4,6 @@ import globals;
 import matrix;
 import postprocessing;
 
-
 [[vk::binding(0, 0)]] var global_uniforms: ConstantBuffer<GlobalUniforms>;
 [[vk::binding(0, 1)]] var instance_data: StructuredBuffer<DebugRectangleInstanceData>;
 

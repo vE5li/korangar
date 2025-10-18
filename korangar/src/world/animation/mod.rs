@@ -295,6 +295,7 @@ impl AnimationData {
         entity_position: Point3<f32>,
         animation_state: &AnimationState,
         direction: Direction,
+        fade_alpha: f32,
     ) {
         let frame = self.get_frame(animation_state, camera, direction);
         let world_matrix = self.calculate_world_matrix(camera, frame, entity_position);
@@ -311,6 +312,7 @@ impl AnimationData {
 
             let position = world_matrix.transform_point(Point3::from_value(0.0));
             let distance = camera.distance_to(position);
+            let color = frame_part.color * fade_alpha;
 
             instructions.push(EntityInstruction {
                 world: world_matrix,
@@ -321,7 +323,7 @@ impl AnimationData {
                 depth_offset,
                 extra_depth_offset: 0.005 * index as f32,
                 curvature,
-                color: frame_part.color,
+                color,
                 mirror: frame_part.mirror,
                 entity_id,
                 add_to_picker,

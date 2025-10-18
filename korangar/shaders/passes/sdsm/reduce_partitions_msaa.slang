@@ -1,5 +1,6 @@
 #language slang 2026
 
+import depth_texture;
 import sdsm;
 import transform;
 
@@ -10,7 +11,7 @@ struct ComputeInput {
     uint local_invocation_index : SV_GroupIndex;
 }
 
-[[vk::binding(1, 1)]] var depth_texture: Texture2DMS;
+[[vk::binding(1, 1)]] var depth_texture: DepthTexture2DMS;
 [[vk::binding(2, 1)]] var partition_data: RWStructuredBuffer<Partition>;
 [[vk::binding(3, 1)]] var interval_data: RWStructuredBuffer<Interval>;
 
@@ -29,12 +30,14 @@ func main(ComputeInput input) {
 
     let tile_start = input.workgroup_id.xy * REDUCE_TILE_DIM + input.local_invocation_id.xy;
 
+    [unroll]
     for (uint tile_y = 0; tile_y < REDUCE_TILE_DIM; tile_y += REDUCE_ZBOUNDS_BLOCK_DIM) {
+        [unroll]
         for (uint tile_x = 0; tile_x < REDUCE_TILE_DIM; tile_x += REDUCE_ZBOUNDS_BLOCK_DIM) {
             let coords = tile_start + uint2(tile_x, tile_y);
 
             if (coords.x < depth_dim.x && coords.y < depth_dim.y) {
-                let depth_value = depth_texture.Load(int2(coords.x, coords.y), 0).r;
+                let depth_value = depth_texture.Load(int2(coords.x, coords.y), 0);
                 let linear_view_z = depth::nonLinearToLinear(depth_value);
 
                 if (linear_view_z >= NEAR_PLANE && linear_view_z < VIRTUAL_FAR_PLANE) {
@@ -51,6 +54,7 @@ func main(ComputeInput input) {
     GroupMemoryBarrierWithGroupSync();
 
     // Parallel reduction in shared memory.
+    [unroll]
     for (uint offset = REDUCE_ZBOUNDS_BLOCK_SIZE >> 1; offset > 0; offset >>= 1) {
         if (input.local_invocation_index < offset) {
             smin_z[input.local_invocation_index] = min(smin_z[input.local_invocation_index], smin_z[offset + input.local_invocation_index]);

@@ -57,31 +57,31 @@ impl DropDownItem<TextureSamplerType> for TextureSamplerType {
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, StateElement)]
-pub enum ShadowDetail {
+pub enum ShadowResolution {
     Normal,
     Ultra,
     Insane,
 }
 
-impl ShadowDetail {
+impl ShadowResolution {
     pub fn directional_shadow_resolution(self) -> u32 {
         match self {
-            ShadowDetail::Normal => 2048,
-            ShadowDetail::Ultra => 3072,
-            ShadowDetail::Insane => 4096,
+            ShadowResolution::Normal => 2048,
+            ShadowResolution::Ultra => 3072,
+            ShadowResolution::Insane => 4096,
         }
     }
 
     pub fn point_shadow_resolution(self) -> u32 {
         match self {
-            ShadowDetail::Normal => 128,
-            ShadowDetail::Ultra => 256,
-            ShadowDetail::Insane => 512,
+            ShadowResolution::Normal => 128,
+            ShadowResolution::Ultra => 256,
+            ShadowResolution::Insane => 512,
         }
     }
 }
 
-impl DropDownItem<ShadowDetail> for ShadowDetail {
+impl DropDownItem<ShadowResolution> for ShadowResolution {
     fn text(&self) -> &str {
         match self {
             Self::Normal => "Normal",
@@ -90,47 +90,72 @@ impl DropDownItem<ShadowDetail> for ShadowDetail {
         }
     }
 
-    fn value(&self) -> ShadowDetail {
+    fn value(&self) -> ShadowResolution {
         *self
     }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, StateElement)]
-pub enum ShadowQuality {
-    Hard,
-    SoftPCF,
-    SoftPCSSx8,
-    SoftPCSSx16,
-    SoftPCSSx32,
-    SoftPCSSx64,
+pub enum ShadowDetail {
+    Low,
+    Medium,
+    High,
+    Ultra,
 }
 
-impl DropDownItem<ShadowQuality> for ShadowQuality {
+impl DropDownItem<ShadowDetail> for ShadowDetail {
     fn text(&self) -> &str {
         match self {
-            Self::Hard => "Hard",
-            Self::SoftPCF => "Soft (PCF)",
-            Self::SoftPCSSx8 => "Soft (PCSS x8)",
-            Self::SoftPCSSx16 => "Soft (PCSS x16)",
-            Self::SoftPCSSx32 => "Soft (PCSS x32)",
-            Self::SoftPCSSx64 => "Soft (PCSS x64)",
+            Self::Low => "Low",
+            Self::Medium => "Medium",
+            Self::High => "High",
+            Self::Ultra => "Ultra",
         }
     }
 
-    fn value(&self) -> ShadowQuality {
+    fn value(&self) -> ShadowDetail {
         *self
     }
 }
 
-impl From<ShadowQuality> for u32 {
-    fn from(value: ShadowQuality) -> Self {
+impl From<ShadowDetail> for u32 {
+    fn from(value: ShadowDetail) -> Self {
         match value {
-            ShadowQuality::Hard => 0,
-            ShadowQuality::SoftPCF => 1,
-            ShadowQuality::SoftPCSSx8 => 2,
-            ShadowQuality::SoftPCSSx16 => 3,
-            ShadowQuality::SoftPCSSx32 => 4,
-            ShadowQuality::SoftPCSSx64 => 5,
+            ShadowDetail::Low => 1,
+            ShadowDetail::Medium => 2,
+            ShadowDetail::High => 3,
+            ShadowDetail::Ultra => 4,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, StateElement)]
+pub enum ShadowMethod {
+    Hard,
+    SoftPCF,
+    SoftPCSS,
+}
+
+impl DropDownItem<ShadowMethod> for ShadowMethod {
+    fn text(&self) -> &str {
+        match self {
+            Self::Hard => "Hard",
+            Self::SoftPCF => "Soft (PCF)",
+            Self::SoftPCSS => "Soft (PCSS)",
+        }
+    }
+
+    fn value(&self) -> ShadowMethod {
+        *self
+    }
+}
+
+impl From<ShadowMethod> for u32 {
+    fn from(value: ShadowMethod) -> Self {
+        match value {
+            ShadowMethod::Hard => 0,
+            ShadowMethod::SoftPCF => 1,
+            ShadowMethod::SoftPCSS => 2,
         }
     }
 }

@@ -10,8 +10,8 @@ use wgpu::{
     BindingType, BlendComponent, BlendFactor, BlendOperation, BlendState, BufferBindingType, BufferUsages, ColorTargetState, ColorWrites,
     CommandEncoder, CompareFunction, DepthBiasState, DepthStencilState, Device, Face, FragmentState, FrontFace, MultisampleState,
     PipelineCompilationOptions, PipelineLayout, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline,
-    RenderPipelineDescriptor, ShaderModule, ShaderModuleDescriptor, ShaderStages, StencilState, TextureFormat, TextureSampleType,
-    TextureView, TextureViewDimension, VertexState, include_wgsl,
+    RenderPipelineDescriptor, ShaderModule, ShaderStages, StencilState, TextureFormat, TextureSampleType, TextureView,
+    TextureViewDimension, VertexState,
 };
 
 use crate::graphics::passes::{
@@ -20,8 +20,6 @@ use crate::graphics::passes::{
 use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::graphics::{BindlessSupport, Buffer, Capabilities, EntityInstruction, GlobalContext, Prepare, RenderInstruction, Texture};
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("../../../../shaders/passes/forward/entity.wgsl");
-const SHADER_BINDLESS: ShaderModuleDescriptor = include_wgsl!("../../../../shaders/passes/forward/entity_bindless.wgsl");
 const DRAWER_NAME: &str = "forward entity";
 const INITIAL_INSTRUCTION_SIZE: usize = 256;
 
@@ -77,14 +75,14 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
         capabilities: &Capabilities,
         device: &Device,
         _queue: &Queue,
-        _shader_compiler: &ShaderCompiler,
+        shader_compiler: &ShaderCompiler,
         global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {
         let shader_module = if capabilities.bindless_support() == BindlessSupport::Full {
-            device.create_shader_module(SHADER_BINDLESS)
+            shader_compiler.create_shader_module("forward", "entity_bindless")
         } else {
-            device.create_shader_module(SHADER)
+            shader_compiler.create_shader_module("forward", "entity")
         };
 
         let instance_data_buffer = Buffer::with_capacity(
@@ -412,7 +410,10 @@ impl ForwardEntityDrawer {
             ],
         };
 
-        let constants = &[("PASS_MODE", f64::from(pass_mode as u32))];
+        let constants = &[
+            // PASS_MODE
+            ("0", f64::from(pass_mode as u32)),
+        ];
 
         device.create_render_pipeline(&RenderPipelineDescriptor {
             label: Some(&format!("{DRAWER_NAME} {pass_mode:?}")),

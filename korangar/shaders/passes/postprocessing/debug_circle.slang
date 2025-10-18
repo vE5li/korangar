@@ -4,8 +4,8 @@ import postprocessing;
 
 public struct DebugCircleVertexOutput {
     public float4 position : SV_Position;
-    public var fragment_position: float2;
-    public var instance_index: uint;
+    [[vk::location(0)]] public var fragment_position: float2;
+    [[vk::location(1)]] public var instance_index: uint;
 }
 
 public struct DebugCircleInstanceData {
@@ -43,6 +43,7 @@ func fs_main(input: DebugCircleVertexOutput) -> float4 {
     return instance.color * intensity;
 }
 
+[ForceInline]
 func gaussian_peak(x: float, scaling_factor: float) -> float {
     // The variance defines how steep the peek is.
     // A larger number will make it fuzzier, a smaller number will make the circle sharper.
@@ -66,6 +67,7 @@ func gaussian_peak(x: float, scaling_factor: float) -> float {
 // 5             0  0
 //
 // (x,y) are the vertex position
+[ForceInline]
 func vertex_data(vertex_index: uint) -> float2 {
     let index = 1u << vertex_index;
     let x = float((index & 0xEu) != 0u);

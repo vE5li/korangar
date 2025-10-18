@@ -12,8 +12,12 @@ struct ModelVertexInput {
 
 struct ModelVertexOutput {
     float4 position : SV_Position;
-    var texture_coordinates: float2;
-    var texture_index: int;
+    [[vk::location(0)]] var texture_coordinates: float2;
+    [[vk::location(1)]] var texture_index: int;
+};
+
+struct ModelFragmentOutput {
+    [[vk::location(0)]] var translucence: float;
 };
 
 [[vk::binding(2, 0)]] var linear_sampler: SamplerState;
@@ -37,7 +41,7 @@ func vs_main(input: ModelVertexInput) -> ModelVertexOutput {
 }
 
 [[shader("pixel")]]
-func fs_main(input: ModelVertexOutput) -> float4 {
+func fs_main(input: ModelVertexOutput) -> ModelFragmentOutput {
     let texture = textures[input.texture_index];
     let diffuse_color = texture.SampleLevel(linear_sampler, input.texture_coordinates, 0.0);
 
@@ -45,5 +49,7 @@ func fs_main(input: ModelVertexOutput) -> float4 {
         discard;
     }
 
-    return diffuse_color;
+    var output: ModelFragmentOutput;
+    output.translucence = 1.0;
+    return output;
 }

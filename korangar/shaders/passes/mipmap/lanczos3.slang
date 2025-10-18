@@ -2,17 +2,13 @@
 
 import screen_space;
 
-[[vk::binding(0, 0)]] var texture: Texture2D;
+public struct MipMapUniforms {
+    // Lanczos3 6x6 resampling kernel (packed as vec4 for std140 layout)
+    public var lanczos3_kernel: float4[9];
+}
 
-// A 6x6 Lanczos 3 kernel.
-static const var KERNEL: float[36] = {
-    0.00059812, -0.00332290, 0.01495304, 0.01495304, -0.00332290, 0.00059812,
-    -0.00332290, 0.01846054, -0.08307242, -0.08307242, 0.01846054, -0.00332290,
-    0.01495304, -0.08307242, 0.37382591, 0.37382591, -0.08307242, 0.01495304,
-    0.01495304, -0.08307242, 0.37382591, 0.37382591, -0.08307242, 0.01495304,
-    -0.00332290, 0.01846054, -0.08307242, -0.08307242, 0.01846054, -0.00332290,
-    0.00059812, -0.00332290, 0.01495304, 0.01495304, -0.00332290, 0.00059812,
-};
+[[vk::binding(0, 0)]] var mipmap_uniforms: ConstantBuffer<MipMapUniforms>;
+[[vk::binding(1, 0)]] var texture: Texture2D;
 
 static const var KERNEL_SIZE: int = 6;
 static const var BORDER_SIZE: int = 3;
@@ -40,7 +36,13 @@ func fs_main(input: FullscreenVertex) -> float4 {
             );
             let clamped_position = clamp(sample_position, int2(0), max_position);
             let source_color = texture.Load(int3(clamped_position, 0));
-            color += source_color * KERNEL[ky * 6 + kx];
+
+            let kernel_index = ky * 6 + kx;
+            let packed_index = kernel_index / 4;
+            let component_index = kernel_index % 4;
+            let kernel_value = mipmap_uniforms.lanczos3_kernel[packed_index][component_index];
+
+            color += source_color * kernel_value;
         }
     }
 

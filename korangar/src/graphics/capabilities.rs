@@ -6,8 +6,6 @@ use crate::graphics::{Msaa, RENDER_TO_TEXTURE_DEPTH_FORMAT, RENDER_TO_TEXTURE_FO
 
 pub const MAX_BINDING_ARRAY_ELEMENTS_PER_SHADER_STAGE: u32 = 10240;
 
-pub const MAX_STORAGE_BUFFER_BINDING_SIZE: u32 = 268435456;
-
 /// The maximum texture size that is guaranteed by the graphic engine to be
 /// available.
 pub const MAX_TEXTURE_SIZE: u32 = 8192;
@@ -39,12 +37,15 @@ impl Capabilities {
         let adapter_features = adapter.features();
         let adapter_limits = adapter.limits();
 
-        // We need to test all textures that we use for MSAA
-        // which sample count they support.
+        // We need to test all textures that we use for MSAA which sample count they
+        // support.
         let supported_msaa = determine_supported_msaa(adapter, &[RENDER_TO_TEXTURE_FORMAT, RENDER_TO_TEXTURE_DEPTH_FORMAT]);
 
-        let mut required_limits = Limits::default().using_resolution(adapter.limits());
-        required_limits.max_storage_buffer_binding_size = MAX_STORAGE_BUFFER_BINDING_SIZE;
+        let required_limits = Limits::default().using_resolution(adapter.limits());
+
+        // WebWGPUs default limit is 8192, which we assert here, because our font maps
+        // are designed to work inside this limit.
+        assert!(required_limits.max_texture_dimension_2d >= MAX_TEXTURE_SIZE);
 
         let mut capabilities = Self {
             supported_msaa,
@@ -54,13 +55,9 @@ impl Capabilities {
             texture_compression: false,
             #[cfg(feature = "debug")]
             polygon_mode_line: false,
-            required_features: Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES | Features::TEXTURE_FORMAT_16BIT_NORM,
+            required_features: Features::empty(),
             required_limits,
         };
-
-        if capabilities.required_limits.max_texture_dimension_2d < MAX_TEXTURE_SIZE {
-            capabilities.required_limits.max_texture_dimension_2d = MAX_TEXTURE_SIZE;
-        }
 
         #[cfg(feature = "debug")]
         {
@@ -77,10 +74,8 @@ impl Capabilities {
                 adapter_features,
                 Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING,
             );
-            Self::check_feature(adapter_features, Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES);
             Self::check_feature(adapter_features, Features::TEXTURE_COMPRESSION_BC);
             Self::check_feature(adapter_features, Features::TEXTURE_BINDING_ARRAY);
-            Self::check_feature(adapter_features, Features::TEXTURE_FORMAT_16BIT_NORM);
             Self::check_feature(adapter_features, Features::POLYGON_MODE_LINE);
         }
 

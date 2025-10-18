@@ -303,7 +303,9 @@ fn check_slangc_availability() {
                 std::process::exit(1);
             }
 
-            let version_output = String::from_utf8_lossy(&output.stdout);
+            // `slangc` currently outputs all diagnostics messages to `stderr`, including
+            // the version.
+            let version_output = String::from_utf8_lossy(&output.stderr);
 
             match parse_slangc_version(&version_output) {
                 Some((year, major, minor)) => {

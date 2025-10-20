@@ -342,7 +342,14 @@ fn check_slangc_availability() {
 }
 
 fn parse_slangc_version(version_output: &str) -> Option<(u32, u32, u32)> {
-    let parts: Vec<&str> = version_output.split('.').collect();
+    // On Nix, the version is formatted as `vYEAR.MAJOR.MINOR-nixpkgs`, so we
+    // sanitize the input to be in the format `YEAR.MAJOR.MINOR`.
+    let sanetized_output: String = version_output
+        .chars()
+        .filter(|character| character.is_ascii_digit() || *character == '.')
+        .collect();
+
+    let parts: Vec<&str> = sanetized_output.split('.').collect();
 
     if parts.len() < 3 {
         return None;

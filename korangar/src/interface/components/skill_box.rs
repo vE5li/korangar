@@ -188,7 +188,11 @@ where
                 false => Color::monochrome_u8(80),
             };
 
-            layout.add_sprite(layout_info.area, &skill.actions, &skill.sprite, &skill.animation_state, color);
+            if let Some(actions) = &skill.actions
+                && let Some(sprite) = &skill.sprite
+            {
+                layout.add_sprite(layout_info.area, &actions, &sprite, &skill.animation_state, color);
+            }
 
             if is_hovered {
                 layout.register_click_handler(MouseButton::Left, &self.handler);

@@ -341,12 +341,14 @@ fn initialize_shutdown_signal() {
 
 struct Client {
     game_file_loader: Arc<GameFileLoader>,
+    #[cfg(feature = "debug")]
     action_loader: Arc<ActionLoader>,
     #[cfg(feature = "debug")]
     animation_loader: Arc<AnimationLoader>,
     async_loader: Arc<AsyncLoader>,
     effect_loader: Arc<EffectLoader>,
     font_loader: Arc<FontLoader>,
+    #[cfg(feature = "debug")]
     sprite_loader: Arc<SpriteLoader>,
     texture_loader: Arc<TextureLoader>,
     library: Arc<Library>,
@@ -760,12 +762,14 @@ impl Client {
 
         Some(Self {
             game_file_loader,
+            #[cfg(feature = "debug")]
             action_loader,
             #[cfg(feature = "debug")]
             animation_loader,
             async_loader,
             effect_loader,
             font_loader,
+            #[cfg(feature = "debug")]
             sprite_loader,
             texture_loader,
             library,
@@ -1151,12 +1155,8 @@ impl Client {
                         player.set_animation_data(animation_data);
                     }
 
-                    *self.client_state.follow_mut(client_state().skill_tree().layout()) = self.library.get_skill_tree_layout_from_job_id(
-                        &self.sprite_loader,
-                        &self.action_loader,
-                        player.get_job_id(),
-                        client_tick,
-                    );
+                    *self.client_state.follow_mut(client_state().skill_tree().layout()) =
+                        self.async_loader.request_skill_tree_layout_load(player.get_job_id(), client_tick);
 
                     self.client_state.follow_mut(client_state().entities()).push(player);
 
@@ -1545,8 +1545,7 @@ impl Client {
                 }
                 NetworkEvent::ChangeJob { account_id, job_id } => {
                     *self.client_state.follow_mut(client_state().skill_tree().layout()) =
-                        self.library
-                            .get_skill_tree_layout_from_job_id(&self.sprite_loader, &self.action_loader, job_id, client_tick);
+                        self.async_loader.request_skill_tree_layout_load(job_id, client_tick);
 
                     let entity = self
                         .client_state
@@ -1701,19 +1700,11 @@ impl Client {
                     for (index, hotkey) in hotkeys.into_iter().take(10).enumerate() {
                         match hotkey {
                             HotkeyState::Bound(hotkey) => {
-                                // TODO: Properly distinct between skill and item.
+                                // TODO: Properly distinguish between skill and item.
                                 let skill_id = SkillId(hotkey.skill_id as u16);
 
-                                let skill_entry = self.library.get_skill_list_entry(skill_id);
-                                let skill = LearnableSkill::load(
-                                    &self.sprite_loader,
-                                    &self.action_loader,
-                                    skill_id,
-                                    hotkey.quantity_or_skill_level,
-                                    skill_entry.file_name.clone(),
-                                    skill_entry.name.clone(),
-                                    client_tick,
-                                );
+                                let mut skill = self.async_loader.request_learnable_skill_load(skill_id, client_tick);
+                                skill.maximum_level = hotkey.quantity_or_skill_level;
 
                                 self.client_state
                                     .follow_mut(client_state().hotbar())

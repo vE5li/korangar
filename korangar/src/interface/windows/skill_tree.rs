@@ -46,13 +46,13 @@ where
 {
     fn follow<'a>(&self, state: &'a ClientState) -> Option<&'a LearnableSkill> {
         // SAFETY:
-        // Unwrapping is save because of the bounds
+        // Unwrapping is safe because of the bounds
         self.layout_path.follow(state).unwrap().get(&self.index)
     }
 
     fn follow_mut<'a>(&self, state: &'a mut ClientState) -> Option<&'a mut LearnableSkill> {
         // SAFETY:
-        // Unwrapping is save because of the bounds
+        // Unwrapping is safe because of the bounds
         self.layout_path.follow_mut(state).unwrap().get_mut(&self.index)
     }
 }

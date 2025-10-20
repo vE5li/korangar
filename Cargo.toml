@@ -13,7 +13,7 @@ cgmath = "0.18"
 chrono = "0.4"
 clap = "4"
 cosmic-text = { version = "0.14", default-features = false }
-cpal = "0.15"
+cpal = "0.16"
 ctrlc = "3"
 ddsfile = "0.5"
 encoding_rs = "0.8"
@@ -23,7 +23,6 @@ flate2 = { version = "1", default-features = false }
 hashbrown = "0.16"
 heck = "0.5"
 image = { version = "0.25", default-features = false }
-kira = { version = "0.10", default-features = false }
 korangar-audio = { path = "korangar-audio" }
 korangar-collision = { path = "korangar-collision" }
 korangar-container = { path = "korangar-container" }
@@ -51,7 +50,10 @@ rav1d = { version = "1", git = "https://github.com/memorysafety/rav1d.git", rev 
 rayon = "1"
 reqwest = "0.12"
 ron = "0.11"
+rtrb = "0.3"
 rust-state = { git = "https://github.com/vE5li/rust-state" }
+symphonia = { version = "0.5", default-features = false }
+send_wrapper = "0.6"
 serde = "1"
 sevenz-rust2 = { version = "0.19", default-features = false }
 smallvec = "1"

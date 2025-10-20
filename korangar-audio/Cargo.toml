@@ -2,19 +2,29 @@
 name = "korangar-audio"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
 
 [dependencies]
-cpal = { workspace = true }
-cgmath = { workspace = true, features = ["mint"] }
-kira = { workspace = true, features = ["cpal", "mp3", "wav"] }
+cgmath = { workspace = true }
 korangar-debug = { workspace = true, optional = true }
 korangar-collision = { workspace = true }
 korangar-container = { workspace = true }
 korangar-loaders = { workspace = true }
 rayon = { workspace = true }
+rtrb = { workspace = true }
+symphonia = { workspace = true, default-features = false, features = ["mp3", "pcm", "wav"] }
+send_wrapper = { workspace = true, optional = true }
 
-[dev-dependencies]
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies.cpal]
+workspace = true
+
+[target.'cfg(target_arch = "wasm32")'.dependencies.cpal]
+workspace = true
+features = ["wasm-bindgen"]
+
+[target.'cfg(target_arch = "wasm32")'.dependencies.send_wrapper]
+workspace = true
 
 [features]
 debug = ["korangar-debug"]
-flac = ["kira/flac"]
+flac = ["symphonia/flac"]

@@ -14,21 +14,52 @@
     flake-utils.lib.eachDefaultSystem (system: let
       overlays = [(import rust-overlay)];
       pkgs = (import nixpkgs) {inherit system overlays;};
+      # Can be removed once slangc 2025.18.2 is officially packaged for nix.
+      shader-slang-git = pkgs.shader-slang.overrideAttrs (oldAttrs: rec {
+        version = "2025.19.1";
+
+        src = pkgs.fetchFromGitHub {
+          owner = "shader-slang";
+          repo = "slang";
+          tag = "v${version}";
+          hash = "sha256-mbtyvPM3dtIZRU9dWMCZ/XCf2mDAPuJMhagMLgFsdWI=";
+          fetchSubmodules = true;
+        };
+
+        # Patches are no longer required.
+        patches = [];
+
+        # Build using the included miniz and lz4 dependencies.
+        cmakeFlags =
+          map (
+            flag:
+              if pkgs.lib.hasPrefix "-DSLANG_USE_SYSTEM_MINIZ=" flag
+              then "-DSLANG_USE_SYSTEM_MINIZ=OFF"
+              else if pkgs.lib.hasPrefix "-DSLANG_USE_SYSTEM_LZ4=" flag
+              then "-DSLANG_USE_SYSTEM_LZ4=OFF"
+              else flag
+          )
+          oldAttrs.cmakeFlags
+          ++ [
+            "-DSLANG_ENABLE_TESTS=OFF"
+            "-DSLANG_ENABLE_EXAMPLES=OFF"
+            "-DSLANG_ENABLE_GFX=OFF"
+          ];
+      });
     in {
       formatter = pkgs.alejandra;
 
       # Provide a shell with all dependencies needed to build `koragnar::*`
-      devShell = pkgs.mkShell {
+      devShells.default = pkgs.mkShell {
         nativeBuildInputs = with pkgs; [
           (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
           pkg-config
         ];
         buildInputs = with pkgs;
-          [libpcap nasm nixpkgs-fmt openssl shaderc shader-slang vulkan-headers vulkan-loader]
+          [libpcap nasm nixpkgs-fmt openssl shaderc shader-slang-git vulkan-headers vulkan-loader]
           ++ lib.optional stdenv.isDarwin [
-            darwin.apple_sdk.frameworks.AppKit
-            darwin.apple_sdk.frameworks.CoreGraphics
-            darwin.moltenvk
+            apple-sdk
+            moltenvk
           ]
           ++ lib.optional stdenv.isLinux [
             alsa-lib.dev
@@ -44,8 +75,7 @@
           + (pkgs.lib.strings.optionalString pkgs.stdenv.isDarwin ''
             export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:${
               pkgs.lib.strings.makeLibraryPath [
-                pkgs.darwin.apple_sdk.frameworks.AppKit
-                pkgs.darwin.apple_sdk.frameworks.CoreGraphics
+                pkgs.apple-sdk
                 pkgs.darwin.moltenvk
               ]
             };

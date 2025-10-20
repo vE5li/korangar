@@ -70,8 +70,8 @@ impl MouseModeExt for MouseMode<ClientState> {
             MouseMode::Custom {
                 mode: MouseInputMode::MoveSkill { skill, .. },
             } => Some(Grabbed::Action(
-                skill.sprite.clone(),
-                skill.actions.clone(),
+                skill.sprite.clone()?,
+                skill.actions.clone()?,
                 skill.animation_state.clone(),
             )),
             _ => None,

@@ -106,7 +106,7 @@ impl From<JobId> for EntityType {
     fn from(job_id: JobId) -> Self {
         match job_id.0 {
             45 => EntityType::Warp,
-            111 => EntityType::Hidden, // TODO: check that this is correct
+            111 => EntityType::Hidden,
             0..=44 | 4000..=5999 => EntityType::Player,
             46..=999 | 10000..=19999 => EntityType::Npc,
             1000..=3999 | 20000..=29999 => EntityType::Monster,

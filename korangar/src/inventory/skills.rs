@@ -89,37 +89,11 @@ pub struct LearnableSkill {
     pub skill_name: String,
     // TODO: Unhide this
     #[hidden_element]
-    pub sprite: Arc<Sprite>,
+    pub sprite: Option<Arc<Sprite>>,
     // TODO: Unhide this
     #[hidden_element]
-    pub actions: Arc<Actions>,
+    pub actions: Option<Arc<Actions>>,
     pub animation_state: SpriteAnimationState,
-}
-
-impl LearnableSkill {
-    pub fn load(
-        sprite_loader: &SpriteLoader,
-        action_loader: &ActionLoader,
-        skill_id: SkillId,
-        maximum_level: SkillLevel,
-        file_name: String,
-        skill_name: String,
-        client_tick: ClientTick,
-    ) -> Self {
-        let file_path = format!("아이템\\{}", file_name);
-        let sprite = sprite_loader.get_or_load(&format!("{file_path}.spr")).unwrap();
-        let actions = action_loader.get_or_load(&format!("{file_path}.act")).unwrap();
-
-        LearnableSkill {
-            skill_id,
-            maximum_level,
-            file_name,
-            skill_name,
-            sprite,
-            actions,
-            animation_state: SpriteAnimationState::new(client_tick),
-        }
-    }
 }
 
 #[derive(Clone, Debug, RustState, StateElement)]

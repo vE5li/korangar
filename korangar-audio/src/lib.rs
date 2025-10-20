@@ -1,5 +1,21 @@
-//! This crate exposes an audio engine for the client
+//! This crate exposes an audio engine for the client.
+//!
+//! It is based on the open source library [Kira](https://github.com/tesselode/kira), which is itself licensed under
+//! the Apache 2 and MIT license.
 #![forbid(missing_docs)]
+
+pub(crate) mod backend;
+pub(crate) mod command;
+mod decibels;
+mod error;
+mod frame;
+pub(crate) mod listener;
+mod manager;
+mod parameter;
+mod playback_state_manager;
+pub(crate) mod sound;
+pub(crate) mod track;
+mod tween;
 
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
@@ -12,15 +28,8 @@ use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use cgmath::{InnerSpace, Matrix3, One, Point3, Quaternion, Vector3};
-use cpal::BufferSize;
-use kira::backend::cpal::{CpalBackend, CpalBackendSettings};
-use kira::listener::ListenerHandle;
-use kira::sound::static_sound::{StaticSoundData, StaticSoundHandle};
-use kira::sound::streaming::{StreamingSoundData, StreamingSoundHandle};
-use kira::sound::{FromFileError, PlaybackState};
-use kira::track::{MainTrackBuilder, SpatialTrackBuilder, SpatialTrackDistances, SpatialTrackHandle, TrackBuilder, TrackHandle};
-use kira::{AudioManager, AudioManagerSettings, Capacities, Decibels, Easing, Frame, Tween};
+use cgmath::{InnerSpace, Matrix3, Point3, Quaternion, Vector3};
+use cpal::{BufferSize, SampleRate, StreamConfig};
 use korangar_collision::{KDTree, Sphere};
 use korangar_container::{
     CacheStatistics, Cacheable, GenerationalSlab, SimpleCache, SimpleSlab, create_generational_key, create_simple_key,
@@ -29,6 +38,15 @@ use korangar_container::{
 use korangar_debug::logging::{Colorize, print_debug};
 use korangar_loaders::FileLoader;
 use rayon::spawn;
+
+use crate::backend::cpal::{CpalBackend, CpalBackendSettings};
+use crate::decibels::Decibels;
+use crate::frame::Frame;
+use crate::manager::{AudioManager, AudioManagerSettings};
+use crate::sound::PlaybackState;
+use crate::sound::static_sound::{StaticSoundData, StaticSoundHandle};
+use crate::sound::streaming::{StreamingSoundData, StreamingSoundHandle};
+use crate::track::{SpatialTrackBuilder, SpatialTrackDistances, SpatialTrackHandle, TrackBuilder, TrackHandle};
 
 create_generational_key!(SoundEffectKey, "The key for a cached sound effect");
 create_simple_key!(AmbientKey, "The key for a ambient sound");
@@ -41,12 +59,12 @@ const BACKGROUND_MUSIC_MAPPING_FILE: &str = "data\\mp3NameTable.txt";
 
 struct BackgroundMusicTrack {
     track_name: String,
-    handle: StreamingSoundHandle<FromFileError>,
+    handle: StreamingSoundHandle,
 }
 
 enum QueuedSoundEffectType {
     Sound,
-    SpatialSound { position: Vector3<f32>, range: f32 },
+    SpatialSound { position: Point3<f32>, range: f32 },
     AmbientSound { ambient_key: AmbientKey },
 }
 
@@ -105,7 +123,6 @@ pub struct AudioEngine<F> {
 
 struct EngineContext<F> {
     active_spatial_tracks: HashMap<AmbientKey, SpatialTrackHandle>,
-    spatial_listener: ListenerHandle,
     ambient_sound: SimpleSlab<AmbientKey, AmbientSoundConfig>,
     spatial_sound_effect_track: TrackHandle,
     async_response_receiver: Receiver<AsyncLoadResult>,
@@ -134,26 +151,26 @@ impl<F: FileLoader> AudioEngine<F> {
     /// Crates a new audio engine.
     pub fn new(game_file_loader: Arc<F>) -> AudioEngine<F> {
         let mut manager = AudioManager::<CpalBackend>::new(AudioManagerSettings {
-            capacities: Capacities::default(),
-            main_track_builder: MainTrackBuilder::default(),
-            internal_buffer_size: 128,
             backend_settings: CpalBackendSettings {
                 device: None,
-                // At sampling rate of 48 kHz 1200 frames take 25 ms.
-                buffer_size: BufferSize::Fixed(1200),
+                config: Some(StreamConfig {
+                    channels: 2,
+                    sample_rate: SampleRate(44100 / 2),
+                    buffer_size: BufferSize::Fixed(1200),
+                }),
             },
+            ..Default::default()
         })
-        .expect("Can't initialize audio backend");
+        .expect("can't initialize audio kira");
         let background_music_track = manager
-            .add_sub_track(TrackBuilder::new())
-            .expect("Can't create background music track");
-        let sound_effect_track = manager.add_sub_track(TrackBuilder::new()).expect("Can't create sound effect track");
+            .add_sub_track(TrackBuilder::default())
+            .expect("can't create background music track");
+        let sound_effect_track = manager
+            .add_sub_track(TrackBuilder::default())
+            .expect("can't create sound effect track");
         let spatial_sound_effect_track = manager
-            .add_sub_track(TrackBuilder::new())
-            .expect("Can't create spatial sound effect track");
-        let position = Vector3::new(0.0, 0.0, 0.0);
-        let orientation = Quaternion::one();
-        let spatial_listener = manager.add_listener(position, orientation).expect("Can't create spatial listener");
+            .add_sub_track(TrackBuilder::default())
+            .expect("can't create spatial sound effect track");
 
         let loading_sound_effect = HashSet::new();
         let cache = SimpleCache::new(
@@ -168,7 +185,6 @@ impl<F: FileLoader> AudioEngine<F> {
 
         let engine_context = Mutex::new(EngineContext {
             active_spatial_tracks: HashMap::default(),
-            spatial_listener,
             ambient_sound: SimpleSlab::default(),
             spatial_sound_effect_track,
             async_response_receiver,
@@ -232,7 +248,7 @@ impl<F: FileLoader> AudioEngine<F> {
             return *sound_effect_key;
         }
 
-        let sound_effect_key = context.sound_effect_paths.insert(path.to_string()).expect("Mapping slab is full");
+        let sound_effect_key = context.sound_effect_paths.insert(path.to_string()).expect("mapping slab is full");
         context.lookup.insert(path.to_string(), sound_effect_key);
 
         if !context.loading_sound_effect.contains(&sound_effect_key) {
@@ -348,40 +364,25 @@ impl<F: FileLoader> AudioEngine<F> {
 
 impl<F: FileLoader> EngineContext<F> {
     fn set_main_volume(&mut self, volume: Decibels) {
-        self.manager.main_track().set_volume(volume, Tween {
-            duration: Duration::from_millis(500),
-            ..Default::default()
-        });
+        self.manager.main_track().set_volume(volume, Duration::from_millis(500));
     }
 
     fn set_background_music_volume(&mut self, volume: Decibels) {
-        self.background_music_track.set_volume(volume, Tween {
-            duration: Duration::from_millis(500),
-            ..Default::default()
-        });
+        self.background_music_track.set_volume(volume, Duration::from_millis(500));
     }
 
     fn set_sound_effect_volume(&mut self, volume: Decibels) {
-        self.sound_effect_track.set_volume(volume, Tween {
-            duration: Duration::from_millis(500),
-            ..Default::default()
-        });
+        self.sound_effect_track.set_volume(volume, Duration::from_millis(500));
     }
 
     fn set_spatial_sound_effect_volume(&mut self, volume: Decibels) {
-        self.spatial_sound_effect_track.set_volume(volume, Tween {
-            duration: Duration::from_millis(500),
-            ..Default::default()
-        });
+        self.spatial_sound_effect_track.set_volume(volume, Duration::from_millis(500));
     }
 
     fn play_background_music_track(&mut self, track_name: Option<&str>) {
         let Some(track_name) = track_name else {
             if let Some(playing) = self.current_background_music_track.as_mut() {
-                playing.handle.stop(Tween {
-                    duration: Duration::from_secs(1),
-                    ..Default::default()
-                });
+                playing.handle.stop(Duration::from_secs(1));
             }
 
             self.current_background_music_track = None;
@@ -396,10 +397,7 @@ impl<F: FileLoader> EngineContext<F> {
             }
 
             if playing.handle.state() == PlaybackState::Playing {
-                playing.handle.stop(Tween {
-                    duration: Duration::from_secs(1),
-                    ..Default::default()
-                });
+                playing.handle.stop(Duration::from_secs(1));
             }
 
             self.queued_background_music_track = Some(track_name.to_string());
@@ -436,9 +434,6 @@ impl<F: FileLoader> EngineContext<F> {
     }
 
     fn play_spatial_sound_effect(&mut self, sound_effect_key: SoundEffectKey, position: Point3<f32>, range: f32) {
-        // Kira uses a RH coordinate system, so we need to convert our LH vectors.
-        let position = Vector3::new(position.x, position.y, -position.z);
-
         match self
             .cache
             .get(&sound_effect_key)
@@ -451,12 +446,9 @@ impl<F: FileLoader> EngineContext<F> {
                         min_distance: 5.0,
                         max_distance: range,
                     })
-                    .attenuation_function(Easing::Linear);
+                    .use_linear_attenuation_function(true);
 
-                match self
-                    .spatial_sound_effect_track
-                    .add_spatial_sub_track(&self.spatial_listener, position, spatial_track)
-                {
+                match self.spatial_sound_effect_track.add_spatial_sub_track(position, spatial_track) {
                     Ok(mut spatial_track_handle) => {
                         if let Err(_error) = spatial_track_handle.play(data) {
                             #[cfg(feature = "debug")]
@@ -500,9 +492,7 @@ impl<F: FileLoader> EngineContext<F> {
                 continue;
             };
 
-            // Kira uses a RH coordinate system, so we need to convert our LH vectors.
             let position = sound_config.bounds.center();
-            let position = Vector3::new(position.x, position.y, -position.z);
 
             let spatial_track = SpatialTrackBuilder::new()
                 .persist_until_sounds_finish(true)
@@ -510,20 +500,16 @@ impl<F: FileLoader> EngineContext<F> {
                     min_distance: 5.0,
                     max_distance: sound_config.bounds.radius(),
                 })
-                .attenuation_function(Easing::Linear);
+                .use_linear_attenuation_function(true);
 
-            let mut spatial_track_handle =
-                match self
-                    .spatial_sound_effect_track
-                    .add_spatial_sub_track(&self.spatial_listener, position, spatial_track)
-                {
-                    Ok(spatial_track_handle) => spatial_track_handle,
-                    Err(_error) => {
-                        #[cfg(feature = "debug")]
-                        print_debug!("[{}] can't add ambient sound track: {:?}", "error".red(), _error);
-                        continue;
-                    }
-                };
+            let mut spatial_track_handle = match self.spatial_sound_effect_track.add_spatial_sub_track(position, spatial_track) {
+                Ok(spatial_track_handle) => spatial_track_handle,
+                Err(_error) => {
+                    #[cfg(feature = "debug")]
+                    print_debug!("[{}] can't add ambient sound track: {:?}", "error".red(), _error);
+                    continue;
+                }
+            };
 
             let sound_effect_key = sound_config.sound_effect_key;
             match self
@@ -583,22 +569,17 @@ impl<F: FileLoader> EngineContext<F> {
         if now.duration_since(self.last_listener_update).as_secs_f32() > 0.05 {
             self.last_listener_update = now;
 
-            // Kira uses a RH coordinate system, so we need to convert our LH vectors.
-            let position = Vector3::new(position.x, position.y, -position.z);
-            let view_direction = Vector3::new(view_direction.x, view_direction.y, -view_direction.z).normalize();
-            let look_up = Vector3::new(look_up.x, look_up.y, -look_up.z).normalize();
+            let view_direction = view_direction.normalize();
+            let look_up = look_up.normalize();
             let right = view_direction.cross(look_up).normalize();
             let up = right.cross(view_direction);
 
-            let rotation_matrix = Matrix3::from_cols(right, up, -view_direction);
+            let rotation_matrix = Matrix3::from_cols(right, up, view_direction);
             let orientation = Quaternion::from(rotation_matrix);
 
-            let tween = Tween {
-                duration: Duration::from_millis(50),
-                ..Default::default()
-            };
-            self.spatial_listener.set_position(position, tween);
-            self.spatial_listener.set_orientation(orientation, tween);
+            let listener = self.manager.listener();
+            listener.set_position(position, Duration::from_millis(50));
+            listener.set_orientation(orientation, Duration::from_millis(50));
         }
     }
 
@@ -617,7 +598,7 @@ impl<F: FileLoader> EngineContext<F> {
                 volume,
                 cycle,
             })
-            .expect("Ambient sound slab is full")
+            .expect("ambient sound slab is full")
     }
 
     fn clear_ambient_sound(&mut self) {
@@ -730,12 +711,9 @@ impl<F: FileLoader> EngineContext<F> {
                             min_distance: 5.0,
                             max_distance: range,
                         })
-                        .attenuation_function(Easing::Linear);
+                        .use_linear_attenuation_function(true);
 
-                    match self
-                        .spatial_sound_effect_track
-                        .add_spatial_sub_track(&self.spatial_listener, position, spatial_track)
-                    {
+                    match self.spatial_sound_effect_track.add_spatial_sub_track(position, spatial_track) {
                         Ok(mut spatial_track_handle) => {
                             if let Err(_error) = spatial_track_handle.play(data) {
                                 #[cfg(feature = "debug")]
@@ -808,7 +786,7 @@ impl<F: FileLoader> EngineContext<F> {
             return;
         };
 
-        let data = match StreamingSoundData::from_file(path) {
+        let data = match StreamingSoundData::from_file(path, true) {
             Ok(sound_effect_data) => sound_effect_data,
             Err(_error) => {
                 #[cfg(feature = "debug")]
@@ -816,13 +794,6 @@ impl<F: FileLoader> EngineContext<F> {
                 return;
             }
         };
-
-        // Workaround: It seems kira drops the music as soon as it finishes, even though
-        // we defined the loop region to be the full region of the music. We shave off
-        // 50 ms of the music, so that the music never finishes, and we properly loop
-        // the music again.
-        let duration = data.duration().as_secs_f64() - 0.05;
-        let data = data.loop_region(..duration);
 
         let handle = match self.background_music_track.play(data) {
             Ok(handle) => handle,

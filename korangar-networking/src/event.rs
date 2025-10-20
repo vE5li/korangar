@@ -179,7 +179,7 @@ pub enum NetworkEvent {
     },
     ChangeJob {
         account_id: AccountId,
-        job_id: u32,
+        job_id: JobId,
     },
     ChangeHair {
         account_id: AccountId,

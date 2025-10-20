@@ -9,7 +9,9 @@ use korangar_debug::logging::Colorize;
 use korangar_interface::element::StateElement;
 use korangar_interface::window::{StateWindow, Window};
 use korangar_networking::EntityData;
-use ragnarok_packets::{AccountId, CharacterInformation, ClientTick, Direction, EntityId, Sex, StatType, TilePosition, WorldPosition};
+use ragnarok_packets::{
+    AccountId, CharacterInformation, ClientTick, Direction, EntityId, JobId, Sex, StatType, TilePosition, WorldPosition,
+};
 use rust_state::{Path, RustState, VecItem};
 #[cfg(feature = "debug")]
 use smallvec::smallvec_inline;
@@ -100,11 +102,11 @@ pub enum EntityType {
     Warp,
 }
 
-impl From<usize> for EntityType {
-    fn from(value: usize) -> Self {
-        match value {
+impl From<JobId> for EntityType {
+    fn from(job_id: JobId) -> Self {
+        match job_id.0 {
             45 => EntityType::Warp,
-            111 => EntityType::Hidden, // TODO: check that this is correct
+            111 => EntityType::Hidden,
             0..=44 | 4000..=5999 => EntityType::Player,
             46..=999 | 10000..=19999 => EntityType::Npc,
             1000..=3999 | 20000..=29999 => EntityType::Monster,
@@ -201,7 +203,7 @@ impl FadeState {
 #[derive(Clone, RustState, StateElement)]
 pub struct Common {
     pub entity_id: EntityId,
-    pub job_id: usize,
+    pub job_id: JobId,
     pub health_points: usize,
     pub maximum_health_points: usize,
     pub movement_speed: usize,
@@ -228,8 +230,8 @@ pub struct Common {
 
 #[cfg_attr(feature = "debug", korangar_debug::profile)]
 #[allow(clippy::invisible_characters)]
-fn get_sprite_path_for_player_job(job_id: usize) -> &'static str {
-    match job_id {
+fn get_sprite_path_for_player_job(job_id: JobId) -> &'static str {
+    match job_id.0 {
         0 => "초보자",             // NOVICE
         1 => "검사",               // SWORDMAN
         2 => "마법사",             // MAGICIAN
@@ -377,13 +379,13 @@ fn get_sprite_path_for_player_job(job_id: usize) -> &'static str {
     }
 }
 
-fn get_entity_part_files(library: &Library, entity_type: EntityType, job_id: usize, sex: Sex, head: Option<usize>) -> Vec<String> {
+fn get_entity_part_files(library: &Library, entity_type: EntityType, job_id: JobId, sex: Sex, head: Option<usize>) -> Vec<String> {
     let sex_sprite_path = match sex == Sex::Female {
         true => "여",
         false => "남",
     };
 
-    fn player_body_path(sex_sprite_path: &str, job_id: usize) -> String {
+    fn player_body_path(sex_sprite_path: &str, job_id: JobId) -> String {
         format!(
             "인간족\\몸통\\{}\\{}_{}",
             sex_sprite_path,
@@ -418,7 +420,7 @@ fn get_entity_part_files(library: &Library, entity_type: EntityType, job_id: usi
 impl Common {
     pub fn new(entity_data: &EntityData, tile_position: TilePosition, world_position: Point3<f32>, client_tick: ClientTick) -> Self {
         let entity_id = entity_data.entity_id;
-        let job_id = entity_data.job as usize;
+        let job_id = entity_data.job_id;
         let head_direction = entity_data.head_direction;
         let direction = entity_data.position.direction;
 
@@ -1228,6 +1230,10 @@ impl Entity {
         self.get_common().entity_id
     }
 
+    pub fn get_job_id(&self) -> JobId {
+        self.get_common().job_id
+    }
+
     pub fn get_entity_type(&self) -> EntityType {
         self.get_common().entity_type
     }
@@ -1256,7 +1262,7 @@ impl Entity {
         }
     }
 
-    pub fn set_job(&mut self, job_id: usize) {
+    pub fn set_job(&mut self, job_id: JobId) {
         self.get_common_mut().job_id = job_id;
     }
 

@@ -9,7 +9,7 @@ use rtrb::Consumer;
 use self::decode_scheduler::DecodeScheduler;
 use super::{CommandReaders, StreamingSoundSettings};
 use crate::decibels::Decibels;
-use crate::frame::{Frame, interpolate_frame};
+use crate::frame::Frame;
 use crate::parameter::Parameter;
 use crate::playback_state_manager::PlaybackStateManager;
 use crate::sound::{PlaybackState, Sound};
@@ -63,10 +63,8 @@ pub(crate) struct StreamingSound {
     frame_consumer: Consumer<TimestampedFrame>,
     playback_state_manager: PlaybackStateManager,
     current_frame: usize,
-    fractional_position: f64,
     volume: Parameter<Decibels>,
     shared: Arc<Shared>,
-    needs_resampling: Option<bool>,
 }
 
 impl StreamingSound {
@@ -82,16 +80,15 @@ impl StreamingSound {
         let current_frame = scheduler.current_frame();
         let start_position = current_frame as f64 / sample_rate as f64;
         shared.position.store(start_position.to_bits(), Ordering::SeqCst);
+
         Self {
             command_readers,
             sample_rate,
             frame_consumer,
             playback_state_manager: PlaybackStateManager::new(),
             current_frame,
-            fractional_position: 0.0,
             volume: Parameter::new(settings.volume),
             shared,
-            needs_resampling: None,
         }
     }
 
@@ -109,24 +106,8 @@ impl StreamingSound {
     }
 
     #[must_use]
-    fn next_frames(&mut self) -> [Frame; 4] {
-        let mut frames = [Frame::ZERO; 4];
-        let chunk = self.frame_consumer.read_chunk(self.frame_consumer.slots().min(4)).unwrap();
-        let (a, b) = chunk.as_slices();
-        let mut iter = a.iter().chain(b.iter());
-        for frame in &mut frames {
-            *frame = iter
-                .next()
-                .copied()
-                .map(|TimestampedFrame { frame, .. }| frame)
-                .unwrap_or(Frame::ZERO);
-        }
-        frames
-    }
-
-    #[must_use]
     fn position(&self) -> f64 {
-        (self.current_frame as f64 + self.fractional_position) / self.sample_rate as f64
+        self.current_frame as f64 / self.sample_rate as f64
     }
 
     fn stop(&mut self, fade_out_tween_duration: Duration) {
@@ -149,11 +130,6 @@ impl Sound for StreamingSound {
     }
 
     fn process(&mut self, out: &mut [Frame], dt: f64) {
-        if self.needs_resampling.is_none() {
-            let backend_sample_rate = (1.0 / dt).round() as u32;
-            self.needs_resampling = Some(self.sample_rate != backend_sample_rate);
-        }
-
         if self.shared.encountered_error() {
             self.playback_state_manager.mark_as_stopped();
             self.update_shared_playback_state();
@@ -182,57 +158,23 @@ impl Sound for StreamingSound {
 
         let num_frames = out.len();
 
-        match self.needs_resampling {
-            Some(false) => {
-                // Fast path: no resampling needed.
-                for (i, frame) in out.iter_mut().enumerate() {
-                    let time_in_chunk = (i + 1) as f64 / num_frames as f64;
-                    let volume = self.volume.interpolated_value(time_in_chunk).as_amplitude();
-                    let fade_volume = self.playback_state_manager.interpolated_fade_volume(time_in_chunk).as_amplitude();
+        for (i, frame) in out.iter_mut().enumerate() {
+            let time_in_chunk = (i + 1) as f64 / num_frames as f64;
+            let volume = self.volume.interpolated_value(time_in_chunk).as_amplitude();
+            let fade_volume = self.playback_state_manager.interpolated_fade_volume(time_in_chunk).as_amplitude();
 
-                    let current_frame = self
-                        .frame_consumer
-                        .pop()
-                        .map(|timestamped_frame| timestamped_frame.frame)
-                        .unwrap_or(Frame::ZERO);
+            let current_frame = self
+                .frame_consumer
+                .pop()
+                .map(|timestamped_frame| timestamped_frame.frame)
+                .unwrap_or(Frame::ZERO);
 
-                    if self.shared.reached_end() && self.frame_consumer.is_empty() {
-                        self.playback_state_manager.mark_as_stopped();
-                        self.update_shared_playback_state();
-                    }
-
-                    *frame = current_frame * fade_volume * volume;
-                }
+            if self.shared.reached_end() && self.frame_consumer.is_empty() {
+                self.playback_state_manager.mark_as_stopped();
+                self.update_shared_playback_state();
             }
-            _ => {
-                // Resampling path: use interpolation.
-                for (i, frame) in out.iter_mut().enumerate() {
-                    let time_in_chunk = (i + 1) as f64 / num_frames as f64;
-                    let volume = self.volume.interpolated_value(time_in_chunk).as_amplitude();
-                    let fade_volume = self.playback_state_manager.interpolated_fade_volume(time_in_chunk).as_amplitude();
-                    let next_frames = self.next_frames();
-                    let interpolated_out = interpolate_frame(
-                        next_frames[0],
-                        next_frames[1],
-                        next_frames[2],
-                        next_frames[3],
-                        self.fractional_position as f32,
-                    );
-                    self.fractional_position += self.sample_rate as f64 * dt;
 
-                    while self.fractional_position >= 1.0 {
-                        self.fractional_position -= 1.0;
-                        self.frame_consumer.pop().ok();
-                    }
-
-                    if self.shared.reached_end() && self.frame_consumer.is_empty() {
-                        self.playback_state_manager.mark_as_stopped();
-                        self.update_shared_playback_state();
-                    }
-
-                    *frame = interpolated_out * fade_volume * volume;
-                }
-            }
+            *frame = current_frame * fade_volume * volume;
         }
     }
 

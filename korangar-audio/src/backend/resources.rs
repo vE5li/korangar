@@ -69,7 +69,6 @@ impl<T> ResourceStorage<T> {
         }
     }
 
-    #[must_use]
     pub(crate) fn iter(&self) -> impl Iterator<Item = &T> {
         self.resources.iter().filter_map(|opt| opt.as_ref())
     }
@@ -80,9 +79,10 @@ impl<T> ResourceStorage<T> {
     }
 }
 
+#[rustfmt::skip]
 impl<'a, T> IntoIterator for &'a mut ResourceStorage<T> {
-    type IntoIter = std::iter::FilterMap<std::slice::IterMut<'a, Option<T>>, fn(&'a mut Option<T>) -> Option<&'a mut T>>;
     type Item = &'a mut T;
+    type IntoIter = std::iter::FilterMap<std::slice::IterMut<'a, Option<T>>, fn(&'a mut Option<T>) -> Option<&'a mut T>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.resources.iter_mut().filter_map(|opt| opt.as_mut())

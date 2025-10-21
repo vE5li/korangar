@@ -11,7 +11,7 @@ impl Transport {
     pub(crate) fn new(looping: bool, num_frames: usize) -> Self {
         Self {
             position: 0,
-            loop_region: looping.then(|| (0, num_frames)),
+            loop_region: looping.then_some((0, num_frames)),
             playing: true,
         }
     }

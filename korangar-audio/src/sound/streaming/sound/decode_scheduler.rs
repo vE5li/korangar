@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
@@ -6,6 +7,7 @@ use rtrb::{Consumer, Producer, RingBuffer};
 
 use super::{Shared, TimestampedFrame};
 use crate::frame::Frame;
+use crate::resampler::Resampler;
 use crate::sound::PlaybackState;
 use crate::sound::error::FromFileError;
 use crate::sound::streaming::{StreamingSoundSettings, SymphoniaDecoder};
@@ -28,6 +30,16 @@ pub(crate) struct DecodeScheduler {
     decoded_chunk: Option<DecodedChunk>,
     frame_producer: Producer<TimestampedFrame>,
     shared: Arc<Shared>,
+    source_sample_rate: u32,
+    backend_sample_rate: u32,
+    resampler: Option<Resampler>,
+    /// Queue of resampled frames waiting to be pushed to the ring buffer.
+    /// Each entry is (resampled_frame, source_frame_index).
+    resampler_output_queue: VecDeque<(Frame, usize)>,
+    /// Count of how many source frames we've pushed to the resampler
+    source_frames_pushed: u64,
+    /// Count of how many resampled frames we've output
+    resampled_frames_output: u64,
 }
 
 impl DecodeScheduler {
@@ -35,6 +47,7 @@ impl DecodeScheduler {
         mut decoder: SymphoniaDecoder,
         settings: StreamingSoundSettings,
         shared: Arc<Shared>,
+        backend_sample_rate: u32,
     ) -> Result<(Self, Consumer<TimestampedFrame>), FromFileError> {
         let (mut frame_producer, frame_consumer) = RingBuffer::new(BUFFER_SIZE);
         // Pre-seed the frame ring buffer with a zero frame. This is the "previous"
@@ -46,7 +59,15 @@ impl DecodeScheduler {
             })
             .expect("the frame producer shouldn't be full because we just created it");
         let num_frames = decoder.num_frames();
+        let source_sample_rate = decoder.sample_rate();
         let decoder_current_frame_index = decoder.seek(0)?;
+
+        let resampler = if source_sample_rate != backend_sample_rate {
+            Some(Resampler::new(source_sample_rate, backend_sample_rate))
+        } else {
+            None
+        };
+
         let scheduler = Self {
             decoder,
             num_frames,
@@ -55,6 +76,12 @@ impl DecodeScheduler {
             decoded_chunk: None,
             frame_producer,
             shared,
+            source_sample_rate,
+            backend_sample_rate,
+            resampler,
+            resampler_output_queue: VecDeque::new(),
+            source_frames_pushed: 0,
+            resampled_frames_output: 0,
         };
         Ok((scheduler, frame_consumer))
     }
@@ -98,19 +125,102 @@ impl DecodeScheduler {
         if self.frame_producer.is_full() {
             return Ok(NextStep::Wait);
         }
-        let frame = self.frame_at_index(self.transport.position)?;
-        self.frame_producer
-            .push(TimestampedFrame {
-                frame,
-                index: self.transport.position,
-            })
-            .expect("could not push frame to frame producer");
-        self.transport.increment_position(self.num_frames);
-        if !self.transport.playing {
-            self.shared.reached_end.store(true, Ordering::SeqCst);
-            return Ok(NextStep::End);
+
+        if self.resampler.is_some() {
+            // First, try to push any queued resampled frames to the ring buffer.
+            while !self.frame_producer.is_full() && !self.resampler_output_queue.is_empty() {
+                let (frame, index) = self.resampler_output_queue.pop_front().unwrap();
+
+                self.frame_producer
+                    .push(TimestampedFrame { frame, index })
+                    .expect("frame producer should not be full");
+
+                self.resampled_frames_output += 1;
+            }
+
+            if self.frame_producer.is_full() {
+                return Ok(NextStep::Wait);
+            }
+
+            // Get resampled frames from the resampler's output buffer and push to ring
+            // buffer.
+            let resampler = self.resampler.as_mut().unwrap();
+            while !self.frame_producer.is_full() && resampler.has_output() {
+                let resampled_frame = resampler.get_frame();
+
+                // Calculate which source frame this output corresponds to
+                // Based on the ratio of frames processed.
+                let source_index =
+                    ((self.resampled_frames_output * self.source_sample_rate as u64) / self.backend_sample_rate as u64) as usize;
+
+                self.frame_producer
+                    .push(TimestampedFrame {
+                        frame: resampled_frame,
+                        index: source_index,
+                    })
+                    .expect("frame producer should not be full");
+
+                self.resampled_frames_output += 1;
+            }
+
+            // If ring buffer is full and resampler still has output, queue remaining
+            // frames.
+            let resampler = self.resampler.as_mut().unwrap();
+            while resampler.has_output() {
+                let resampled_frame = resampler.get_frame();
+                let source_index =
+                    ((self.resampled_frames_output * self.source_sample_rate as u64) / self.backend_sample_rate as u64) as usize;
+                self.resampler_output_queue.push_back((resampled_frame, source_index));
+                self.resampled_frames_output += 1;
+            }
+
+            if !self.resampler_output_queue.is_empty() {
+                return Ok(NextStep::Wait);
+            }
+
+            // If transport is still playing, push a new source frame to the resampler.
+            if self.transport.playing {
+                let source_frame = self.frame_at_index(self.transport.position)?;
+                let resampler = self.resampler.as_mut().unwrap();
+                resampler.push_frame(source_frame);
+                self.source_frames_pushed += 1;
+                self.transport.increment_position(self.num_frames);
+
+                if !self.transport.playing {
+                    self.shared.reached_end.store(true, Ordering::SeqCst);
+                    // Don't end immediately - we may still have resampled frames to output.
+                    return Ok(NextStep::Continue);
+                }
+            } else {
+                // Transport stopped and no more output - end the thread.
+                let resampler = self.resampler.as_ref().unwrap();
+                if !resampler.has_output() && self.resampler_output_queue.is_empty() {
+                    self.shared.reached_end.store(true, Ordering::SeqCst);
+                    return Ok(NextStep::End);
+                }
+            }
+
+            Ok(NextStep::Continue)
+        } else {
+            // No resampling needed
+            let frame = self.frame_at_index(self.transport.position)?;
+
+            self.frame_producer
+                .push(TimestampedFrame {
+                    frame,
+                    index: self.transport.position,
+                })
+                .expect("could not push frame to frame producer");
+
+            self.transport.increment_position(self.num_frames);
+
+            if !self.transport.playing {
+                self.shared.reached_end.store(true, Ordering::SeqCst);
+                return Ok(NextStep::End);
+            }
+
+            Ok(NextStep::Continue)
         }
-        Ok(NextStep::Continue)
     }
 
     fn frame_at_index(&mut self, index: usize) -> Result<Frame, FromFileError> {

@@ -42,8 +42,11 @@ pub(crate) trait SoundData {
     /// The [`Sound`] implementation will be sent to the audio renderer
     /// for playback, and the handle will be returned to the user by
     /// [`AudioManager::play`](crate::AudioManager::play).
+    ///
+    /// # Parameters
+    /// - `backend_sample_rate`: The output sample rate of the audio device.
     #[allow(clippy::type_complexity)]
-    fn into_sound(self) -> Result<(Box<dyn Sound>, Self::Handle), Self::Error>;
+    fn into_sound(self, backend_sample_rate: u32) -> Result<(Box<dyn Sound>, Self::Handle), Self::Error>;
 }
 
 /// An actively playing sound.

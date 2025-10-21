@@ -8,6 +8,7 @@ use super::handle::StaticSoundHandle;
 use super::sound::StaticSound;
 use crate::decibels::Decibels;
 use crate::frame::Frame;
+use crate::resampler::Resampler;
 use crate::sound::error::FromFileError;
 use crate::sound::symphonia::load_frames_from_buffer_ref;
 use crate::sound::{Sound, SoundData};
@@ -98,7 +99,13 @@ impl StaticSoundData {
         })
     }
 
-    pub(super) fn split(self) -> (StaticSound, StaticSoundHandle) {
+    pub(super) fn split(mut self, backend_sample_rate: u32) -> (StaticSound, StaticSoundHandle) {
+        if self.sample_rate != backend_sample_rate {
+            let mut resampler = Resampler::new(self.sample_rate, backend_sample_rate);
+            self.frames = resampler.resample_batch(&self.frames);
+            self.sample_rate = backend_sample_rate;
+        }
+
         let sound = StaticSound::new(self);
         let shared = sound.shared();
         (sound, StaticSoundHandle { shared })
@@ -110,8 +117,8 @@ impl SoundData for StaticSoundData {
     type Handle = StaticSoundHandle;
 
     #[allow(clippy::type_complexity)]
-    fn into_sound(self) -> Result<(Box<dyn Sound>, Self::Handle), Self::Error> {
-        let (sound, handle) = self.split();
+    fn into_sound(self, backend_sample_rate: u32) -> Result<(Box<dyn Sound>, Self::Handle), Self::Error> {
+        let (sound, handle) = self.split(backend_sample_rate);
         Ok((Box::new(sound), handle))
     }
 }

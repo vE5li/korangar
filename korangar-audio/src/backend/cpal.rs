@@ -1,20 +1,10 @@
 //! Plays audio using [cpal](https://crates.io/crates/cpal).
 
 mod error;
-use cpal::{Device, StreamConfig};
-pub(crate) use error::Error;
 
-/// Settings for the cpal kira.
-#[derive(Clone, Default)]
-pub(crate) struct CpalBackendSettings {
-    /// The output audio device to use. If [`None`], the default output
-    /// device will be used.
-    pub(crate) device: Option<Device>,
-    /// A StreamConfig given by Cpal. If [`None`], the default supported
-    /// config will be used. You can also get a supported config of your
-    /// choosing using Cpal functions.
-    pub(crate) config: Option<StreamConfig>,
-}
+use cpal::traits::HostTrait;
+use cpal::{BufferSize, Device, SampleRate, StreamConfig};
+pub(crate) use error::Error;
 
 #[cfg(target_arch = "wasm32")]
 mod wasm;
@@ -25,3 +15,19 @@ pub(crate) use wasm::CpalBackend;
 mod desktop;
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) use desktop::CpalBackend;
+
+pub(crate) fn default_device_and_config() -> Result<(Device, StreamConfig), Error> {
+    let host = cpal::default_host();
+    let device = host.default_output_device().ok_or(Error::NoDefaultOutputDevice)?;
+    // We don't use the default sampling rate, since if the audio device switches,
+    // we need to use the same configuration for it, or else the re-sampled audio
+    // files won't play correctly (we re-sample audio files on load, not at
+    // playtime). Stereo with 48 kHz should be supported by any device and is the
+    // standard for many operating systems.
+    let config = StreamConfig {
+        channels: 2,
+        sample_rate: SampleRate(48000),
+        buffer_size: BufferSize::Fixed(1200),
+    };
+    Ok((device, config))
+}

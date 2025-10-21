@@ -27,11 +27,11 @@ impl StreamingSoundData {
 }
 
 impl StreamingSoundData {
-    pub(crate) fn split(self) -> Result<(StreamingSound, StreamingSoundHandle, DecodeScheduler), FromFileError> {
+    pub(crate) fn split(self, backend_sample_rate: u32) -> Result<(StreamingSound, StreamingSoundHandle, DecodeScheduler), FromFileError> {
         let (command_writers, command_readers) = command_writers_and_readers();
         let sample_rate = self.decoder.sample_rate();
         let shared = Arc::new(Shared::new());
-        let (scheduler, frame_consumer) = DecodeScheduler::new(self.decoder, self.settings, shared.clone())?;
+        let (scheduler, frame_consumer) = DecodeScheduler::new(self.decoder, self.settings, shared.clone(), backend_sample_rate)?;
         let sound = StreamingSound::new(
             sample_rate,
             self.settings,
@@ -49,8 +49,8 @@ impl SoundData for StreamingSoundData {
     type Error = FromFileError;
     type Handle = StreamingSoundHandle;
 
-    fn into_sound(self) -> Result<(Box<dyn Sound>, Self::Handle), Self::Error> {
-        let (sound, handle, scheduler) = self.split()?;
+    fn into_sound(self, backend_sample_rate: u32) -> Result<(Box<dyn Sound>, Self::Handle), Self::Error> {
+        let (sound, handle, scheduler) = self.split(backend_sample_rate)?;
         scheduler.start();
         Ok((Box::new(sound), handle))
     }

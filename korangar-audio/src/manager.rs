@@ -23,8 +23,8 @@ pub(crate) struct AudioManager<B: Backend = DefaultBackend> {
 
 impl<B: Backend> AudioManager<B> {
     /// Creates a new [`AudioManager`].
-    pub(crate) fn new(settings: AudioManagerSettings<B>) -> Result<Self, B::Error> {
-        let (mut backend, sample_rate) = B::setup(settings.backend_settings, settings.internal_buffer_size)?;
+    pub(crate) fn new(settings: AudioManagerSettings) -> Result<Self, B::Error> {
+        let (mut backend, sample_rate) = B::setup(settings.internal_buffer_size)?;
         let renderer_shared = Arc::new(RendererShared::new(sample_rate));
         let (resources, resource_controllers) =
             create_resources(settings.capacities, settings.main_track_builder, settings.internal_buffer_size);
@@ -74,7 +74,7 @@ impl Default for Capacities {
 }
 
 /// Settings for an [`AudioManager`](AudioManager).
-pub(crate) struct AudioManagerSettings<B: Backend> {
+pub(crate) struct AudioManagerSettings {
     /// Specifies how many of each resource type an audio context
     /// can have.
     pub(crate) capacities: Capacities,
@@ -82,20 +82,14 @@ pub(crate) struct AudioManagerSettings<B: Backend> {
     pub(crate) main_track_builder: MainTrackBuilder,
     /// Determines how often modulators will be updated (in samples).
     pub(crate) internal_buffer_size: usize,
-    /// Configures the kira.
-    pub(crate) backend_settings: B::Settings,
 }
 
-impl<B: Backend> Default for AudioManagerSettings<B>
-where
-    B::Settings: Default,
-{
+impl Default for AudioManagerSettings {
     fn default() -> Self {
         Self {
             capacities: Capacities::default(),
             main_track_builder: MainTrackBuilder::default(),
             internal_buffer_size: 256,
-            backend_settings: B::Settings::default(),
         }
     }
 }

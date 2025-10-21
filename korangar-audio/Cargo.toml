@@ -5,15 +5,20 @@ edition = "2024"
 license = "MIT"
 
 [dependencies]
+bytemuck = { workspace = true, features = ["derive"] }
 cgmath = { workspace = true }
 korangar-debug = { workspace = true, optional = true }
 korangar-collision = { workspace = true }
 korangar-container = { workspace = true }
 korangar-loaders = { workspace = true }
 rayon = { workspace = true }
+realfft = { workspace = true }
 rtrb = { workspace = true }
 symphonia = { workspace = true, default-features = false, features = ["mp3", "pcm", "wav"] }
 send_wrapper = { workspace = true, optional = true }
+
+[dev-dependencies]
+approx = "0.5"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies.cpal]
 workspace = true

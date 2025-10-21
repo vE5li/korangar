@@ -1,10 +1,9 @@
 mod stream_manager;
 
-use cpal::traits::{DeviceTrait, HostTrait};
 use cpal::{BufferSize, Device, StreamConfig};
-use stream_manager::{StreamManager, StreamManagerController};
 
-use super::{CpalBackendSettings, Error};
+use self::stream_manager::{StreamManager, StreamManagerController};
+use super::{Error, default_device_and_config};
 use crate::backend::{Backend, Renderer};
 
 enum State {
@@ -22,35 +21,20 @@ enum State {
 /// connect a [`Renderer`] to the operating system's audio driver.
 pub(crate) struct CpalBackend {
     state: State,
-    /// Whether the device was specified by the user.
-    custom_device: bool,
     buffer_size: BufferSize,
 }
 
 impl Backend for CpalBackend {
     type Error = Error;
-    type Settings = CpalBackendSettings;
 
-    fn setup(settings: Self::Settings, _internal_buffer_size: usize) -> Result<(Self, u32), Self::Error> {
-        let host = cpal::default_host();
-
-        let (device, custom_device) = match settings.device {
-            Some(device) => (device, true),
-            None => (host.default_output_device().ok_or(Error::NoDefaultOutputDevice)?, false),
-        };
-
-        let config = match settings.config {
-            Some(config) => config,
-            None => device.default_output_config()?.config(),
-        };
-
+    fn setup(_internal_buffer_size: usize) -> Result<(Self, u32), Self::Error> {
+        let (device, config) = default_device_and_config()?;
         let sample_rate = config.sample_rate.0;
         let buffer_size = config.buffer_size;
 
         Ok((
             Self {
                 state: State::Uninitialized { device, config },
-                custom_device,
                 buffer_size,
             },
             sample_rate,
@@ -61,10 +45,10 @@ impl Backend for CpalBackend {
         let state = std::mem::replace(&mut self.state, State::Empty);
         if let State::Uninitialized { device, config } = state {
             self.state = State::Initialized {
-                stream_manager_controller: StreamManager::start(renderer, device, config, self.custom_device, self.buffer_size)?,
+                stream_manager_controller: StreamManager::start(renderer, device, config, self.buffer_size)?,
             };
         } else {
-            panic!("cannot initialize the kira multiple times")
+            panic!("cannot initialize the audio backend multiple times")
         }
         Ok(())
     }

@@ -3,6 +3,7 @@
 //! It is based on the open source library [Kira](https://github.com/tesselode/kira), which is itself licensed under
 //! the Apache 2 and MIT license.
 #![forbid(missing_docs)]
+extern crate core;
 
 pub(crate) mod backend;
 pub(crate) mod command;
@@ -13,6 +14,7 @@ pub(crate) mod listener;
 mod manager;
 mod parameter;
 mod playback_state_manager;
+mod resampler;
 pub(crate) mod sound;
 pub(crate) mod track;
 mod tween;
@@ -29,7 +31,6 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use cgmath::{InnerSpace, Matrix3, Point3, Quaternion, Vector3};
-use cpal::{BufferSize, SampleRate, StreamConfig};
 use korangar_collision::{KDTree, Sphere};
 use korangar_container::{
     CacheStatistics, Cacheable, GenerationalSlab, SimpleCache, SimpleSlab, create_generational_key, create_simple_key,
@@ -39,7 +40,7 @@ use korangar_debug::logging::{Colorize, print_debug};
 use korangar_loaders::FileLoader;
 use rayon::spawn;
 
-use crate::backend::cpal::{CpalBackend, CpalBackendSettings};
+use crate::backend::cpal::CpalBackend;
 use crate::decibels::Decibels;
 use crate::frame::Frame;
 use crate::manager::{AudioManager, AudioManagerSettings};
@@ -150,18 +151,7 @@ struct EngineContext<F> {
 impl<F: FileLoader> AudioEngine<F> {
     /// Crates a new audio engine.
     pub fn new(game_file_loader: Arc<F>) -> AudioEngine<F> {
-        let mut manager = AudioManager::<CpalBackend>::new(AudioManagerSettings {
-            backend_settings: CpalBackendSettings {
-                device: None,
-                config: Some(StreamConfig {
-                    channels: 2,
-                    sample_rate: SampleRate(44100 / 2),
-                    buffer_size: BufferSize::Fixed(1200),
-                }),
-            },
-            ..Default::default()
-        })
-        .expect("can't initialize audio kira");
+        let mut manager = AudioManager::<CpalBackend>::new(AudioManagerSettings::default()).expect("can't initialize audio kira");
         let background_music_track = manager
             .add_sub_track(TrackBuilder::default())
             .expect("can't create background music track");

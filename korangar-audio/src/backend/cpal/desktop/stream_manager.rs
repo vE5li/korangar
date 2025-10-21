@@ -3,11 +3,11 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
-use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use cpal::traits::{DeviceTrait, StreamTrait};
 use cpal::{BufferSize, Device, Stream, StreamConfig, StreamError};
 use rtrb::{Consumer, Producer, RingBuffer};
 
-use super::super::Error;
+use super::super::{Error, default_device_and_config};
 use crate::backend::Renderer;
 
 const CHECK_STREAM_INTERVAL: Duration = Duration::from_millis(500);
@@ -40,8 +40,6 @@ pub(super) struct StreamManager {
     state: State,
     device_name: String,
     sample_rate: u32,
-    #[allow(dead_code)]
-    custom_device: bool,
     buffer_size: BufferSize,
 }
 
@@ -50,7 +48,6 @@ impl StreamManager {
         renderer: Renderer,
         device: Device,
         mut config: StreamConfig,
-        custom_device: bool,
         buffer_size: BufferSize,
     ) -> Result<StreamManagerController, Error> {
         let should_drop = Arc::new(AtomicBool::new(false));
@@ -63,7 +60,6 @@ impl StreamManager {
                 state: State::Idle { renderer },
                 device_name: device_name(&device),
                 sample_rate: config.sample_rate.0,
-                custom_device,
                 buffer_size,
             };
             let mut unhandled_stream_error_consumer = match stream_manager.start_stream(&device, &mut config) {
@@ -107,25 +103,10 @@ impl StreamManager {
                     StreamError::DeviceNotAvailable => {
                         self.stop_stream();
                         if let Ok((device, mut config)) = default_device_and_config() {
-                            // TODO: gracefully handle errors that occur in this function
                             *unhandled_stream_error_consumer = self.start_stream(&device, &mut config).unwrap();
                         }
                     }
                     StreamError::BackendSpecific { err: _ } => {}
-                }
-            }
-            // Check for device changes if a custom device hasn't been specified.
-            // Disabled on macOS due to audio artifacts that seem to occur when the device
-            // is queried while playing.
-            #[cfg(not(target_os = "macos"))]
-            if !self.custom_device
-                && let Ok((device, mut config)) = default_device_and_config()
-            {
-                let device_name = device_name(&device);
-                let sample_rate = config.sample_rate.0;
-                if device_name != self.device_name || sample_rate != self.sample_rate {
-                    self.stop_stream();
-                    *unhandled_stream_error_consumer = self.start_stream(&device, &mut config).unwrap();
                 }
             }
         }
@@ -179,13 +160,6 @@ impl StreamManager {
             panic!("trying to stop the stream when it's not running")
         }
     }
-}
-
-fn default_device_and_config() -> Result<(Device, StreamConfig), Error> {
-    let host = cpal::default_host();
-    let device = host.default_output_device().ok_or(Error::NoDefaultOutputDevice)?;
-    let config = device.default_output_config()?.config();
-    Ok((device, config))
 }
 
 fn device_name(device: &Device) -> String {

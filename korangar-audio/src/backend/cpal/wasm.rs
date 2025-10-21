@@ -2,7 +2,7 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, Stream, StreamConfig};
 use send_wrapper::SendWrapper;
 
-use super::{CpalBackendSettings, Error};
+use super::{Error, default_device_and_config};
 use crate::backend::{Backend, Renderer};
 
 enum State {
@@ -19,21 +19,11 @@ pub(crate) struct CpalBackend {
 
 impl Backend for CpalBackend {
     type Error = Error;
-    type Settings = CpalBackendSettings;
 
-    fn setup(settings: Self::Settings, _internal_buffer_size: usize) -> Result<(Self, u32), Self::Error> {
-        let host = cpal::default_host();
-        let device = if let Some(device) = settings.device {
-            device
-        } else {
-            host.default_output_device().ok_or(Error::NoDefaultOutputDevice)?
-        };
-        let config = if let Some(config) = settings.config {
-            config
-        } else {
-            device.default_output_config()?.config()
-        };
+    fn setup(_internal_buffer_size: usize) -> Result<(Self, u32), Self::Error> {
+        let (device, config) = default_device_and_config()?;
         let sample_rate = config.sample_rate.0;
+
         Ok((
             Self {
                 state: SendWrapper::new(State::Uninitialized { device, config }),

@@ -6,13 +6,17 @@ use std::sync::Arc;
 
 use hashbrown::hash_map::RawEntryMut;
 use hashbrown::{HashMap, HashSet};
+#[cfg(feature = "interface")]
 use korangar_interface::element::StateElement;
+#[cfg(feature = "interface")]
 use rust_state::RustState;
 
 use crate::HumanReadableBytes;
 
 /// Statistics about the cache.
-#[derive(Clone, Copy, PartialEq, Eq, Default, RustState, StateElement)]
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "interface", derive(RustState))]
+#[cfg_attr(feature = "interface", derive(StateElement))]
 pub struct CacheStatistics {
     /// The current count of cached values.
     pub count: u32,

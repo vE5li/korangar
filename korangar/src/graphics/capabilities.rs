@@ -55,7 +55,9 @@ impl Capabilities {
             texture_compression: false,
             #[cfg(feature = "debug")]
             polygon_mode_line: false,
-            required_features: Features::empty(),
+            // WebGPU only guarantees MSAA 4x. We need this feature to allow
+            // 2x and 8x on devices that support it.
+            required_features: Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES,
             required_limits,
         };
 

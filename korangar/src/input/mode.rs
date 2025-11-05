@@ -6,7 +6,7 @@ use ragnarok_packets::TilePosition;
 
 use crate::graphics::Texture;
 use crate::interface::resource::{ItemSource, SkillSource};
-use crate::inventory::Skill;
+use crate::inventory::LearnableSkill;
 use crate::loaders::Sprite;
 use crate::state::ClientState;
 use crate::world::{Actions, ResourceMetadata, SpriteAnimationState};
@@ -23,7 +23,7 @@ pub enum MouseInputMode {
     },
     MoveSkill {
         source: SkillSource,
-        skill: Skill,
+        skill: LearnableSkill,
     },
 }
 
@@ -70,8 +70,8 @@ impl MouseModeExt for MouseMode<ClientState> {
             MouseMode::Custom {
                 mode: MouseInputMode::MoveSkill { skill, .. },
             } => Some(Grabbed::Action(
-                skill.sprite.clone(),
-                skill.actions.clone(),
+                skill.sprite.clone()?,
+                skill.actions.clone()?,
                 skill.animation_state.clone(),
             )),
             _ => None,

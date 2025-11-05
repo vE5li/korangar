@@ -104,6 +104,7 @@ use crate::input::{InputEvent, InputSystem};
 use crate::interface::cursor::{MouseCursor, MouseCursorState};
 use crate::interface::resource::{ItemSource, SkillSource};
 use crate::interface::windows::*;
+use crate::inventory::{LearnableSkill, LearnedSkill};
 use crate::loaders::*;
 #[cfg(feature = "debug")]
 use crate::renderer::DebugMarkerRenderer;
@@ -340,12 +341,14 @@ fn initialize_shutdown_signal() {
 
 struct Client {
     game_file_loader: Arc<GameFileLoader>,
+    #[cfg(feature = "debug")]
     action_loader: Arc<ActionLoader>,
     #[cfg(feature = "debug")]
     animation_loader: Arc<AnimationLoader>,
     async_loader: Arc<AsyncLoader>,
     effect_loader: Arc<EffectLoader>,
     font_loader: Arc<FontLoader>,
+    #[cfg(feature = "debug")]
     sprite_loader: Arc<SpriteLoader>,
     texture_loader: Arc<TextureLoader>,
     library: Arc<Library>,
@@ -759,12 +762,14 @@ impl Client {
 
         Some(Self {
             game_file_loader,
+            #[cfg(feature = "debug")]
             action_loader,
             #[cfg(feature = "debug")]
             animation_loader,
             async_loader,
             effect_loader,
             font_loader,
+            #[cfg(feature = "debug")]
             sprite_loader,
             texture_loader,
             library,
@@ -1150,6 +1155,9 @@ impl Client {
                         player.set_animation_data(animation_data);
                     }
 
+                    *self.client_state.follow_mut(client_state().skill_tree().layout()) =
+                        self.async_loader.request_skill_tree_layout_load(player.get_job_id(), client_tick);
+
                     self.client_state.follow_mut(client_state().entities()).push(player);
 
                     self.interface.close_window_with_class(WindowClass::CharacterSelection);
@@ -1164,7 +1172,10 @@ impl Client {
                     ));
                     self.interface
                         .open_window(ChatWindow::new(client_state().chat_window(), client_state().chat_messages()));
-                    self.interface.open_window(HotbarWindow::new(client_state().hotbar().skills()));
+                    self.interface.open_window(HotbarWindow::new(
+                        client_state().hotbar().skills(),
+                        client_state().skill_tree().skills(),
+                    ));
 
                     // Put the dialog system in a well-defined state.
                     self.client_state.follow_mut(client_state().dialog_window()).end();
@@ -1524,12 +1535,8 @@ impl Client {
                     self.client_state.follow_mut(client_state().inventory()).remove_item(index, amount);
                 }
                 NetworkEvent::SkillTree { skill_information } => {
-                    self.client_state.follow_mut(client_state().skill_tree()).fill(
-                        &self.sprite_loader,
-                        &self.action_loader,
-                        skill_information,
-                        client_tick,
-                    );
+                    *self.client_state.follow_mut(client_state().skill_tree().skills()) =
+                        skill_information.into_iter().map(LearnedSkill::new).collect();
                 }
                 NetworkEvent::UpdateEquippedPosition { index, equipped_position } => {
                     self.client_state
@@ -1537,6 +1544,9 @@ impl Client {
                         .update_equipped_position(index, equipped_position);
                 }
                 NetworkEvent::ChangeJob { account_id, job_id } => {
+                    *self.client_state.follow_mut(client_state().skill_tree().layout()) =
+                        self.async_loader.request_skill_tree_layout_load(job_id, client_tick);
+
                     let entity = self
                         .client_state
                         .follow_mut(client_state().entities())
@@ -1548,7 +1558,7 @@ impl Client {
                     // inventory and for unequipping items. We should probably manually
                     // request a full list of items and the hotbar.
 
-                    entity.set_job(job_id as usize);
+                    entity.set_job(job_id);
 
                     if let Some(animation_data) = self.async_loader.request_animation_data_load(
                         entity.get_entity_id(),
@@ -1690,18 +1700,12 @@ impl Client {
                     for (index, hotkey) in hotkeys.into_iter().take(10).enumerate() {
                         match hotkey {
                             HotkeyState::Bound(hotkey) => {
-                                let Some(mut skill) = self
-                                    .client_state
-                                    .follow(client_state().skill_tree())
-                                    .find_skill(SkillId(hotkey.skill_id as u16))
-                                else {
-                                    self.client_state
-                                        .follow_mut(client_state().hotbar())
-                                        .clear_slot(&mut self.networking_system, HotbarSlot(index as u16));
-                                    continue;
-                                };
+                                // TODO: Properly distinguish between skill and item.
+                                let skill_id = SkillId(hotkey.skill_id as u16);
 
-                                skill.skill_level = hotkey.quantity_or_skill_level;
+                                let mut skill = self.async_loader.request_learnable_skill_load(skill_id, client_tick);
+                                skill.maximum_level = hotkey.quantity_or_skill_level;
+
                                 self.client_state
                                     .follow_mut(client_state().hotbar())
                                     .set_slot(HotbarSlot(index as u16), skill);
@@ -1954,9 +1958,10 @@ impl Client {
                     if self.client_state.try_follow(this_entity()).is_some() {
                         match self.interface.is_window_with_class_open(WindowClass::SkillTree) {
                             true => self.interface.close_window_with_class(WindowClass::SkillTree),
-                            false => self
-                                .interface
-                                .open_window(SkillTreeWindow::new(client_state().skill_tree().skills())),
+                            false => self.interface.open_window(SkillTreeWindow::new(
+                                client_state().skill_tree().layout(),
+                                client_state().skill_tree().skills(),
+                            )),
                         }
                     }
                 }
@@ -2125,6 +2130,11 @@ impl Client {
                             .follow_mut(client_state().hotbar())
                             .update_slot(&mut self.networking_system, slot, skill);
                     }
+                    (SkillSource::Hotbar { slot }, SkillSource::SkillTree) => {
+                        self.client_state
+                            .follow_mut(client_state().hotbar())
+                            .clear_slot(&mut self.networking_system, slot);
+                    }
                     (SkillSource::Hotbar { slot: source_slot }, SkillSource::Hotbar { slot: destination_slot }) => {
                         self.client_state.follow_mut(client_state().hotbar()).swap_slot(
                             &mut self.networking_system,
@@ -2135,44 +2145,60 @@ impl Client {
                     _ => {}
                 },
                 InputEvent::CastSkill { slot } => {
-                    if let Some(skill) = self.client_state.follow(client_state().hotbar()).get_skill_in_slot(slot).as_ref() {
-                        match skill.skill_type {
+                    if let Some(learnable_skill) = self.client_state.follow(client_state().hotbar()).get_skill_in_slot(slot).as_ref()
+                        && let Some(learned_skill) = self
+                            .client_state
+                            .follow(client_state().skill_tree().skills())
+                            .iter()
+                            .find(|learned_skill| learned_skill.skill_id == learnable_skill.skill_id)
+                    {
+                        match learned_skill.skill_type {
                             SkillType::Passive => {}
                             SkillType::Attack => {
                                 if let PickerTarget::Entity(entity_id) = input_report.mouse_target {
-                                    let _ = self.networking_system.cast_skill(skill.skill_id, skill.skill_level, entity_id);
+                                    let _ = self.networking_system.cast_skill(
+                                        learnable_skill.skill_id,
+                                        learnable_skill.maximum_level,
+                                        entity_id,
+                                    );
                                 }
                             }
                             SkillType::Ground | SkillType::Trap => {
                                 if let PickerTarget::Tile { x, y } = input_report.mouse_target {
-                                    let _ = self
-                                        .networking_system
-                                        .cast_ground_skill(skill.skill_id, skill.skill_level, TilePosition { x, y });
+                                    let _ = self.networking_system.cast_ground_skill(
+                                        learnable_skill.skill_id,
+                                        learnable_skill.maximum_level,
+                                        TilePosition { x, y },
+                                    );
                                 }
                             }
-                            SkillType::SelfCast => match skill.skill_id == ROLLING_CUTTER_ID {
+                            SkillType::SelfCast => match learnable_skill.skill_id == ROLLING_CUTTER_ID {
                                 true => {
                                     let _ = self.networking_system.cast_channeling_skill(
-                                        skill.skill_id,
-                                        skill.skill_level,
+                                        learnable_skill.skill_id,
+                                        learnable_skill.maximum_level,
                                         self.client_state.follow(this_entity().manually_asserted()).get_entity_id(),
                                     );
                                 }
                                 false => {
                                     let _ = self.networking_system.cast_skill(
-                                        skill.skill_id,
-                                        skill.skill_level,
+                                        learnable_skill.skill_id,
+                                        learnable_skill.maximum_level,
                                         self.client_state.follow(this_entity().manually_asserted()).get_entity_id(),
                                     );
                                 }
                             },
                             SkillType::Support => {
                                 if let PickerTarget::Entity(entity_id) = input_report.mouse_target {
-                                    let _ = self.networking_system.cast_skill(skill.skill_id, skill.skill_level, entity_id);
+                                    let _ = self.networking_system.cast_skill(
+                                        learnable_skill.skill_id,
+                                        learnable_skill.maximum_level,
+                                        entity_id,
+                                    );
                                 } else {
                                     let _ = self.networking_system.cast_skill(
-                                        skill.skill_id,
-                                        skill.skill_level,
+                                        learnable_skill.skill_id,
+                                        learnable_skill.maximum_level,
                                         self.client_state.follow(this_entity().manually_asserted()).get_entity_id(),
                                     );
                                 }

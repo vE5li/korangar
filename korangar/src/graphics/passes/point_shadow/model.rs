@@ -99,7 +99,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
                 &bind_group_layout,
                 texture_bind_group,
             ],
-            push_constant_ranges: &[],
+            immediate_size: 0,
         });
 
         let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
@@ -117,7 +117,6 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
                 compilation_options: PipelineCompilationOptions::default(),
                 targets: &[],
             }),
-            multiview: None,
             primitive: PrimitiveState::default(),
             multisample: MultisampleState::default(),
             depth_stencil: Some(DepthStencilState {
@@ -128,6 +127,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
                 bias: Default::default(),
             }),
             cache: None,
+            multiview_mask: None,
         });
 
         Self {

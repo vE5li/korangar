@@ -843,6 +843,10 @@ impl Client {
     }
 
     fn render_frame(&mut self, event_loop: &ActiveEventLoop) {
+        if self.window.is_none() {
+            return;
+        }
+
         if SHUTDOWN_SIGNAL.load(Ordering::SeqCst) {
             event_loop.exit();
             return;
@@ -2305,10 +2309,9 @@ impl Client {
                 },
                 #[cfg(feature = "debug")]
                 InputEvent::OpenMapDataWindow => {
-                    if self.map.is_some() {
+                    if let Some(map) = self.map.as_ref() {
                         let inspecting_maps = self.client_state.follow_mut(client_state().inspecting_maps());
-                        let map_data = self.map.as_ref().unwrap().get_map_data();
-                        let map_data_path = state::prepare_map_inspection(inspecting_maps, map_data);
+                        let map_data_path = state::prepare_map_inspection(inspecting_maps, map.get_map_data());
 
                         self.interface.open_state_window(map_data_path);
                     }
@@ -2493,7 +2496,7 @@ impl Client {
         }
 
         // Main map update and render loop
-        if self.map.is_some() {
+        if let Some(map) = self.map.as_ref() {
             #[cfg(feature = "debug")]
             let update_main_camera_measurement = Profiler::start_measurement("update main camera");
 
@@ -2570,8 +2573,6 @@ impl Client {
 
             #[cfg(feature = "debug")]
             update_entities_measurement.stop();
-
-            let map = self.map.as_ref().unwrap();
 
             #[cfg(feature = "debug")]
             let update_videos_measurement = Profiler::start_measurement("update videos");
@@ -3464,9 +3465,10 @@ impl ApplicationHandler for Client {
                 }
             }
             WindowEvent::RedrawRequested => {
-                if self.window.is_some() {
-                    self.render_frame(event_loop);
-                    self.window.as_mut().unwrap().request_redraw();
+                self.render_frame(event_loop);
+
+                if let Some(window) = self.window.as_mut() {
+                    window.request_redraw();
                 }
             }
             _ignored => {}

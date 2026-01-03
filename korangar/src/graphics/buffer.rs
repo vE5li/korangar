@@ -127,7 +127,7 @@ impl<T: Sized + Pod + Zeroable> Buffer<T> {
         }
         self.size.store(data_size.get(), Ordering::Release);
 
-        let mut buffer = staging_belt.write_buffer(command_encoder, &self.buffer, 0, data_size, device);
+        let mut buffer = staging_belt.write_buffer(command_encoder, &self.buffer, 0, data_size);
         buffer.copy_from_slice(data);
 
         recreated

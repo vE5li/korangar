@@ -11,7 +11,7 @@ use crate::frame::Frame;
 /// Since we're on the audio thread and control the calling pattern, we don't
 /// need complex ring buffer logic - just simple chunked processing.
 pub(crate) struct Resampler {
-    resampler: ResamplerFft<2>,
+    resampler: ResamplerFft,
     input_buffer: Vec<Frame>,
     input_length: usize,
     output_buffer: Vec<Frame>,
@@ -31,7 +31,7 @@ impl Resampler {
         let input_rate = SampleRate::try_from(input_rate).unwrap_or(SampleRate::Hz22050);
         let output_rate = SampleRate::try_from(output_rate).unwrap_or(SampleRate::Hz48000);
 
-        let resampler = ResamplerFft::<2>::new(input_rate, output_rate);
+        let resampler = ResamplerFft::new(2, input_rate, output_rate);
 
         // ResamplerFft's chunk size is in f32 values, not frames.
         let chunk_size_in = resampler.chunk_size_input() / 2;

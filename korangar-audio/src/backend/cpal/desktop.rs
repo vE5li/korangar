@@ -29,7 +29,7 @@ impl Backend for CpalBackend {
 
     fn setup(_internal_buffer_size: usize) -> Result<(Self, u32), Self::Error> {
         let (device, config) = default_device_and_config()?;
-        let sample_rate = config.sample_rate.0;
+        let sample_rate = config.sample_rate;
         let buffer_size = config.buffer_size;
 
         Ok((

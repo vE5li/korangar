@@ -17,7 +17,7 @@ By default, Korangar will try to connect to a remote rAthena instance that we ho
 You can also tell Korangar to connect to a server on your local machine by editing `sclientinfo.xml` in `korangar/archive/data/`. Just duplicate one of the existing entries and replace the server IP and name. If you are interested in setting up a server locally I suggest reading the [install instructions](https://github.com/rathena/rathena#2-installation) on the rAthena GitHub page. If you are comfortable reading Nix coder you can also check out [korangar-rathena](https://github.com/vE5li/korangar-rathena), which is the repository containing the configuration of the development server (including all patches and settings).
 
 # Logging in
-If everything starts correctly, you should see a window prompting you for a username and a password. You can create a new user by entering your desired username with the suffix `_m` or `_f` (for `male` and `female` respectively) and your desired password. _Hint_: remember to remove the `_*` suffix the next time you want to log in to your account.
+If everything starts correctly, you should see a window prompting you for a username and a password. You can create a new user by entering your desired username with the suffix `_m` or `_f` (for `male` and `female` respectively) and your desired password.
 
 > [!WARNING]
 > Please don't use any of your usual credentials as we will be able to see them in the database. They will also be saved in _**plain text**_ in the client folder if you tick the boxes during login.

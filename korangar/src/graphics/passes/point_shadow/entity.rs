@@ -138,7 +138,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some(DRAWER_NAME),
             bind_group_layouts,
-            push_constant_ranges: &[],
+            immediate_size: 0,
         });
 
         let constants = &[("near_plane", NEAR_PLANE as f64)];
@@ -164,7 +164,6 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
                 },
                 targets: &[],
             }),
-            multiview: None,
             primitive: PrimitiveState::default(),
             multisample: MultisampleState::default(),
             depth_stencil: Some(DepthStencilState {
@@ -175,6 +174,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
                 bias: DepthBiasState::default(),
             }),
             cache: None,
+            multiview_mask: None,
         });
 
         Self {

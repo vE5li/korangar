@@ -109,7 +109,9 @@ use crate::loaders::*;
 #[cfg(feature = "debug")]
 use crate::renderer::DebugMarkerRenderer;
 use crate::renderer::{AlignHorizontal, EffectRenderer, GameInterfaceRenderer};
-use crate::settings::{GameSettingsPathExt, GraphicsSettings, IN_GAME_THEMES_PATH, LightingMode, MENU_THEMES_PATH, WORLD_THEMES_PATH};
+use crate::settings::{
+    GameSettingsPathExt, GraphicsSettings, IN_GAME_THEMES_PATH, LightingMode, MENU_THEMES_PATH, ServiceSettingsPathExt, WORLD_THEMES_PATH,
+};
 use crate::state::theme::{InterfaceTheme, InterfaceThemeType, WorldTheme};
 use crate::system::GameTimer;
 #[cfg(feature = "debug")]
@@ -848,6 +850,10 @@ impl Client {
     }
 
     fn render_frame(&mut self, event_loop: &ActiveEventLoop) {
+        if self.window.is_none() {
+            return;
+        }
+
         if SHUTDOWN_SIGNAL.load(Ordering::SeqCst) {
             event_loop.exit();
             return;
@@ -947,6 +953,23 @@ impl Client {
                     login_data,
                 } => {
                     self.audio_engine.play_sound_effect(self.main_menu_click_sound_effect);
+
+                    // Remove `_m`/`_f` suffix from the username. The suffix is only for *creating*
+                    // an account and thus can (and needs to) be removed after the first successful
+                    // login.
+                    {
+                        let selected_service_path =
+                            SelectedServicePath::new(client_state().login_window(), client_state().login_settings());
+                        let username_path = selected_service_path.username();
+
+                        let username = self.client_state.follow_mut(username_path);
+
+                        if let Some(stripped) = username.strip_suffix("_m") {
+                            *username = stripped.to_owned();
+                        } else if let Some(stripped) = username.strip_suffix("_f") {
+                            *username = stripped.to_owned();
+                        }
+                    }
 
                     self.saved_login_data = Some(login_data);
 
@@ -2331,10 +2354,9 @@ impl Client {
                 },
                 #[cfg(feature = "debug")]
                 InputEvent::OpenMapDataWindow => {
-                    if self.map.is_some() {
+                    if let Some(map) = self.map.as_ref() {
                         let inspecting_maps = self.client_state.follow_mut(client_state().inspecting_maps());
-                        let map_data = self.map.as_ref().unwrap().get_map_data();
-                        let map_data_path = state::prepare_map_inspection(inspecting_maps, map_data);
+                        let map_data_path = state::prepare_map_inspection(inspecting_maps, map.get_map_data());
 
                         self.interface.open_state_window(map_data_path);
                     }
@@ -2519,7 +2541,7 @@ impl Client {
         }
 
         // Main map update and render loop
-        if self.map.is_some() {
+        if let Some(map) = self.map.as_ref() {
             #[cfg(feature = "debug")]
             let update_main_camera_measurement = Profiler::start_measurement("update main camera");
 
@@ -2596,8 +2618,6 @@ impl Client {
 
             #[cfg(feature = "debug")]
             update_entities_measurement.stop();
-
-            let map = self.map.as_ref().unwrap();
 
             #[cfg(feature = "debug")]
             let update_videos_measurement = Profiler::start_measurement("update videos");
@@ -3490,9 +3510,10 @@ impl ApplicationHandler for Client {
                 }
             }
             WindowEvent::RedrawRequested => {
-                if self.window.is_some() {
-                    self.render_frame(event_loop);
-                    self.window.as_mut().unwrap().request_redraw();
+                self.render_frame(event_loop);
+
+                if let Some(window) = self.window.as_mut() {
+                    window.request_redraw();
                 }
             }
             _ignored => {}

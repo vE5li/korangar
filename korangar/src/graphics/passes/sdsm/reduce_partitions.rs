@@ -32,7 +32,7 @@ impl Dispatch<{ BindGroupCount::Two }> for ReducePartitionsDispatcher {
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some(DISPATCHER_NAME),
             bind_group_layouts: &[pass_bind_group_layouts[0], pass_bind_group_layouts[1]],
-            push_constant_ranges: &[],
+            immediate_size: 0,
         });
 
         let pipeline = device.create_compute_pipeline(&ComputePipelineDescriptor {

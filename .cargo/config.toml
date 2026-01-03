@@ -1,6 +1,5 @@
-# Steam Hardware survey: https://store.steampowered.com/hwsurvey/Steam-Hardware-Software-Survey-Welcome-to-Steam
 [target.'cfg(target_arch="x86_64")']
-rustflags = ["-C", "target-feature=+aes,+avx,+avx2,+cmpxchg16b,+fma,+sse3,+ssse3,+sse4.1,+sse4.2"]
+rustflags = ["-C", "target_cpu=x86-64-v3", "-C", "target-feature=+aes"]
 
 [target.'cfg(target_arch="aarch64")']
 rustflags = ["-C", "target-feature=+aes"]

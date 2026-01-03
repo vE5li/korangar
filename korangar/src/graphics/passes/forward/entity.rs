@@ -158,7 +158,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some(DRAWER_NAME),
             bind_group_layouts,
-            push_constant_ranges: &[],
+            immediate_size: 0,
         });
 
         let color_attachment_formats = render_pass_context.color_attachment_formats();
@@ -440,7 +440,6 @@ impl ForwardEntityDrawer {
                 },
                 targets: &targets,
             }),
-            multiview: None,
             primitive: PrimitiveState {
                 cull_mode: Some(Face::Back),
                 front_face: FrontFace::Ccw,
@@ -458,6 +457,7 @@ impl ForwardEntityDrawer {
                 bias: DepthBiasState::default(),
             }),
             cache: None,
+            multiview_mask: None,
         })
     }
 }

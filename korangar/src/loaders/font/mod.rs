@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 
 use cgmath::{Point2, Vector2};
 use cosmic_text::fontdb::ID;
-use cosmic_text::{Attrs, Buffer, Family, FontSystem, Metrics, Shaping, fontdb};
+use cosmic_text::{Attrs, Buffer, Family, FontSystem, Metrics, Shaping, Weight, fontdb};
 use hashbrown::HashMap;
 use image::{ImageBuffer, Rgba, RgbaImage, imageops};
 #[cfg(feature = "debug")]
@@ -223,7 +223,7 @@ impl FontLoader {
 
             for &id in &ids {
                 glyph_cache.insert(id, glyphs.clone());
-                let _ = font_system.get_font(id);
+                let _ = font_system.get_font(id, Weight::NORMAL);
             }
 
             font_map
@@ -271,7 +271,7 @@ impl FontLoader {
 
                 for &id in &ids {
                     glyph_cache.insert(id, adjusted_glyphs.clone());
-                    let _ = font_system.get_font(id);
+                    let _ = font_system.get_font(id, Weight::NORMAL);
                 }
 
                 imageops::replace(&mut font_map_image_data, &font_map, 0, start_height);

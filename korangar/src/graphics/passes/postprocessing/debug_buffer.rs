@@ -68,7 +68,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
                 GlobalContext::debug_bind_group_layout(device, global_context.msaa),
                 &bind_group_layout,
             ],
-            push_constant_ranges: &[],
+            immediate_size: 0,
         });
 
         let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
@@ -93,8 +93,8 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
             primitive: PrimitiveState::default(),
             multisample: MultisampleState::default(),
             depth_stencil: None,
-            multiview: None,
             cache: None,
+            multiview_mask: None,
         });
 
         Self {

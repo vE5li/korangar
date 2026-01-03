@@ -130,7 +130,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
                 &bind_group_layout,
                 texture_bind_group,
             ],
-            push_constant_ranges: &[],
+            immediate_size: 0,
         });
 
         let color_attachment_formats = render_pass_context.color_attachment_formats();
@@ -554,7 +554,6 @@ impl ForwardModelDrawer {
                 },
                 targets: &targets,
             }),
-            multiview: None,
             primitive: PrimitiveState {
                 cull_mode: if opaque { Some(Face::Back) } else { None },
                 front_face: FrontFace::Ccw,
@@ -578,6 +577,7 @@ impl ForwardModelDrawer {
                 bias: DepthBiasState::default(),
             }),
             cache: None,
+            multiview_mask: None,
         })
     }
 }

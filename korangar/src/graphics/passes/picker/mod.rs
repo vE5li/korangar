@@ -71,6 +71,7 @@ impl RenderPassContext<{ BindGroupCount::One }, { ColorAttachmentCount::One }, {
             }),
             timestamp_writes: None,
             occlusion_query_set: None,
+            multiview_mask: None,
         });
 
         let unpadded_size = global_context.picker_buffer_texture.get_unpadded_size();

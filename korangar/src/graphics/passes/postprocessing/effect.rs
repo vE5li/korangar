@@ -161,7 +161,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some(DRAWER_NAME),
             bind_group_layouts,
-            push_constant_ranges: &[],
+            immediate_size: 0,
         });
 
         let mut pipelines = HashMap::with_capacity(PRELOAD_PIPELINES.len());
@@ -452,8 +452,8 @@ impl PostProcessingEffectDrawer {
             primitive: PrimitiveState::default(),
             multisample: MultisampleState::default(),
             depth_stencil: None,
-            multiview: None,
             cache: None,
+            multiview_mask: None,
         })
     }
 

@@ -1,4 +1,4 @@
-use wgpu::{AddressMode, CompareFunction, Device, FilterMode, Sampler, SamplerBorderColor, SamplerDescriptor};
+use wgpu::{AddressMode, CompareFunction, Device, FilterMode, MipmapFilterMode, Sampler, SamplerBorderColor, SamplerDescriptor};
 
 use crate::graphics::{Capabilities, TextureSamplerType};
 
@@ -16,7 +16,7 @@ pub(crate) fn create_new_sampler(
             address_mode_w: AddressMode::Repeat,
             mag_filter: FilterMode::Nearest,
             min_filter: FilterMode::Nearest,
-            mipmap_filter: FilterMode::Nearest,
+            mipmap_filter: MipmapFilterMode::Nearest,
             lod_min_clamp: 0.0,
             lod_max_clamp: 32.0,
             compare: None,
@@ -30,7 +30,7 @@ pub(crate) fn create_new_sampler(
             address_mode_w: AddressMode::Repeat,
             mag_filter: FilterMode::Linear,
             min_filter: FilterMode::Linear,
-            mipmap_filter: FilterMode::Linear,
+            mipmap_filter: MipmapFilterMode::Linear,
             lod_min_clamp: 0.0,
             lod_max_clamp: 32.0,
             compare: None,
@@ -44,7 +44,7 @@ pub(crate) fn create_new_sampler(
             address_mode_w: AddressMode::Repeat,
             mag_filter: FilterMode::Linear,
             min_filter: FilterMode::Linear,
-            mipmap_filter: FilterMode::Linear,
+            mipmap_filter: MipmapFilterMode::Linear,
             lod_min_clamp: 0.0,
             lod_max_clamp: 32.0,
             compare: None,
@@ -59,7 +59,7 @@ pub(crate) fn create_new_sampler(
                 address_mode_w: AddressMode::default(),
                 mag_filter: FilterMode::Linear,
                 min_filter: FilterMode::Linear,
-                mipmap_filter: FilterMode::Linear,
+                mipmap_filter: MipmapFilterMode::Linear,
                 lod_min_clamp: 0.0,
                 lod_max_clamp: 32.0,
                 compare: Some(CompareFunction::Greater),

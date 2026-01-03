@@ -63,7 +63,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
                 Self::Context::bind_group_layout(device)[1],
                 &bind_group_layout,
             ],
-            push_constant_ranges: &[],
+            immediate_size: 0,
         });
 
         let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
@@ -119,7 +119,6 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
                     }),
                 ],
             }),
-            multiview: None,
             primitive: PrimitiveState {
                 cull_mode: Some(Face::Back),
                 front_face: FrontFace::Ccw,
@@ -137,6 +136,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
                 bias: DepthBiasState::default(),
             }),
             cache: None,
+            multiview_mask: None,
         });
 
         Self { bind_group, pipeline }

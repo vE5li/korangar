@@ -94,6 +94,7 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, {
             }),
             timestamp_writes: None,
             occlusion_query_set: None,
+            multiview_mask: None,
         });
 
         pass.set_viewport(

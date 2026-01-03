@@ -45,7 +45,7 @@ impl Drawer<{ BindGroupCount::None }, { ColorAttachmentCount::One }, { DepthAtta
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some(&label),
             bind_group_layouts: &[&texture_bind_group_layout],
-            push_constant_ranges: &[],
+            immediate_size: 0,
         });
 
         let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
@@ -70,8 +70,8 @@ impl Drawer<{ BindGroupCount::None }, { ColorAttachmentCount::One }, { DepthAtta
             primitive: PrimitiveState::default(),
             depth_stencil: None,
             multisample: MultisampleState::default(),
-            multiview: None,
             cache: None,
+            multiview_mask: None,
         });
 
         Self { pipeline }

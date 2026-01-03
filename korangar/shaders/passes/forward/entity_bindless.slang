@@ -121,10 +121,13 @@ func fragment(input: ForwardEntityBindlessVertexOutput) -> ForwardEntityFragment
 
     var output: ForwardEntityFragmentOutput;
 
-    if (PASS_MODE == 0 && (alpha_channel == 0.0 || alpha_channel <= (1.0 - ENTITY_OPAQUE_EPSILON))) {
+    // Workaround until WGPU supports `SpecConstantOp`
+    let pass_mode = uint(float(PASS_MODE));
+
+    if (pass_mode == 0 && (alpha_channel == 0.0 || alpha_channel <= (1.0 - ENTITY_OPAQUE_EPSILON))) {
         // Opaque pass can early exit if invisible or transparent pixel was found.
         discard;
-    } else if (PASS_MODE == 1 && (alpha_channel == 0.0 || alpha_channel > (1.0 - ENTITY_OPAQUE_EPSILON))) {
+    } else if (pass_mode == 1 && (alpha_channel == 0.0 || alpha_channel > (1.0 - ENTITY_OPAQUE_EPSILON))) {
         // Transparent pass can early exit if invisible or opaque pixel was found.
         discard;
     } else {

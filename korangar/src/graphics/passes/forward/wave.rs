@@ -96,7 +96,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some(DRAWER_NAME),
             bind_group_layouts: &[pass_bind_group_layouts[0], pass_bind_group_layouts[1], &bind_group_layout],
-            push_constant_ranges: &[],
+            immediate_size: 0,
         });
 
         let color_attachment_formats = render_pass_context.color_attachment_formats();
@@ -151,7 +151,6 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
                     }),
                 ],
             }),
-            multiview: None,
             primitive: PrimitiveState::default(),
             multisample: MultisampleState {
                 count: global_context.msaa.sample_count(),
@@ -165,6 +164,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
                 bias: DepthBiasState::default(),
             }),
             cache: None,
+            multiview_mask: None,
         });
 
         Self {

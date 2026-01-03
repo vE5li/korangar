@@ -128,7 +128,7 @@ struct EngineContext {
 
 impl GraphicsEngine {
     pub fn initialize(descriptor: GraphicsEngineDescriptor) -> GraphicsEngine {
-        let staging_belt = StagingBelt::new(1048576); // 1 MiB
+        let staging_belt = StagingBelt::new(descriptor.device.clone(), 1048576); // 1 MiB
         let mut frame_pacer = FramePacer::new(60.0);
         let cpu_stage = frame_pacer.create_frame_stage(Instant::now());
 

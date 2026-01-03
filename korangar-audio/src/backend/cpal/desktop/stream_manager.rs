@@ -59,7 +59,7 @@ impl StreamManager {
             let mut stream_manager = StreamManager {
                 state: State::Idle { renderer },
                 device_name: device_name(&device),
-                sample_rate: config.sample_rate.0,
+                sample_rate: config.sample_rate,
                 buffer_size,
             };
             let mut unhandled_stream_error_consumer = match stream_manager.start_stream(&device, &mut config) {
@@ -106,7 +106,7 @@ impl StreamManager {
                             *unhandled_stream_error_consumer = self.start_stream(&device, &mut config).unwrap();
                         }
                     }
-                    StreamError::BackendSpecific { err: _ } => {}
+                    StreamError::StreamInvalidated | StreamError::BufferUnderrun | StreamError::BackendSpecific { err: _ } => {}
                 }
             }
         }
@@ -120,7 +120,7 @@ impl StreamManager {
         };
         config.buffer_size = self.buffer_size;
         let device_name = device_name(device);
-        let sample_rate = config.sample_rate.0;
+        let sample_rate = config.sample_rate;
         if sample_rate != self.sample_rate {
             renderer.on_change_sample_rate(sample_rate);
         }
@@ -163,9 +163,11 @@ impl StreamManager {
 }
 
 fn device_name(device: &Device) -> String {
-    device.name().unwrap_or_else(|_| "device name unavailable".to_string())
+    device
+        .description()
+        .map(|description| description.name().to_string())
+        .unwrap_or_else(|_| "device name unavailable".to_string())
 }
-
 fn process_renderer(renderer: &mut SendOnDrop<Renderer>, data: &mut [f32], channels: u16) {
     renderer.on_start_processing();
     renderer.process(data, channels);

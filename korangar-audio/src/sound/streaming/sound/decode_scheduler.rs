@@ -126,7 +126,7 @@ impl DecodeScheduler {
             return Ok(NextStep::Wait);
         }
 
-        if self.resampler.is_some() {
+        if let Some(resampler) = &mut self.resampler {
             // First, try to push any queued resampled frames to the ring buffer.
             while !self.frame_producer.is_full() && !self.resampler_output_queue.is_empty() {
                 let (frame, index) = self.resampler_output_queue.pop_front().unwrap();
@@ -144,7 +144,6 @@ impl DecodeScheduler {
 
             // Get resampled frames from the resampler's output buffer and push to ring
             // buffer.
-            let resampler = self.resampler.as_mut().unwrap();
             while !self.frame_producer.is_full() && resampler.has_output() {
                 let resampled_frame = resampler.get_frame();
 
@@ -165,7 +164,6 @@ impl DecodeScheduler {
 
             // If ring buffer is full and resampler still has output, queue remaining
             // frames.
-            let resampler = self.resampler.as_mut().unwrap();
             while resampler.has_output() {
                 let resampled_frame = resampler.get_frame();
                 let source_index =

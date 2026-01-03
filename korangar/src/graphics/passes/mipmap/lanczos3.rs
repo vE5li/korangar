@@ -21,7 +21,7 @@ impl Lanczos3Drawer {
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some(DRAWER_NAME),
             bind_group_layouts: &[pass_bind_group_layouts[0]],
-            push_constant_ranges: &[],
+            immediate_size: 0,
         });
 
         let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
@@ -46,8 +46,8 @@ impl Lanczos3Drawer {
                     write_mask: ColorWrites::default(),
                 })],
             }),
-            multiview: None,
             cache: None,
+            multiview_mask: None,
         });
 
         Self { pipeline }

@@ -96,11 +96,14 @@ func fragment(input: ModelVertexOutput) -> float4 {
 
     var fragment_color = float4(0.0);
 
-    if (PASS_MODE == 0 && alpha_channel == 0.0) {
+    // Workaround until WGPU supports `SpecConstantOp`
+    let pass_mode = uint(float(PASS_MODE));
+
+    if (pass_mode == 0 && alpha_channel == 0.0) {
         discard;
-    } else if (PASS_MODE == 1 && (alpha_channel == 0.0 || alpha_channel <= (1.0 - MODEL_OPAQUE_EPSILON))) {
+    } else if (pass_mode == 1 && (alpha_channel == 0.0 || alpha_channel <= (1.0 - MODEL_OPAQUE_EPSILON))) {
         discard;
-    } else if (PASS_MODE == 2 && (alpha_channel == 0.0 || alpha_channel > (1.0 - MODEL_OPAQUE_EPSILON))) {
+    } else if (pass_mode == 2 && (alpha_channel == 0.0 || alpha_channel > (1.0 - MODEL_OPAQUE_EPSILON))) {
         discard;
     } else {
         let pixel_position = uint2(floor(input.position.xy));

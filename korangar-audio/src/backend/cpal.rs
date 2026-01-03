@@ -3,7 +3,7 @@
 mod error;
 
 use cpal::traits::HostTrait;
-use cpal::{BufferSize, Device, SampleRate, StreamConfig};
+use cpal::{BufferSize, Device, StreamConfig};
 pub(crate) use error::Error;
 
 #[cfg(target_arch = "wasm32")]
@@ -26,7 +26,7 @@ pub(crate) fn default_device_and_config() -> Result<(Device, StreamConfig), Erro
     // standard for many operating systems.
     let config = StreamConfig {
         channels: 2,
-        sample_rate: SampleRate(48000),
+        sample_rate: 48000,
         buffer_size: BufferSize::Fixed(1200),
     };
     Ok((device, config))

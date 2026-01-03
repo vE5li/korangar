@@ -16,7 +16,8 @@ use crate::state::{ClientState, ClientStatePathExt, client_state};
 const MAXIMUM_USERNAME_LENGTH: usize = 24;
 const MAXIMUM_PASSWORD_LENGTH: usize = 24;
 
-struct SelectedServicePath<P, S> {
+// TODO: Maybe move this somewhere else
+pub struct SelectedServicePath<P, S> {
     window_state_path: P,
     service_settings_path: S,
 }
@@ -26,7 +27,7 @@ where
     P: Path<ClientState, LoginWindowState>,
     S: Path<ClientState, LoginSettings>,
 {
-    fn new(window_state_path: P, service_settings_path: S) -> Self {
+    pub fn new(window_state_path: P, service_settings_path: S) -> Self {
         Self {
             window_state_path,
             service_settings_path,

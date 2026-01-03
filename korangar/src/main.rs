@@ -108,7 +108,9 @@ use crate::loaders::*;
 #[cfg(feature = "debug")]
 use crate::renderer::DebugMarkerRenderer;
 use crate::renderer::{AlignHorizontal, EffectRenderer, GameInterfaceRenderer};
-use crate::settings::{GameSettingsPathExt, GraphicsSettings, IN_GAME_THEMES_PATH, LightingMode, MENU_THEMES_PATH, WORLD_THEMES_PATH};
+use crate::settings::{
+    GameSettingsPathExt, GraphicsSettings, IN_GAME_THEMES_PATH, LightingMode, MENU_THEMES_PATH, ServiceSettingsPathExt, WORLD_THEMES_PATH,
+};
 use crate::state::theme::{InterfaceTheme, InterfaceThemeType, WorldTheme};
 use crate::system::GameTimer;
 #[cfg(feature = "debug")]
@@ -946,6 +948,23 @@ impl Client {
                     login_data,
                 } => {
                     self.audio_engine.play_sound_effect(self.main_menu_click_sound_effect);
+
+                    // Remove `_m`/`_f` suffix from the username. The suffix is only for *creating*
+                    // an account and thus can (and needs to) be removed after the first successful
+                    // login.
+                    {
+                        let selected_service_path =
+                            SelectedServicePath::new(client_state().login_window(), client_state().login_settings());
+                        let username_path = selected_service_path.username();
+
+                        let username = self.client_state.follow_mut(username_path);
+
+                        if let Some(stripped) = username.strip_suffix("_m") {
+                            *username = stripped.to_owned();
+                        } else if let Some(stripped) = username.strip_suffix("_f") {
+                            *username = stripped.to_owned();
+                        }
+                    }
 
                     self.saved_login_data = Some(login_data);
 

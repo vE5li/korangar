@@ -111,6 +111,7 @@ use crate::renderer::{AlignHorizontal, EffectRenderer, GameInterfaceRenderer};
 use crate::settings::{
     GameSettingsPathExt, GraphicsSettings, IN_GAME_THEMES_PATH, LightingMode, MENU_THEMES_PATH, ServiceSettingsPathExt, WORLD_THEMES_PATH,
 };
+use crate::state::SelectedServicePath;
 use crate::state::theme::{InterfaceTheme, InterfaceThemeType, WorldTheme};
 use crate::system::GameTimer;
 #[cfg(feature = "debug")]

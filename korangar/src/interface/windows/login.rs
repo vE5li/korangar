@@ -2,109 +2,19 @@ use korangar_interface::components::text_box::DefaultHandler;
 use korangar_interface::element::StateElement;
 use korangar_interface::element::id::FocusIdExt;
 use korangar_interface::window::{CustomWindow, Window};
-use rust_state::{Context, Path, RustState, Selector};
+use rust_state::{Context, Path, RustState};
 
 use crate::graphics::{Color, ShadowPadding};
 use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
 use crate::loaders::{ClientInfo, ClientInfoPathExt, OverflowBehavior, ServiceId};
-use crate::settings::{LoginSettings, LoginSettingsPathExt, ServiceSettings, ServiceSettingsPathExt};
+use crate::settings::{LoginSettings, LoginSettingsPathExt, ServiceSettingsPathExt};
 use crate::state::localization::LocalizationPathExt;
 use crate::state::theme::InterfaceThemeType;
-use crate::state::{ClientState, ClientStatePathExt, client_state};
+use crate::state::{ClientState, ClientStatePathExt, SelectedServicePath, client_state};
 
 const MAXIMUM_USERNAME_LENGTH: usize = 24;
 const MAXIMUM_PASSWORD_LENGTH: usize = 24;
-
-// TODO: Maybe move this somewhere else
-pub struct SelectedServicePath<P, S> {
-    window_state_path: P,
-    service_settings_path: S,
-}
-
-impl<P, S> SelectedServicePath<P, S>
-where
-    P: Path<ClientState, LoginWindowState>,
-    S: Path<ClientState, LoginSettings>,
-{
-    pub fn new(window_state_path: P, service_settings_path: S) -> Self {
-        Self {
-            window_state_path,
-            service_settings_path,
-        }
-    }
-}
-
-impl<P, S> Clone for SelectedServicePath<P, S>
-where
-    P: Path<ClientState, LoginWindowState>,
-    S: Path<ClientState, LoginSettings>,
-{
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<P, S> Copy for SelectedServicePath<P, S>
-where
-    P: Path<ClientState, LoginWindowState>,
-    S: Path<ClientState, LoginSettings>,
-{
-}
-
-impl<P, S> Selector<ClientState, ServiceSettings> for SelectedServicePath<P, S>
-where
-    P: Path<ClientState, LoginWindowState>,
-    S: Path<ClientState, LoginSettings>,
-{
-    fn select<'a>(&'a self, state: &'a ClientState) -> Option<&'a ServiceSettings> {
-        self.follow(state)
-    }
-}
-
-impl<P, S> Path<ClientState, ServiceSettings> for SelectedServicePath<P, S>
-where
-    P: Path<ClientState, LoginWindowState>,
-    S: Path<ClientState, LoginSettings>,
-{
-    fn follow<'a>(&self, state: &'a ClientState) -> Option<&'a ServiceSettings> {
-        let selected_service_path = self.window_state_path.selected_service();
-        // SAFETY:
-        //
-        // Unwrapping here is safe because of the bounds.
-        let selected_service = selected_service_path.follow(state).unwrap();
-
-        // SAFETY:
-        //
-        // First unwrap here is safe because of the bounds.
-        // Second unwrap guaranteed to be safe by the ClientState. When it loads, it
-        // makes sure each available service has a settings entry.
-        self.service_settings_path
-            .follow(state)
-            .unwrap()
-            .service_settings
-            .get(selected_service)
-    }
-
-    fn follow_mut<'a>(&self, state: &'a mut ClientState) -> Option<&'a mut ServiceSettings> {
-        let selected_service_path = self.window_state_path.selected_service();
-        // SAFETY:
-        //
-        // Unwrapping here is safe because of the bounds.
-        let selected_service = *selected_service_path.follow_mut(state).unwrap();
-
-        // SAFETY:
-        //
-        // First unwrap here is safe because of the bounds.
-        // Second unwrap guaranteed to be safe by the ClientState. When it loads, it
-        // makes sure each available service has a settings entry.
-        self.service_settings_path
-            .follow_mut(state)
-            .unwrap()
-            .service_settings
-            .get_mut(&selected_service)
-    }
-}
 
 /// Internal state of the login window.
 #[derive(RustState, StateElement)]

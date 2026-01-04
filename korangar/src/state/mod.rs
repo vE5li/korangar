@@ -37,13 +37,17 @@ use crate::character_slots::CharacterSlots;
 use crate::graphics::RenderOptions;
 use crate::graphics::{Color, CornerDiameter, ScreenClip, ScreenPosition, ScreenSize, ShadowPadding};
 use crate::input::{InputEvent, MouseInputMode};
-use crate::interface::windows::{ChatWindowState, DialogWindowState, FriendListWindowState, LoginWindowState, WindowCache, WindowClass};
+use crate::interface::windows::{
+    ChatWindowState, DialogWindowState, FriendListWindowState, LoginWindowState, LoginWindowStatePathExt, WindowCache, WindowClass,
+};
 #[cfg(feature = "debug")]
 use crate::interface::windows::{ProfilerWindowState, ThemeInspectorWindowState};
 use crate::inventory::{Hotbar, Inventory, SkillTree};
 use crate::loaders::{ClientInfo, FontLoader, FontSize, GameFileLoader, OverflowBehavior, load_client_info};
 use crate::renderer::InterfaceRenderer;
-use crate::settings::{GameSettings, GraphicsSettingsCapabilities, InterfaceSettings, InterfaceSettingsCapabilities, LoginSettings};
+use crate::settings::{
+    GameSettings, GraphicsSettingsCapabilities, InterfaceSettings, InterfaceSettingsCapabilities, LoginSettings, ServiceSettings,
+};
 use crate::state::theme::WorldTheme;
 #[cfg(feature = "debug")]
 use crate::world::Object;
@@ -564,6 +568,95 @@ pub fn this_entity() -> impl Path<ClientState, Entity, false> {
     }
 
     CustomPath
+}
+
+pub struct SelectedServicePath<P, S> {
+    window_state_path: P,
+    service_settings_path: S,
+}
+
+impl<P, S> SelectedServicePath<P, S>
+where
+    P: Path<ClientState, LoginWindowState>,
+    S: Path<ClientState, LoginSettings>,
+{
+    pub fn new(window_state_path: P, service_settings_path: S) -> Self {
+        Self {
+            window_state_path,
+            service_settings_path,
+        }
+    }
+}
+
+impl<P, S> Clone for SelectedServicePath<P, S>
+where
+    P: Path<ClientState, LoginWindowState>,
+    S: Path<ClientState, LoginSettings>,
+{
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<P, S> Copy for SelectedServicePath<P, S>
+where
+    P: Path<ClientState, LoginWindowState>,
+    S: Path<ClientState, LoginSettings>,
+{
+}
+
+impl<P, S> Selector<ClientState, ServiceSettings> for SelectedServicePath<P, S>
+where
+    P: Path<ClientState, LoginWindowState>,
+    S: Path<ClientState, LoginSettings>,
+{
+    fn select<'a>(&'a self, state: &'a ClientState) -> Option<&'a ServiceSettings> {
+        self.follow(state)
+    }
+}
+
+impl<P, S> Path<ClientState, ServiceSettings> for SelectedServicePath<P, S>
+where
+    P: Path<ClientState, LoginWindowState>,
+    S: Path<ClientState, LoginSettings>,
+{
+    fn follow<'a>(&self, state: &'a ClientState) -> Option<&'a ServiceSettings> {
+        let selected_service_path = self.window_state_path.selected_service();
+        // SAFETY:
+        //
+        // Unwrapping here is safe because of the bounds.
+        let selected_service = selected_service_path.follow(state).unwrap();
+
+        // SAFETY:
+        //
+        // First unwrap here is safe because of the bounds.
+        // Second unwrap guaranteed to be safe by the ClientState. When it loads, it
+        // makes sure each available service has a settings entry.
+        self.service_settings_path
+            .follow(state)
+            .unwrap()
+            .service_settings
+            .get(selected_service)
+    }
+
+    fn follow_mut<'a>(&self, state: &'a mut ClientState) -> Option<&'a mut ServiceSettings> {
+        let selected_service_path = self.window_state_path.selected_service();
+        // SAFETY:
+        //
+        // Unwrapping here is safe because of the bounds.
+        let selected_service = *selected_service_path.follow_mut(state).unwrap();
+
+        // SAFETY:
+        //
+        // First unwrap here is safe because of the bounds.
+        // Second unwrap guaranteed to be safe by the ClientState. When it loads, it
+        // makes sure each available service has a settings entry.
+        self.service_settings_path
+            .follow_mut(state)
+            .unwrap()
+            .service_settings
+            .get_mut(&selected_service)
+    }
 }
 
 #[cfg(feature = "debug")]

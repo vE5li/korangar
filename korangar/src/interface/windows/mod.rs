@@ -65,7 +65,7 @@ pub use self::graphics_settings::GraphicsSettingsWindow;
 pub use self::hotbar::HotbarWindow;
 pub use self::interface_settings::InterfaceSettingsWindow;
 pub use self::inventory::InventoryWindow;
-pub use self::login::{LoginWindow, LoginWindowState, SelectedServicePath};
+pub use self::login::{LoginWindow, LoginWindowState, LoginWindowStatePathExt};
 #[cfg(feature = "debug")]
 pub use self::maps::MapsWindow;
 pub use self::menu::MenuWindow;

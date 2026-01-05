@@ -2,6 +2,7 @@ use korangar_interface::MouseMode;
 use korangar_interface::element::store::{ElementStore, ElementStoreMut};
 use korangar_interface::element::{BaseLayoutInfo, Element};
 use korangar_interface::event::{ClickHandler, DropHandler, Event, EventQueue};
+use korangar_interface::layout::tooltip::TooltipExt;
 use korangar_interface::layout::{MouseButton, Resolver, WindowLayout};
 use korangar_interface::prelude::{HorizontalAlignment, VerticalAlignment};
 use ragnarok_packets::SkillLevel;
@@ -10,48 +11,54 @@ use rust_state::{Context, Path};
 use crate::graphics::{Color, CornerDiameter, ShadowPadding};
 use crate::input::{InputEvent, MouseInputMode};
 use crate::interface::resource::SkillSource;
-use crate::inventory::Skill;
+use crate::inventory::{LearnableSkill, LearnedSkill};
 use crate::loaders::{FontSize, OverflowBehavior};
 use crate::renderer::LayoutExt;
 use crate::state::ClientState;
 
 struct LevelDisplay {
-    level: SkillLevel,
+    level: Option<SkillLevel>,
+    maximum_level: SkillLevel,
     string: Option<String>,
 }
 
 impl Default for LevelDisplay {
     fn default() -> Self {
         Self {
-            level: SkillLevel(0),
+            level: None,
+            maximum_level: SkillLevel(0),
             string: Default::default(),
         }
     }
 }
 
 impl LevelDisplay {
-    fn update(&mut self, new_level: SkillLevel) {
-        if self.string.is_none() || self.level != new_level {
-            self.string = Some(new_level.0.to_string());
+    fn update(&mut self, new_level: Option<SkillLevel>, new_maximum_level: SkillLevel) {
+        if self.string.is_none() || new_level != self.level || new_maximum_level != self.maximum_level {
+            self.string = match new_level {
+                Some(level) => Some(format!("{}/{}", level.0, new_maximum_level.0)),
+                None => Some(new_maximum_level.0.to_string()),
+            };
             self.level = new_level;
+            self.maximum_level = new_maximum_level;
         }
     }
 }
 
-struct SkillBoxHandler<P> {
-    skill_path: P,
+struct SkillBoxHandler<A> {
+    skill_path: A,
     source: SkillSource,
 }
 
-impl<P> SkillBoxHandler<P> {
-    fn new(skill_path: P, source: SkillSource) -> Self {
+impl<A> SkillBoxHandler<A> {
+    fn new(skill_path: A, source: SkillSource) -> Self {
         Self { skill_path, source }
     }
 }
 
-impl<P> ClickHandler<ClientState> for SkillBoxHandler<P>
+impl<A> ClickHandler<ClientState> for SkillBoxHandler<A>
 where
-    P: Path<ClientState, Skill, false>,
+    A: Path<ClientState, LearnableSkill, false>,
 {
     fn handle_click(&self, state: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
         // SAFETY:
@@ -73,7 +80,7 @@ where
 
 impl<P> DropHandler<ClientState> for SkillBoxHandler<P>
 where
-    P: Path<ClientState, Skill, false>,
+    P: Path<ClientState, LearnableSkill, false>,
 {
     fn handle_drop(&self, _: &Context<ClientState>, queue: &mut EventQueue<ClientState>, mouse_mode: &MouseMode<ClientState>) {
         if let MouseMode::Custom {
@@ -89,31 +96,35 @@ where
     }
 }
 
-pub struct SkillBox<A> {
-    skill_path: A,
+pub struct SkillBox<A, B> {
+    learnable_skill_path: A,
+    learned_skill_path: B,
     handler: SkillBoxHandler<A>,
     level_display: LevelDisplay,
 }
 
-impl<A> SkillBox<A>
+impl<A, B> SkillBox<A, B>
 where
     A: Copy,
+    B: Copy,
 {
     /// This function is supposed to be called from a component macro
     /// and not intended to be called manually.
     #[inline(always)]
-    pub fn component_new(skill_path: A, source: SkillSource) -> Self {
+    pub fn component_new(learnable_skill_path: A, learned_skill_path: B, source: SkillSource) -> Self {
         Self {
-            skill_path,
-            handler: SkillBoxHandler::new(skill_path, source),
+            learnable_skill_path,
+            learned_skill_path,
+            handler: SkillBoxHandler::new(learnable_skill_path, source),
             level_display: LevelDisplay::default(),
         }
     }
 }
 
-impl<A> Element<ClientState> for SkillBox<A>
+impl<A, B> Element<ClientState> for SkillBox<A, B>
 where
-    A: Path<ClientState, Skill, false>,
+    A: Path<ClientState, LearnableSkill, false>,
+    B: Path<ClientState, LearnedSkill, false>,
 {
     type LayoutInfo = BaseLayoutInfo;
 
@@ -125,8 +136,9 @@ where
     ) -> Self::LayoutInfo {
         let area = resolver.with_height(40.0);
 
-        if let Some(skill) = state.try_get(&self.skill_path) {
-            self.level_display.update(skill.skill_level);
+        if let Some(learnable_skill) = state.try_get(&self.learnable_skill_path) {
+            let skill_level = state.try_get(&self.learned_skill_path).map(|skill| skill.skill_level);
+            self.level_display.update(skill_level, learnable_skill.maximum_level);
         }
 
         Self::LayoutInfo { area }
@@ -170,17 +182,23 @@ where
             layout.register_drop_handler(&self.handler);
         }
 
-        if let Some(skill) = state.try_get(&self.skill_path) {
-            layout.add_sprite(
-                layout_info.area,
-                &skill.actions,
-                &skill.sprite,
-                &skill.animation_state,
-                Color::WHITE,
-            );
+        if let Some(skill) = state.try_get(&self.learnable_skill_path) {
+            let color = match state.try_get(&self.learned_skill_path).is_some() {
+                true => Color::WHITE,
+                false => Color::monochrome_u8(80),
+            };
+
+            if let Some(actions) = &skill.actions
+                && let Some(sprite) = &skill.sprite
+            {
+                layout.add_sprite(layout_info.area, &actions, &sprite, &skill.animation_state, color);
+            }
 
             if is_hovered {
                 layout.register_click_handler(MouseButton::Left, &self.handler);
+
+                struct SkillBoxTooltip;
+                layout.add_tooltip(&skill.skill_name, SkillBoxTooltip.tooltip_id());
             }
 
             layout.add_text(

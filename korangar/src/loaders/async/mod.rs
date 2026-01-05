@@ -7,16 +7,25 @@ use korangar_debug::logging::print_debug;
 #[cfg(feature = "debug")]
 use korangar_debug::profiling::Profiler;
 use korangar_networking::{InventoryItem, NoMetadata, ShopItem};
-use ragnarok_packets::{EntityId, ItemId, TilePosition};
+use ragnarok_packets::{ClientTick, EntityId, ItemId, JobId, SkillId, SkillLevel, TilePosition};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
 use crate::graphics::Texture;
 use crate::init_tls_rand;
+use crate::inventory::LearnableSkill;
 use crate::loaders::error::LoadError;
-use crate::loaders::{ActionLoader, AnimationLoader, ImageType, MapLoader, ModelLoader, SpriteLoader, TextureLoader, VideoLoader};
+use crate::loaders::{ActionLoader, AnimationLoader, ImageType, MapLoader, ModelLoader, Sprite, SpriteLoader, TextureLoader, VideoLoader};
 #[cfg(feature = "debug")]
 use crate::threads;
-use crate::world::{AnimationData, EntityType, ItemName, ItemNameKey, ItemResource, ItemResourceKey, Library, Map, ResourceMetadata};
+use crate::world::{
+    Actions, AnimationData, AnimationPair, EntityType, ItemName, ItemNameKey, ItemResource, ItemResourceKey, Library, Map,
+    ResourceMetadata, SkillListEntry, SkillTreeLayout, SpriteAnimationState,
+};
+
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
+pub enum SkillLocation {
+    SkillTree,
+}
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
 pub enum ItemLocation {
@@ -29,11 +38,15 @@ pub enum LoaderId {
     AnimationData(EntityId),
     ItemSprite(ItemId),
     Map(String),
+    SkillSprite(SkillId),
+    SkillActions(SkillId),
 }
 
 pub enum LoadableResource {
     AnimationData(Arc<AnimationData>),
     ItemSprite { texture: Arc<Texture>, location: ItemLocation },
+    SkillSprite { sprite: Arc<Sprite>, location: SkillLocation },
+    SkillActions { actions: Arc<Actions>, location: SkillLocation },
     Map { map: Box<Map>, position: Option<TilePosition> },
 }
 
@@ -125,6 +138,62 @@ impl AsyncLoader {
     }
 
     #[must_use]
+    pub fn request_skill_sprite_load(&self, skill_location: SkillLocation, skill_id: SkillId, path: &str) -> Option<Arc<Sprite>> {
+        let sprite_path = format!("{path}.spr");
+
+        match self.sprite_loader.get(&sprite_path) {
+            Some(sprite) => Some(sprite),
+            None => {
+                let sprite_loader = self.sprite_loader.clone();
+
+                self.request_load(LoaderId::SkillSprite(skill_id), move || {
+                    #[cfg(feature = "debug")]
+                    let _load_measurement = Profiler::start_measurement("skill sprite load");
+
+                    let sprite = match sprite_loader.get(&sprite_path) {
+                        Some(sprite) => sprite,
+                        None => sprite_loader.load(&sprite_path)?,
+                    };
+                    Ok(LoadableResource::SkillSprite {
+                        sprite,
+                        location: skill_location,
+                    })
+                });
+
+                None
+            }
+        }
+    }
+
+    #[must_use]
+    pub fn request_skill_actions_load(&self, skill_location: SkillLocation, skill_id: SkillId, path: &str) -> Option<Arc<Actions>> {
+        let actions_path = format!("{path}.spr");
+
+        match self.action_loader.get(&actions_path) {
+            Some(actions) => Some(actions),
+            None => {
+                let action_loader = self.action_loader.clone();
+
+                self.request_load(LoaderId::SkillActions(skill_id), move || {
+                    #[cfg(feature = "debug")]
+                    let _load_measurement = Profiler::start_measurement("skill actions load");
+
+                    let actions = match action_loader.get(&actions_path) {
+                        Some(actions) => actions,
+                        None => action_loader.load(&actions_path)?,
+                    };
+                    Ok(LoadableResource::SkillActions {
+                        actions,
+                        location: skill_location,
+                    })
+                });
+
+                None
+            }
+        }
+    }
+
+    #[must_use]
     pub fn request_item_sprite_load(
         &self,
         item_location: ItemLocation,
@@ -199,6 +268,25 @@ impl AsyncLoader {
         ShopItem { metadata, ..item }
     }
 
+    pub fn request_learnable_skill_load(&self, skill_id: SkillId, client_tick: ClientTick) -> LearnableSkill {
+        let skill_entry = self.library.get::<SkillListEntry>(skill_id);
+
+        let path = format!("아이템\\{}", skill_entry.file_name);
+        // FIX: Remove the location thing completely from Korangar.
+        let sprite = self.request_skill_sprite_load(SkillLocation::SkillTree, skill_id, &path);
+        let actions = self.request_skill_actions_load(SkillLocation::SkillTree, skill_id, &path);
+
+        LearnableSkill {
+            skill_id,
+            maximum_level: skill_entry.maximum_level,
+            file_name: skill_entry.file_name.clone(),
+            skill_name: skill_entry.name.clone(),
+            sprite,
+            actions,
+            animation_state: SpriteAnimationState::new(client_tick),
+        }
+    }
+
     pub fn request_map_load(&self, map_name: String, position: Option<TilePosition>) {
         let map_loader = self.map_loader.clone();
         let model_loader = self.model_loader.clone();
@@ -212,6 +300,15 @@ impl AsyncLoader {
             let map = map_loader.load(map_name, &model_loader, texture_loader, video_loader.clone(), &library)?;
             Ok(LoadableResource::Map { map, position })
         });
+    }
+
+    pub fn request_skill_tree_layout_load(&self, job_id: JobId, client_tick: ClientTick) -> HashMap<usize, LearnableSkill> {
+        let layout = self.library.get::<SkillTreeLayout>(job_id);
+
+        HashMap::from_iter(layout.0.iter().map(|(slot, skill_id)| {
+            let skill = self.request_learnable_skill_load(*skill_id, client_tick);
+            (*slot, skill)
+        }))
     }
 
     fn request_load<F>(&self, id: LoaderId, load_function: F)

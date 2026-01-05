@@ -11,7 +11,7 @@ use ragnarok_packets::{
 use rust_state::Context;
 
 use crate::interface::resource::{ItemSource, SkillSource};
-use crate::inventory::Skill;
+use crate::inventory::LearnableSkill;
 use crate::loaders::ServiceId;
 use crate::state::ClientState;
 #[cfg(feature = "debug")]
@@ -157,7 +157,7 @@ pub enum InputEvent {
         /// Destination of the move.
         destination: SkillSource,
         /// Skill to move.
-        skill: Skill,
+        skill: LearnableSkill,
     },
     /// Cast a skill.
     CastSkill {

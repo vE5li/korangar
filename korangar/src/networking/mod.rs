@@ -274,7 +274,7 @@ impl Packet for ErrorPacket {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, StateElement)]
-enum Direction {
+pub enum Direction {
     Incoming,
     Outgoing,
 }

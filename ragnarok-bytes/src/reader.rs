@@ -306,15 +306,13 @@ mod metadata {
 
 #[cfg(test)]
 mod byte {
-    use std::assert_matches::assert_matches;
-
     use crate::ByteReader;
 
     #[test]
     fn under_limit() {
         let mut byte_reader = ByteReader::without_metadata(&[9; 1]);
 
-        assert_matches!(byte_reader.byte::<()>(), Ok(9));
+        assert_eq!(byte_reader.byte::<()>(), Ok(9));
     }
 
     #[test]
@@ -328,15 +326,13 @@ mod byte {
 
 #[cfg(test)]
 mod bytes {
-    use std::assert_matches::assert_matches;
-
     use crate::ByteReader;
 
     #[test]
     fn under_limit() {
         let mut byte_reader = ByteReader::without_metadata(&[9; 4]);
 
-        assert_matches!(byte_reader.bytes::<(), 4>(), Ok([9, 9, 9, 9]));
+        assert_eq!(byte_reader.bytes::<(), 4>(), Ok([9, 9, 9, 9]));
     }
 
     #[test]
@@ -349,7 +345,6 @@ mod bytes {
 
 #[cfg(test)]
 mod slice {
-    use std::assert_matches::assert_matches;
 
     use crate::ByteReader;
 
@@ -357,7 +352,7 @@ mod slice {
     fn smaller_than_limit() {
         let mut byte_reader = ByteReader::without_metadata(&[9; 4]);
 
-        assert_matches!(byte_reader.slice::<()>(3), Ok(&[9, 9, 9]));
+        assert_eq!(byte_reader.slice::<()>(3), Ok([9, 9, 9].as_slice()));
         assert_eq!(byte_reader.remaining_bytes().as_slice(), &[9]);
     }
 
@@ -365,7 +360,7 @@ mod slice {
     fn exactly_on_limit() {
         let mut byte_reader = ByteReader::without_metadata(&[9; 4]);
 
-        assert_matches!(byte_reader.slice::<()>(4), Ok(&[9, 9, 9, 9]));
+        assert_eq!(byte_reader.slice::<()>(4), Ok([9, 9, 9, 9].as_slice()));
         assert!(byte_reader.is_empty());
     }
 

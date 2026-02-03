@@ -53,7 +53,7 @@ impl DropDownItem<Language> for Language {
 /// allowing editing and saving language files from the client.
 #[cfg(feature = "debug")]
 #[derive(Default)]
-struct LocalizationControls;
+pub struct LocalizationControls;
 
 #[cfg(feature = "debug")]
 impl StateElement<ClientState> for LocalizationControls {

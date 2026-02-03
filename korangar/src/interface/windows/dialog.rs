@@ -17,7 +17,7 @@ use crate::state::{ClientState, ClientStatePathExt, client_state};
 /// - Storing information about which elements are next buttons since we need to
 ///   be able to remove those individually.
 #[derive(RustState, StateElement)]
-struct DialogElement {
+pub struct DialogElement {
     /// Stores the UI element.
     // TODO: Unfortunately this has to be an unsafe cell as of now. Ideally this can be changed
     // later.

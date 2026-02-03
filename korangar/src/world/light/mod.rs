@@ -170,7 +170,7 @@ impl PointLightManager {
         self.have_no_shadows_this_frame.clear();
         self.had_shadows_last_frame.clear();
 
-        self.scored_point_lights.sort_by(|left, right| right.2.cmp(&left.2));
+        self.scored_point_lights.sort_by_key(|right| std::cmp::Reverse(right.2));
         let mut scored_iterator = self.scored_point_lights.drain(..);
 
         for _ in 0..shadow_map_count {

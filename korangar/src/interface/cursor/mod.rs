@@ -9,6 +9,8 @@ use crate::loaders::{ActionLoader, Sprite, SpriteLoader};
 use crate::renderer::{GameInterfaceRenderer, SpriteRenderer};
 use crate::world::{Actions, SpriteAnimationState};
 
+const PICKUP_DURATION_MS: u32 = 150;
+
 #[allow(dead_code)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum MouseCursorState {
@@ -26,6 +28,11 @@ pub enum MouseCursorState {
     Unsure2 = 11,
     WarpFast = 12,
     Unsure3 = 13,
+    /// Not an orignial state, represented as part of this enum to make the API
+    /// more ergonomic. Will likely be refactored with this entire module at
+    /// some point.
+    HoverItem = 900,
+    PickUpItem,
 }
 
 impl From<MouseCursorState> for usize {
@@ -39,6 +46,7 @@ pub struct MouseCursor {
     actions: Arc<Actions>,
     cursor_state: MouseCursorState,
     animation_state: SpriteAnimationState,
+    locked_until: ClientTick,
     shown: bool,
 }
 
@@ -47,6 +55,7 @@ impl MouseCursor {
         let sprite = sprite_loader.get_or_load("cursors.spr").unwrap();
         let actions = action_loader.get_or_load("cursors.act").unwrap();
         let animation_state = SpriteAnimationState::new(ClientTick(0));
+        let locked_until = ClientTick(0);
         let shown = true;
 
         Self {
@@ -54,6 +63,7 @@ impl MouseCursor {
             actions,
             cursor_state: MouseCursorState::Default,
             animation_state,
+            locked_until,
             shown,
         }
     }
@@ -71,10 +81,28 @@ impl MouseCursor {
     }
 
     pub fn set_state(&mut self, state: MouseCursorState, client_tick: ClientTick) {
-        if self.cursor_state != state {
-            self.cursor_state = state;
-            self.animation_state.action_base_offset = usize::from(self.cursor_state);
-            self.animation_state.start_time = client_tick;
+        if client_tick.0 > self.locked_until.0 {
+            // Cursor is unlocked
+            if self.cursor_state != state {
+                self.cursor_state = state;
+
+                let base_offset = match state {
+                    MouseCursorState::PickUpItem => {
+                        // Lock the cursor.
+                        self.locked_until = ClientTick(client_tick.0 + PICKUP_DURATION_MS);
+
+                        usize::from(MouseCursorState::Grab)
+                    }
+                    MouseCursorState::HoverItem => usize::from(MouseCursorState::Grab),
+                    regular => usize::from(regular),
+                };
+
+                self.animation_state.action_base_offset = base_offset;
+                self.animation_state.start_time = client_tick;
+            }
+        } else if self.cursor_state == state {
+            // Cursor is locked, but we can still extend the duration of the state.
+            self.locked_until = ClientTick(client_tick.0 + PICKUP_DURATION_MS);
         }
     }
 
@@ -131,15 +159,38 @@ impl MouseCursor {
             _ => 7,
         };
 
-        self.actions.render_sprite(
-            renderer,
-            &self.sprite,
-            &self.animation_state,
-            mouse_position,
-            direction,
-            ScreenClip::unbound(),
-            color,
-            scaling,
-        );
+        // TODO: Is there some deeper logic here?
+        const HOVER_ITEM_FRAME: usize = 0;
+        const PICKUP_FRAME: usize = 2;
+
+        let frame_index = match self.cursor_state {
+            MouseCursorState::HoverItem => Some(HOVER_ITEM_FRAME),
+            MouseCursorState::PickUpItem => Some(PICKUP_FRAME),
+            _ => None,
+        };
+
+        if let Some(frame_index) = frame_index {
+            self.actions.render_sprite_frame(
+                renderer,
+                &self.sprite,
+                self.animation_state.get_action_index(direction),
+                frame_index,
+                mouse_position,
+                ScreenClip::unbound(),
+                color,
+                scaling,
+            );
+        } else {
+            self.actions.render_sprite(
+                renderer,
+                &self.sprite,
+                &self.animation_state,
+                mouse_position,
+                direction,
+                ScreenClip::unbound(),
+                color,
+                scaling,
+            );
+        }
     }
 }

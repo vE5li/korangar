@@ -31,8 +31,8 @@ impl EntityData {
     }
 }
 
-impl From<EntityAppearedPacket> for EntityData {
-    fn from(packet: EntityAppearedPacket) -> Self {
+impl From<EntityAppearPacket> for EntityData {
+    fn from(packet: EntityAppearPacket) -> Self {
         Self {
             entity_id: packet.entity_id,
             movement_speed: packet.movement_speed,
@@ -48,8 +48,8 @@ impl From<EntityAppearedPacket> for EntityData {
     }
 }
 
-impl From<EntityAppeared2Packet> for EntityData {
-    fn from(packet: EntityAppeared2Packet) -> Self {
+impl From<EntityAppear2Packet> for EntityData {
+    fn from(packet: EntityAppear2Packet) -> Self {
         Self {
             entity_id: packet.entity_id,
             movement_speed: packet.movement_speed,
@@ -65,8 +65,8 @@ impl From<EntityAppeared2Packet> for EntityData {
     }
 }
 
-impl From<MovingEntityAppearedPacket> for EntityData {
-    fn from(packet: MovingEntityAppearedPacket) -> Self {
+impl From<MovingEntityAppearPacket> for EntityData {
+    fn from(packet: MovingEntityAppearPacket) -> Self {
         let (origin, destination) = packet.position.to_origin_destination();
 
         Self {

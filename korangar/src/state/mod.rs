@@ -51,7 +51,7 @@ use crate::settings::{
 use crate::state::theme::WorldTheme;
 #[cfg(feature = "debug")]
 use crate::world::Object;
-use crate::world::{Entity, Player, ResourceMetadata};
+use crate::world::{Entity, GroundItem, Player, ResourceMetadata};
 use crate::{AudioSettings, GraphicsSettings};
 
 /// A message in the in-game chat.
@@ -69,6 +69,22 @@ pub struct ChatMessage {
 impl ChatMessage {
     pub fn new(text: String, color: MessageColor) -> Self {
         Self { text, color }
+    }
+}
+
+#[derive(Debug, Clone, Copy, RustState, StateElement)]
+pub enum BufferedAction {
+    AttackEntity { entity_id: EntityId },
+    PickUpItem { entity_id: EntityId },
+}
+
+impl BufferedAction {
+    pub fn is_attack_entity(&self, entity_id: EntityId) -> bool {
+        matches!(self, BufferedAction::AttackEntity { entity_id: buffered_entity_id } if *buffered_entity_id == entity_id)
+    }
+
+    pub fn is_pick_up_item(&self, entity_id: EntityId) -> bool {
+        matches!(self, BufferedAction::PickUpItem { entity_id: buffered_entity_id } if *buffered_entity_id == entity_id)
     }
 }
 
@@ -121,6 +137,8 @@ pub struct ClientState {
     entities: Vec<Entity>,
     /// All dead entities on the map.
     dead_entities: Vec<Entity>,
+    /// All ground items on the map.
+    ground_items: Vec<GroundItem>,
 
     /// List of all received chat messages.
     chat_messages: Vec<ChatMessage>,
@@ -168,9 +186,9 @@ pub struct ClientState {
     /// Size of the Korangar window.
     window_size: ScreenSize,
 
-    /// Buffered attack entity. Like when attacking a target that is out of
+    /// Buffered player action. For example, attacking a target that is out of
     /// range.
-    buffered_attack_entity: Option<EntityId>,
+    buffered_action: Option<BufferedAction>,
 
     /// Map data that is viewed in the inspector. Once added to this vector they
     /// are never removed so we can ensure the user interface remains valid.
@@ -311,7 +329,7 @@ impl ClientState {
             let graphics_settings_capabilities = GraphicsSettingsCapabilities::default();
         });
 
-        let buffered_attack_entity = None;
+        let buffered_action = None;
 
         #[cfg(feature = "debug")]
         let debug_timer = korangar_debug::logging::Timer::new("creating debug resources");
@@ -360,6 +378,7 @@ impl ClientState {
             dialog_window,
             entities: Vec::new(),
             dead_entities: Vec::new(),
+            ground_items: Vec::new(),
             chat_messages,
             friend_list,
             shop_items,
@@ -376,7 +395,7 @@ impl ClientState {
             switch_request,
             create_character_name,
             window_size,
-            buffered_attack_entity,
+            buffered_action,
             #[cfg(feature = "debug")]
             inspecting_maps,
             #[cfg(feature = "debug")]

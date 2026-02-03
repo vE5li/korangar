@@ -339,6 +339,7 @@ fn get_sprite_path_for_player_job(job_id: usize) -> &'static str {
         4047 => "권성",            // STAR
         4049 => "소울링커",        // LINKER
         4190 => "슈퍼노비스",      // SUPERNOVICE2
+        4191 => "슈퍼노비스",      // SUPERNOVICE2_B
         4211 => "KAGEROU",         // KAGEROU
         4212 => "OBORO",           // OBORO
         4215 => "REBELLION",       // REBELLION

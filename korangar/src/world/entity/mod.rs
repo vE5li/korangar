@@ -315,7 +315,7 @@ fn get_sprite_path_for_player_job(job_id: usize) -> &'static str {
         4063 => "아크비숍",        // ARCH_BISHOP_H
         4064 => "미케닉",          // MECHANIC_H
         4065 => "길로틴크로스",    // GUILLOTINE_CROSS_H
-        4073 => "가돼",            // ROYAL_GUARD_H
+        4073 => "가드",            // ROYAL_GUARD_H
         4074 => "소서러",          // SORCERER_H
         4075 => "민스트럴",        // MINSTREL_H
         4076 => "원더러",          // WANDERER_H

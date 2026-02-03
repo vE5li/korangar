@@ -115,6 +115,12 @@ where
                         event: Toggle(self.render_options_path.show_entities()),
                     },
                     state_button! {
+                        text: "Show ground items",
+                        tooltip: "Show ^000001ground items^000000",
+                        state: self.render_options_path.show_ground_items(),
+                        event: Toggle(self.render_options_path.show_ground_items()),
+                    },
+                    state_button! {
                         text: "Show water",
                         tooltip: "Show the ^000001water plane^000000",
                         state: self.render_options_path.show_water(),

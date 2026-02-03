@@ -246,18 +246,57 @@ where
     packet_handler.register(|packet: ResurrectionPacket| NetworkEvent::ResurrectPlayer {
         entity_id: packet.entity_id,
     })?;
-    packet_handler.register(|packet: EntityAppearedPacket| NetworkEvent::AddEntity {
+    packet_handler.register(|packet: EntityAppearPacket| NetworkEvent::AddEntity {
         entity_data: packet.into(),
     })?;
-    packet_handler.register(|packet: EntityAppeared2Packet| NetworkEvent::AddEntity {
+    packet_handler.register(|packet: EntityAppear2Packet| NetworkEvent::AddEntity {
         entity_data: packet.into(),
     })?;
-    packet_handler.register(|packet: MovingEntityAppearedPacket| NetworkEvent::AddEntity {
+    packet_handler.register(|packet: MovingEntityAppearPacket| NetworkEvent::AddEntity {
         entity_data: packet.into(),
     })?;
-    packet_handler.register(|packet: EntityDisappearedPacket| NetworkEvent::RemoveEntity {
+    packet_handler.register(|packet: EntityDisAppearPacket| NetworkEvent::RemoveEntity {
         entity_id: packet.entity_id,
         reason: packet.reason,
+    })?;
+    packet_handler.register(|packet: GroundItemAppearPacket| NetworkEvent::AddGroundItem {
+        entity_id: packet.entity_id,
+        item_id: packet.item_id,
+        is_identified: packet.is_identified != 0,
+        quantity: packet.quantity,
+        position: packet.position,
+        x_offset: packet.x_offset,
+        y_offset: packet.y_offset,
+    })?;
+    packet_handler.register(|packet: GroundItemAppear2Packet| NetworkEvent::AddGroundItem {
+        entity_id: packet.entity_id,
+        item_id: packet.item_id,
+        is_identified: packet.is_identified != 0,
+        quantity: packet.quantity,
+        position: packet.position,
+        x_offset: packet.x_offset,
+        y_offset: packet.y_offset,
+    })?;
+    packet_handler.register(|packet: GroundItemAppear3Packet| NetworkEvent::AddGroundItem {
+        entity_id: packet.entity_id,
+        item_id: packet.item_id,
+        is_identified: packet.is_identified != 0,
+        quantity: packet.quantity,
+        position: packet.position,
+        x_offset: packet.x_offset,
+        y_offset: packet.y_offset,
+    })?;
+    packet_handler.register(|packet: GroundItemAppear4Packet| NetworkEvent::AddGroundItem {
+        entity_id: packet.entity_id,
+        item_id: packet.item_id,
+        is_identified: packet.is_identified != 0,
+        quantity: packet.quantity,
+        position: packet.position,
+        x_offset: packet.x_offset,
+        y_offset: packet.y_offset,
+    })?;
+    packet_handler.register(|packet: ItemDisappearPacket| NetworkEvent::RemoveGroundItem {
+        entity_id: packet.entity_id,
     })?;
     packet_handler.register(|packet: UpdateStatPacket| {
         let UpdateStatPacket { stat_type } = packet;
@@ -497,7 +536,7 @@ where
     packet_handler.register(|packet: ItemPickupPacket| {
         let ItemPickupPacket {
             index,
-            count,
+            quantity,
             item_id,
             is_identified,
             is_broken,
@@ -515,7 +554,10 @@ where
         } = packet;
 
         if result != ItemPickupResult::Success {
-            todo!();
+            return vec![NetworkEvent::ChatMessage {
+                text: "Failed to pick up item.".to_string(),
+                color: MessageColor::Error,
+            }];
         }
 
         // TODO: Not sure where to store these, since the *InventoryItem packets are not
@@ -524,7 +566,7 @@ where
 
         let details = match equip_position.is_empty() {
             true => InventoryItemDetails::Regular {
-                amount: count,
+                amount: quantity,
                 equipped_position: equip_position,
                 flags: {
                     let mut flags = RegularItemFlags::empty();
@@ -560,7 +602,13 @@ where
             details,
         };
 
-        NetworkEvent::IventoryItemAdded { item }
+        let is_identified = is_identified != 0;
+
+        vec![NetworkEvent::IventoryItemAdded { item }, NetworkEvent::ItemObtained {
+            item_id,
+            quantity,
+            is_identified,
+        }]
     })?;
     packet_handler.register(|packet: RemoveItemFromInventoryPacket| NetworkEvent::InventoryItemRemoved {
         reason: packet.remove_reason,
@@ -622,6 +670,10 @@ where
             attack_duration: packet.attack_duration,
             is_critical: true,
         }),
+        DamageType::PickUpItem => Some(NetworkEvent::EntityPickUpItem {
+            entity_id: packet.source_entity_id,
+            item_entity_id: packet.destination_entity_id,
+        }),
         DamageType::StandUp => Some(NetworkEvent::PlayerStandUp {
             entity_id: packet.destination_entity_id,
         }),
@@ -641,6 +693,10 @@ where
             damage_amount: (packet.damage_amount > 0).then_some(packet.damage_amount as usize),
             attack_duration: packet.attack_duration,
             is_critical: true,
+        }),
+        DamageType::PickUpItem => Some(NetworkEvent::EntityPickUpItem {
+            entity_id: packet.source_entity_id,
+            item_entity_id: packet.destination_entity_id,
         }),
         DamageType::StandUp => Some(NetworkEvent::PlayerStandUp {
             entity_id: packet.destination_entity_id,

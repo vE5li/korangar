@@ -29,6 +29,10 @@ impl SpriteAnimationState {
             time: 0,
         }
     }
+
+    pub fn get_action_index(&self, direction: usize) -> usize {
+        self.action_base_offset * 8 + direction
+    }
 }
 
 impl SpriteAnimationState {
@@ -70,16 +74,30 @@ impl Actions {
         scaling: f32,
     ) {
         let direction = camera_direction % 8;
-        let animation_action = animation_state.action_base_offset * 8 + direction;
-        let action = &self.actions[animation_action % self.actions.len()];
-        let delay = self.delays[animation_action % self.delays.len()];
+        let action_index = animation_state.get_action_index(direction);
+        let delay = self.delays[action_index % self.delays.len()];
         let factor = delay * 50.0;
 
         // We must use f64 here, so that the microsecond u32 value of
         // `animation_state.time` can always be properly represented.
         let frame = (f64::from(animation_state.time) / f64::from(factor)) as usize;
 
-        let motion = &action.motions[frame % action.motions.len()];
+        self.render_sprite_frame(renderer, sprite, action_index, frame, position, screen_clip, color, scaling);
+    }
+
+    pub fn render_sprite_frame(
+        &self,
+        renderer: &impl SpriteRenderer,
+        sprite: &Sprite,
+        action_index: usize,
+        frame_index: usize,
+        position: ScreenPosition,
+        screen_clip: ScreenClip,
+        color: Color,
+        scaling: f32,
+    ) {
+        let action = &self.actions[action_index % self.actions.len()];
+        let motion = &action.motions[frame_index % action.motions.len()];
 
         for sprite_clip in &motion.sprite_clips {
             // `get` instead of a direct index in case a fallback was loaded

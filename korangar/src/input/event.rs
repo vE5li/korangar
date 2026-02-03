@@ -119,6 +119,11 @@ pub enum InputEvent {
         /// Id of the entity to interact with.
         entity_id: EntityId,
     },
+    /// Pick up an item from the ground.
+    PickUpItem {
+        /// Id of the item entity to pick up.
+        entity_id: EntityId,
+    },
     /// Send a chat message.
     SendMessage {
         /// Text of the message.

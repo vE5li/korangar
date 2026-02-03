@@ -721,6 +721,12 @@ where
         }
     }
 
+    pub fn pick_up_item(&mut self, entity_id: EntityId) -> Result<(), NotConnectedError> {
+        match self.map_server_packet_version()? {
+            SupportedPacketVersion::_20220406 => self.send_map_server_packet(ItemPickupRequestPacket::new(entity_id)),
+        }
+    }
+
     pub fn send_chat_message(&mut self, player_name: &str, text: &str) -> Result<(), NotConnectedError> {
         let message = format!("{} : {}", player_name, text);
 

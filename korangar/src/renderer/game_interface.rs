@@ -21,7 +21,7 @@ use crate::world::MarkerIdentifier;
 #[allow(unused)]
 pub enum AlignHorizontal {
     Left,
-    Mid,
+    Center,
 }
 
 /// Renders the in-game interface (like the FPS counter, the mouse pointer or
@@ -194,7 +194,7 @@ impl GameInterfaceRenderer {
 
         let horizontal_offset = match align_horizontal {
             AlignHorizontal::Left => 0.0,
-            AlignHorizontal::Mid => -size.x / 2.0,
+            AlignHorizontal::Center => -size.x / 2.0,
         };
 
         let mut instructions = self.instructions.borrow_mut();
@@ -229,8 +229,23 @@ impl GameInterfaceRenderer {
         );
     }
 
+    pub fn render_hover_text(&self, text: &str, scaling: Scaling, mouse_position: ScreenPosition) {
+        let offset = ScreenPosition {
+            left: 15.0 * scaling.get_factor(),
+            top: 15.0 * scaling.get_factor(),
+        };
+
+        self.render_text(
+            text,
+            mouse_position + offset,
+            Color::WHITE,
+            FontSize(16.0),
+            AlignHorizontal::Center,
+        );
+    }
+
     pub fn render_damage_text(&self, text: &str, position: ScreenPosition, color: Color, font_size: FontSize) {
-        self.render_text(text, position, color, font_size, AlignHorizontal::Mid);
+        self.render_text(text, position, color, font_size, AlignHorizontal::Center);
     }
 
     pub fn render_bar(&self, position: ScreenPosition, size: ScreenSize, color: Color, maximum: f32, current: f32) {

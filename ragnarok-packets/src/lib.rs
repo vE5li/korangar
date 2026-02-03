@@ -1537,6 +1537,13 @@ pub struct RequestActionPacket {
 
 #[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0362)]
+pub struct ItemPickupRequestPacket {
+    pub entity_id: EntityId,
+}
+
+#[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x00F3)]
 #[variable_length]
 pub struct GlobalMessagePacket {
@@ -1672,7 +1679,7 @@ pub enum DisappearanceReason {
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x0080)]
-pub struct EntityDisappearedPacket {
+pub struct EntityDisAppearPacket {
     pub entity_id: EntityId,
     pub reason: DisappearanceReason,
 }
@@ -1681,7 +1688,7 @@ pub struct EntityDisappearedPacket {
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x09FD)]
 #[variable_length]
-pub struct MovingEntityAppearedPacket {
+pub struct MovingEntityAppearPacket {
     pub object_type: u8,
     pub entity_id: EntityId,
     pub group_id: u32, // may be reversed - or completely wrong
@@ -1734,7 +1741,7 @@ pub struct ResurrectionPacket {
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x09FE)]
 #[variable_length]
-pub struct EntityAppearedPacket {
+pub struct EntityAppearPacket {
     pub object_type: u8,
     pub entity_id: EntityId,
     pub group_id: u32, // may be reversed - or completely wrong
@@ -1776,7 +1783,7 @@ pub struct EntityAppearedPacket {
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x09FF)]
 #[variable_length]
-pub struct EntityAppeared2Packet {
+pub struct EntityAppear2Packet {
     pub object_type: u8,
     pub entity_id: EntityId,
     pub group_id: u32, // may be reversed - or completely wrong
@@ -3378,6 +3385,69 @@ pub struct StateChangePacket {
     pub is_pk_mode_on: u8,
 }
 
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x009D)]
+pub struct GroundItemAppearPacket {
+    pub entity_id: EntityId,
+    pub item_id: ItemId,
+    pub is_identified: u8,
+    pub position: TilePosition,
+    pub quantity: u16,
+    pub x_offset: u8,
+    pub y_offset: u8,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x009E)]
+pub struct GroundItemAppear2Packet {
+    pub entity_id: EntityId,
+    pub item_id: ItemId,
+    pub is_identified: u8,
+    pub position: TilePosition,
+    pub x_offset: u8,
+    pub y_offset: u8,
+    pub quantity: u16,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x084B)]
+pub struct GroundItemAppear3Packet {
+    pub entity_id: EntityId,
+    pub item_id: ItemId,
+    pub item_type: u16,
+    pub is_identified: u8,
+    pub position: TilePosition,
+    pub x_offset: u8,
+    pub y_offset: u8,
+    pub quantity: u16,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0ADD)]
+pub struct GroundItemAppear4Packet {
+    pub entity_id: EntityId,
+    pub item_id: ItemId,
+    pub item_type: u16,
+    pub is_identified: u8,
+    pub position: TilePosition,
+    pub x_offset: u8,
+    pub y_offset: u8,
+    pub quantity: u16,
+    pub show_drop_effect: u8,
+    pub drop_effect_mode: u16,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x00A1)]
+pub struct ItemDisappearPacket {
+    pub entity_id: EntityId,
+}
+
 #[derive(Debug, Clone, ByteConvertable, PartialEq, Eq)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub enum ItemPickupResult {
@@ -3396,7 +3466,7 @@ pub enum ItemPickupResult {
 #[header(0x0B41)]
 pub struct ItemPickupPacket {
     pub index: InventoryIndex,
-    pub count: u16,
+    pub quantity: u16,
     pub item_id: ItemId,
     pub is_identified: u8,
     pub is_broken: u8,

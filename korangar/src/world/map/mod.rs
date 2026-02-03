@@ -24,7 +24,7 @@ use rust_state::RustState;
 use wgpu::Queue;
 
 pub use self::lighting::Lighting;
-use super::{Camera, Entity, Object, PointLightId, PointLightManager, ResourceSet, ResourceSetBuffer, SubMesh, Video};
+use super::{Camera, Entity, GroundItem, Object, PointLightId, PointLightManager, ResourceSet, ResourceSetBuffer, SubMesh, Video};
 #[cfg(feature = "debug")]
 use super::{LightSourceExt, Model, PointLightSet};
 #[cfg(feature = "debug")]
@@ -425,6 +425,17 @@ impl Map {
         entities
             .iter()
             .for_each(|entity| entity.render(instructions, camera, false, client_tick));
+    }
+
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
+    pub fn render_ground_items(
+        &self,
+        instructions: &mut Vec<EntityInstruction>,
+        items: &[GroundItem],
+        camera: &dyn Camera,
+        client_tick: ClientTick,
+    ) {
+        items.iter().for_each(|item| item.render(instructions, camera, client_tick));
     }
 
     #[cfg(feature = "debug")]

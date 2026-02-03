@@ -14,6 +14,7 @@ use crate::world::{ActionEvent, Actions, Camera, EntityType};
 
 const TILE_SIZE: f32 = 10.0;
 const SPRITE_SCALE: f32 = 1.4;
+const PICKUP_ANIMATION_FACTOR: f32 = 25.0;
 
 #[allow(dead_code)]
 #[derive(Copy, Clone, Default, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
@@ -113,6 +114,15 @@ impl AnimationState {
         self.looping = false;
     }
 
+    pub fn pickup(&mut self, entity_type: EntityType, client_tick: ClientTick) {
+        self.action_type = AnimationActionType::Pickup;
+        self.action_base_offset = self.action_type.action_base_offset(entity_type);
+        self.start_time = client_tick;
+        self.duration = None;
+        self.factor = Some(PICKUP_ANIMATION_FACTOR);
+        self.looping = false;
+    }
+
     pub fn walk(&mut self, entity_type: EntityType, movement_speed: usize, client_tick: ClientTick) {
         self.action_type = AnimationActionType::Walk;
         self.action_base_offset = self.action_type.action_base_offset(entity_type);
@@ -138,8 +148,16 @@ impl AnimationState {
         )
     }
 
+    pub fn is_pickup(&self) -> bool {
+        self.action_type == AnimationActionType::Pickup
+    }
+
     pub fn is_walking(&self) -> bool {
         self.action_type == AnimationActionType::Walk
+    }
+
+    pub fn is_dead(&self) -> bool {
+        self.action_type == AnimationActionType::Die
     }
 
     pub fn update(&mut self, client_tick: ClientTick) {

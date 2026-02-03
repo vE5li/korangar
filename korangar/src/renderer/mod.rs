@@ -11,7 +11,9 @@ use std::sync::Arc;
 #[cfg(feature = "debug")]
 use cgmath::Point3;
 pub use effect::EffectRenderer;
-pub use game_interface::{AlignHorizontal, GameInterfaceRenderer};
+#[cfg(feature = "debug")]
+pub use game_interface::AlignHorizontal;
+pub use game_interface::GameInterfaceRenderer;
 pub use interface::{InterfaceRenderer, LayoutExt};
 #[cfg(feature = "debug")]
 pub use marker::DebugMarkerRenderer;

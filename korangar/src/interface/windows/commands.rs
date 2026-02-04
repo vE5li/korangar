@@ -84,15 +84,59 @@ impl CustomWindow<ClientState> for CommandsWindow {
                     text: "Monsters",
                     overflow_behavior: OverflowBehavior::Shrink,
                 },
-                button! {
-                    text: "Spawn Dummy",
-                    tooltip: "Spawns a neutral dummy [^000001@spawn 21077^000000]",
-                    event: InputEvent::SendMessage { text: "@spawn 21077".to_string() },
+                split! {
+                    gaps: theme().window().gaps(),
+                    children: (
+                        button! {
+                            text: "Spawn dummy",
+                            tooltip: "Spawns a neutral dummy [^000001@spawn 21077^000000]",
+                            event: InputEvent::SendMessage { text: "@spawn 21077".to_string() },
+                        },
+                        button! {
+                            text: "Spawn 5 plants",
+                            tooltip: "Spawn 5 plants [^000001@spawn 1080 5^000000]",
+                            event: InputEvent::SendMessage { text: "@spawn 1080 5".to_string() },
+                        },
+                    ),
                 },
-                button! {
-                    text: "Kill all",
-                    tooltip: "Kills all monsters without dropping loot [^000001@killmonster2^000000]",
-                    event: InputEvent::SendMessage { text: "@killmonster2".to_string() },
+                split! {
+                    gaps: theme().window().gaps(),
+                    children: (
+                        button! {
+                            text: "Kill all",
+                            tooltip: "Kills all monsters and drops their loot [^000001@killmonster^000000]",
+                            event: InputEvent::SendMessage { text: "@killmonster".to_string() },
+                        },
+                        button! {
+                            text: "Remove all",
+                            tooltip: "Removes all monsters without dropping loot [^000001@killmonster2^000000]",
+                            event: InputEvent::SendMessage { text: "@killmonster2".to_string() },
+                        },
+                    ),
+                },
+                text! {
+                    text: "Auto loot",
+                    overflow_behavior: OverflowBehavior::Shrink,
+                },
+                split! {
+                    gaps: theme().window().gaps(),
+                    children: (
+                        button! {
+                            text: "Toggle",
+                            tooltip: "Toggles autoloot [^000001@autoloot^000000]",
+                            event: InputEvent::SendMessage { text: "@autoloot".to_string() },
+                        },
+                        button! {
+                            text: "Turn off",
+                            tooltip: "Turns auto loot off [^000001@autoloot off^000000]",
+                            event: InputEvent::SendMessage { text: "@autoloot off".to_string() },
+                        },
+                        button! {
+                            text: "Turn on",
+                            tooltip: "Turns auto loot on [^000001@autoloot 100^000000]",
+                            event: InputEvent::SendMessage { text: "@autoloot 100".to_string() },
+                        },
+                    ),
                 },
                 text! {
                     text: "Stats",

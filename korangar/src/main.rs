@@ -1051,7 +1051,12 @@ impl Client {
                         .cloned()
                         .unwrap();
 
-                    let mut player = Entity::Player(Player::new(saved_login_data.account_id, &character_information, client_tick));
+                    let mut player = Entity::Player(Player::new(
+                        &self.library,
+                        saved_login_data.account_id,
+                        &character_information,
+                        client_tick,
+                    ));
 
                     *self.client_state.follow_mut(client_state().player_name()) = character_information.name;
 
@@ -1121,7 +1126,7 @@ impl Client {
                 }
                 NetworkEvent::AddEntity { entity_data } => {
                     if let Some(map) = &self.map
-                        && let Some(npc) = Npc::new(map, &mut self.path_finder, entity_data, client_tick)
+                        && let Some(npc) = Npc::new(&self.library, map, &mut self.path_finder, entity_data, client_tick)
                     {
                         let mut npc = Entity::Npc(npc);
 
@@ -1558,7 +1563,7 @@ impl Client {
                     // inventory and for unequipping items. We should probably manually
                     // request a full list of items and the hotbar.
 
-                    entity.set_job(job_id);
+                    entity.set_job(&self.library, job_id);
 
                     if let Some(animation_data) = self.async_loader.request_animation_data_load(
                         entity.get_entity_id(),
@@ -1609,9 +1614,9 @@ impl Client {
                         frame_timer,
                         EffectCenter::Entity(entity_id, Point3::new(0.0, 0.0, 0.0)),
                         Vector3::new(0.0, 9.0, 0.0),
-                        // FIX: The point light ID needs to be unique.
-                        // The point light manager uses the ID to decide which point light
-                        // renders with a shadow. Having duplicate IDs might cause some
+                        // FIX: The point light id needs to be unique.
+                        // The point light manager uses the id to decide which point light
+                        // renders with a shadow. Having duplicate ids might cause some
                         // visual artifacts, such as flickering, as the point lights switch
                         // between shadows and no shadows.
                         PointLightId::new(entity_id.0),

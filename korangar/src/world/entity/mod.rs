@@ -33,7 +33,8 @@ use crate::renderer::MarkerRenderer;
 use crate::state::ClientState;
 use crate::state::theme::{InterfaceThemeType, WorldTheme};
 use crate::world::{
-    ActionEvent, AnimationData, AnimationState, Camera, FadeDirection, FadeState, JobIdentity, Library, MAX_WALK_PATH_SIZE, Map, PathFinder,
+    ActionEvent, AnimationData, AnimationState, Camera, FadeDirection, FadeState, IsBabyJob, JobIdentity, Library, MAX_WALK_PATH_SIZE, Map,
+    PathFinder,
 };
 #[cfg(feature = "debug")]
 use crate::world::{MarkerIdentifier, SubMesh};
@@ -45,6 +46,7 @@ const FEMALE_HAIR_LOOKUP: &[usize] = &[2, 2, 4, 7, 1, 5, 3, 6, 12, 10, 9, 11, 8]
 const SOUND_COOLDOWN_DURATION: u32 = 200;
 const SPATIAL_SOUND_RANGE: f32 = 250.0;
 const FADE_IN_DURATION_MS: u32 = 500;
+const BABY_JOB_SCALE: f32 = 0.75;
 
 #[derive(Clone)]
 pub enum ResourceState<T> {
@@ -166,6 +168,7 @@ pub struct Common {
     pub animation_data: Option<Arc<AnimationData>>,
     pub tile_position: TilePosition,
     pub world_position: Point3<f32>,
+    pub scale: f32,
     #[hidden_element]
     details: ResourceState<String>,
     #[hidden_element]
@@ -368,7 +371,13 @@ fn get_entity_part_files(library: &Library, entity_type: EntityType, job_id: Job
 }
 
 impl Common {
-    pub fn new(entity_data: &EntityData, tile_position: TilePosition, world_position: Point3<f32>, client_tick: ClientTick) -> Self {
+    pub fn new(
+        library: &Library,
+        entity_data: &EntityData,
+        tile_position: TilePosition,
+        world_position: Point3<f32>,
+        client_tick: ClientTick,
+    ) -> Self {
         let entity_id = entity_data.entity_id;
         let job_id = entity_data.job_id;
         let head_direction = entity_data.head_direction;
@@ -384,6 +393,10 @@ impl Common {
 
         let details = ResourceState::Unavailable;
         let animation_state = AnimationState::new(entity_type, client_tick);
+        let scale = match library.get::<IsBabyJob>(job_id) {
+            IsBabyJob(true) => BABY_JOB_SCALE,
+            IsBabyJob(false) => 1.0,
+        };
 
         Self {
             tile_position,
@@ -404,6 +417,7 @@ impl Common {
             stopped_moving: false,
             sound_state: SoundState::default(),
             fade_state: FadeState::new(FADE_IN_DURATION_MS, client_tick),
+            scale,
         }
     }
 
@@ -849,6 +863,7 @@ impl Common {
                 &self.animation_state,
                 self.direction,
                 self.fade_state.calculate_alpha(client_tick),
+                self.scale,
             );
         }
     }
@@ -864,6 +879,7 @@ impl Common {
                 self.direction,
                 Color::rgb_u8(255, 0, 0),
                 Color::rgb_u8(0, 255, 0),
+                self.scale,
             );
         }
     }
@@ -917,7 +933,7 @@ impl Player {
     /// This function creates the player entity free-floating in the
     /// "void". When a new map is loaded on map change, the server sends
     /// the correct position we need to position the player to.
-    pub fn new(account_id: AccountId, character_information: &CharacterInformation, client_tick: ClientTick) -> Self {
+    pub fn new(library: &Library, account_id: AccountId, character_information: &CharacterInformation, client_tick: ClientTick) -> Self {
         let hair_id = character_information.head as usize;
         let spell_points = character_information.spell_points as usize;
         let activity_points = 0;
@@ -931,7 +947,7 @@ impl Player {
         let tile_position = TilePosition::new(0, 0);
         let position = Point3::origin();
 
-        let mut common = Common::new(&entity_data, tile_position, position, client_tick);
+        let mut common = Common::new(library, &entity_data, tile_position, position, client_tick);
         // Player's own character should not fade in.
         common.fade_state = FadeState::Opaque;
 
@@ -1098,7 +1114,13 @@ pub struct Npc {
 }
 
 impl Npc {
-    pub fn new(map: &Map, path_finder: &mut PathFinder, entity_data: EntityData, client_tick: ClientTick) -> Option<Self> {
+    pub fn new(
+        library: &Library,
+        map: &Map,
+        path_finder: &mut PathFinder,
+        entity_data: EntityData,
+        client_tick: ClientTick,
+    ) -> Option<Self> {
         let Some(position) = map.get_world_position(entity_data.position.tile_position()) else {
             #[cfg(feature = "debug")]
             korangar_debug::logging::print_debug!(
@@ -1109,7 +1131,13 @@ impl Npc {
             return None;
         };
 
-        let mut common = Common::new(&entity_data, entity_data.position.tile_position(), position, client_tick);
+        let mut common = Common::new(
+            library,
+            &entity_data,
+            entity_data.position.tile_position(),
+            position,
+            client_tick,
+        );
 
         if let Some(destination) = entity_data.destination {
             common.move_from_to(
@@ -1248,8 +1276,15 @@ impl Entity {
         }
     }
 
-    pub fn set_job(&mut self, job_id: JobId) {
-        self.get_common_mut().job_id = job_id;
+    pub fn set_job(&mut self, library: &Library, job_id: JobId) {
+        let scale = match library.get::<IsBabyJob>(job_id) {
+            IsBabyJob(true) => BABY_JOB_SCALE,
+            IsBabyJob(false) => 1.0,
+        };
+
+        let common = self.get_common_mut();
+        common.job_id = job_id;
+        common.scale = scale;
     }
 
     pub fn set_hair(&mut self, hair_id: usize) {

@@ -93,6 +93,7 @@ impl GroundItem {
                 &self.animation_state,
                 Direction::South,
                 self.fade_state.calculate_alpha(client_tick),
+                1.0,
             );
         }
     }

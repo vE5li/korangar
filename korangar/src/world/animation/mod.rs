@@ -284,7 +284,13 @@ impl AnimationData {
         }
     }
 
-    pub fn calculate_world_matrix(&self, camera: &dyn Camera, frame: &AnimationFrame, entity_position: Point3<f32>) -> Matrix4<f32> {
+    pub fn calculate_world_matrix(
+        &self,
+        camera: &dyn Camera,
+        frame: &AnimationFrame,
+        entity_position: Point3<f32>,
+        scale: f32,
+    ) -> Matrix4<f32> {
         // Offset the image to below the ground by frame.offset.y.
         // Add 0.5 to change from center of pixel to the lower border of pixel
         let origin_y = -frame.offset.y as f32 + 0.5;
@@ -292,7 +298,7 @@ impl AnimationData {
         // Add 1.0 in z-coordinate, because the entity is at point with z = 1.0.
         // The operation is performed beforehand to correctly rotate the billboard.
         let origin = Point3::new(0.0, origin_y, 0.0) * SPRITE_SCALE / TILE_SIZE + Vector3::unit_z();
-        let size = Vector2::new(frame.size.x as f32, frame.size.y as f32) * SPRITE_SCALE / TILE_SIZE;
+        let size = Vector2::new(frame.size.x as f32, frame.size.y as f32) * (SPRITE_SCALE / TILE_SIZE) * scale;
         camera.billboard_matrix(entity_position, origin, size)
     }
 
@@ -314,9 +320,10 @@ impl AnimationData {
         animation_state: &AnimationState,
         direction: Direction,
         fade_alpha: f32,
+        scale: f32,
     ) {
         let frame = self.get_frame(animation_state, camera, direction);
-        let world_matrix = self.calculate_world_matrix(camera, frame, entity_position);
+        let world_matrix = self.calculate_world_matrix(camera, frame, entity_position, scale);
 
         for (index, frame_part) in frame.frame_parts.iter().enumerate() {
             let animation_index = frame_part.animation_index;
@@ -361,9 +368,10 @@ impl AnimationData {
         direction: Direction,
         color_external: Color,
         color_internal: Color,
+        scale: f32,
     ) {
         let frame = self.get_frame(animation_state, camera, direction);
-        let world_matrix = self.calculate_world_matrix(camera, frame, entity_position);
+        let world_matrix = self.calculate_world_matrix(camera, frame, entity_position, scale);
         instructions.push(DebugRectangleInstruction {
             world: world_matrix,
             color: color_external,

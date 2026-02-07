@@ -4,8 +4,10 @@
 -- in Lua allows modifying/extending this easily without editing the Korangar
 -- source code.
 
--- TODO: We probably should use JTbl here instead, I believe that would make all jobs available.
+-- TODO: We probably should use JTtbl here instead, I believe that would make all jobs available.
 function GET_TAB_FOR_JOB(job_id)
+    -- Helper function to handle nil job ids by returning -1 as a fallback.
+    -- This ensures comparisons don't fail when a job id doesn't exist in `JOBID`.
     local non_nil = function(job_id)
         return job_id or -1
     end

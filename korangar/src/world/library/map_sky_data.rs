@@ -37,7 +37,7 @@ pub struct CloudEffect {
 
 impl Table for MapSkyData {
     type Key<'a> = &'a str;
-    type Storage = HashMap<String, MapSkyData>;
+    type Storage = HashMap<String, Self>;
 
     fn load(game_file_loader: &GameFileLoader) -> mlua::Result<Self::Storage> {
         let map_sky_data_table = match game_file_loader.get("data\\luafiles514\\lua files\\mapskydata\\mapskydata.lub") {

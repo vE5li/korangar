@@ -18,7 +18,7 @@ impl Display for JobIdentity {
 
 impl Table for JobIdentity {
     type Key<'a> = JobId;
-    type Storage = HashMap<JobId, JobIdentity>;
+    type Storage = HashMap<JobId, Self>;
 
     fn load(game_file_loader: &GameFileLoader) -> mlua::Result<Self::Storage> {
         let state = Lua::load_from_game_files(game_file_loader, &[

@@ -1,3 +1,4 @@
+mod baby_job;
 mod item_info;
 mod item_name;
 mod item_resource;
@@ -14,6 +15,7 @@ use hashbrown::HashMap;
 use korangar_loaders::FileLoader;
 use mlua::Lua;
 
+pub use self::baby_job::IsBabyJob;
 pub use self::item_info::ItemInfo;
 pub use self::item_name::{ItemName, ItemNameKey};
 pub use self::item_resource::{ItemResource, ItemResourceKey};
@@ -31,6 +33,7 @@ pub struct Library {
     skill_information_table: <SkillListInformation as Table>::Storage,
     skill_requirements_table: <SkillListRequirements as Table>::Storage,
     skill_tree_table: <SkillTreeLayout as Table>::Storage,
+    baby_job_table: <IsBabyJob as Table>::Storage,
 }
 
 impl Library {
@@ -41,6 +44,7 @@ impl Library {
         let skill_information_table = SkillListInformation::load(game_file_loader)?;
         let skill_requirements_table = SkillListRequirements::load(game_file_loader)?;
         let skill_tree_table = SkillTreeLayout::load(game_file_loader)?;
+        let baby_job_table = IsBabyJob::load(game_file_loader)?;
 
         Ok(Self {
             job_identity_table,
@@ -49,6 +53,7 @@ impl Library {
             skill_information_table,
             skill_requirements_table,
             skill_tree_table,
+            baby_job_table,
         })
     }
 

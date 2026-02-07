@@ -449,7 +449,7 @@ pub struct CharacterSelectionFailedPacket {
 }
 
 /// Sent by the character server as a response to [SelectCharacterPacket]
-/// succeeding. Provides a map server to connect to, along with the ID of our
+/// succeeding. Provides a map server to connect to, along with the id of our
 /// selected character.
 #[derive(Debug, Clone, Packet, ServerPacket, CharacterServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
@@ -1108,7 +1108,7 @@ pub struct OverheadMessagePacket {
 
 /// Sent by the map server to the client when there is a new chat message from
 /// an entity. Provides the message to be displayed in the chat window, the
-/// color of the message, and the ID of the entity it originated from.
+/// color of the message, and the id of the entity it originated from.
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x02C1)]

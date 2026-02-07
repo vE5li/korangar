@@ -354,7 +354,7 @@ where
 
     fn open_new_window(&mut self, window: impl Window<App> + 'static) {
         let id = self.next_window_id;
-        // TODO: Actual logic to wrap around and adjust all window IDs.
+        // TODO: Actual logic to wrap around and adjust all window ids.
         self.next_window_id = self.next_window_id.wrapping_add(1);
 
         let window_class = window.get_class();

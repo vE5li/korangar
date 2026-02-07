@@ -15,7 +15,7 @@ pub struct ItemInfo {
 
 impl Table for ItemInfo {
     type Key<'a> = ItemId;
-    type Storage = HashMap<ItemId, ItemInfo>;
+    type Storage = HashMap<ItemId, Self>;
 
     fn load(game_file_loader: &GameFileLoader) -> mlua::Result<Self::Storage> {
         let state = Lua::load_from_game_files(game_file_loader, &["data\\luafiles514\\lua files\\datainfo\\iteminfo.lub"])?;

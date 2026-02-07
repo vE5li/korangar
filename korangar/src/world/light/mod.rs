@@ -32,7 +32,7 @@ impl LightSourceExt for LightSource {
     }
 }
 
-/// ID of a point light. This should be unique and is used in the heuristic for
+/// Id of a point light. This should be unique and is used in the heuristic for
 /// which light casts a shadow.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PointLightId(u32);

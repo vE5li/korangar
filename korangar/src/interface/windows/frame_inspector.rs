@@ -18,7 +18,7 @@ use crate::state::ClientState;
 use crate::state::theme::InterfaceThemeType;
 use crate::{FontSize, OverflowBehavior};
 
-/// ZST for the tooltip ID.
+/// ZST for the tooltip id.
 struct FrameInspectorTooltip;
 
 const VISIBILITY_THRESHHOLD: f32 = 0.01;

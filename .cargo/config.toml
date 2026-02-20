@@ -8,4 +8,4 @@ rustflags = ["-C", "target-feature=+aes"]
 linker = "rust-lld.exe"
 
 [target.aarch64-apple-darwin]
-linker = "lld"
+linker = "rust-lld"

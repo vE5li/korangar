@@ -13,7 +13,7 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   BINARY_NAME: korangar
-  SLANG_VERSION: v2025.18.2
+  SLANG_VERSION: v2026.1.1
 
 jobs:
   build-release:
@@ -59,8 +59,14 @@ jobs:
       - name: Download and install slangc
         if: steps.cache-slangc.outputs.cache-hit != 'true'
         run: |
-          mkdir -p ~/slangc
-          cd ~/slangc
+          if [ "${{ matrix.name }}" = "Windows" ]; then
+            SLANGC_DIR="$USERPROFILE/slangc"
+          else
+            SLANGC_DIR="$HOME/slangc"
+          fi
+
+          mkdir -p "$SLANGC_DIR"
+          cd "$SLANGC_DIR"
 
           VERSION_NO_V=${SLANG_VERSION#v}
 
@@ -85,7 +91,12 @@ jobs:
           fi
 
       - name: Add slangc to PATH
-        run: echo "$HOME/slangc/bin" >> $GITHUB_PATH
+        run: |
+          if [ "${{ matrix.name }}" = "Windows" ]; then
+            echo "$USERPROFILE/slangc/bin" >> $GITHUB_PATH
+          else
+            echo "$HOME/slangc/bin" >> $GITHUB_PATH
+          fi
 
       - name: Verify slangc installation
         run: |

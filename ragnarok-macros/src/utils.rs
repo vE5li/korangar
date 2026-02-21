@@ -1,17 +1,37 @@
 use proc_macro2::Punct;
 use syn::parse::{Parse, ParseStream};
-use syn::{Attribute, Error, LitInt};
+use syn::{Attribute, Error, Ident, LitInt, Token};
 
 #[derive(Clone)]
 pub struct PacketSignature {
     pub signature: u16,
+    pub version: Option<String>,
 }
 
 impl Parse for PacketSignature {
     fn parse(input: ParseStream) -> Result<Self, Error> {
         let signature: LitInt = input.parse().expect("packet header must be u16");
+        let signature_value = signature.base10_parse::<u16>()?;
+
+        let version = if input.peek(Token![,]) {
+            input.parse::<Token![,]>()?;
+
+            let version_ident: Ident = input.parse()?;
+            if version_ident != "version" {
+                return Err(Error::new(version_ident.span(), "expected 'version'"));
+            }
+
+            input.parse::<Token![=]>()?;
+
+            let lit_str: syn::LitStr = input.parse()?;
+            Some(lit_str.value())
+        } else {
+            None
+        };
+
         Ok(PacketSignature {
-            signature: signature.base10_parse::<u16>()?,
+            signature: signature_value,
+            version,
         })
     }
 }

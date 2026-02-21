@@ -676,7 +676,7 @@ pub fn prepare_map_inspection(inspecting_maps: &mut Vec<MapData>, map_data: &Map
             item.ground_file == map_data.ground_file
                 && item._ini_file == map_data._ini_file
                 && item.gat_file == map_data.gat_file
-                && item.build_number == map_data.build_number
+                && item.build_version == map_data.build_version
         })
         .unwrap_or_else(|| {
             let index = inspecting_maps.len();

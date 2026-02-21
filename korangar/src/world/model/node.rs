@@ -159,7 +159,7 @@ impl Node {
     ) -> (Matrix4<f32>, Matrix4<f32>, Matrix4<f32>) {
         match is_static {
             true => (parent_matrix * self.transform_matrix, Matrix4::identity(), Matrix4::identity()),
-            false => match self.version.smaller(2, 2) {
+            false => match self.version.below(2, 2) {
                 true => {
                     let animation_scale_matrix = match self.scale_keyframes.is_empty() {
                         true => Matrix4::identity(),

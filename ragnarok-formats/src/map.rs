@@ -6,7 +6,7 @@ use ragnarok_bytes::{ByteConvertable, ByteReader, ByteWriter, ConversionError, C
 use crate::color::{ColorBGRA, ColorRGB};
 use crate::signature::Signature;
 use crate::transform::Transform;
-use crate::version::{InternalVersion, MajorFirst, Version};
+use crate::version::{BuildVersion, MajorFirst, Version, VersionMetadata};
 
 #[derive(Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
@@ -19,7 +19,8 @@ pub struct MapData {
     #[version]
     pub version: Version<MajorFirst>,
     #[version_equals_or_above(2, 5)]
-    pub build_number: Option<i32>,
+    #[build_version]
+    pub build_version: Option<BuildVersion>,
     #[version_equals_or_above(2, 2)]
     pub _unknown: Option<u8>,
     #[length(40)]
@@ -31,7 +32,7 @@ pub struct MapData {
     #[version_equals_or_above(1, 4)]
     #[length(40)]
     pub _source_file: Option<String>,
-    #[version_smaller(2, 6)]
+    #[version_below(2, 6)]
     pub water_settings: Option<WaterSettings>,
     pub light_settings: LightSettings,
     #[version_equals_or_above(1, 6)]
@@ -75,7 +76,7 @@ bitflags::bitflags! {
 }
 
 impl FromBytes for QuadTreeData {
-    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+    fn from_bytes(byte_reader: &mut ByteReader) -> ConversionResult<Self> {
         const MAX_DEPTH: usize = 5;
         const CHILD_COUNT: usize = 4;
 
@@ -141,7 +142,7 @@ impl FromBytes for QuadTreeData {
 }
 
 impl FromBytes for TileFlags {
-    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+    fn from_bytes(byte_reader: &mut ByteReader) -> ConversionResult<Self> {
         match <Self as bitflags::Flags>::Bits::from_bytes(byte_reader).trace::<Self>()? {
             0 => Ok(Self::WALKABLE),
             1 => Ok(Self::empty()),
@@ -233,7 +234,7 @@ pub struct GroundData {
     #[repeating_expr(light_map_count as usize * light_map_width as usize * light_map_height as usize * 4)]
     #[new_default]
     pub _skip: Option<Vec<u8>>,
-    #[version_smaller(1, 7)]
+    #[version_below(1, 7)]
     #[repeating_expr(light_map_count * 16)]
     #[new_default]
     pub _skip2: Option<Vec<u8>>,
@@ -256,14 +257,15 @@ pub struct GroundTile {
 }
 
 impl FromBytes for GroundTile {
-    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+    fn from_bytes(byte_reader: &mut ByteReader) -> ConversionResult<Self> {
         let southwest_corner_height = f32::from_bytes(byte_reader).trace::<Self>()?;
         let southeast_corner_height = f32::from_bytes(byte_reader).trace::<Self>()?;
         let northwest_corner_height = f32::from_bytes(byte_reader).trace::<Self>()?;
         let northeast_corner_height = f32::from_bytes(byte_reader).trace::<Self>()?;
 
         let version = byte_reader
-            .get_metadata::<Self, Option<InternalVersion>>()?
+            .get_metadata::<Self, dyn VersionMetadata>()?
+            .get_version()
             .ok_or(ConversionError::from_message("version not set"))?;
 
         let top_surface_index = match version.equals_or_above(1, 7) {
@@ -324,7 +326,7 @@ pub enum ResourceType {
 }
 
 impl FromBytes for ResourceType {
-    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+    fn from_bytes(byte_reader: &mut ByteReader) -> ConversionResult<Self> {
         let index = i32::from_bytes(byte_reader).trace::<Self>()?;
         match index {
             1 => Ok(ResourceType::Object),
@@ -348,8 +350,7 @@ pub struct ObjectData {
     pub _animation_speed: Option<f32>,
     #[version_equals_or_above(1, 3)]
     pub _block_type: Option<i32>,
-    // FIX: only if build_version >= 186
-    #[version_equals_or_above(2, 6)]
+    #[version_and_build_version_equals_or_above(2, 6, 186)]
     #[new_default]
     pub _unknown: Option<u8>,
     #[length(80)]
@@ -391,7 +392,7 @@ impl MapResources {
 }
 
 impl FromBytes for MapResources {
-    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+    fn from_bytes(byte_reader: &mut ByteReader) -> ConversionResult<Self> {
         let resources_amount = u32::from_bytes(byte_reader).trace::<Self>()?;
 
         let mut objects = Vec::new();

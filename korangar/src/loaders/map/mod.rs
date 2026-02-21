@@ -14,7 +14,7 @@ use korangar_debug::logging::Timer;
 use korangar_loaders::FileLoader;
 use ragnarok_bytes::{ByteReader, FromBytes};
 use ragnarok_formats::map::{GatData, GroundData, MapData, MapResources};
-use ragnarok_formats::version::InternalVersion;
+use ragnarok_formats::version::MapFormatMetadata;
 use wgpu::{BufferUsages, Device, Queue};
 
 use self::vertices::{generate_tile_vertices, ground_vertices};
@@ -29,7 +29,7 @@ pub const GROUND_TILE_SIZE: f32 = 10.0;
 pub const GAT_TILE_SIZE: f32 = 5.0;
 
 #[cfg(feature = "debug")]
-fn assert_byte_reader_empty<Meta>(mut byte_reader: ByteReader<Meta>, file_name: &str) {
+fn assert_byte_reader_empty(mut byte_reader: ByteReader, file_name: &str) {
     use korangar_debug::logging::{Colorize, print_debug};
 
     if !byte_reader.is_empty() {
@@ -363,7 +363,7 @@ fn apply_map_offset(ground_data: &GroundData, resources: &mut MapResources) {
 
 fn parse_generic_data<Data: FromBytes>(resource_file: &str, game_file_loader: &GameFileLoader) -> Result<Data, LoadError> {
     let bytes = game_file_loader.get(resource_file).map_err(LoadError::File)?;
-    let mut byte_reader: ByteReader<Option<InternalVersion>> = ByteReader::with_default_metadata(&bytes);
+    let mut byte_reader: ByteReader = ByteReader::with_default_metadata::<MapFormatMetadata>(&bytes);
 
     let data = Data::from_bytes(&mut byte_reader).map_err(LoadError::Conversion)?;
 

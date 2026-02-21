@@ -3,7 +3,7 @@ use ragnarok_bytes::{
 };
 
 use crate::signature::Signature;
-use crate::version::{InternalVersion, MinorFirst, Version};
+use crate::version::{MinorFirst, Version, VersionMetadata};
 
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
@@ -18,7 +18,7 @@ pub struct PaletteImageData {
 pub struct EncodedData(pub Vec<u8>);
 
 impl FromBytes for PaletteImageData {
-    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self>
+    fn from_bytes(byte_reader: &mut ByteReader) -> ConversionResult<Self>
     where
         Self: Sized,
     {
@@ -29,9 +29,10 @@ impl FromBytes for PaletteImageData {
             0 => Vec::new(),
             image_size
                 if byte_reader
-                    .get_metadata::<Self, Option<InternalVersion>>()?
+                    .get_metadata::<Self, dyn VersionMetadata>()?
+                    .get_version()
                     .ok_or(ConversionError::from_message("version not set"))?
-                    .smaller(2, 1) =>
+                    .below(2, 1) =>
             {
                 Vec::from_n_bytes(byte_reader, image_size).trace::<Self>()?
             }

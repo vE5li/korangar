@@ -1,7 +1,6 @@
-use std::any::Any;
-
 use encoding_rs::{EUC_KR, Encoding};
 
+use crate::metadata::{CastableMetadata, DynMetadata};
 use crate::{ConversionError, ConversionErrorType, ConversionResult};
 
 /// Saved state of a [`ByteReader`] that can be restored.
@@ -33,40 +32,16 @@ pub(crate) struct TemporaryLimit {
 /// It should therefore be avoided to modify the metadata while reading of
 /// composite structures data that might fail, for example multi-field structs
 /// that implement [`FromBytes`](crate::from_bytes::FromBytes).
-pub struct ByteReader<'a, Meta = ()>
-where
-    Meta: 'static,
-{
+pub struct ByteReader<'a> {
     data: &'a [u8],
     encoding: &'static Encoding,
     offset: usize,
     limit: usize,
-    metadata: Meta,
+    metadata: DynMetadata,
 }
 
-impl<'a> ByteReader<'a, ()> {
-    /// Create a new [`ByteReader`] without metadata.
-    pub fn without_metadata(data: &'a [u8]) -> Self {
-        Self::with_metadata(data, ())
-    }
-}
-
-impl<'a, Meta> ByteReader<'a, Meta>
-where
-    Meta: Default + 'static,
-{
-    /// Create a new [`ByteReader`] with default metadata.
-    pub fn with_default_metadata(data: &'a [u8]) -> Self {
-        Self::with_metadata(data, Default::default())
-    }
-}
-
-impl<'a, Meta> ByteReader<'a, Meta>
-where
-    Meta: Any + 'static,
-{
-    /// Create a new [`ByteReader`] with specific metadata.
-    pub fn with_metadata(data: &'a [u8], metadata: Meta) -> Self {
+impl<'a> ByteReader<'a> {
+    fn new_inner(data: &'a [u8], metadata: DynMetadata) -> Self {
         let limit = data.len();
 
         Self {
@@ -76,6 +51,27 @@ where
             limit,
             metadata,
         }
+    }
+
+    /// Create a new [`ByteReader`] without metadata.
+    pub fn without_metadata(data: &'a [u8]) -> Self {
+        Self::new_inner(data, DynMetadata::new(()))
+    }
+
+    /// Create a new [`ByteReader`] with default metadata.
+    pub fn with_default_metadata<T: CastableMetadata + Default>(data: &'a [u8]) -> Self {
+        let mut metadata = DynMetadata::new(T::default());
+        T::register(&mut metadata);
+
+        Self::new_inner(data, metadata)
+    }
+
+    /// Create a new [`ByteReader`] with provided metadata.
+    pub fn with_metadata<T: CastableMetadata>(data: &'a [u8], metadata: T) -> Self {
+        let mut metadata = DynMetadata::new(metadata);
+        T::register(&mut metadata);
+
+        Self::new_inner(data, metadata)
     }
 
     /// Sets the encoding used to decode strings.
@@ -140,9 +136,9 @@ where
 
     pub fn get_metadata<Caller, As>(&self) -> ConversionResult<&As>
     where
-        As: Any + 'static,
+        As: ?Sized + 'static,
     {
-        (&self.metadata as &dyn Any).downcast_ref::<As>().ok_or_else(|| {
+        self.metadata.get().ok_or_else(|| {
             ConversionError::from_error_type(ConversionErrorType::IncorrectMetadata {
                 type_name: std::any::type_name::<Caller>(),
             })
@@ -151,17 +147,13 @@ where
 
     pub fn get_metadata_mut<Caller, As>(&mut self) -> ConversionResult<&mut As>
     where
-        As: Any + 'static,
+        As: ?Sized + 'static,
     {
-        (&mut self.metadata as &mut dyn Any).downcast_mut::<As>().ok_or_else(|| {
+        self.metadata.get_mut().ok_or_else(|| {
             ConversionError::from_error_type(ConversionErrorType::IncorrectMetadata {
                 type_name: std::any::type_name::<Caller>(),
             })
         })
-    }
-
-    pub fn into_metadata(self) -> Meta {
-        self.metadata
     }
 
     fn check_upper_bound<Caller>(offset: usize, length: usize) -> ConversionResult<()> {
@@ -279,28 +271,34 @@ mod temporary_limit {
 #[cfg(test)]
 mod metadata {
     use crate::ByteReader;
+    use crate::metadata::{CastableMetadata, Caster};
+
+    #[derive(Debug)]
+    struct HasDebug;
+
+    impl CastableMetadata for HasDebug {
+        fn register(metadata: &mut crate::metadata::DynMetadata) {
+            metadata.register_caster(Caster::new(
+                |any| any.downcast_ref::<Self>().map(|version| version as &dyn std::fmt::Debug),
+                |any| any.downcast_mut::<Self>().map(|version| version as &mut dyn std::fmt::Debug),
+            ));
+        }
+    }
 
     #[test]
     fn get_metadata() {
-        let byte_reader = ByteReader::<i32>::with_metadata(&[0; 1], 9);
+        let byte_reader = ByteReader::with_metadata(&[0; 1], HasDebug);
 
-        assert!(byte_reader.get_metadata::<(), i32>().is_ok());
-        assert!(byte_reader.get_metadata::<(), u32>().is_err());
+        assert!(byte_reader.get_metadata::<(), dyn std::fmt::Debug>().is_ok());
+        assert!(byte_reader.get_metadata::<(), dyn std::fmt::Display>().is_err());
     }
 
     #[test]
     fn get_metadata_mut() {
-        let mut byte_reader = ByteReader::<i32>::with_metadata(&[0; 1], 9);
+        let mut byte_reader = ByteReader::with_metadata(&[0; 1], HasDebug);
 
-        assert!(byte_reader.get_metadata_mut::<(), i32>().is_ok());
-        assert!(byte_reader.get_metadata_mut::<(), u32>().is_err());
-    }
-
-    #[test]
-    fn into_metadata() {
-        let byte_reader = ByteReader::<i32>::with_metadata(&[0; 1], 9);
-
-        assert_eq!(byte_reader.into_metadata(), 9);
+        assert!(byte_reader.get_metadata_mut::<(), dyn std::fmt::Debug>().is_ok());
+        assert!(byte_reader.get_metadata_mut::<(), dyn std::fmt::Display>().is_err());
     }
 }
 
@@ -345,7 +343,6 @@ mod bytes {
 
 #[cfg(test)]
 mod slice {
-
     use crate::ByteReader;
 
     #[test]

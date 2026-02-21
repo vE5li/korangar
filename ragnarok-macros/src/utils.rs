@@ -31,6 +31,24 @@ impl Parse for Version {
     }
 }
 
+#[derive(Clone)]
+pub struct VersionAndBuildVersion {
+    pub major: LitInt,
+    pub minor: LitInt,
+    pub build: LitInt,
+}
+
+impl Parse for VersionAndBuildVersion {
+    fn parse(input: ParseStream) -> Result<Self, Error> {
+        let major = input.parse().expect("version with build version must be three bytes long");
+        input.parse::<Punct>().expect("version must be separated by commas");
+        let minor = input.parse().expect("version with build version must be three bytes long");
+        input.parse::<Punct>().expect("version must be separated by commas");
+        let build = input.parse().expect("version with build version must be three bytes long");
+        Ok(VersionAndBuildVersion { major, minor, build })
+    }
+}
+
 pub fn get_unique_attribute(attributes: &mut Vec<Attribute>, name: &str) -> Option<Attribute> {
     let mut matching_attributes = attributes.extract_if(.., |attribute| attribute.path().segments[0].ident == name);
     let return_attribute = matching_attributes.next();

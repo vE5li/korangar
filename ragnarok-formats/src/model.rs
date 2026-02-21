@@ -5,7 +5,7 @@ use ragnarok_bytes::{
 use rust_state::Path;
 
 use crate::signature::Signature;
-use crate::version::{InternalVersion, MajorFirst, Version};
+use crate::version::{MajorFirst, Version, VersionMetadata};
 
 /// A string that can either have a fixed length or be length prefixed, based on
 /// the file format version.
@@ -16,9 +16,10 @@ pub struct ModelString<const LENGTH: usize> {
 }
 
 impl<const LENGTH: usize> FromBytes for ModelString<LENGTH> {
-    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+    fn from_bytes(byte_reader: &mut ByteReader) -> ConversionResult<Self> {
         let inner = if byte_reader
-            .get_metadata::<Self, Option<InternalVersion>>()?
+            .get_metadata::<Self, dyn VersionMetadata>()?
+            .get_version()
             .ok_or(ConversionError::from_message("version not set"))?
             .equals_or_above(2, 2)
         {
@@ -172,7 +173,7 @@ pub struct TextureCoordinateData {
 pub struct NodeData {
     pub node_name: ModelString<40>,
     pub parent_node_name: ModelString<40>,
-    #[version_smaller(2, 3)]
+    #[version_below(2, 3)]
     #[new_derive]
     pub texture_count: Option<u32>,
     #[repeating_option(texture_count)]
@@ -184,14 +185,14 @@ pub struct NodeData {
     pub texture_names: Vec<ModelString<40>>,
     #[cfg_attr(feature = "interface", hidden_element)]
     pub offset_matrix: Matrix3<f32>,
-    #[version_smaller(2, 2)]
+    #[version_below(2, 2)]
     pub translation1: Option<Vector3<f32>>,
     pub translation2: Vector3<f32>,
-    #[version_smaller(2, 2)]
+    #[version_below(2, 2)]
     pub rotation_angle: Option<f32>,
-    #[version_smaller(2, 2)]
+    #[version_below(2, 2)]
     pub rotation_axis: Option<Vector3<f32>>,
-    #[version_smaller(2, 2)]
+    #[version_below(2, 2)]
     pub scale: Option<Vector3<f32>>,
     #[new_derive]
     pub vertex_position_count: u32,
@@ -237,17 +238,17 @@ pub struct ModelData {
     pub shade_type: u32,
     #[version_equals_or_above(1, 4)]
     pub alpha: Option<u8>,
-    #[version_smaller(2, 2)]
+    #[version_below(2, 2)]
     #[new_default]
     pub reserved: Option<[u8; 16]>,
     #[version_equals_or_above(2, 2)]
     pub frames_per_second: Option<f32>,
-    #[version_smaller(2, 3)]
+    #[version_below(2, 3)]
     #[new_derive]
     pub texture_count: Option<u32>,
     #[repeating_option(texture_count)]
     pub texture_names: Vec<ModelString<40>>,
-    #[version_smaller(2, 2)]
+    #[version_below(2, 2)]
     pub root_node_name: Option<ModelString<40>>,
     #[version_equals_or_above(2, 2)]
     #[new_derive]

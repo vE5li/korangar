@@ -189,7 +189,7 @@ impl Packet for UnknownPacket {
     const HEADER: PacketHeader = PacketHeader(0);
     const IS_PING: bool = false;
 
-    fn payload_from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+    fn payload_from_bytes(byte_reader: &mut ByteReader) -> ConversionResult<Self> {
         let _ = byte_reader;
         unimplemented!()
     }
@@ -234,7 +234,7 @@ impl Packet for ErrorPacket {
     const HEADER: PacketHeader = PacketHeader(0);
     const IS_PING: bool = false;
 
-    fn payload_from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+    fn payload_from_bytes(byte_reader: &mut ByteReader) -> ConversionResult<Self> {
         let _ = byte_reader;
         unimplemented!()
     }

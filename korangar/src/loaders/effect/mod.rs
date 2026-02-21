@@ -10,7 +10,7 @@ use korangar_debug::logging::{Colorize, Timer, print_debug};
 use korangar_loaders::FileLoader;
 use ragnarok_bytes::{ByteReader, FromBytes};
 use ragnarok_formats::effect::EffectData;
-use ragnarok_formats::version::InternalVersion;
+use ragnarok_formats::version::GenericFormatMetadata;
 use wgpu::BlendFactor;
 
 use super::error::LoadError;
@@ -53,7 +53,7 @@ impl EffectLoader {
             .game_file_loader
             .get(&format!("data\\texture\\effect\\{path}"))
             .map_err(LoadError::File)?;
-        let mut byte_reader: ByteReader<Option<InternalVersion>> = ByteReader::with_default_metadata(&bytes);
+        let mut byte_reader: ByteReader = ByteReader::with_default_metadata::<GenericFormatMetadata>(&bytes);
 
         // TODO: Add fallback
         let effect_data = EffectData::from_bytes(&mut byte_reader).map_err(LoadError::Conversion)?;

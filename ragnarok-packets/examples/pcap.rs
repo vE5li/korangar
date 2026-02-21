@@ -150,7 +150,7 @@ fn handler<P: Packet + 'static>(server_type: ServerType, direction: Direction) -
 macro_rules! create_handler {
     ($server_type:expr, $direction:expr, [$($packet:ty),* $(,)?]) => {
         {
-            let mut new_handler = PacketHandler::<(), (), _>::with_callback(PrintCallback::new($server_type, $direction));
+            let mut new_handler = PacketHandler::<(), _>::with_callback(PrintCallback::new($server_type, $direction));
             $(
                 new_handler.register(handler::<$packet>($server_type, $direction)).unwrap();
             )*

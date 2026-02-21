@@ -9,7 +9,7 @@ use korangar_loaders::FileLoader;
 use num::Zero;
 use ragnarok_bytes::{ByteReader, FromBytes};
 use ragnarok_formats::model::{ModelData, NodeData};
-use ragnarok_formats::version::InternalVersion;
+use ragnarok_formats::version::{GenericFormatMetadata, InternalVersion};
 use smallvec::SmallVec;
 
 use super::error::LoadError;
@@ -482,7 +482,7 @@ impl ModelLoader {
                 );
             }
         };
-        let mut byte_reader: ByteReader<Option<InternalVersion>> = ByteReader::with_default_metadata(&bytes);
+        let mut byte_reader: ByteReader = ByteReader::with_default_metadata::<GenericFormatMetadata>(&bytes);
 
         let model_data = match ModelData::from_bytes(&mut byte_reader) {
             Ok(model_data) => model_data,

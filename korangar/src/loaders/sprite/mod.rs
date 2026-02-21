@@ -11,7 +11,7 @@ use korangar_interface::element::StateElement;
 use korangar_loaders::FileLoader;
 use ragnarok_bytes::{ByteReader, FromBytes};
 use ragnarok_formats::sprite::{PaletteColor, RgbaImageData, SpriteData};
-use ragnarok_formats::version::InternalVersion;
+use ragnarok_formats::version::GenericFormatMetadata;
 use rust_state::RustState;
 
 use super::{FALLBACK_SPRITE_FILE, TextureLoader};
@@ -77,7 +77,7 @@ impl SpriteLoader {
                 return self.get_or_load(FALLBACK_SPRITE_FILE);
             }
         };
-        let mut byte_reader: ByteReader<Option<InternalVersion>> = ByteReader::with_default_metadata(&bytes);
+        let mut byte_reader: ByteReader = ByteReader::with_default_metadata::<GenericFormatMetadata>(&bytes);
 
         let sprite_data = match SpriteData::from_bytes(&mut byte_reader) {
             Ok(sprite_data) => sprite_data,

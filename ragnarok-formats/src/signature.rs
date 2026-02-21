@@ -12,7 +12,7 @@ impl<const MAGIC: &'static [u8]> FixedByteSize for Signature<MAGIC> {
 }
 
 impl<const MAGIC: &'static [u8]> FromBytes for Signature<MAGIC> {
-    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self>
+    fn from_bytes(byte_reader: &mut ByteReader) -> ConversionResult<Self>
     where
         Self: Sized,
     {

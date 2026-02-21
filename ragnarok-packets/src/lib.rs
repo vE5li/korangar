@@ -38,7 +38,7 @@ pub trait Packet: std::fmt::Debug + Send + Clone + 'static {
 
     /// Read packet **without the header**. To read the packet with the header,
     /// use [`PacketExt::packet_from_bytes`].
-    fn payload_from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self>;
+    fn payload_from_bytes(byte_reader: &mut ByteReader) -> ConversionResult<Self>;
 
     /// Write packet **without the header**. To write the packet with the
     /// header, use [`PacketExt::packet_to_bytes`].
@@ -57,7 +57,7 @@ pub trait Packet: std::fmt::Debug + Send + Clone + 'static {
 pub trait PacketExt: Packet {
     /// Read packet **with the header**. To read the packet without the header,
     /// use [`Packet::payload_from_bytes`].
-    fn packet_from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self>;
+    fn packet_from_bytes(byte_reader: &mut ByteReader) -> ConversionResult<Self>;
 
     /// Write packet **with the header**. To write the packet without the
     /// header, use [`Packet::payload_to_bytes`].
@@ -68,7 +68,7 @@ impl<T> PacketExt for T
 where
     T: Packet,
 {
-    fn packet_from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+    fn packet_from_bytes(byte_reader: &mut ByteReader) -> ConversionResult<Self> {
         let header = PacketHeader::from_bytes(byte_reader)?;
 
         if header != Self::HEADER {
@@ -208,7 +208,7 @@ pub struct ColorRGBA {
 pub struct InventoryIndex(pub u16);
 
 impl FromBytes for InventoryIndex {
-    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+    fn from_bytes(byte_reader: &mut ByteReader) -> ConversionResult<Self> {
         u16::from_bytes(byte_reader).map(|raw| Self(raw - 2))
     }
 }
@@ -950,7 +950,7 @@ impl FixedByteSize for RegularItemFlags {
 }
 
 impl FromBytes for RegularItemFlags {
-    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+    fn from_bytes(byte_reader: &mut ByteReader) -> ConversionResult<Self> {
         <Self as bitflags::Flags>::Bits::from_bytes(byte_reader).map(|raw| Self::from_bits(raw).expect("Invalid equip position"))
     }
 }
@@ -1001,7 +1001,7 @@ impl FixedByteSize for EquippableItemFlags {
 }
 
 impl FromBytes for EquippableItemFlags {
-    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+    fn from_bytes(byte_reader: &mut ByteReader) -> ConversionResult<Self> {
         <Self as bitflags::Flags>::Bits::from_bytes(byte_reader).map(|raw| Self::from_bits(raw).expect("Invalid equip position"))
     }
 }
@@ -1202,11 +1202,11 @@ pub enum StatType {
 }
 
 impl FromBytes for StatType {
-    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+    fn from_bytes(byte_reader: &mut ByteReader) -> ConversionResult<Self> {
         /// For some reason, the stats are packed into the upper two bytes of an
         /// `i32`. I am unsure why that is but for now we will just work
         /// with what we got.
-        fn weirdly_formatted_stat<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<(i32, i32)> {
+        fn weirdly_packed_stat(byte_reader: &mut ByteReader) -> ConversionResult<(i32, i32)> {
             let _ = i16::from_bytes(byte_reader)?;
             let base = i16::from_bytes(byte_reader)?;
             let _ = i16::from_bytes(byte_reader)?;
@@ -1228,12 +1228,12 @@ impl FromBytes for StatType {
             9 => u32::from_bytes(byte_reader).map(Self::StatPoints),
             11 => u32::from_bytes(byte_reader).map(Self::BaseLevel),
             12 => u32::from_bytes(byte_reader).map(Self::SkillPoints),
-            13 => weirdly_formatted_stat(byte_reader).map(|(base, bonus)| Self::Strength(base, bonus)),
-            14 => weirdly_formatted_stat(byte_reader).map(|(base, bonus)| Self::Agility(base, bonus)),
-            15 => weirdly_formatted_stat(byte_reader).map(|(base, bonus)| Self::Vitality(base, bonus)),
-            16 => weirdly_formatted_stat(byte_reader).map(|(base, bonus)| Self::Intelligence(base, bonus)),
-            17 => weirdly_formatted_stat(byte_reader).map(|(base, bonus)| Self::Dexterity(base, bonus)),
-            18 => weirdly_formatted_stat(byte_reader).map(|(base, bonus)| Self::Luck(base, bonus)),
+            13 => weirdly_packed_stat(byte_reader).map(|(base, bonus)| Self::Strength(base, bonus)),
+            14 => weirdly_packed_stat(byte_reader).map(|(base, bonus)| Self::Agility(base, bonus)),
+            15 => weirdly_packed_stat(byte_reader).map(|(base, bonus)| Self::Vitality(base, bonus)),
+            16 => weirdly_packed_stat(byte_reader).map(|(base, bonus)| Self::Intelligence(base, bonus)),
+            17 => weirdly_packed_stat(byte_reader).map(|(base, bonus)| Self::Dexterity(base, bonus)),
+            18 => weirdly_packed_stat(byte_reader).map(|(base, bonus)| Self::Luck(base, bonus)),
             20 => u32::from_bytes(byte_reader).map(Self::Zeny),
             22 => u64::from_bytes(byte_reader).map(Self::NextBaseExperience),
             23 => u64::from_bytes(byte_reader).map(Self::NextJobExperience),
@@ -1463,7 +1463,7 @@ pub enum StatUpType {
 }
 
 impl FromBytes for StatUpType {
-    fn from_bytes<Meta>(_: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+    fn from_bytes(_: &mut ByteReader) -> ConversionResult<Self> {
         todo!()
     }
 }
@@ -3674,7 +3674,7 @@ impl FixedByteSize for EquipPosition {
 }
 
 impl FromBytes for EquipPosition {
-    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+    fn from_bytes(byte_reader: &mut ByteReader) -> ConversionResult<Self> {
         <Self as bitflags::Flags>::Bits::from_bytes(byte_reader).map(|raw| Self::from_bits(raw).expect("Invalid equip position"))
     }
 }

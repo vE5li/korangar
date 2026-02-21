@@ -87,7 +87,7 @@ impl WorldPosition {
 }
 
 impl FromBytes for WorldPosition {
-    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+    fn from_bytes(byte_reader: &mut ByteReader) -> ConversionResult<Self> {
         let coordinates: Vec<u16> = byte_reader.slice::<Self>(3)?.iter().map(|byte| *byte as u16).collect();
 
         let x = (coordinates[1] >> 6) | (coordinates[0] << 2);
@@ -158,7 +158,7 @@ impl WorldPosition2 {
 }
 
 impl FromBytes for WorldPosition2 {
-    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+    fn from_bytes(byte_reader: &mut ByteReader) -> ConversionResult<Self> {
         let coordinates: Vec<u16> = byte_reader.slice::<Self>(6)?.iter().map(|byte| *byte as u16).collect();
 
         let x1 = (coordinates[1] >> 6) | (coordinates[0] << 2);

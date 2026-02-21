@@ -14,7 +14,7 @@ use crate::{
 };
 
 pub fn register_login_server_packets<Callback>(
-    packet_handler: &mut PacketHandler<NetworkEventList, (), Callback>,
+    packet_handler: &mut PacketHandler<NetworkEventList, Callback>,
 ) -> Result<(), DuplicateHandlerError>
 where
     Callback: PacketCallback,
@@ -63,7 +63,7 @@ where
 }
 
 pub fn register_character_server_packets<Callback>(
-    packet_handler: &mut PacketHandler<NetworkEventList, (), Callback>,
+    packet_handler: &mut PacketHandler<NetworkEventList, Callback>,
 ) -> Result<(), DuplicateHandlerError>
 where
     Callback: PacketCallback,
@@ -149,7 +149,7 @@ where
 }
 
 pub fn register_map_server_packets<Callback>(
-    packet_handler: &mut PacketHandler<NetworkEventList, (), Callback>,
+    packet_handler: &mut PacketHandler<NetworkEventList, Callback>,
 ) -> Result<(), DuplicateHandlerError>
 where
     Callback: PacketCallback,

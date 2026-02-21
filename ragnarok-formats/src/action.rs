@@ -12,7 +12,7 @@ pub struct SpriteClip {
     pub mirror_on: u32,
     #[version_equals_or_above(2, 0)]
     pub color: Option<u32>,
-    #[version_smaller(2, 4)]
+    #[version_below(2, 4)]
     pub zoom: Option<f32>,
     #[version_equals_or_above(2, 4)]
     pub zoom2: Option<Vector2<f32>>,

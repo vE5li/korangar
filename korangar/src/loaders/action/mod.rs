@@ -10,7 +10,7 @@ use korangar_debug::logging::{Colorize, Timer, print_debug};
 use korangar_loaders::FileLoader;
 use ragnarok_bytes::{ByteReader, FromBytes};
 use ragnarok_formats::action::ActionsData;
-use ragnarok_formats::version::InternalVersion;
+use ragnarok_formats::version::GenericFormatMetadata;
 
 use super::error::LoadError;
 use crate::loaders::{FALLBACK_ACTIONS_FILE, GameFileLoader};
@@ -59,7 +59,7 @@ impl ActionLoader {
                 return self.get_or_load(FALLBACK_ACTIONS_FILE);
             }
         };
-        let mut byte_reader: ByteReader<Option<InternalVersion>> = ByteReader::with_default_metadata(&bytes);
+        let mut byte_reader: ByteReader = ByteReader::with_default_metadata::<GenericFormatMetadata>(&bytes);
 
         let actions_data = match ActionsData::from_bytes(&mut byte_reader) {
             Ok(actions_data) => actions_data,

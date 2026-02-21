@@ -4,7 +4,7 @@ use proc_macro2::{Delimiter, TokenStream};
 use quote::{format_ident, quote};
 use syn::{DataStruct, Field};
 
-use crate::utils::{Version, get_unique_attribute};
+use crate::utils::{Version, VersionAndBuildVersion, get_unique_attribute};
 
 pub fn byte_convertable_helper(data_struct: DataStruct) -> (TokenStream, Vec<TokenStream>, Vec<TokenStream>, Vec<TokenStream>, Delimiter) {
     let mut from_bytes_implementations = vec![];
@@ -26,6 +26,7 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (TokenStream, Vec<Tok
         let field_type = field.ty.clone();
 
         let is_version = get_unique_attribute(&mut field.attrs, "version").is_some();
+        let is_build_version = get_unique_attribute(&mut field.attrs, "build_version").is_some();
 
         let length = get_unique_attribute(&mut field.attrs, "length").map(|attribute| match attribute.meta {
             syn::Meta::List(list) => list.tokens,
@@ -83,21 +84,68 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (TokenStream, Vec<Tok
             syn::Meta::Path(_) | syn::Meta::NameValue(_) => panic!("expected token stream in attribute"),
         });
 
-        let version_smaller = get_unique_attribute(&mut field.attrs, "version_smaller")
+        let version_below = get_unique_attribute(&mut field.attrs, "version_below")
             .map(|attribute| attribute.parse_args().expect("failed to parse version"))
             .map(|version: Version| (version.major, version.minor))
-            .map(|(major, minor)| quote!(smaller(#major, #minor)));
+            .map(|(major, minor)| {
+                quote! {
+                    byte_reader
+                        .get_metadata::<Self, dyn ragnarok_formats::version::VersionMetadata>()?
+                        .get_version()
+                        .ok_or(ragnarok_bytes::ConversionError::from_message("version not set"))?
+                        .below(#major, #minor)
+                }
+            });
 
         let version_equals_or_above = get_unique_attribute(&mut field.attrs, "version_equals_or_above")
             .map(|attribute| attribute.parse_args().expect("failed to parse version"))
             .map(|version: Version| (version.major, version.minor))
-            .map(|(major, minor)| quote!(equals_or_above(#major, #minor)));
+            .map(|(major, minor)| {
+                quote! {
+                    byte_reader
+                        .get_metadata::<Self, dyn ragnarok_formats::version::VersionMetadata>()?
+                        .get_version()
+                        .ok_or(ragnarok_bytes::ConversionError::from_message("version not set"))?
+                        .equals_or_above(#major, #minor)
+                }
+            });
+
+        let version_and_build_version_equals_or_above = get_unique_attribute(&mut field.attrs, "version_and_build_version_equals_or_above")
+            .map(|attribute| attribute.parse_args().expect("failed to parse version"))
+            .map(|version: VersionAndBuildVersion| (version.major, version.minor, version.build))
+            .map(|(major, minor, build)| {
+                quote! {
+                    {
+                        let internal_version = byte_reader
+                            .get_metadata::<Self, dyn ragnarok_formats::version::VersionMetadata>()?
+                            .get_version()
+                            .ok_or(ragnarok_bytes::ConversionError::from_message("version not set"))?;
+
+                        // HACK: Since the build version is added conditionally, we can't know if
+                        // it will be set or not. If we don't, we just ignore that part of the check.
+                        let build_version_condition = byte_reader
+                            .get_metadata::<Self, dyn ragnarok_formats::version::BuildVersionMetadata>()?
+                            .get_build_version()
+                            .map(|build_version| build_version.equals_or_above(#build))
+                            .unwrap_or(true);
+
+                        internal_version.equals_or_above_with_extra_condition(#major, #minor, build_version_condition)
+                    }
+                }
+            });
 
         assert!(
-            version_smaller.is_none() || version_equals_or_above.is_none(),
+            [&version_below, &version_equals_or_above, &version_and_build_version_equals_or_above]
+                .iter()
+                .filter(|function| function.is_some())
+                .count()
+                <= 1,
             "version restriction may only be specified once"
         );
-        let version_function = version_smaller.or(version_equals_or_above);
+
+        let version_function = version_below
+            .or(version_equals_or_above)
+            .or(version_and_build_version_equals_or_above);
         let version_restricted = version_function.is_some();
 
         // base from bytes implementation
@@ -171,10 +219,7 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (TokenStream, Vec<Tok
         let from_implementation = match version_function {
             Some(function) => {
                 quote! {
-                    let #field_variable = match byte_reader
-                            .get_metadata::<Self, Option<ragnarok_formats::version::InternalVersion>>()?
-                            .ok_or(ragnarok_bytes::ConversionError::from_message("version not set"))?
-                            .#function {
+                    let #field_variable = match #function {
                         true => Some(#from_implementation),
                         false => None,
                     };
@@ -192,9 +237,24 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (TokenStream, Vec<Tok
         to_bytes_implementations.push(to_implementation);
 
         if is_version {
-            from_bytes_implementations.push(
-                quote!(*byte_reader.get_metadata_mut::<Self, Option<ragnarok_formats::version::InternalVersion>>()? = Some(ragnarok_formats::version::InternalVersion::from(#field_variable));),
-            );
+            from_bytes_implementations.push(quote!(
+                byte_reader.get_metadata_mut::<Self, dyn ragnarok_formats::version::VersionMetadata>()?.set_version(
+                    ragnarok_formats::version::InternalVersion::from(#field_variable)
+                );
+            ));
+        } else if is_build_version {
+            from_bytes_implementations.push(quote!(
+                // HACK: The build version of the map format is version restricted, meaning
+                // that it is wrapped in an `Option`. We could generate code that works for version
+                // restricted and non-version restricted build versions but I don't think that will
+                // ever be required. So for now I'm assuming that the build number is an `Option`
+                // in the generated code.
+                if let Some(build_version) = #field_variable {
+                    byte_reader.get_metadata_mut::<Self, dyn ragnarok_formats::version::BuildVersionMetadata>()?.set_build_version(
+                        build_version
+                    );
+                }
+            ));
         }
     }
 

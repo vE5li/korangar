@@ -44,8 +44,10 @@ pub fn derive_fixed_byte_size(token_stream: InterfaceTokenStream) -> InterfaceTo
         repeating_expr,
         repeating_option,
         version,
+        build_version,
         version_equals_or_above,
-        version_smaller,
+        version_below,
+        version_and_build_version_equals_or_above,
     )
 )]
 pub fn derive_byte_convertable(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
@@ -74,8 +76,10 @@ pub fn derive_byte_convertable(token_stream: InterfaceTokenStream) -> InterfaceT
         repeating_expr,
         repeating_option,
         version,
+        build_version,
         version_equals_or_above,
-        version_smaller,
+        version_below,
+        version_and_build_version_equals_or_above,
     )
 )]
 pub fn derive_from_bytes(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
@@ -104,8 +108,10 @@ pub fn derive_from_bytes(token_stream: InterfaceTokenStream) -> InterfaceTokenSt
         numeric_type,
         numeric_value,
         version,
+        build_version,
         version_equals_or_above,
-        version_smaller,
+        version_below,
+        version_and_build_version_equals_or_above,
     )
 )]
 pub fn derive_to_bytes(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {

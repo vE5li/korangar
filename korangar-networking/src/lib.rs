@@ -282,7 +282,7 @@ where
         address: SocketAddr,
         mut action_receiver: UnboundedReceiver<Vec<u8>>,
         event_sender: UnboundedSender<NetworkEvent>,
-        mut packet_handler: PacketHandler<NetworkEventList, (), Callback>,
+        mut packet_handler: PacketHandler<NetworkEventList, Callback>,
         ping_factory: impl Fn(&Mutex<TimeSynchronization>) -> PingPacket,
         ping_frequency: Duration,
         // After logging in to the character server, it sends the account id without any packet.
@@ -590,8 +590,8 @@ where
     fn create_login_server_packet_handler(
         packet_callback: Callback,
         packet_version: SupportedPacketVersion,
-    ) -> Result<PacketHandler<NetworkEventList, (), Callback>, DuplicateHandlerError> {
-        let mut packet_handler = PacketHandler::<NetworkEventList, (), Callback>::with_callback(packet_callback);
+    ) -> Result<PacketHandler<NetworkEventList, Callback>, DuplicateHandlerError> {
+        let mut packet_handler = PacketHandler::<NetworkEventList, Callback>::with_callback(packet_callback);
 
         match packet_version {
             SupportedPacketVersion::_20220406 => packet_versions::version_20220406::register_login_server_packets(&mut packet_handler)?,
@@ -603,8 +603,8 @@ where
     fn create_character_server_packet_handler(
         packet_callback: Callback,
         packet_version: SupportedPacketVersion,
-    ) -> Result<PacketHandler<NetworkEventList, (), Callback>, DuplicateHandlerError> {
-        let mut packet_handler = PacketHandler::<NetworkEventList, (), Callback>::with_callback(packet_callback);
+    ) -> Result<PacketHandler<NetworkEventList, Callback>, DuplicateHandlerError> {
+        let mut packet_handler = PacketHandler::<NetworkEventList, Callback>::with_callback(packet_callback);
 
         match packet_version {
             SupportedPacketVersion::_20220406 => packet_versions::version_20220406::register_character_server_packets(&mut packet_handler)?,
@@ -616,8 +616,8 @@ where
     fn create_map_server_packet_handler(
         packet_callback: Callback,
         packet_version: SupportedPacketVersion,
-    ) -> Result<PacketHandler<NetworkEventList, (), Callback>, DuplicateHandlerError> {
-        let mut packet_handler = PacketHandler::<NetworkEventList, (), Callback>::with_callback(packet_callback);
+    ) -> Result<PacketHandler<NetworkEventList, Callback>, DuplicateHandlerError> {
+        let mut packet_handler = PacketHandler::<NetworkEventList, Callback>::with_callback(packet_callback);
 
         match packet_version {
             SupportedPacketVersion::_20220406 => packet_versions::version_20220406::register_map_server_packets(&mut packet_handler)?,

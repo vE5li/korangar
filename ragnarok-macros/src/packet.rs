@@ -73,7 +73,7 @@ pub fn derive_packet_struct(
             const IS_PING: bool = #is_ping;
             const HEADER: ragnarok_packets::PacketHeader = ragnarok_packets::PacketHeader(#signature);
 
-            fn payload_from_bytes<Meta>(byte_reader: &mut ragnarok_bytes::ByteReader<Meta>) -> ragnarok_bytes::ConversionResult<Self> {
+            fn payload_from_bytes(byte_reader: &mut ragnarok_bytes::ByteReader) -> ragnarok_bytes::ConversionResult<Self> {
                 let base_offset = byte_reader.get_offset();
                 #insert_packet_length
                 #(#from_bytes_implementations)*

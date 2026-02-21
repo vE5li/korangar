@@ -5,7 +5,7 @@ mod implement;
 /// Trait to deserialize from a [`ByteReader`].
 pub trait FromBytes {
     /// Takes bytes from a [`ByteReader`] and deserializes them into a type `T`.
-    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self>
+    fn from_bytes(byte_reader: &mut ByteReader) -> ConversionResult<Self>
     where
         Self: Sized;
 }
@@ -14,7 +14,7 @@ pub trait FromBytes {
 pub trait FromBytesExt: FromBytes {
     /// Takes a fixed number of bytes from the [`ByteReader`] and tries to
     /// deserialize them into a type `T`.
-    fn from_n_bytes<Meta>(byte_reader: &mut ByteReader<Meta>, size: usize) -> ConversionResult<Self>
+    fn from_n_bytes(byte_reader: &mut ByteReader, size: usize) -> ConversionResult<Self>
     where
         Self: Sized;
 }
@@ -24,7 +24,7 @@ where
     T: FromBytes,
 {
     #[allow(clippy::uninit_assumed_init)]
-    fn from_n_bytes<Meta>(byte_reader: &mut ByteReader<Meta>, size: usize) -> ConversionResult<Self>
+    fn from_n_bytes(byte_reader: &mut ByteReader, size: usize) -> ConversionResult<Self>
     where
         Self: Sized,
     {
@@ -48,7 +48,7 @@ mod from_n_bytes {
     const TEST_BYTE_SIZE: usize = 4;
 
     impl FromBytes for Test {
-        fn from_bytes<Meta>(byte_reader: &mut crate::ByteReader<Meta>) -> crate::ConversionResult<Self>
+        fn from_bytes(byte_reader: &mut crate::ByteReader) -> crate::ConversionResult<Self>
         where
             Self: Sized,
         {

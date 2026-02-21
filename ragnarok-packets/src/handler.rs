@@ -58,23 +58,19 @@ pub struct NoPacketCallback;
 
 impl PacketCallback for NoPacketCallback {}
 
-pub type HandlerFunction<Output, Meta> = Box<dyn Fn(&mut ByteReader<Meta>) -> ConversionResult<Output>>;
+pub type HandlerFunction<Output> = Box<dyn Fn(&mut ByteReader) -> ConversionResult<Output>>;
 
 /// A struct to help with reading packets from a [`ByteReader`] and
 /// converting them to some common event type.
 ///
 /// It allows passing a packet callback to monitor incoming packets.
-pub struct PacketHandler<Output, Meta, Callback>
-where
-    Meta: 'static,
-{
-    handlers: HashMap<PacketHeader, HandlerFunction<Output, Meta>>,
+pub struct PacketHandler<Output, Callback> {
+    handlers: HashMap<PacketHeader, HandlerFunction<Output>>,
     packet_callback: Callback,
 }
 
-impl<Output, Meta, Callback> Default for PacketHandler<Output, Meta, Callback>
+impl<Output, Callback> Default for PacketHandler<Output, Callback>
 where
-    Meta: 'static,
     Callback: Default,
 {
     fn default() -> Self {
@@ -85,9 +81,8 @@ where
     }
 }
 
-impl<Output, Meta, Callback> PacketHandler<Output, Meta, Callback>
+impl<Output, Callback> PacketHandler<Output, Callback>
 where
-    Meta: Default + 'static,
     Output: Default,
     Callback: PacketCallback,
 {
@@ -151,7 +146,7 @@ where
     }
 
     /// Take a single packet from the byte stream.
-    pub fn process_one(&mut self, byte_reader: &mut ByteReader<Meta>) -> HandlerResult<Output> {
+    pub fn process_one(&mut self, byte_reader: &mut ByteReader) -> HandlerResult<Output> {
         let save_point = byte_reader.create_save_point();
 
         let Ok(header) = PacketHeader::from_bytes(byte_reader) else {

@@ -3,6 +3,7 @@
 mod error;
 mod fixed;
 mod from_bytes;
+mod metadata;
 mod reader;
 mod to_bytes;
 mod writer;
@@ -14,6 +15,7 @@ pub use ragnarok_macros::{ByteConvertable, FixedByteSize, FromBytes, ToBytes};
 pub use self::error::{ConversionError, ConversionErrorType, ConversionResult, ConversionResultExt};
 pub use self::fixed::{FixedByteSize, FixedByteSizeCollection};
 pub use self::from_bytes::{FromBytes, FromBytesExt};
+pub use self::metadata::{CastableMetadata, Caster, DynMetadata};
 pub use self::reader::ByteReader;
 pub use self::to_bytes::{ToBytes, ToBytesExt};
 pub use self::writer::ByteWriter;
@@ -127,7 +129,7 @@ mod conversion {
 
     #[test]
     fn full_lenght_string() {
-        let mut byte_stream = ByteReader::<()>::without_metadata(&[65, 65, 65, 65]);
+        let mut byte_stream = ByteReader::without_metadata(&[65, 65, 65, 65]);
 
         assert_eq!(String::from_n_bytes(&mut byte_stream, 4).unwrap(), "AAAA")
     }

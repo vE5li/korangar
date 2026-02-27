@@ -9,7 +9,7 @@ use korangar_interface::layout::{Resolvers, WindowLayout, with_single_resolver};
 use korangar_interface::prelude::{HorizontalAlignment, VerticalAlignment};
 use korangar_interface::window::{CustomWindow, Window};
 use korangar_networking::ShopItem;
-use rust_state::{Context, ManuallyAssertExt, Path, PathExt, Selector, VecIndexExt};
+use rust_state::{ManuallyAssertExt, Path, PathExt, Selector, State, VecIndexExt};
 
 use super::WindowClass;
 use crate::InputEvent;
@@ -84,7 +84,7 @@ where
 
     fn create_layout_info(
         &mut self,
-        state: &Context<ClientState>,
+        state: &State<ClientState>,
         store: ElementStoreMut,
         resolvers: &mut dyn Resolvers<ClientState>,
     ) -> Self::LayoutInfo {
@@ -125,7 +125,7 @@ where
 
     fn lay_out<'a>(
         &'a self,
-        state: &'a Context<ClientState>,
+        state: &'a State<ClientState>,
         store: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut WindowLayout<'a, ClientState>,
@@ -203,7 +203,7 @@ where
 
     fn create_layout_info(
         &mut self,
-        state: &Context<ClientState>,
+        state: &State<ClientState>,
         mut store: ElementStoreMut,
         resolvers: &mut dyn Resolvers<ClientState>,
     ) -> Self::LayoutInfo {
@@ -253,7 +253,7 @@ where
                             A: Path<ClientState, ShopItem<(ResourceMetadata, u32)>>,
                             B: Path<ClientState, Vec<ShopItem<(ResourceMetadata, u32)>>>,
                         {
-                            fn handle_click(&self, state: &Context<ClientState>, _: &mut EventQueue<ClientState>) {
+                            fn handle_click(&self, state: &State<ClientState>, _: &mut EventQueue<ClientState>) {
                                 let item_id = state.get(&self.item_path).item_id;
                                 let amount = self.amount;
 
@@ -307,7 +307,7 @@ where
 
     fn lay_out<'a>(
         &'a self,
-        state: &'a Context<ClientState>,
+        state: &'a State<ClientState>,
         store: ElementStore<'a>,
         _: &'a Self::LayoutInfo,
         layout: &mut WindowLayout<'a, ClientState>,
@@ -350,7 +350,7 @@ where
                     children: (
                         button! {
                             text: "Buy",
-                            event: move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
+                            event: move |state: &State<ClientState>, queue: &mut EventQueue<ClientState>| {
                                 let cart = state.get(&self.cart_path);
                                 let items = cart
                                     .iter()

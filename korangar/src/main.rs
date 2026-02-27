@@ -74,7 +74,7 @@ use ragnarok_packets::{
     SkillLevel, SkillType, TilePosition, UnitId, WorldPosition,
 };
 use renderer::InterfaceRenderer;
-use rust_state::{Context, ManuallyAssertExt};
+use rust_state::{ManuallyAssertExt, State};
 #[cfg(feature = "debug")]
 use rust_state::{VecIndexExt, VecLookupExt};
 use settings::{
@@ -85,7 +85,7 @@ use state::inventory::InventoryPathExt;
 use state::localization::Localization;
 use state::skills::SkillTreePathExt;
 use state::theme::{CursorThemePathExt, IndicatorThemePathExt, InterfaceThemePathExt, WorldThemePathExt};
-use state::{ChatMessage, ClientState, ClientStatePathExt, ClientStateRootExt, client_state, this_entity, this_player};
+use state::{ChatMessage, ClientState, ClientStatePathExt, client_state, this_entity, this_player};
 #[cfg(feature = "debug")]
 use wgpu::Device;
 use wgpu::util::initialize_adapter_from_env_or_default;
@@ -329,7 +329,7 @@ struct Client {
     window: Option<Arc<Window>>,
 
     map: Option<Box<Map>>,
-    client_state: Context<ClientState>,
+    client_state: State<ClientState>,
 }
 
 impl Client {
@@ -632,7 +632,7 @@ impl Client {
         });
 
         time_phase!("create client state", {
-            let client_state = Context::new(ClientState::new(
+            let client_state = State::new(ClientState::new(
                 &game_file_loader,
                 graphics_settings.clone(),
                 #[cfg(feature = "debug")]
@@ -643,9 +643,9 @@ impl Client {
         let active_interface_settings = client_state.follow(crate::client_state().interface_settings()).clone();
 
         interface.open_window(LoginWindow::new(
-            ClientState::path().login_window(),
-            ClientState::path().login_settings(),
-            ClientState::path().client_info(),
+            crate::client_state().login_window(),
+            crate::client_state().login_settings(),
+            crate::client_state().client_info(),
         ));
 
         Some(Self {
@@ -3534,7 +3534,13 @@ impl Client {
         *self.client_state.follow_mut(client_state().skill_tree_window().highlighted_skill()) = None;
 
         // Apply the game state after all the UI work + rendering is done.
-        self.client_state.apply();
+        if let Err(_errors) = self.client_state.apply() {
+            #[cfg(feature = "debug")]
+            {
+                print_debug!("[{}] failed to apply {} updates: ", "error".red(), _errors.len());
+                _errors.into_iter().for_each(|error| print_debug!("path: {}", error.type_name));
+            }
+        }
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]

@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 
 use alignment::{HorizontalAlignment, VerticalAlignment};
 use area::Area;
-use rust_state::Context;
+use rust_state::State;
 use tooltip::{Tooltip, TooltipId};
 
 pub use self::resolver::{Resolver, Resolvers, with_nth_resolver, with_single_resolver};
@@ -651,7 +651,7 @@ impl<'a, App: Application> WindowLayout<'a, App> {
         false
     }
 
-    pub fn handle_click(&self, state: &Context<App>, queue: &mut EventQueue<App>, mouse_button: MouseButton) {
+    pub fn handle_click(&self, state: &State<App>, queue: &mut EventQueue<App>, mouse_button: MouseButton) {
         for layer in self.layers.iter().rev() {
             for (registered_button, click_handler) in &layer.click_handlers {
                 if *registered_button == mouse_button {
@@ -661,7 +661,7 @@ impl<'a, App: Application> WindowLayout<'a, App> {
         }
     }
 
-    pub fn handle_drop(&self, state: &Context<App>, queue: &mut EventQueue<App>, mouse_mode: &'a MouseMode<App>) {
+    pub fn handle_drop(&self, state: &State<App>, queue: &mut EventQueue<App>, mouse_mode: &'a MouseMode<App>) {
         for layer in self.layers.iter().rev() {
             for drop_handler in &layer.drop_handlers {
                 drop_handler.handle_drop(state, queue, mouse_mode);
@@ -669,7 +669,7 @@ impl<'a, App: Application> WindowLayout<'a, App> {
         }
     }
 
-    pub fn handle_scroll(&self, state: &Context<App>, queue: &mut EventQueue<App>, delta: f32) {
+    pub fn handle_scroll(&self, state: &State<App>, queue: &mut EventQueue<App>, delta: f32) {
         for layer in self.layers.iter().rev() {
             for scroll_handler in &layer.scroll_handlers {
                 if scroll_handler.handle_scroll(state, queue, delta) {
@@ -679,7 +679,7 @@ impl<'a, App: Application> WindowLayout<'a, App> {
         }
     }
 
-    pub fn handle_character(&self, state: &Context<App>, queue: &mut EventQueue<App>, character: char) -> bool {
+    pub fn handle_character(&self, state: &State<App>, queue: &mut EventQueue<App>, character: char) -> bool {
         let mut input_handled = false;
 
         for layer in &self.layers {

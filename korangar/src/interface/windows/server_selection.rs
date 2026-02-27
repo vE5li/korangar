@@ -5,7 +5,7 @@ use korangar_interface::element::{DefaultLayoutInfo, Element};
 use korangar_interface::layout::{Resolvers, WindowLayout, with_single_resolver};
 use korangar_interface::window::{CustomWindow, Window};
 use ragnarok_packets::{CharacterServerInformation, CharacterServerInformationPathExt};
-use rust_state::{Context, Path};
+use rust_state::{Path, State};
 
 use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
@@ -51,7 +51,7 @@ where
                 }
             }
 
-            fn correct_element_size(&mut self, state: &Context<ClientState>) {
+            fn correct_element_size(&mut self, state: &State<ClientState>) {
                 let character_server_information = state.get(&self.path);
 
                 match self.item_boxes.len().cmp(&character_server_information.len()) {
@@ -65,7 +65,7 @@ where
                             let path = self.path.index(index).manually_asserted();
                             self.item_boxes.push(Box::new(button! {
                                 text: self.path.index(index).manually_asserted().server_name(),
-                                event: move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
+                                event: move |state: &State<ClientState>, queue: &mut EventQueue<ClientState>| {
                                     let character_server_information = state.get(&path).clone();
                                     queue.queue(InputEvent::SelectServer { character_server_information });
                                 },
@@ -85,7 +85,7 @@ where
 
             fn create_layout_info(
                 &mut self,
-                state: &Context<ClientState>,
+                state: &State<ClientState>,
                 mut store: ElementStoreMut,
                 resolvers: &mut dyn Resolvers<ClientState>,
             ) -> Self::LayoutInfo {
@@ -106,7 +106,7 @@ where
 
             fn lay_out<'a>(
                 &'a self,
-                state: &'a Context<ClientState>,
+                state: &'a State<ClientState>,
                 store: ElementStore<'a>,
                 layout_info: &'a Self::LayoutInfo,
                 layout: &mut WindowLayout<'a, ClientState>,

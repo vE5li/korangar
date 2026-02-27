@@ -7,7 +7,7 @@ use korangar_interface::layout::{Resolvers, WindowLayout, with_single_resolver};
 use korangar_interface::prelude::{HorizontalAlignment, VerticalAlignment};
 use korangar_interface::window::{CustomWindow, Window};
 use korangar_networking::MessageColor;
-use rust_state::{Context, Path, RustState};
+use rust_state::{Path, RustState, State};
 
 use super::WindowClass;
 use crate::graphics::Color;
@@ -47,7 +47,7 @@ where
 
     fn create_layout_info(
         &mut self,
-        state: &Context<ClientState>,
+        state: &State<ClientState>,
         _: ElementStoreMut,
         resolvers: &mut dyn Resolvers<ClientState>,
     ) -> Self::LayoutInfo {
@@ -100,7 +100,7 @@ where
 
     fn lay_out<'a>(
         &'a self,
-        state: &'a Context<ClientState>,
+        state: &'a State<ClientState>,
         _: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut WindowLayout<'a, ClientState>,
@@ -187,7 +187,7 @@ where
         use korangar_interface::prelude::*;
 
         let current_text_path = self.chat_window_state.current_text();
-        let send_action = move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
+        let send_action = move |state: &State<ClientState>, queue: &mut EventQueue<ClientState>| {
             let text = state.get(&current_text_path);
 
             if !text.is_empty() {

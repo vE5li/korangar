@@ -2,7 +2,7 @@ use korangar_interface::components::text_box::DefaultHandler;
 use korangar_interface::element::StateElement;
 use korangar_interface::element::id::FocusIdExt;
 use korangar_interface::window::{CustomWindow, Window};
-use rust_state::{Context, Path, PathExt, RustState};
+use rust_state::{Path, PathExt, RustState, State};
 
 use crate::graphics::{Color, ShadowPadding};
 use crate::input::InputEvent;
@@ -67,7 +67,7 @@ where
             selected_service_path.username().follow_safe(state).is_empty() || selected_service_path.password().follow_safe(state).is_empty()
         });
 
-        let login_action = move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
+        let login_action = move |state: &State<ClientState>, queue: &mut EventQueue<ClientState>| {
             let selected_service_path = self.window_state_path.selected_service();
             let selected_service_id = state.get(&selected_service_path);
             let username = state.get(&username_path);
@@ -87,7 +87,7 @@ where
         struct UsernameTextBox;
         struct PasswordTextBox;
 
-        let username_action = move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
+        let username_action = move |state: &State<ClientState>, queue: &mut EventQueue<ClientState>| {
             if !state.get(&username_path).is_empty() {
                 queue.queue(Event::FocusElement {
                     focus_id: PasswordTextBox.focus_id(),
@@ -95,7 +95,7 @@ where
             }
         };
 
-        let password_action = move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
+        let password_action = move |state: &State<ClientState>, queue: &mut EventQueue<ClientState>| {
             let username = state.get(&username_path);
 
             if username.is_empty() {

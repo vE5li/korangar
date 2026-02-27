@@ -5,7 +5,7 @@ use korangar_interface::element::{Element, ElementBox, ErasedElement, StateEleme
 use korangar_interface::layout::{Resolvers, with_single_resolver};
 use korangar_interface::window::{CustomWindow, Window};
 use ragnarok_packets::EntityId;
-use rust_state::{Context, Path, RustState};
+use rust_state::{Path, RustState, State};
 
 use super::WindowClass;
 use crate::input::InputEvent;
@@ -91,7 +91,7 @@ impl DialogWindowState {
         self.elements.push(DialogElement::new(
             button! {
                 text: client_state().localization().next_button_text(),
-                event: move |_: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
+                event: move |_: &State<ClientState>, queue: &mut EventQueue<ClientState>| {
                     queue.queue(InputEvent::NextDialog { npc_id });
                 },
             },
@@ -116,7 +116,7 @@ impl DialogWindowState {
         self.elements.push(DialogElement::new(
             button! {
                 text: client_state().localization().close_button_text(),
-                event: move |_: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
+                event: move |_: &State<ClientState>, queue: &mut EventQueue<ClientState>| {
                     queue.queue(InputEvent::CloseDialog { npc_id });
                 },
             },
@@ -140,7 +140,7 @@ impl DialogWindowState {
             self.elements.push(DialogElement::new(
                 button! {
                     text: text,
-                    event: move |_: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
+                    event: move |_: &State<ClientState>, queue: &mut EventQueue<ClientState>| {
                         queue.queue(InputEvent::ChooseDialogOption { npc_id, option: index as i8 + 1 });
                     },
                 },
@@ -181,7 +181,7 @@ where
 {
     type LayoutInfo = ();
 
-    fn create_layout_info(&mut self, state: &Context<ClientState>, mut store: ElementStoreMut, resolvers: &mut dyn Resolvers<ClientState>) {
+    fn create_layout_info(&mut self, state: &State<ClientState>, mut store: ElementStoreMut, resolvers: &mut dyn Resolvers<ClientState>) {
         with_single_resolver(resolvers, |resolver| {
             state
                 .get(&self.dialog_elements_path)
@@ -199,7 +199,7 @@ where
 
     fn lay_out<'a>(
         &'a self,
-        state: &'a Context<ClientState>,
+        state: &'a State<ClientState>,
         store: korangar_interface::element::store::ElementStore<'a>,
         _: &'a Self::LayoutInfo,
         layout: &mut korangar_interface::layout::WindowLayout<'a, ClientState>,

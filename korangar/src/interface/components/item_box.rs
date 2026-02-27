@@ -6,7 +6,7 @@ use korangar_interface::layout::area::Area;
 use korangar_interface::layout::{MouseButton, Resolvers, WindowLayout, with_single_resolver};
 use korangar_interface::prelude::{HorizontalAlignment, VerticalAlignment};
 use korangar_networking::{InventoryItem, InventoryItemDetails};
-use rust_state::{Context, Path};
+use rust_state::{Path, State};
 
 use crate::graphics::{Color, CornerDiameter, ShadowPadding};
 use crate::input::{InputEvent, MouseInputMode};
@@ -46,7 +46,7 @@ impl<P> ClickHandler<ClientState> for ItemBoxHandler<P>
 where
     P: Path<ClientState, InventoryItem<ResourceMetadata>, false>,
 {
-    fn handle_click(&self, state: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
+    fn handle_click(&self, state: &State<ClientState>, queue: &mut EventQueue<ClientState>) {
         // Unwrapping here is fine since we only register the handler if the slot has a
         // item.
         let item = state.try_get(&self.item_path).unwrap().clone();
@@ -63,7 +63,7 @@ impl<P> DropHandler<ClientState> for ItemBoxHandler<P>
 where
     P: Path<ClientState, InventoryItem<ResourceMetadata>, false>,
 {
-    fn handle_drop(&self, _: &Context<ClientState>, queue: &mut EventQueue<ClientState>, mouse_mode: &MouseMode<ClientState>) {
+    fn handle_drop(&self, _: &State<ClientState>, queue: &mut EventQueue<ClientState>, mouse_mode: &MouseMode<ClientState>) {
         if let MouseMode::Custom {
             mode: MouseInputMode::MoveItem { source, item },
         } = mouse_mode
@@ -107,7 +107,7 @@ where
 
     fn create_layout_info(
         &mut self,
-        state: &Context<ClientState>,
+        state: &State<ClientState>,
         _: ElementStoreMut,
         resolvers: &mut dyn Resolvers<ClientState>,
     ) -> Self::LayoutInfo {
@@ -127,7 +127,7 @@ where
 
     fn lay_out<'a>(
         &'a self,
-        state: &'a Context<ClientState>,
+        state: &'a State<ClientState>,
         _: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut WindowLayout<'a, ClientState>,

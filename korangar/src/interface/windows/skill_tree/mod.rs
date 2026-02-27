@@ -6,7 +6,7 @@ use hashbrown::HashMap;
 use korangar_interface::element::StateElement;
 use korangar_interface::window::{CustomWindow, Window};
 use ragnarok_packets::{SkillId, SkillLevel};
-use rust_state::{Context, ManuallyAssertExt, Path, PathExt, RustState, VecIndexExt};
+use rust_state::{ManuallyAssertExt, Path, PathExt, RustState, State, VecIndexExt};
 
 use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
@@ -107,13 +107,13 @@ where
                                 children: (
                                     button! {
                                         text: client_state().localization().reset_skill_points_button_text(),
-                                        event: move |state: &Context<ClientState>, _: &mut EventQueue<ClientState>| {
+                                        event: move |state: &State<ClientState>, _: &mut EventQueue<ClientState>| {
                                             state.update_value_with(self.window_state_path.pending_skill_points(), Vec::clear);
                                         },
                                     },
                                     button! {
                                         text: client_state().localization().cancel_skill_points_button_text(),
-                                        event: move |state: &Context<ClientState>, _: &mut EventQueue<ClientState>| {
+                                        event: move |state: &State<ClientState>, _: &mut EventQueue<ClientState>| {
                                             state.update_value_with(self.window_state_path.pending_skill_points(), Vec::clear);
                                             state.update_value(self.window_state_path.currently_skilling(), false);
                                         },
@@ -123,7 +123,7 @@ where
                                         disabled: ComputedSelector::new_default(move |state: &ClientState| {
                                             self.window_state_path.pending_skill_points().follow_safe(state).is_empty()
                                         }),
-                                        event: move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
+                                        event: move |state: &State<ClientState>, queue: &mut EventQueue<ClientState>| {
                                             let pending_skill_points_path = self.window_state_path.pending_skill_points();
                                             let pending_skill_points = state.get(&pending_skill_points_path);
                                             let skill_ids = pending_skill_points.clone();

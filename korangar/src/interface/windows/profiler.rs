@@ -9,7 +9,7 @@ use korangar_interface::layout::area::Area;
 use korangar_interface::layout::{MouseButton, Resolvers, WindowLayout, with_single_resolver};
 use korangar_interface::prelude::EventQueue;
 use korangar_interface::window::{CustomWindow, Window};
-use rust_state::{Context, Path, RustState};
+use rust_state::{Path, RustState, State};
 
 use crate::graphics::{Color, CornerDiameter, ShadowPadding};
 use crate::input::InputEvent;
@@ -107,7 +107,7 @@ impl DefaultClickHandler {
 }
 
 impl ClickHandler<ClientState> for DefaultClickHandler {
-    fn handle_click(&self, _: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
+    fn handle_click(&self, _: &State<ClientState>, queue: &mut EventQueue<ClientState>) {
         let (visible_thread, frame_index) = *self.inner.borrow();
 
         let measurement = korangar_debug::profiling::get_frame_by_index(visible_thread, frame_index);
@@ -138,7 +138,7 @@ where
 
     fn create_layout_info(
         &mut self,
-        _: &Context<ClientState>,
+        _: &State<ClientState>,
         _: ElementStoreMut,
         resolvers: &mut dyn Resolvers<ClientState>,
     ) -> Self::LayoutInfo {
@@ -150,7 +150,7 @@ where
 
     fn lay_out<'a>(
         &'a self,
-        state: &'a Context<ClientState>,
+        state: &'a State<ClientState>,
         _: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut WindowLayout<'a, ClientState>,
@@ -307,7 +307,7 @@ where
                         state_button! {
                             text: "Halt",
                             state: halted,
-                            event: |_: &Context<ClientState>, _: &mut EventQueue<ClientState>| {
+                            event: |_: &State<ClientState>, _: &mut EventQueue<ClientState>| {
                                 let halted = Profiler::get_halted();
                                 Profiler::set_halted(!halted);
                             },

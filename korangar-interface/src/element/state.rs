@@ -8,7 +8,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use interface_components::collapsible;
-use rust_state::{ArrayLookupExt, Context, ManuallyAssertExt, OptionExt, Path, PathExt, Selector, VecIndexExt};
+use rust_state::{ArrayLookupExt, ManuallyAssertExt, OptionExt, Path, PathExt, Selector, State, VecIndexExt};
 
 use super::Element;
 use super::store::ElementStoreMut;
@@ -300,7 +300,7 @@ where
 
         struct PrivateFocusId;
 
-        let action = move |_: &Context<App>, queue: &mut EventQueue<App>| {
+        let action = move |_: &State<App>, queue: &mut EventQueue<App>| {
             queue.queue(Event::Unfocus);
         };
 
@@ -432,7 +432,7 @@ where
 {
     type LayoutInfo = OptionLayoutInfo<E::LayoutInfo, T::LayoutInfoMut>;
 
-    fn create_layout_info(&mut self, state: &Context<App>, store: ElementStoreMut, resolvers: &mut dyn Resolvers<App>) -> Self::LayoutInfo {
+    fn create_layout_info(&mut self, state: &State<App>, store: ElementStoreMut, resolvers: &mut dyn Resolvers<App>) -> Self::LayoutInfo {
         if state.get(&self.option_path).is_some() {
             let element = self
                 .element
@@ -446,7 +446,7 @@ where
 
     fn lay_out<'a>(
         &'a self,
-        state: &'a Context<App>,
+        state: &'a State<App>,
         store: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut WindowLayout<'a, App>,
@@ -585,13 +585,13 @@ where
     // TODO: Refactor to not have to re-allocate this every frame.
     type LayoutInfo = Vec<T::LayoutInfoMut>;
 
-    fn get_element_count(&self, state: &Context<App>) -> usize {
+    fn get_element_count(&self, state: &State<App>) -> usize {
         state.get(&self.self_path).len()
     }
 
     fn create_layout_info(
         &mut self,
-        state: &Context<App>,
+        state: &State<App>,
         mut store: ElementStoreMut,
         resolvers: &mut dyn Resolvers<App>,
     ) -> Self::LayoutInfo {
@@ -632,7 +632,7 @@ where
 
     fn lay_out<'a>(
         &'a self,
-        state: &'a Context<App>,
+        state: &'a State<App>,
         store: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut WindowLayout<'a, App>,
@@ -698,7 +698,7 @@ where
 
             fn create_layout_info(
                 &mut self,
-                state: &Context<App>,
+                state: &State<App>,
                 _: ElementStoreMut,
                 resolvers: &mut dyn Resolvers<App>,
             ) -> Self::LayoutInfo {
@@ -715,7 +715,7 @@ where
 
             fn lay_out<'a>(
                 &'a self,
-                state: &'a Context<App>,
+                state: &'a State<App>,
                 _: ElementStore<'a>,
                 layout_info: &'a Self::LayoutInfo,
                 layout: &mut WindowLayout<'a, App>,
@@ -755,7 +755,7 @@ where
             },
             extra_elements: (
                 ClearButton {
-                    event: move |state: &rust_state::Context<App>, _: &mut korangar_interface::event::EventQueue<App>| {
+                    event: move |state: &rust_state::State<App>, _: &mut korangar_interface::event::EventQueue<App>| {
                         state.update_value_with(self_path, |vector| vector.clear());
                     }
                 },

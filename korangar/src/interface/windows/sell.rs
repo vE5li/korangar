@@ -9,7 +9,7 @@ use korangar_interface::layout::{Resolvers, WindowLayout, with_single_resolver};
 use korangar_interface::prelude::{HorizontalAlignment, VerticalAlignment};
 use korangar_interface::window::{CustomWindow, Window};
 use korangar_networking::SellItem;
-use rust_state::{Context, ManuallyAssertExt, Path, PathExt, Selector, VecIndexExt};
+use rust_state::{ManuallyAssertExt, Path, PathExt, Selector, State, VecIndexExt};
 
 use super::WindowClass;
 use crate::graphics::{Color, CornerDiameter, ShadowPadding};
@@ -83,7 +83,7 @@ where
 
     fn create_layout_info(
         &mut self,
-        state: &Context<ClientState>,
+        state: &State<ClientState>,
         store: ElementStoreMut,
         resolvers: &mut dyn Resolvers<ClientState>,
     ) -> Self::LayoutInfo {
@@ -124,7 +124,7 @@ where
 
     fn lay_out<'a>(
         &'a self,
-        state: &'a Context<ClientState>,
+        state: &'a State<ClientState>,
         store: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut WindowLayout<'a, ClientState>,
@@ -205,7 +205,7 @@ where
 
     fn create_layout_info(
         &mut self,
-        state: &Context<ClientState>,
+        state: &State<ClientState>,
         mut store: ElementStoreMut,
         resolvers: &mut dyn Resolvers<ClientState>,
     ) -> Self::LayoutInfo {
@@ -261,7 +261,7 @@ where
                             A: Path<ClientState, SellItem<(ResourceMetadata, u16)>>,
                             B: Path<ClientState, Vec<SellItem<(ResourceMetadata, u16)>>>,
                         {
-                            fn handle_click(&self, state: &Context<ClientState>, _: &mut EventQueue<ClientState>) {
+                            fn handle_click(&self, state: &State<ClientState>, _: &mut EventQueue<ClientState>) {
                                 let item = state.get(&self.item_path).clone();
                                 let amount = self.amount;
 
@@ -316,7 +316,7 @@ where
 
     fn lay_out<'a>(
         &'a self,
-        state: &'a Context<ClientState>,
+        state: &'a State<ClientState>,
         store: ElementStore<'a>,
         _: &'a Self::LayoutInfo,
         layout: &mut WindowLayout<'a, ClientState>,

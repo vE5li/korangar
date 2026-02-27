@@ -1,6 +1,6 @@
 use korangar_interface::components::text_box::DefaultHandler;
 use korangar_interface::window::{CustomWindow, Window};
-use rust_state::{Context, Path, PathExt};
+use rust_state::{Path, PathExt, State};
 
 use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
@@ -40,7 +40,7 @@ where
             self.character_name_path.follow_safe(state).len() < MINIMUM_NAME_LENGTH
         });
 
-        let create_action = move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
+        let create_action = move |state: &State<ClientState>, queue: &mut EventQueue<ClientState>| {
             let name = state.get(&self.character_name_path).clone();
             queue.queue(InputEvent::CreateCharacter { slot: self.slot, name });
         };

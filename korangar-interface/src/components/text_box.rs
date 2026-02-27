@@ -2,7 +2,7 @@ use std::any::Any;
 use std::cell::{Cell, UnsafeCell};
 use std::marker::PhantomData;
 
-use rust_state::{Context, Path, RustState, Selector};
+use rust_state::{Path, RustState, Selector, State};
 
 use crate::application::{Application, Size};
 use crate::element::Element;
@@ -59,7 +59,7 @@ impl<App> ClickHandler<App> for TextBoxData
 where
     App: Application,
 {
-    fn handle_click(&self, _: &Context<App>, _: &mut EventQueue<App>) {
+    fn handle_click(&self, _: &State<App>, _: &mut EventQueue<App>) {
         let is_hidden = self.is_hidden.get();
         self.is_hidden.set(!is_hidden);
     }
@@ -80,7 +80,7 @@ impl<App> ClickHandler<App> for FocusClick
 where
     App: Application,
 {
-    fn handle_click(&self, _: &Context<App>, queue: &mut EventQueue<App>) {
+    fn handle_click(&self, _: &State<App>, queue: &mut EventQueue<App>) {
         let element_id = *self.element_id.as_ref().unwrap();
         queue.queue(Event::FocusElementPost { element_id });
     }
@@ -211,7 +211,7 @@ where
     V: Selector<App, App::OverflowBehavior>,
     Id: Any,
 {
-    fn create_layout_info(&mut self, state: &Context<App>, store: ElementStoreMut, resolvers: &mut dyn Resolvers<App>) -> Self::LayoutInfo {
+    fn create_layout_info(&mut self, state: &State<App>, store: ElementStoreMut, resolvers: &mut dyn Resolvers<App>) -> Self::LayoutInfo {
         with_single_resolver(resolvers, |resolver| {
             let height = *state.get(&self.height);
 
@@ -261,7 +261,7 @@ where
 
     fn lay_out<'a>(
         &'a self,
-        state: &'a Context<App>,
+        state: &'a State<App>,
         store: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut WindowLayout<'a, App>,
@@ -399,7 +399,7 @@ where
     P: Path<App, String>,
     A: ClickHandler<App>,
 {
-    fn handle_character(&self, state: &Context<App>, queue: &mut EventQueue<App>, character: char) {
+    fn handle_character(&self, state: &State<App>, queue: &mut EventQueue<App>, character: char) {
         if character == '\x09' || character == '\x0d' {
             // On tab or enter
             self.action.handle_click(state, queue);

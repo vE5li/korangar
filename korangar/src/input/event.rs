@@ -8,7 +8,7 @@ use ragnarok_packets::{
     AccountId, BuyOrSellOption, CharacterId, CharacterServerInformation, EntityId, HotbarSlot, ShopId, SkillId, SoldItemInformation,
     StatUpType, TilePosition,
 };
-use rust_state::Context;
+use rust_state::State;
 
 use crate::interface::resource::{ItemSource, SkillSource};
 use crate::loaders::ServiceId;
@@ -322,7 +322,7 @@ impl From<InputEvent> for Event<ClientState> {
 }
 
 impl ClickHandler<ClientState> for InputEvent {
-    fn handle_click(&self, _: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
+    fn handle_click(&self, _: &State<ClientState>, queue: &mut EventQueue<ClientState>) {
         queue.queue(self.clone());
     }
 }

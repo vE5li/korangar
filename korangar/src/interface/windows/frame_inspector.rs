@@ -10,7 +10,7 @@ use korangar_interface::layout::tooltip::TooltipExt;
 use korangar_interface::layout::{Resolvers, WindowLayout, with_single_resolver};
 use korangar_interface::prelude::{HorizontalAlignment, VerticalAlignment};
 use korangar_interface::window::{CustomWindow, Window};
-use rust_state::Context;
+use rust_state::State;
 
 use crate::graphics::{Color, CornerDiameter, ShadowPadding};
 use crate::interface::windows::profiler::color_lookup::ColorLookup;
@@ -229,7 +229,7 @@ impl Element<ClientState> for FrameInspectorView {
 
     fn create_layout_info(
         &mut self,
-        _: &Context<ClientState>,
+        _: &State<ClientState>,
         _: ElementStoreMut,
         resolvers: &mut dyn Resolvers<ClientState>,
     ) -> Self::LayoutInfo {
@@ -242,7 +242,7 @@ impl Element<ClientState> for FrameInspectorView {
 
     fn lay_out<'a>(
         &'a self,
-        _: &'a Context<ClientState>,
+        _: &'a State<ClientState>,
         _: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut WindowLayout<'a, ClientState>,
@@ -331,7 +331,7 @@ impl Element<ClientState> for FrameInspectorView {
 }
 
 impl ScrollHandler<ClientState> for FrameInspectorView {
-    fn handle_scroll(&self, _: &Context<ClientState>, _: &mut EventQueue<ClientState>, delta: f32) -> bool {
+    fn handle_scroll(&self, _: &State<ClientState>, _: &mut EventQueue<ClientState>, delta: f32) -> bool {
         const ZOOM_SPEED: f32 = 0.004;
 
         let mut inner = self.inner.borrow_mut();

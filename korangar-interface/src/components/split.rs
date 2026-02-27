@@ -1,4 +1,4 @@
-use rust_state::{Context, Selector};
+use rust_state::{Selector, State};
 
 use crate::application::Application;
 use crate::element::Element;
@@ -71,7 +71,7 @@ where
 {
     type LayoutInfo = Children::LayoutInfo;
 
-    fn create_layout_info(&mut self, state: &Context<App>, store: ElementStoreMut, resolvers: &mut dyn Resolvers<App>) -> Self::LayoutInfo {
+    fn create_layout_info(&mut self, state: &State<App>, store: ElementStoreMut, resolvers: &mut dyn Resolvers<App>) -> Self::LayoutInfo {
         with_single_resolver(resolvers, |resolver| {
             let gaps = *state.get(&self.gaps);
             let element_count = self.children.get_element_count(state);
@@ -94,7 +94,7 @@ where
 
     fn lay_out<'a>(
         &'a self,
-        state: &'a Context<App>,
+        state: &'a State<App>,
         store: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut WindowLayout<'a, App>,

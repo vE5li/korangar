@@ -3,7 +3,7 @@ use korangar_interface::element::store::{ElementStore, ElementStoreMut};
 use korangar_interface::element::{BaseLayoutInfo, Element};
 use korangar_interface::layout::{Resolvers, WindowLayout, with_single_resolver};
 use korangar_interface::window::{CustomWindow, Window};
-use rust_state::{Context, Path};
+use rust_state::{Path, State};
 
 use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
@@ -23,7 +23,7 @@ mod character_slot_preview {
     use korangar_interface::layout::tooltip::TooltipExt;
     use korangar_interface::layout::{MouseButton, Resolvers, WindowLayout, with_single_resolver};
     use ragnarok_packets::{CharacterInformation, CharacterInformationPathExt};
-    use rust_state::{Context, ManuallyAssertExt, Path};
+    use rust_state::{ManuallyAssertExt, Path, State};
 
     use crate::graphics::{Color, CornerDiameter, ScreenPosition, ScreenSize, ShadowPadding};
     use crate::input::InputEvent;
@@ -63,7 +63,7 @@ mod character_slot_preview {
         A: Path<ClientState, Option<usize>>,
         B: Path<ClientState, CharacterInformation, false>,
     {
-        fn handle_click(&self, _: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
+        fn handle_click(&self, _: &State<ClientState>, queue: &mut EventQueue<ClientState>) {
             use korangar_interface::prelude::*;
 
             let slot = self.slot;
@@ -75,7 +75,7 @@ mod character_slot_preview {
                 children: (
                     button! {
                         text: "Delete",
-                        event: move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
+                        event: move |state: &State<ClientState>, queue: &mut EventQueue<ClientState>| {
                             // We should not be able to get here if the character is not present, so it's
                             // fine to unwrap.
                             let character_information = state.try_get(&character_information_path).unwrap();
@@ -87,14 +87,14 @@ mod character_slot_preview {
                     },
                     button! {
                         text: "Switch",
-                        event: move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
+                        event: move |state: &State<ClientState>, queue: &mut EventQueue<ClientState>| {
                             state.update_value(switch_request_path, Some(slot));
                             queue.queue(Event::CloseOverlay);
                         },
                     },
                     button! {
                         text: "Cancel",
-                        event: move |_: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
+                        event: move |_: &State<ClientState>, queue: &mut EventQueue<ClientState>| {
                             queue.queue(Event::CloseOverlay);
                         },
                     },
@@ -151,7 +151,7 @@ mod character_slot_preview {
 
         fn create_layout_info(
             &mut self,
-            _: &Context<ClientState>,
+            _: &State<ClientState>,
             store: ElementStoreMut,
             resolvers: &mut dyn Resolvers<ClientState>,
         ) -> Self::LayoutInfo {
@@ -176,7 +176,7 @@ mod character_slot_preview {
 
         fn lay_out<'a>(
             &'a self,
-            state: &'a Context<ClientState>,
+            state: &'a State<ClientState>,
             _: ElementStore<'a>,
             layout_info: &'a Self::LayoutInfo,
             layout: &mut WindowLayout<'a, ClientState>,
@@ -391,7 +391,7 @@ mod character_slot_preview {
     where
         T: Copy + PartialEq + Display + 'static,
     {
-        fn get_str<'a, P>(&'a self, path: P, state: &'a Context<ClientState>) -> &'a str
+        fn get_str<'a, P>(&'a self, path: P, state: &'a State<ClientState>) -> &'a str
         where
             P: Path<ClientState, T>,
         {
@@ -413,7 +413,7 @@ mod character_slot_preview {
     }
 
     impl ClickHandler<ClientState> for SelectCharacter {
-        fn handle_click(&self, _: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
+        fn handle_click(&self, _: &State<ClientState>, queue: &mut EventQueue<ClientState>) {
             queue.queue(InputEvent::SelectCharacter { slot: self.slot });
         }
     }
@@ -423,7 +423,7 @@ mod character_slot_preview {
     }
 
     impl ClickHandler<ClientState> for CreateCharacter {
-        fn handle_click(&self, _: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
+        fn handle_click(&self, _: &State<ClientState>, queue: &mut EventQueue<ClientState>) {
             queue.queue(InputEvent::OpenCharacterCreationWindow { slot: self.slot });
         }
     }
@@ -436,7 +436,7 @@ mod character_slot_preview {
     where
         P: Path<ClientState, Option<usize>>,
     {
-        fn handle_click(&self, state: &Context<ClientState>, _: &mut EventQueue<ClientState>) {
+        fn handle_click(&self, state: &State<ClientState>, _: &mut EventQueue<ClientState>) {
             state.update_value(self.switch_request, None);
         }
     }
@@ -450,7 +450,7 @@ mod character_slot_preview {
     where
         P: Path<ClientState, Option<usize>>,
     {
-        fn handle_click(&self, state: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
+        fn handle_click(&self, state: &State<ClientState>, queue: &mut EventQueue<ClientState>) {
             // We should not be able to get here if there is no switch request, so it's
             // fine to unwrap.
             let origin_slot = state.get(&self.switch_request).unwrap();
@@ -535,7 +535,7 @@ where
                 }
             }
 
-            fn correct_element_size(&mut self, state: &Context<ClientState>) {
+            fn correct_element_size(&mut self, state: &State<ClientState>) {
                 let character_slots = state.get(&self.character_slots);
                 let slot_count = character_slots.get_slot_count();
 
@@ -601,7 +601,7 @@ where
 
             fn create_layout_info(
                 &mut self,
-                state: &Context<ClientState>,
+                state: &State<ClientState>,
                 mut store: ElementStoreMut,
                 resolvers: &mut dyn Resolvers<ClientState>,
             ) -> Self::LayoutInfo {
@@ -621,7 +621,7 @@ where
 
             fn lay_out<'a>(
                 &'a self,
-                state: &'a Context<ClientState>,
+                state: &'a State<ClientState>,
                 store: ElementStore<'a>,
                 layout_info: &'a Self::LayoutInfo,
                 layout: &mut WindowLayout<'a, ClientState>,

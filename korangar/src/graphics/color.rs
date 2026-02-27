@@ -5,7 +5,7 @@ use korangar_interface::element::{BaseLayoutInfo, Element, StateElement};
 use korangar_interface::layout::{Resolvers, WindowLayout, with_single_resolver};
 use mlua::{Lua, Value};
 use ragnarok_formats::color::{ColorBGRA, ColorRGB};
-use rust_state::{Context, Path};
+use rust_state::{Path, State};
 use serde::{Deserialize, Serialize};
 
 use crate::graphics::{CornerDiameter, ShadowPadding};
@@ -274,7 +274,7 @@ impl StateElement<ClientState> for Color {
 
             fn create_layout_info(
                 &mut self,
-                _: &Context<ClientState>,
+                _: &State<ClientState>,
                 _: ElementStoreMut,
                 resolvers: &mut dyn Resolvers<ClientState>,
             ) -> Self::LayoutInfo {
@@ -287,7 +287,7 @@ impl StateElement<ClientState> for Color {
 
             fn lay_out<'a>(
                 &'a self,
-                state: &'a Context<ClientState>,
+                state: &'a State<ClientState>,
                 _: ElementStore<'a>,
                 layout_info: &'a Self::LayoutInfo,
                 layout: &mut WindowLayout<'a, ClientState>,
@@ -330,7 +330,7 @@ impl StateElement<ClientState> for Color {
 
             fn create_layout_info(
                 &mut self,
-                _: &Context<ClientState>,
+                _: &State<ClientState>,
                 _: ElementStoreMut,
                 resolvers: &mut dyn Resolvers<ClientState>,
             ) -> Self::LayoutInfo {
@@ -343,7 +343,7 @@ impl StateElement<ClientState> for Color {
 
             fn lay_out<'a>(
                 &'a self,
-                state: &'a Context<ClientState>,
+                state: &'a State<ClientState>,
                 _: ElementStore<'a>,
                 layout_info: &'a Self::LayoutInfo,
                 layout: &mut WindowLayout<'a, ClientState>,

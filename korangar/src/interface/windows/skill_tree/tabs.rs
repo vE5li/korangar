@@ -8,7 +8,7 @@ use korangar_interface::element::{Element, ElementBox};
 use korangar_interface::event::{DropHandler, EventQueue};
 use korangar_interface::layout::area::Area;
 use korangar_interface::layout::{Resolvers, WindowLayout, with_nth_resolver, with_single_resolver};
-use rust_state::{Context, ManuallyAssertExt, Path, PathExt, VecIndexExt};
+use rust_state::{ManuallyAssertExt, Path, PathExt, State, VecIndexExt};
 
 use crate::input::{InputEvent, MouseInputMode};
 use crate::interface::resource::SkillSource;
@@ -46,13 +46,13 @@ where
 {
     type LayoutInfo = ();
 
-    fn get_element_count(&self, state: &Context<ClientState>) -> usize {
+    fn get_element_count(&self, state: &State<ClientState>) -> usize {
         state.get(&self.layout_path).tabs.len()
     }
 
     fn create_layout_info(
         &mut self,
-        state: &Context<ClientState>,
+        state: &State<ClientState>,
         mut store: ElementStoreMut,
         resolvers: &mut dyn Resolvers<ClientState>,
     ) -> Self::LayoutInfo {
@@ -68,7 +68,7 @@ where
                 for tab_index in self.buttons.len()..tab_count {
                     self.buttons.push(ErasedElement::new(button! {
                     text: self.layout_path.tabs().index(tab_index).name().manually_asserted(),
-                    event: move |state: &rust_state::Context<ClientState>, _: &mut korangar_interface::event::EventQueue<ClientState>| {
+                    event: move |state: &rust_state::State<ClientState>, _: &mut korangar_interface::event::EventQueue<ClientState>| {
                         state.update_value(selected_tab_path, tab_index);
                     },
                     disabled: ComputedSelector::new_default(move |state: &ClientState| *selected_tab_path.follow_safe(state) == tab_index),
@@ -88,7 +88,7 @@ where
 
     fn lay_out<'a>(
         &'a self,
-        state: &'a Context<ClientState>,
+        state: &'a State<ClientState>,
         store: ElementStore<'a>,
         _: &'a Self::LayoutInfo,
         layout: &mut WindowLayout<'a, ClientState>,
@@ -128,7 +128,7 @@ where
 
     fn create_layout_info(
         &mut self,
-        state: &Context<ClientState>,
+        state: &State<ClientState>,
         mut store: ElementStoreMut,
         resolvers: &mut dyn Resolvers<ClientState>,
     ) -> Self::LayoutInfo {
@@ -174,7 +174,7 @@ where
 
     fn lay_out<'a>(
         &'a self,
-        state: &'a Context<ClientState>,
+        state: &'a State<ClientState>,
         store: ElementStore<'a>,
         _: &'a Self::LayoutInfo,
         layout: &mut WindowLayout<'a, ClientState>,
@@ -197,7 +197,7 @@ impl<Children> DropSkillWrapper<Children> {
 }
 
 impl<Children> DropHandler<ClientState> for DropSkillWrapper<Children> {
-    fn handle_drop(&self, _: &Context<ClientState>, queue: &mut EventQueue<ClientState>, mouse_mode: &MouseMode<ClientState>) {
+    fn handle_drop(&self, _: &State<ClientState>, queue: &mut EventQueue<ClientState>, mouse_mode: &MouseMode<ClientState>) {
         if let MouseMode::Custom {
             mode: MouseInputMode::MoveSkill { source, skill },
         } = mouse_mode
@@ -219,7 +219,7 @@ where
 
     fn create_layout_info(
         &mut self,
-        state: &Context<ClientState>,
+        state: &State<ClientState>,
         store: ElementStoreMut,
         resolvers: &mut dyn Resolvers<ClientState>,
     ) -> Self::LayoutInfo {
@@ -230,7 +230,7 @@ where
 
     fn lay_out<'a>(
         &'a self,
-        state: &'a Context<ClientState>,
+        state: &'a State<ClientState>,
         store: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut WindowLayout<'a, ClientState>,

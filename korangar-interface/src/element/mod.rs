@@ -5,7 +5,7 @@ pub mod store;
 use std::marker::PhantomData;
 
 pub use interface_macros::StateElement;
-use rust_state::Context;
+use rust_state::State;
 use store::{ElementStore, ElementStoreMut};
 
 pub use self::state::*;
@@ -53,7 +53,7 @@ pub trait Element<App: Application> {
     /// - `either` component: Will return the number of elements of `on_true` or
     ///   `on_false` based on the selector. That way, components like `split`
     ///   will always render correctly with `either` as a child.
-    fn get_element_count(&self, _: &Context<App>) -> usize {
+    fn get_element_count(&self, _: &State<App>) -> usize {
         1
     }
 
@@ -65,7 +65,7 @@ pub trait Element<App: Application> {
     /// - Allocating space for the element using the resolver
     /// - Laying out text to get the dimensions and font size
     /// - Doing the same for children elements
-    fn create_layout_info(&mut self, state: &Context<App>, store: ElementStoreMut, resolvers: &mut dyn Resolvers<App>) -> Self::LayoutInfo;
+    fn create_layout_info(&mut self, state: &State<App>, store: ElementStoreMut, resolvers: &mut dyn Resolvers<App>) -> Self::LayoutInfo;
 
     /// Add the element to the [layout](WindowLayout).
     ///
@@ -75,7 +75,7 @@ pub trait Element<App: Application> {
     /// - Adding input handlers to the layout
     fn lay_out<'a>(
         &'a self,
-        state: &'a Context<App>,
+        state: &'a State<App>,
         store: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut WindowLayout<'a, App>,
@@ -94,9 +94,9 @@ where
 {
     type LayoutInfo = ();
 
-    fn create_layout_info(&mut self, _: &Context<App>, _: ElementStoreMut, _: &mut dyn Resolvers<App>) -> Self::LayoutInfo {}
+    fn create_layout_info(&mut self, _: &State<App>, _: ElementStoreMut, _: &mut dyn Resolvers<App>) -> Self::LayoutInfo {}
 
-    fn lay_out<'a>(&'a self, _: &'a Context<App>, _: ElementStore<'a>, _: &'a Self::LayoutInfo, _: &mut WindowLayout<'a, App>) {}
+    fn lay_out<'a>(&'a self, _: &'a State<App>, _: ElementStore<'a>, _: &'a Self::LayoutInfo, _: &mut WindowLayout<'a, App>) {}
 }
 
 /// Element that stores its own layout info, rather than letting the parent
@@ -141,18 +141,12 @@ where
 {
     type LayoutInfo = ();
 
-    fn create_layout_info(&mut self, state: &Context<App>, store: ElementStoreMut, resolvers: &mut dyn Resolvers<App>) {
+    fn create_layout_info(&mut self, state: &State<App>, store: ElementStoreMut, resolvers: &mut dyn Resolvers<App>) {
         let layout_info = self.element.create_layout_info(state, store, resolvers);
         self.layout_info = Some(layout_info);
     }
 
-    fn lay_out<'a>(
-        &'a self,
-        state: &'a Context<App>,
-        store: ElementStore<'a>,
-        _: &'a Self::LayoutInfo,
-        layout: &mut WindowLayout<'a, App>,
-    ) {
+    fn lay_out<'a>(&'a self, state: &'a State<App>, store: ElementStore<'a>, _: &'a Self::LayoutInfo, layout: &mut WindowLayout<'a, App>) {
         let layout_info = self.layout_info.as_ref().expect("no layout created");
         self.element.lay_out(state, store, layout_info, layout);
     }
@@ -167,13 +161,13 @@ where
 {
     type LayoutInfo = ();
 
-    fn get_element_count(&self, _: &Context<App>) -> usize {
+    fn get_element_count(&self, _: &State<App>) -> usize {
         0
     }
 
-    fn create_layout_info(&mut self, _: &Context<App>, _: ElementStoreMut, _: &mut dyn Resolvers<App>) {}
+    fn create_layout_info(&mut self, _: &State<App>, _: ElementStoreMut, _: &mut dyn Resolvers<App>) {}
 
-    fn lay_out<'a>(&'a self, _: &'a Context<App>, _: ElementStore<'a>, _: &'a Self::LayoutInfo, _: &mut WindowLayout<'a, App>) {}
+    fn lay_out<'a>(&'a self, _: &'a State<App>, _: ElementStore<'a>, _: &'a Self::LayoutInfo, _: &mut WindowLayout<'a, App>) {}
 }
 
 impl<App, T, const N: usize> Element<App> for [T; N]
@@ -183,13 +177,13 @@ where
 {
     type LayoutInfo = [T::LayoutInfo; N];
 
-    fn get_element_count(&self, _: &Context<App>) -> usize {
+    fn get_element_count(&self, _: &State<App>) -> usize {
         N
     }
 
     fn create_layout_info(
         &mut self,
-        state: &Context<App>,
+        state: &State<App>,
         mut store: ElementStoreMut,
         resolvers: &mut dyn Resolvers<App>,
     ) -> Self::LayoutInfo {
@@ -202,7 +196,7 @@ where
 
     fn lay_out<'a>(
         &'a self,
-        state: &'a Context<App>,
+        state: &'a State<App>,
         store: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut WindowLayout<'a, App>,
@@ -229,13 +223,13 @@ macro_rules! impl_element_for_tuple {
         {
             type LayoutInfo = ($($ty::LayoutInfo,)*);
 
-            fn get_element_count(&self, _: &Context<App>) -> usize {
+            fn get_element_count(&self, _: &State<App>) -> usize {
                 ${count($ty)}
             }
 
             fn create_layout_info(
                 &mut self,
-                state: &Context<App>,
+                state: &State<App>,
                 mut store: ElementStoreMut,
                 resolvers: &mut dyn Resolvers<App>,
             ) -> Self::LayoutInfo {
@@ -250,7 +244,7 @@ macro_rules! impl_element_for_tuple {
 
             fn lay_out<'a>(
                 &'a self,
-                state: &'a Context<App>,
+                state: &'a State<App>,
                 store: ElementStore<'a>,
                 layout_info: &'a Self::LayoutInfo,
                 layout: &mut WindowLayout<'a, App>,

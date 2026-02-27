@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use rust_state::{Context, Selector};
+use rust_state::{Selector, State};
 
 use crate::application::Application;
 use crate::element::Element;
@@ -43,14 +43,14 @@ where
 {
     type LayoutInfo = Children::LayoutInfo;
 
-    fn create_layout_info(&mut self, state: &Context<App>, store: ElementStoreMut, resolvers: &mut dyn Resolvers<App>) -> Self::LayoutInfo {
+    fn create_layout_info(&mut self, state: &State<App>, store: ElementStoreMut, resolvers: &mut dyn Resolvers<App>) -> Self::LayoutInfo {
         let selected_tab = state.get(&self.selected_tab);
         self.children.get_tab_mut(selected_tab).create_layout_info(state, store, resolvers)
     }
 
     fn lay_out<'a>(
         &'a self,
-        state: &'a Context<App>,
+        state: &'a State<App>,
         store: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut WindowLayout<'a, App>,

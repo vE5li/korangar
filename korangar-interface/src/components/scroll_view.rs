@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 
 use num::Signed;
-use rust_state::{Context, Selector};
+use rust_state::{Selector, State};
 
 use crate::application::Application;
 use crate::element::Element;
@@ -40,7 +40,7 @@ impl<App> ScrollHandler<App> for PersistentData
 where
     App: Application,
 {
-    fn handle_scroll(&self, _: &Context<App>, _: &mut EventQueue<App>, delta: f32) -> bool {
+    fn handle_scroll(&self, _: &State<App>, _: &mut EventQueue<App>, delta: f32) -> bool {
         let mut inner = self.inner.borrow_mut();
 
         // Don't try to scroll if its already at the minimum or maximum scroll value.
@@ -93,7 +93,7 @@ where
 
     fn create_layout_info(
         &mut self,
-        state: &Context<App>,
+        state: &State<App>,
         mut store: ElementStoreMut,
         resolvers: &mut dyn Resolvers<App>,
     ) -> Self::LayoutInfo {
@@ -149,7 +149,7 @@ where
 
     fn lay_out<'a>(
         &'a self,
-        state: &'a Context<App>,
+        state: &'a State<App>,
         store: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut WindowLayout<'a, App>,

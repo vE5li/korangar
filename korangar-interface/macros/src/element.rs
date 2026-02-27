@@ -285,7 +285,7 @@ pub fn derive_state_element_enum(_data_enum: DataEnum, generics: Generics, name:
                 //
                 //     fn create_layout_info(
                 //         &mut self,
-                //         state: &rust_state::Context<App>,
+                //         state: &rust_state::State<App>,
                 //         mut store: korangar_interface::element::store::ElementStoreMut,
                 //         resolvers: &mut korangar_interface::layout::Resolver<App>,
                 //     ) -> Self::LayoutInfo {
@@ -300,7 +300,7 @@ pub fn derive_state_element_enum(_data_enum: DataEnum, generics: Generics, name:
                 //
                 //     fn lay_out<'a>(
                 //         &'a self,
-                //         state: &'a rust_state::Context<App>,
+                //         state: &'a rust_state::State<App>,
                 //         store: korangar_interface::element::store::ElementStore<'a>,
                 //         layout_info: &'a Self::LayoutInfo,
                 //         layout: &mut korangar_interface::layout::Layout<'a, App>,
@@ -320,7 +320,7 @@ pub fn derive_state_element_enum(_data_enum: DataEnum, generics: Generics, name:
 
                 button! {
                     text: name,
-                    event: |state: &rust_state::Context<App>, _: &mut korangar_interface::event::EventQueue<App>| {
+                    event: |state: &rust_state::State<App>, _: &mut korangar_interface::event::EventQueue<App>| {
                         println!("Just a dummy for now");
                     },
                 }
@@ -354,7 +354,7 @@ pub fn derive_state_element_enum(_data_enum: DataEnum, generics: Generics, name:
                 //
                 //     fn create_layout_info(
                 //         &mut self,
-                //         state: &rust_state::Context<App>,
+                //         state: &rust_state::State<App>,
                 //         mut store: korangar_interface::element::store::ElementStoreMut,
                 //         resolvers: &mut korangar_interface::layout::Resolver<App>,
                 //     ) -> Self::LayoutInfo {
@@ -369,7 +369,7 @@ pub fn derive_state_element_enum(_data_enum: DataEnum, generics: Generics, name:
                 //
                 //     fn lay_out<'a>(
                 //         &'a self,
-                //         state: &'a rust_state::Context<App>,
+                //         state: &'a rust_state::State<App>,
                 //         store: korangar_interface::element::store::ElementStore<'a>,
                 //         layout_info: &'a Self::LayoutInfo,
                 //         layout: &mut korangar_interface::layout::Layout<'a, App>,
@@ -394,7 +394,7 @@ pub fn derive_state_element_enum(_data_enum: DataEnum, generics: Generics, name:
 
                 button! {
                     text: name,
-                    event: |state: &rust_state::Context<App>, _: &mut korangar_interface::event::EventQueue<App>| {
+                    event: |state: &rust_state::State<App>, _: &mut korangar_interface::event::EventQueue<App>| {
                         println!("Just a dummy for now");
                     },
                 }

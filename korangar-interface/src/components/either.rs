@@ -1,4 +1,4 @@
-use rust_state::{Context, Selector};
+use rust_state::{Selector, State};
 
 use crate::application::Application;
 use crate::element::Element;
@@ -38,14 +38,14 @@ where
 {
     type LayoutInfo = EitherLayoutInfo<OnTrue::LayoutInfo, OnFalse::LayoutInfo>;
 
-    fn get_element_count(&self, state: &Context<App>) -> usize {
+    fn get_element_count(&self, state: &State<App>) -> usize {
         match *state.get(&self.selector) {
             true => self.on_true.get_element_count(state),
             false => self.on_false.get_element_count(state),
         }
     }
 
-    fn create_layout_info(&mut self, state: &Context<App>, store: ElementStoreMut, resolvers: &mut dyn Resolvers<App>) -> Self::LayoutInfo {
+    fn create_layout_info(&mut self, state: &State<App>, store: ElementStoreMut, resolvers: &mut dyn Resolvers<App>) -> Self::LayoutInfo {
         match *state.get(&self.selector) {
             true => EitherLayoutInfo::OnTrue(self.on_true.create_layout_info(state, store, resolvers)),
             false => EitherLayoutInfo::OnFalse(self.on_false.create_layout_info(state, store, resolvers)),
@@ -54,7 +54,7 @@ where
 
     fn lay_out<'a>(
         &'a self,
-        state: &'a Context<App>,
+        state: &'a State<App>,
         store: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut WindowLayout<'a, App>,

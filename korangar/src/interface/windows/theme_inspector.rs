@@ -1,7 +1,7 @@
 use korangar_interface::components::text_box::DefaultHandler;
 use korangar_interface::element::StateElement;
 use korangar_interface::window::{CustomWindow, Window};
-use rust_state::{Context, Path, RustState};
+use rust_state::{Path, RustState, State};
 
 use crate::interface::windows::WindowClass;
 use crate::state::ClientState;
@@ -74,7 +74,7 @@ where
                                         children: (
                                             button! {
                                                 text: "Load",
-                                                event: move |state: &Context<ClientState>, _: &mut EventQueue<ClientState>| {
+                                                event: move |state: &State<ClientState>, _: &mut EventQueue<ClientState>| {
                                                     let name = state.get(&self.window_state_path.menu_theme_name()).clone();
 
                                                     state.update_value_with(self.menu_theme_path, move |theme| {
@@ -84,7 +84,7 @@ where
                                             },
                                             button! {
                                                 text: "Save",
-                                                event: move |state: &Context<ClientState>, _: &mut EventQueue<ClientState>| {
+                                                event: move |state: &State<ClientState>, _: &mut EventQueue<ClientState>| {
                                                     let name_path = self.window_state_path.menu_theme_name();
                                                     let theme_name = state.get(&name_path);
 
@@ -109,7 +109,7 @@ where
                                         children: (
                                             button! {
                                                 text: "Load",
-                                                event: move |state: &Context<ClientState>, _: &mut EventQueue<ClientState>| {
+                                                event: move |state: &State<ClientState>, _: &mut EventQueue<ClientState>| {
                                                     let name = state.get(&self.window_state_path.in_game_theme_name()).clone();
 
                                                     state.update_value_with(self.in_game_theme_path, move |theme| {
@@ -119,7 +119,7 @@ where
                                             },
                                             button! {
                                                 text: "Save",
-                                                event: move |state: &Context<ClientState>, _: &mut EventQueue<ClientState>| {
+                                                event: move |state: &State<ClientState>, _: &mut EventQueue<ClientState>| {
                                                     let name_path = self.window_state_path.in_game_theme_name();
                                                     let theme_name = state.get(&name_path);
 
@@ -144,7 +144,7 @@ where
                                         children: (
                                             button! {
                                                 text: "Load",
-                                                event: move |state: &Context<ClientState>, _: &mut EventQueue<ClientState>| {
+                                                event: move |state: &State<ClientState>, _: &mut EventQueue<ClientState>| {
                                                     let name = state.get(&self.window_state_path.world_theme_name()).clone();
 
                                                     state.update_value_with(self.world_theme_path, move |theme| {
@@ -154,7 +154,7 @@ where
                                             },
                                             button! {
                                                 text: "Save",
-                                                event: move |state: &Context<ClientState>, _: &mut EventQueue<ClientState>| {
+                                                event: move |state: &State<ClientState>, _: &mut EventQueue<ClientState>| {
                                                     let name_path = self.window_state_path.world_theme_name();
                                                     let theme_name = state.get(&name_path);
 

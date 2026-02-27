@@ -1,6 +1,6 @@
 use std::vec::Drain;
 
-use rust_state::Context;
+use rust_state::State;
 
 use super::ClickHandler;
 use crate::MouseMode;
@@ -63,7 +63,7 @@ impl<App: Application> Clone for Event<App> {
 }
 
 impl<App: Application> ClickHandler<App> for Event<App> {
-    fn handle_click(&self, _: &Context<App>, queue: &mut EventQueue<App>) {
+    fn handle_click(&self, _: &State<App>, queue: &mut EventQueue<App>) {
         queue.queue(self.clone());
     }
 }

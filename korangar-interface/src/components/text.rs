@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use rust_state::{Context, RustState, Selector};
+use rust_state::{RustState, Selector, State};
 
 use crate::application::{Application, Size};
 use crate::element::Element;
@@ -77,7 +77,7 @@ where
     G: Selector<App, VerticalAlignment>,
     H: Selector<App, App::OverflowBehavior>,
 {
-    fn create_layout_info(&mut self, state: &Context<App>, _: ElementStoreMut, resolvers: &mut dyn Resolvers<App>) -> Self::LayoutInfo {
+    fn create_layout_info(&mut self, state: &State<App>, _: ElementStoreMut, resolvers: &mut dyn Resolvers<App>) -> Self::LayoutInfo {
         with_single_resolver(resolvers, |resolver| {
             let height = *state.get(&self.height);
 
@@ -97,7 +97,7 @@ where
 
     fn lay_out<'a>(
         &'a self,
-        state: &'a Context<App>,
+        state: &'a State<App>,
         _: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut WindowLayout<'a, App>,

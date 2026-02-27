@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use std::num::NonZeroU32;
 
 use interface_components::scroll_view;
-use rust_state::{Context, Path, RustState, Selector};
+use rust_state::{Path, RustState, Selector, State};
 
 use crate::application::{Application, Position, Size};
 use crate::element::store::{ElementStore, ElementStoreMut};
@@ -95,7 +95,7 @@ where
     N: Selector<App, VerticalAlignment>,
     O: Selector<App, App::OverflowBehavior>,
 {
-    fn create_layout_info(&mut self, state: &Context<App>, _: ElementStoreMut, resolvers: &mut dyn Resolvers<App>) -> Self::LayoutInfo {
+    fn create_layout_info(&mut self, state: &State<App>, _: ElementStoreMut, resolvers: &mut dyn Resolvers<App>) -> Self::LayoutInfo {
         with_single_resolver(resolvers, |resolver| {
             let height = *state.get(&self.height);
             let option = &state.get(&self.options)[self.option_index];
@@ -124,7 +124,7 @@ where
 
     fn lay_out<'a>(
         &'a self,
-        state: &'a Context<App>,
+        state: &'a State<App>,
         _: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut WindowLayout<'a, App>,
@@ -191,7 +191,7 @@ where
 
     fn create_layout_info(
         &mut self,
-        state: &Context<App>,
+        state: &State<App>,
         mut store: ElementStoreMut,
         resolvers: &mut dyn Resolvers<App>,
     ) -> Self::LayoutInfo {
@@ -214,7 +214,7 @@ where
                                 text_marker: PhantomData,
                                 options: options.clone(),
                                 option_index: index,
-                                event: move |state: &Context<App>, queue: &mut EventQueue<App>| {
+                                event: move |state: &State<App>, queue: &mut EventQueue<App>| {
                                     let options = state.get(&options);
                                     let value = options[index].value();
                                     state.update_value(value_path, value);
@@ -260,7 +260,7 @@ where
 
     fn lay_out<'a>(
         &'a self,
-        state: &'a Context<App>,
+        state: &'a State<App>,
         store: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut WindowLayout<'a, App>,
@@ -299,7 +299,7 @@ where
     A: Path<App, Value>,
     B: Selector<App, Vec<Item>> + Clone,
 {
-    fn handle_click(&self, _: &Context<App>, queue: &mut EventQueue<App>) {
+    fn handle_click(&self, _: &State<App>, queue: &mut EventQueue<App>) {
         let element = ErasedElement::new(scroll_view! {
             children: InnerElement {
                 value_path: self.value_path,
@@ -486,7 +486,7 @@ where
     N: Selector<App, VerticalAlignment>,
     O: Selector<App, App::OverflowBehavior>,
 {
-    fn create_layout_info(&mut self, state: &Context<App>, store: ElementStoreMut, resolvers: &mut dyn Resolvers<App>) -> Self::LayoutInfo {
+    fn create_layout_info(&mut self, state: &State<App>, store: ElementStoreMut, resolvers: &mut dyn Resolvers<App>) -> Self::LayoutInfo {
         with_single_resolver(resolvers, |resolver| {
             let mut height = *state.get(&self.height);
             let mut font_size = *state.get(&self.font_size);
@@ -531,7 +531,7 @@ where
 
     fn lay_out<'a>(
         &'a self,
-        state: &'a Context<App>,
+        state: &'a State<App>,
         _: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut WindowLayout<'a, App>,

@@ -40,7 +40,7 @@ where
 {
     fn create_layout_info(
         &mut self,
-        state: &rust_state::Context<App>,
+        state: &rust_state::State<App>,
         _: ElementStoreMut,
         resolvers: &mut dyn Resolvers<App>,
     ) -> Self::LayoutInfo {
@@ -80,7 +80,7 @@ where
 
     fn lay_out<'a>(
         &'a self,
-        state: &'a rust_state::Context<App>,
+        state: &'a rust_state::State<App>,
         _: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut WindowLayout<'a, App>,
@@ -124,7 +124,7 @@ where
 {
     fn create_layout_info(
         &mut self,
-        state: &rust_state::Context<App>,
+        state: &rust_state::State<App>,
         _: ElementStoreMut,
         resolvers: &mut dyn Resolvers<App>,
     ) -> Self::LayoutInfo {
@@ -159,7 +159,7 @@ where
 
     fn lay_out<'a>(
         &'a self,
-        state: &'a rust_state::Context<App>,
+        state: &'a rust_state::State<App>,
         _: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut WindowLayout<'a, App>,

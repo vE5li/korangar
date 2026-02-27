@@ -6,7 +6,7 @@ use korangar_interface::element::{Element, ElementBox, StateElement};
 use korangar_interface::layout::{Resolvers, WindowLayout, with_single_resolver};
 use korangar_interface::window::{CustomWindow, Window};
 use ragnarok_packets::{Friend, FriendPathExt};
-use rust_state::{Context, ManuallyAssertExt, Path, RustState, VecIndexExt};
+use rust_state::{ManuallyAssertExt, Path, RustState, State, VecIndexExt};
 
 use crate::input::InputEvent;
 use crate::interface::windows::WindowClass;
@@ -41,7 +41,7 @@ where
 
     fn create_layout_info(
         &mut self,
-        state: &Context<ClientState>,
+        state: &State<ClientState>,
         mut store: ElementStoreMut,
         resolvers: &mut dyn Resolvers<ClientState>,
     ) -> Self::LayoutInfo {
@@ -64,7 +64,7 @@ where
                             text: name_path,
                             children: button! {
                                 text: client_state().localization().remove_button_text(),
-                                event: move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
+                                event: move |state: &State<ClientState>, queue: &mut EventQueue<ClientState>| {
                                     let &Friend { account_id, character_id, .. } = state.get(&friend_path);
 
                                     queue.queue(
@@ -85,7 +85,7 @@ where
 
     fn lay_out<'a>(
         &'a self,
-        state: &'a Context<ClientState>,
+        state: &'a State<ClientState>,
         store: ElementStore<'a>,
         _: &'a Self::LayoutInfo,
         layout: &mut WindowLayout<'a, ClientState>,
@@ -132,7 +132,7 @@ where
 
         struct AddFriendTextBox;
 
-        let add_action = move |state: &Context<ClientState>, queue: &mut EventQueue<ClientState>| {
+        let add_action = move |state: &State<ClientState>, queue: &mut EventQueue<ClientState>| {
             let character_name = state.get(&self.window_state_path.currently_adding()).clone();
 
             // TODO: Give some sort of error if the name is too short.

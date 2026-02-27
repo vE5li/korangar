@@ -2,7 +2,7 @@ use korangar_interface::element::Element;
 use korangar_interface::element::store::{ElementStore, ElementStoreMut};
 use korangar_interface::layout::{Resolvers, WindowLayout, with_single_resolver};
 use korangar_interface::window::{CustomWindow, Window};
-use rust_state::{Context, Path};
+use rust_state::{Path, State};
 
 use crate::interface::windows::WindowClass;
 use crate::networking::{PacketHistory, PacketHistoryPathExt};
@@ -42,7 +42,7 @@ where
 
             fn create_layout_info(
                 &mut self,
-                state: &Context<ClientState>,
+                state: &State<ClientState>,
                 mut store: ElementStoreMut,
                 resolvers: &mut dyn Resolvers<ClientState>,
             ) {
@@ -63,7 +63,7 @@ where
 
             fn lay_out<'a>(
                 &'a self,
-                state: &'a Context<ClientState>,
+                state: &'a State<ClientState>,
                 store: ElementStore<'a>,
                 _: &'a Self::LayoutInfo,
                 layout: &mut WindowLayout<'a, ClientState>,
@@ -95,7 +95,7 @@ where
                     children: (
                         button! {
                             text: "Clear",
-                            event: move |state: &Context<ClientState>, _: &mut EventQueue<ClientState>| {
+                            event: move |state: &State<ClientState>, _: &mut EventQueue<ClientState>| {
                                 state.update_value_with(self.packet_history_path.entries(), |buffer| buffer.clear());
                             }
                         },

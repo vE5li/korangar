@@ -6,7 +6,7 @@ use korangar_interface::layout::tooltip::TooltipExt;
 use korangar_interface::layout::{Icon, MouseButton, Resolvers, WindowLayout, with_single_resolver};
 use korangar_interface::prelude::{HorizontalAlignment, VerticalAlignment};
 use ragnarok_packets::SkillLevel;
-use rust_state::{Context, Path};
+use rust_state::{Path, State};
 
 use super::{SkillTreeWindowState, SkillTreeWindowStatePathExt};
 use crate::graphics::{Color, ShadowPadding};
@@ -72,7 +72,7 @@ where
     B: Path<ClientState, LearnedSkill, false>,
     C: Path<ClientState, SkillTreeWindowState>,
 {
-    fn handle_click(&self, state: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
+    fn handle_click(&self, state: &State<ClientState>, queue: &mut EventQueue<ClientState>) {
         // Unwrapping here is fine since we only register the handler if the slot has a
         // skill.
         let mut learnable_skill = state.try_get(&self.learnable_skill_path).unwrap().clone();
@@ -136,7 +136,7 @@ where
     A: Path<ClientState, LearnedSkill, false>,
     B: Path<ClientState, SkillTreeWindowState>,
 {
-    fn handle_click(&self, state: &Context<ClientState>, _: &mut EventQueue<ClientState>) {
+    fn handle_click(&self, state: &State<ClientState>, _: &mut EventQueue<ClientState>) {
         if let Some(learned_skill) = state.try_get(&self.learned_skill_path) {
             let skill_id = learned_skill.skill_id;
             let current_level = state
@@ -173,7 +173,7 @@ where
     A: Path<ClientState, LearnedSkill, false>,
     B: Path<ClientState, SkillTreeWindowState>,
 {
-    fn handle_click(&self, state: &Context<ClientState>, _: &mut EventQueue<ClientState>) {
+    fn handle_click(&self, state: &State<ClientState>, _: &mut EventQueue<ClientState>) {
         if let Some(learned_skill) = state.try_get(&self.learned_skill_path) {
             let skill_id = learned_skill.skill_id;
             let current_level = state
@@ -235,7 +235,7 @@ where
 
     fn create_layout_info(
         &mut self,
-        state: &Context<ClientState>,
+        state: &State<ClientState>,
         _: ElementStoreMut,
         resolvers: &mut dyn Resolvers<ClientState>,
     ) -> Self::LayoutInfo {
@@ -278,7 +278,7 @@ where
 
     fn lay_out<'a>(
         &'a self,
-        state: &'a Context<ClientState>,
+        state: &'a State<ClientState>,
         _: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut WindowLayout<'a, ClientState>,

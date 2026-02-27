@@ -1,7 +1,7 @@
 use std::cell::Cell;
 use std::marker::PhantomData;
 
-use rust_state::{Context, RustState, Selector};
+use rust_state::{RustState, Selector, State};
 
 use crate::application::{Application, Size};
 use crate::element::Element;
@@ -59,7 +59,7 @@ impl<App> ClickHandler<App> for CollapsibleData
 where
     App: Application,
 {
-    fn handle_click(&self, _: &Context<App>, _: &mut EventQueue<App>) {
+    fn handle_click(&self, _: &State<App>, _: &mut EventQueue<App>) {
         let expanded = self.expanded.get();
         self.expanded.set(!expanded);
     }
@@ -201,7 +201,7 @@ where
 
     fn create_layout_info(
         &mut self,
-        state: &Context<App>,
+        state: &State<App>,
         mut store: ElementStoreMut,
         resolvers: &mut dyn Resolvers<App>,
     ) -> Self::LayoutInfo {
@@ -271,7 +271,7 @@ where
 
     fn lay_out<'a>(
         &'a self,
-        state: &'a Context<App>,
+        state: &'a State<App>,
         store: ElementStore<'a>,
         layout_info: &'a Self::LayoutInfo,
         layout: &mut WindowLayout<'a, App>,

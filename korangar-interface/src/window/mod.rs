@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 
 pub use anchor::{Anchor, AnchorPoint};
 pub use interface_macros::StateWindow;
-use rust_state::{Context, Path, RustState, Selector};
+use rust_state::{Path, RustState, Selector, State};
 use store::WindowStore;
 
 use crate::MouseMode;
@@ -36,13 +36,13 @@ pub trait Window<App: Application>: private::Sealed {
     fn get_theme_type(&self) -> App::ThemeType;
 
     /// Returns if the window is closable or not.
-    fn is_closable(&self, state: &Context<App>) -> bool;
+    fn is_closable(&self, state: &State<App>) -> bool;
 
     /// Create the layout info for the window.
     #[allow(private_interfaces)]
     fn create_layout_info(
         &mut self,
-        state: &Context<App>,
+        state: &State<App>,
         store: &mut WindowStore,
         data: &mut WindowData<App>,
         generator: &mut ElementIdGenerator,
@@ -52,13 +52,7 @@ pub trait Window<App: Application>: private::Sealed {
 
     /// Lay out the window.
     #[allow(private_interfaces)]
-    fn lay_out<'a>(
-        &'a self,
-        state: &'a Context<App>,
-        store: &'a WindowStore,
-        data: &'a WindowData<App>,
-        layout: &mut WindowLayout<'a, App>,
-    );
+    fn lay_out<'a>(&'a self, state: &'a State<App>, store: &'a WindowStore, data: &'a WindowData<App>, layout: &mut WindowLayout<'a, App>);
 }
 
 /// An application specific custom window.
@@ -166,7 +160,7 @@ impl ResizeClickHandler {
 }
 
 impl<App: Application> ClickHandler<App> for ResizeClickHandler {
-    fn handle_click(&self, _: &Context<App>, queue: &mut EventQueue<App>) {
+    fn handle_click(&self, _: &State<App>, queue: &mut EventQueue<App>) {
         let Self { window_id, resize_mode } = *self;
 
         queue.queue(Event::SetMouseMode {
@@ -187,7 +181,7 @@ impl MoveClickHandler {
 }
 
 impl<App: Application> ClickHandler<App> for MoveClickHandler {
-    fn handle_click(&self, _: &Context<App>, queue: &mut EventQueue<App>) {
+    fn handle_click(&self, _: &State<App>, queue: &mut EventQueue<App>) {
         queue.queue(Event::SetMouseMode {
             mouse_mode: MouseMode::MovingWindow { window_id: self.window_id },
         });
@@ -206,7 +200,7 @@ impl CloseClickHandler {
 }
 
 impl<App: Application> ClickHandler<App> for CloseClickHandler {
-    fn handle_click(&self, _: &Context<App>, queue: &mut EventQueue<App>) {
+    fn handle_click(&self, _: &State<App>, queue: &mut EventQueue<App>) {
         queue.queue(Event::CloseWindow { window_id: self.window_id });
     }
 }
@@ -365,14 +359,14 @@ where
         self.theme
     }
 
-    fn is_closable(&self, state: &Context<App>) -> bool {
+    fn is_closable(&self, state: &State<App>) -> bool {
         *state.get(&self.closable)
     }
 
     #[allow(private_interfaces)]
     fn create_layout_info(
         &mut self,
-        state: &Context<App>,
+        state: &State<App>,
         store: &mut WindowStore,
         data: &mut WindowData<App>,
         generator: &mut ElementIdGenerator,
@@ -455,13 +449,7 @@ where
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     #[allow(private_interfaces)]
-    fn lay_out<'a>(
-        &'a self,
-        state: &'a Context<App>,
-        store: &'a WindowStore,
-        data: &'a WindowData<App>,
-        layout: &mut WindowLayout<'a, App>,
-    ) {
+    fn lay_out<'a>(&'a self, state: &'a State<App>, store: &'a WindowStore, data: &'a WindowData<App>, layout: &mut WindowLayout<'a, App>) {
         let store = store.get_from_window_id(data.id);
         let layout_info = self.layout_info.as_ref().expect("no layout present");
 

@@ -32,7 +32,7 @@ use layout::area::Area;
 use layout::tooltip::TooltipTheme;
 use layout::{MouseButton, ResizeMode, Resolver, WindowLayout};
 use option_ext::OptionExt;
-use rust_state::Context;
+use rust_state::State;
 use theme::ThemePathGetter;
 use window::store::WindowStore;
 use window::{Anchor, CustomWindow, DisplayInformation, StateWindow, Window, WindowData, WindowThemePathExt};
@@ -436,7 +436,7 @@ where
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn close_top_window(&mut self, state: &Context<App>) {
+    pub fn close_top_window(&mut self, state: &State<App>) {
         if let Some(index_from_back) = self.windows.iter().rev().position(|wrapper| wrapper.window.is_closable(state)) {
             let index = self.windows.len() - 1 - index_from_back;
             self.remove_window(index);
@@ -525,7 +525,7 @@ where
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn lay_out_windows<'a>(
         &'a mut self,
-        state: &'a Context<App>,
+        state: &'a State<App>,
         interface_scaling: f32,
         mouse_position: App::Position,
     ) -> InterfaceFrame<'a, App> {
@@ -684,7 +684,7 @@ impl<App: Application> InterfaceFrame<'_, App> {
     #[cfg_attr(feature = "debug", korangar_debug::profile("render user interface"))]
     pub fn render(
         &mut self,
-        state: &Context<App>,
+        state: &State<App>,
         renderer: &App::Renderer,
         tooltip_theme: &TooltipTheme<App>,
         mouse_position: App::Position,
@@ -713,7 +713,7 @@ impl<App: Application> InterfaceFrame<'_, App> {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn render_window_anchors(&self, state: &Context<App>, renderer: &App::Renderer, window_id: u64) {
+    fn render_window_anchors(&self, state: &State<App>, renderer: &App::Renderer, window_id: u64) {
         if let Some(wrapper) = self.windows.iter().find(|wrapper| wrapper.data.id == window_id) {
             App::set_current_theme_type(wrapper.window.get_theme_type());
 
@@ -837,7 +837,7 @@ impl<App: Application> InterfaceFrame<'_, App> {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn click(&mut self, state: &Context<App>, mouse_button: MouseButton) {
+    pub fn click(&mut self, state: &State<App>, mouse_button: MouseButton) {
         self.event_queue.queue(Event::Unfocus);
         self.event_queue.queue(Event::CloseOverlay);
 
@@ -867,7 +867,7 @@ impl<App: Application> InterfaceFrame<'_, App> {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn drop(&mut self, state: &Context<App>) {
+    pub fn drop(&mut self, state: &State<App>) {
         self.event_queue.queue(Event::SetMouseMode {
             mouse_mode: MouseMode::Default,
         });
@@ -884,7 +884,7 @@ impl<App: Application> InterfaceFrame<'_, App> {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn scroll(&mut self, state: &Context<App>, delta: f32) {
+    pub fn scroll(&mut self, state: &State<App>, delta: f32) {
         if let Some(layout) = &self.overlay_layout {
             layout.handle_scroll(state, self.event_queue, delta);
         }
@@ -897,7 +897,7 @@ impl<App: Application> InterfaceFrame<'_, App> {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn input_characters(&mut self, state: &Context<App>, characters: &[char]) -> bool {
+    pub fn input_characters(&mut self, state: &State<App>, characters: &[char]) -> bool {
         let mut input_handled = false;
 
         if let Some(layout) = &self.overlay_layout {

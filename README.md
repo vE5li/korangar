@@ -9,12 +9,8 @@
 
 Korangar is a next-gen Ragnarok Online client written in Rust. It features real-time lighting with drop shadows. It adds a completely new and very customizable user interface and removes limitations of the official client, such as the fixed aspect ratio. It also supports Linux, Windows and MacOS!
 
-##### Screenshots of the current state
-![geffen 1](.github/geffen_1.png)
-*Geffen in the afternoon*
-
-![geffen 2](.github/geffen_2.png)
-*Geffen at night*
+##### Screenshot of the current state
+![geffen](.github/geffen.png)
 
 ## 🚀 Running
 

@@ -171,8 +171,8 @@ fn main() {
     cap.filter("host 49.12.109.207", true).unwrap();
 
     let mut client_login_handler = create_handler!(ServerType::Login, Direction::Incoming, [
-        LoginServerLoginSuccessPacket,
-        LoginFailedPacket,
+        LoginServerLoginSuccessPacket_20170315,
+        LoginBannedPacked,
         LoginFailedPacket2
     ]);
 
@@ -182,11 +182,11 @@ fn main() {
     ]);
 
     let mut client_character_handler = create_handler!(ServerType::Character, Direction::Incoming, [
-        LoginFailedPacket,
+        LoginBannedPacked,
         CharacterServerLoginSuccessPacket,
         RequestCharacterListSuccessPacket,
         Packet0b18,
-        CharacterSelectionSuccessPacket,
+        CharacterSelectionSuccessPacket_20170315,
         CharacterSelectionFailedPacket,
         MapServerUnavailablePacket,
         CreateCharacterSuccessPacket,
@@ -199,12 +199,12 @@ fn main() {
     let mut server_character_handler = create_handler!(ServerType::Character, Direction::Outgoing, [
         CharacterServerKeepalivePacket,
         RequestCharacterListPacket,
-        CharacterListPacket,
+        CharacterListPacket_20211103,
         CharacterSlotPagePacket,
         CharacterBanListPacket,
         LoginPincodePacket,
         SelectCharacterPacket,
-        CreateCharacterPacket,
+        CreateCharacterPacket_20151001,
         DeleteCharacterPacket,
         SwitchCharacterSlotPacket,
     ]);
@@ -222,10 +222,10 @@ fn main() {
         PlayerMovePacket,
         ChangeMapPacket,
         ResurrectionPacket,
-        EntityAppearPacket,
-        EntityAppear2Packet,
-        MovingEntityAppearPacket,
-        EntityDisAppearPacket,
+        EntityAppearPacket_20141022,
+        EntityStandPacket_20141022,
+        MovingEntityAppearPacket_20141022,
+        EntityDisappearedPacket,
         UpdateStatPacket,
         UpdateStatPacket1,
         UpdateStatPacket2,
@@ -239,7 +239,7 @@ fn main() {
         InventoyStartPacket,
         RegularItemListPacket,
         EquippableItemListPacket,
-        InventoyEndPacket,
+        InventoryEndPacket,
         EquippableSwitchItemListPacket,
         MapTypePacket,
         UpdateSkillTreePacket,

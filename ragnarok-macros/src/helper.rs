@@ -6,7 +6,16 @@ use syn::{DataStruct, Field};
 
 use crate::utils::{Version, VersionAndBuildVersion, get_unique_attribute};
 
-pub fn byte_convertable_helper(data_struct: DataStruct) -> (TokenStream, Vec<TokenStream>, Vec<TokenStream>, Vec<TokenStream>, Delimiter) {
+pub fn byte_convertable_helper(
+    data_struct: DataStruct,
+    versions: Vec<(&str, u16)>,
+) -> (
+    Vec<TokenStream>,
+    Vec<TokenStream>,
+    Vec<TokenStream>,
+    Vec<TokenStream>,
+    Delimiter,
+) {
     let mut from_bytes_implementations = vec![];
     let mut implemented_fields = vec![];
     let mut to_bytes_implementations = vec![];
@@ -24,6 +33,12 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (TokenStream, Vec<Tok
         let field_variable = field.ident.clone().unwrap_or(counter_ident);
         let field_identifier = field.ident.as_ref().map(|ident| quote!(#ident)).unwrap_or(quote!(#counter_index));
         let field_type = field.ty.clone();
+
+        // Check if this field should be skipped for the serialization.
+        // This is the case for some packet which hold their headers as field, to handle
+        // packet id "shuffling". We use #[hidden_element] which is already used
+        // by the UI library to hide fields.
+        let skip_payload_serialization = get_unique_attribute(&mut field.attrs, "hidden_element").is_some();
 
         let is_version = get_unique_attribute(&mut field.attrs, "version").is_some();
         let is_build_version = get_unique_attribute(&mut field.attrs, "build_version").is_some();
@@ -230,11 +245,14 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (TokenStream, Vec<Tok
         from_bytes_implementations.push(from_implementation);
 
         // base to byte implementation
-        let to_implementation = match version_restricted {
-            true => quote!(panic!("version restricted fields can't be serialized at the moment");),
-            false => quote!(ragnarok_bytes::ConversionResultExt::trace::<Self>(#to_length)?;),
-        };
-        to_bytes_implementations.push(to_implementation);
+        // Skip field we don't want to serialize
+        if !skip_payload_serialization {
+            let to_implementation = match version_restricted {
+                true => quote!(panic!("version restricted fields can't be serialized at the moment");),
+                false => quote!(ragnarok_bytes::ConversionResultExt::trace::<Self>(#to_length)?;),
+            };
+            to_bytes_implementations.push(to_implementation);
+        }
 
         if is_version {
             from_bytes_implementations.push(quote!(
@@ -362,26 +380,63 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (TokenStream, Vec<Tok
         }
     }
 
-    let new_implementation_inner = match delimiter {
-        Delimiter::Brace => quote!(Self { #(#new_implementations),* }),
-        Delimiter::Parenthesis => quote!(Self(#(#new_implementations),*)),
-        _ => unreachable!(),
-    };
+    // Generate constructor for each version
+    let new_implementations_vec: Vec<TokenStream> = versions
+        .into_iter()
+        .map(|(version, header_value)| {
+            let constructor_name = if version == "default" {
+                format_ident!("new")
+            } else {
+                format_ident!("new_{}", version)
+            };
 
-    let new_implementation = quote! {
-        /// Automatically derived `new` function that will fill any fields annotated with any of
-        /// the `new` attributes.
-        ///
-        /// NOTE: The filled fields will *NOT* be updated, so keep that in mind when making
-        /// changes to the struct afterwards.
-        #[allow(clippy::too_many_arguments)]
-        pub fn new(#(#new_arguments),*) -> Self {
-            #new_implementation_inner
-        }
-    };
+            // Filter out header field from arguments
+            let filtered_args: Vec<_> = new_arguments
+                .iter()
+                .filter(|arg| {
+                    let arg_str = arg.to_string();
+                    !arg_str.starts_with("header")
+                })
+                .collect();
+
+            // Filter out header field from implementations and replace it with the
+            // version-specific header
+            let filtered_impls: Vec<_> = new_implementations
+                .iter()
+                .map(|impl_tokens| {
+                    let impl_str = impl_tokens.to_string();
+                    if impl_str.starts_with("header") {
+                        // Replace with version-specific header (format as hex)
+                        let header_hex = syn::LitInt::new(&format!("{:#x}", header_value), proc_macro2::Span::call_site());
+                        quote!(header: ragnarok_packets::PacketHeader(#header_hex))
+                    } else {
+                        impl_tokens.clone()
+                    }
+                })
+                .collect();
+
+            let constructor_inner = match delimiter {
+                Delimiter::Brace => quote!(Self { #(#filtered_impls),* }),
+                Delimiter::Parenthesis => quote!(Self(#(#filtered_impls),*)),
+                _ => unreachable!(),
+            };
+
+            quote! {
+                /// Automatically derived `new` function that will fill any fields annotated with any of
+                /// the `new` attributes.
+                ///
+                /// NOTE: The filled fields will *NOT* be updated, so keep that in mind when making
+                /// changes to the struct afterwards.
+                #[allow(clippy::too_many_arguments)]
+                pub fn #constructor_name(#(#filtered_args),*) -> Self {
+                    #constructor_inner
+                }
+            }
+        })
+        .collect();
 
     (
-        new_implementation,
+        new_implementations_vec,
         from_bytes_implementations,
         implemented_fields,
         to_bytes_implementations,

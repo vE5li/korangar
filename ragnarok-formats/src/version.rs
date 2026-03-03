@@ -124,9 +124,7 @@ impl InternalVersion {
     /// This allows extending the version with additional subversions, for
     /// example the build version of the map format.
     pub fn equals_or_above_with_extra_condition(&self, major: u8, minor: u8, extra_condition: bool) -> bool {
-        self.major > major
-            || (self.major == major && self.minor >= minor)
-            || (self.major == major && self.minor == minor && extra_condition)
+        self.major > major || (self.major == major && self.minor > minor) || (self.major == major && self.minor == minor && extra_condition)
     }
 }
 
@@ -348,24 +346,24 @@ mod comparison {
         let version = InternalVersion { major: 2, minor: 5 };
 
         // Major version is greater.
+        assert!(version.equals_or_above_with_extra_condition(1, 5, true));
         assert!(version.equals_or_above_with_extra_condition(1, 5, false));
 
-        // Major and minor are equal or above.
-        assert!(version.equals_or_above_with_extra_condition(2, 5, false));
+        // Minor version is greater.
+        assert!(version.equals_or_above_with_extra_condition(2, 4, true));
         assert!(version.equals_or_above_with_extra_condition(2, 4, false));
 
-        // Major and minor match exactly, extra condition true.
+        // Major and minor match exactly.
         assert!(version.equals_or_above_with_extra_condition(2, 5, true));
+        assert!(!version.equals_or_above_with_extra_condition(2, 5, false));
 
-        // Major and minor match exactly, extra condition false.
-        assert!(version.equals_or_above_with_extra_condition(2, 5, false));
+        // Major version is below.
+        assert!(!version.equals_or_above_with_extra_condition(3, 5, true));
+        assert!(!version.equals_or_above_with_extra_condition(3, 5, false));
 
-        // Version is below and extra condition is false.
-        assert!(!version.equals_or_above_with_extra_condition(2, 6, false));
-        assert!(!version.equals_or_above_with_extra_condition(3, 0, false));
-
-        // Version is below but extra condition is true.
+        // Minor version is below.
         assert!(!version.equals_or_above_with_extra_condition(2, 6, true));
+        assert!(!version.equals_or_above_with_extra_condition(2, 6, false));
     }
 
     #[test]

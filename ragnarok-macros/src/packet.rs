@@ -13,16 +13,66 @@ pub fn derive_packet_struct(
 ) -> InterfaceTokenStream {
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
-    let packet_signature = get_unique_attribute(&mut attributes, "header")
-        .map(|attribute| attribute.parse_args::<PacketSignature>())
-        .expect("packet needs to specify a signature")
-        .expect("failed to parse packet header");
+    let mut header_attributes = Vec::new();
+    attributes.retain(|attr| {
+        if attr.path().segments[0].ident == "header" {
+            header_attributes.push(attr.clone());
+            false
+        } else {
+            true
+        }
+    });
+
+    if header_attributes.is_empty() {
+        panic!("packet needs to specify at least one header");
+    }
+
+    let packet_signatures: Vec<PacketSignature> = header_attributes
+        .into_iter()
+        .map(|attr| attr.parse_args::<PacketSignature>().expect("failed to parse packet header"))
+        .collect();
+
     let is_ping = get_unique_attribute(&mut attributes, "ping").is_some();
     let is_variable_length = get_unique_attribute(&mut attributes, "variable_length").is_some();
 
-    let signature = packet_signature.signature;
-    let (new_implementation, from_bytes_implementations, implemented_fields, to_bytes_implementations, delimiter) =
-        byte_convertable_helper(data_struct);
+    let default_signature = packet_signatures[0].signature;
+
+    let is_versioned = packet_signatures.len() > 1;
+
+    // If there are multiple headers, all must have versions
+    if is_versioned {
+        for sig in &packet_signatures {
+            if sig.version.is_none() {
+                panic!("When multiple #[header(...)] attributes are used, all headers must specify a version");
+            }
+        }
+        let has_header_field = match &data_struct.fields {
+            syn::Fields::Named(fields) => fields
+                .named
+                .iter()
+                .any(|f| f.ident.as_ref().map(|ident| ident == "header").unwrap_or(false)),
+            _ => false,
+        };
+
+        if !has_header_field {
+            panic!(
+                "Versioned packets (with multiple #[header(...)] attributes) must have a `header: PacketHeader` field with \
+                 #[hidden_element]"
+            );
+        }
+    }
+
+    let versions: Vec<(&str, u16)> = if is_versioned {
+        packet_signatures
+            .iter()
+            .map(|sig| (sig.version.as_ref().unwrap().as_str(), sig.signature))
+            .collect()
+    } else {
+        vec![("default", packet_signatures[0].signature)]
+    };
+
+    let (new_implementations, from_bytes_implementations, implemented_fields, to_bytes_implementations, delimiter) =
+        byte_convertable_helper(data_struct, versions);
 
     let instanciate = match delimiter {
         proc_macro2::Delimiter::Brace => quote!(Self { #(#implemented_fields),* }),
@@ -64,14 +114,26 @@ pub fn derive_packet_struct(
         },
     };
 
+    let packet_header_override = if is_versioned {
+        quote! {
+            fn packet_header(&self) -> ragnarok_packets::PacketHeader {
+                self.header
+            }
+        }
+    } else {
+        quote! {}
+    };
+
     quote! {
         impl #impl_generics #name #type_generics #where_clause {
-            #new_implementation
+            #(#new_implementations)*
         }
 
         impl #impl_generics ragnarok_packets::Packet for #name #type_generics #where_clause {
             const IS_PING: bool = #is_ping;
-            const HEADER: ragnarok_packets::PacketHeader = ragnarok_packets::PacketHeader(#signature);
+            const HEADER: ragnarok_packets::PacketHeader = ragnarok_packets::PacketHeader(#default_signature);
+
+            #packet_header_override
 
             fn payload_from_bytes(byte_reader: &mut ragnarok_bytes::ByteReader) -> ragnarok_bytes::ConversionResult<Self> {
                 let base_offset = byte_reader.get_offset();

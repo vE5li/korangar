@@ -13,8 +13,8 @@ fn derive_for_struct(
     implement_from: bool,
     implement_to: bool,
 ) -> InterfaceTokenStream {
-    let (new_implementation, from_bytes_implementations, implemented_fields, to_bytes_implementations, delimiter) =
-        byte_convertable_helper(data_struct);
+    let (new_implementations, from_bytes_implementations, implemented_fields, to_bytes_implementations, delimiter) =
+        byte_convertable_helper(data_struct, vec![("default", 0)]);
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
     let instanciate = match delimiter {
@@ -26,7 +26,7 @@ fn derive_for_struct(
     let new = implement_to.then(|| {
         quote! {
             impl #impl_generics #name #type_generics #where_clause {
-                #new_implementation
+                #(#new_implementations)*
             }
         }
     });

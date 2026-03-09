@@ -57,8 +57,12 @@ fn evaluate_job(
         )?;
 
         for (tab_index, tab) in inherited_skill_tree_layout.tabs.iter().enumerate() {
+            // Ensure the result vector is large enough for this tab index.
+            if tab_index >= result.len() {
+                result.resize_with(tab_index + 1, HashMap::default);
+            }
+
             for (slot, skill_id) in tab.skills.iter() {
-                // This assumes that a job can not inherit from a job on a higher tab.
                 if result[tab_index].get(slot).is_none() {
                     result[tab_index].insert(*slot, *skill_id);
                 }

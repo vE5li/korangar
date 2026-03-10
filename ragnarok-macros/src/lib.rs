@@ -145,6 +145,7 @@ pub fn derive_to_bytes(token_stream: InterfaceTokenStream) -> InterfaceTokenStre
         repeating_option,
         repeating_remaining,
         variable_length,
+        hidden_element,
     )
 )]
 pub fn derive_packet(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {

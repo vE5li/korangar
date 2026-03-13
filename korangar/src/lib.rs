@@ -17,6 +17,7 @@
 #![feature(thread_local)]
 
 // Helper macro to time and print the startup time of Korangar
+#[macro_export]
 macro_rules! time_phase {
     ($message:expr, { $($statements:tt)* }) => {
         #[cfg(feature = "debug")]
@@ -29,18 +30,18 @@ macro_rules! time_phase {
     }
 }
 
-mod graphics;
-mod input;
-mod state;
+pub mod graphics;
+pub mod input;
+pub mod state;
 #[macro_use]
-mod interface;
-mod loaders;
+pub mod interface;
+pub mod loaders;
 #[cfg(feature = "debug")]
-mod networking;
-mod renderer;
-mod settings;
-mod system;
-mod world;
+pub mod networking;
+pub mod renderer;
+pub mod settings;
+pub mod system;
+pub mod world;
 
 use std::io::Cursor;
 use std::net::{SocketAddr, ToSocketAddrs};
@@ -177,7 +178,25 @@ fn initialize_shutdown_signal() {
     .expect("Error setting Ctrl-C handler");
 }
 
-pub struct Client {
+pub trait ClientHooks {
+    fn inject_input_event(&mut self, input_events: &mut Vec<InputEvent>) {
+        let _ = input_events;
+    }
+
+    fn inspect_network_event(&mut self, network_event: &NetworkEvent) {
+        let _ = network_event;
+    }
+
+    fn inspect_state(&mut self, state: &mut State<ClientState>) {
+        let _ = state;
+    }
+}
+
+pub struct NoHooks;
+
+impl ClientHooks for NoHooks {}
+
+pub struct Client<T> {
     game_file_loader: Arc<GameFileLoader>,
     action_loader: Arc<ActionLoader>,
     #[cfg(feature = "debug")]
@@ -280,10 +299,12 @@ pub struct Client {
 
     map: Option<Arc<Map>>,
     client_state: State<ClientState>,
+
+    hooks: T,
 }
 
-impl Client {
-    pub fn init(sync_cache: bool) -> Option<Self> {
+impl<T: ClientHooks> Client<T> {
+    pub fn init(sync_cache: bool, hooks: T) -> Option<Self> {
         // We start a frame so that functions trying to start a measurement don't panic.
         #[cfg(feature = "debug")]
         let _measurement = threads::Main::start_frame();
@@ -724,6 +745,8 @@ impl Client {
 
             map: Some(map),
             client_state,
+
+            hooks,
         })
     }
 
@@ -913,6 +936,8 @@ impl Client {
         self.networking_system.get_events(&mut self.network_event_buffer);
 
         for event in self.network_event_buffer.drain() {
+            self.hooks.inspect_network_event(&event);
+
             match event {
                 NetworkEvent::LoginServerConnected {
                     character_servers,
@@ -1990,6 +2015,8 @@ impl Client {
                 *self.client_state.follow(client_state().render_options().use_debug_camera()),
             );
         }
+
+        self.hooks.inject_input_event(&mut self.input_event_buffer);
 
         for event in self.input_event_buffer.drain(..) {
             match event {
@@ -3464,10 +3491,12 @@ impl Client {
         if let Some(frame) = maybe_frame {
             self.graphics_engine.render_next_frame(frame, render_instruction);
         }
+
+        self.hooks.inspect_state(&mut self.client_state);
     }
 }
 
-impl ApplicationHandler for Client {
+impl<T: ClientHooks> ApplicationHandler for Client<T> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         // To be as portable as possible, winit recommends to initialize the window and
         // graphics backend after the first resume event is received.

@@ -2030,6 +2030,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "korangar-testing"
+version = "0.1.0"
+dependencies = [
+ "korangar",
+ "korangar-networking",
+ "ragnarok-packets",
+ "rust-state",
+ "winit",
+]
+
+[[package]]
 name = "korangar-video"
 version = "0.1.0"
 dependencies = [

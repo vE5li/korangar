@@ -3,6 +3,7 @@
     flake-utils.url = "github:numtide/flake-utils";
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     rust-overlay.url = "github:oxalica/rust-overlay";
+    korangar-rathena.url = "github:vE5li/korangar-rathena";
   };
 
   outputs = {
@@ -10,21 +11,41 @@
     flake-utils,
     rust-overlay,
     nixpkgs,
+    korangar-rathena,
   }:
     flake-utils.lib.eachDefaultSystem (system: let
-      overlays = [(import rust-overlay)];
+      overlays = [(import rust-overlay) korangar-rathena.overlays.default];
       pkgs = (import nixpkgs) {inherit system overlays;};
+
+      test-log-file = "/tmp/korangar-packet-test.log";
+      run-packet-test = pkgs.writeShellScriptBin "run-packet-test" ''
+        ${pkgs.lib.getExe pkgs.rathena-test-20220406} > ${test-log-file} 2>&1 &
+        RATHENA_PID=$!
+
+        cargo build --bin packet_test
+
+        while ! grep -q "test rAthena is running" ${test-log-file} 2> /dev/null; do
+          echo "Waiting for rAthena..."
+          sleep 0.5
+        done
+
+        echo "rAthena is ready"
+        sleep 5
+
+        cargo run --bin packet_test
+
+        kill $RATHENA_PID
+      '';
     in {
       formatter = pkgs.alejandra;
 
-      # Provide a shell with all dependencies needed to build `koragnar::*`
       devShells.default = pkgs.mkShell {
         nativeBuildInputs = with pkgs; [
           (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
           pkg-config
         ];
         buildInputs = with pkgs;
-          [libpcap nasm nixpkgs-fmt openssl shaderc shader-slang vulkan-headers vulkan-loader]
+          [libpcap nasm nixpkgs-fmt openssl shaderc shader-slang vulkan-headers vulkan-loader run-packet-test]
           ++ lib.optional stdenv.isDarwin [
             apple-sdk
             moltenvk
@@ -37,6 +58,7 @@
 
         # For any tools that need to see the rust toolchain src
         RUST_SRC_PATH = pkgs.rustPlatform.rustLibSrc;
+
         shellHook =
           ""
           # For darwin, explicitly set our LD_LIBRARY_PATH, otherwise `cargo run` will not find paths in e.g. `/nix/store`
@@ -59,11 +81,5 @@
             };
           '');
       };
-      # If we want to `nix build` and provide a derivation, we can use
-      # `naersk`, e.g.
-      #   defaultPackage = naersk'.buildPackage {
-      #      src = ./.;
-      #   };
-      #   app.default = { ... }
     });
 }

@@ -1,4 +1,5 @@
 #![allow(incomplete_features)]
+#![allow(clippy::too_many_arguments)]
 #![feature(adt_const_params)]
 #![feature(allocator_api)]
 #![feature(generic_const_exprs)]
@@ -70,8 +71,8 @@ use networking::{PacketHistory, PacketHistoryCallback};
 #[cfg(not(feature = "debug"))]
 use ragnarok_packets::handler::NoPacketCallback;
 use ragnarok_packets::{
-    AttackRange, BuyShopItemsResult, CharacterServerInformation, ClientTick, Direction, DisappearanceReason, HotbarSlot, SellItemsResult,
-    SkillId, SkillLevel, SkillType, TilePosition, UnitId, WorldPosition,
+    AttackRange, BuyShopItemsResult, CharacterServerInformation, Direction, DisappearanceReason, HotbarSlot, SellItemsResult, SkillId,
+    SkillLevel, SkillType, TilePosition, UnitId, WorldPosition,
 };
 use renderer::InterfaceRenderer;
 use rust_state::{ManuallyAssertExt, State};
@@ -91,9 +92,8 @@ use wgpu::Device;
 use wgpu::util::initialize_adapter_from_env_or_default;
 use wgpu::wgt::{Dx12SwapchainKind, Dx12UseFrameLatencyWaitableObject};
 use wgpu::{
-    BackendOptions, Backends, DeviceDescriptor, Dx12BackendOptions, Dx12Compiler, ExperimentalFeatures, ForceShaderModelToken,
-    GlBackendOptions, GlDebugFns, GlFenceBehavior, Gles3MinorVersion, Instance, InstanceDescriptor, InstanceFlags, MemoryBudgetThresholds,
-    MemoryHints, NoopBackendOptions, Queue, Trace,
+    BackendOptions, Backends, DeviceDescriptor, Dx12BackendOptions, Dx12Compiler, ExperimentalFeatures, GlBackendOptions, GlFenceBehavior,
+    Gles3MinorVersion, Instance, InstanceDescriptor, InstanceFlags, MemoryBudgetThresholds, MemoryHints, NoopBackendOptions, Queue, Trace,
 };
 use winit::application::ApplicationHandler;
 use winit::dpi::{LogicalSize, PhysicalSize};
@@ -103,7 +103,7 @@ use winit::keyboard::PhysicalKey;
 use winit::window::{Icon, Window, WindowId};
 
 use crate::graphics::*;
-use crate::input::{InputEvent, InputReport, InputSystem};
+use crate::input::{InputEvent, InputSystem};
 use crate::interface::cursor::{MouseCursor, MouseCursorState};
 use crate::interface::resource::{ItemSource, SkillSource};
 use crate::interface::windows::*;
@@ -117,7 +117,7 @@ use crate::settings::{
 use crate::state::skills::{LearnedSkill, SkillTreeLayoutPathExt, bring_skill_to_level};
 use crate::state::theme::{InterfaceTheme, InterfaceThemeType, WorldTheme};
 use crate::state::{BufferedAction, SelectedServicePath};
-use crate::system::{FrameTimers, GameTimer};
+use crate::system::GameTimer;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 use crate::world::*;
@@ -179,17 +179,11 @@ fn initialize_shutdown_signal() {
 }
 
 pub trait ClientHooks {
-    fn inject_input_event(&mut self, input_events: &mut Vec<InputEvent>) {
-        let _ = input_events;
-    }
+    fn inject_input_event(&mut self, input_events: &mut Vec<InputEvent>) {}
 
-    fn inspect_network_event(&mut self, network_event: &NetworkEvent) {
-        let _ = network_event;
-    }
+    fn inspect_network_event(&mut self, network_event: &NetworkEvent) {}
 
-    fn inspect_state(&mut self, state: &mut State<ClientState>) {
-        let _ = state;
-    }
+    fn inspect_state(&mut self, state: &mut State<ClientState>) {}
 }
 
 pub struct NoHooks;
@@ -205,8 +199,6 @@ pub struct Client<T> {
     async_loader: Arc<AsyncLoader>,
     effect_loader: Arc<EffectLoader>,
     font_loader: Arc<FontLoader>,
-    #[cfg(feature = "debug")]
-    map_loader: Arc<MapLoader>,
     #[cfg(feature = "debug")]
     sprite_loader: Arc<SpriteLoader>,
     texture_loader: Arc<TextureLoader>,
@@ -299,7 +291,7 @@ pub struct Client<T> {
     device: Device,
     window: Option<Arc<Window>>,
 
-    map: Option<Arc<Map>>,
+    map: Option<Box<Map>>,
     client_state: State<ClientState>,
 
     hooks: T,
@@ -307,43 +299,6 @@ pub struct Client<T> {
 
 impl<T: ClientHooks> Client<T> {
     pub fn init(sync_cache: bool, hooks: T) -> Option<Self> {
-        // We start a frame so that functions trying to start a measurement don't panic.
-        #[cfg(feature = "debug")]
-        let _measurement = threads::Main::start_frame();
-
-        initialize_shutdown_signal();
-
-        time_phase!("create global thread pool", {
-            rayon::ThreadPoolBuilder::new()
-                .num_threads(4)
-                .start_handler(|_| init_tls_rand())
-                .build_global()
-                .unwrap();
-        });
-
-        time_phase!("seed main random instance", {
-            init_tls_rand();
-        });
-
-        // Check if korangar is in the correct working directory and if not, try to
-        // correct it.
-        // NOTE: This check might be temporary or feature gated in the future.
-        time_phase!("adjust working directory", {
-            if !std::fs::metadata("archive").is_ok_and(|metadata| metadata.is_dir()) {
-                #[cfg(feature = "debug")]
-                print_debug!(
-                    "[{}] failed to find archive directory, attempting to change working directory {}",
-                    "warning".yellow(),
-                    "korangar".magenta()
-                );
-
-                if let Err(_error) = std::env::set_current_dir("korangar") {
-                    #[cfg(feature = "debug")]
-                    print_debug!("[{}] failed to change working directory: {:?}", "error".red(), _error);
-                }
-            }
-        });
-
         time_phase!("load graphics settings", {
             let picker_value = Arc::new(AtomicU64::new(0));
             let directional_shadow_partitions = Arc::new(Mutex::new([DirectionalShadowPartition::default(); PARTITION_COUNT]));
@@ -352,7 +307,7 @@ impl<T: ClientHooks> Client<T> {
         });
 
         time_phase!("create adapter", {
-            let instance = Instance::new(InstanceDescriptor {
+            let instance = Instance::new(&InstanceDescriptor {
                 backends: Backends::all().with_env(),
                 flags: InstanceFlags::from_build_config().with_env(),
                 memory_budget_thresholds: MemoryBudgetThresholds::default(),
@@ -360,19 +315,14 @@ impl<T: ClientHooks> Client<T> {
                     gl: GlBackendOptions {
                         gles_minor_version: Gles3MinorVersion::Automatic,
                         fence_behavior: GlFenceBehavior::Normal,
-                        debug_fns: GlDebugFns::Auto,
                     },
                     dx12: Dx12BackendOptions {
                         shader_compiler: Dx12Compiler::StaticDxc.with_env(),
                         presentation_system: Dx12SwapchainKind::DxgiFromHwnd,
                         latency_waitable_object: Dx12UseFrameLatencyWaitableObject::Wait,
-                        force_shader_model: ForceShaderModelToken::default(),
-                        agility_sdk: None,
                     },
                     noop: NoopBackendOptions { enable: false },
                 },
-                // On Vulkan, Metal and Dx12, this is currently unused.
-                display: None,
             });
 
             let adapter = pollster::block_on(async { initialize_adapter_from_env_or_default(&instance, None).await.unwrap() });
@@ -673,8 +623,6 @@ impl<T: ClientHooks> Client<T> {
             effect_loader,
             font_loader,
             #[cfg(feature = "debug")]
-            map_loader,
-            #[cfg(feature = "debug")]
             sprite_loader,
             texture_loader,
             library,
@@ -754,15 +702,22 @@ impl<T: ClientHooks> Client<T> {
         })
     }
 
-    pub fn run(&mut self) {
-        let event_loop = EventLoop::new().unwrap();
-        event_loop.set_control_flow(ControlFlow::Poll);
-        let _ = event_loop.run_app(self);
-    }
+    fn render_frame(&mut self, event_loop: &ActiveEventLoop) {
+        if self.window.is_none() {
+            return;
+        }
 
-    #[inline(always)]
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn clear_render_instructions(&mut self) {
+        if SHUTDOWN_SIGNAL.load(Ordering::SeqCst) {
+            event_loop.exit();
+            return;
+        }
+
+        #[cfg(feature = "debug")]
+        let _measurement = threads::Main::start_frame();
+
+        #[cfg(feature = "debug")]
+        let clear_measurement = Profiler::start_measurement("clear instructions");
+
         self.interface_renderer.clear();
         self.bottom_interface_renderer.clear();
         self.middle_interface_renderer.clear();
@@ -790,137 +745,42 @@ impl<T: ClientHooks> Client<T> {
         self.point_shadow_entity_instructions.clear();
         self.point_light_with_shadow_instructions.clear();
         self.point_light_instructions.clear();
-    }
 
-    #[inline(always)]
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn update_client_state(&mut self) {
-        // Unset the highlighted skill just before applying. That way, if the skill is
-        // still hovered the value will be the same as before, if not it will clear the
-        // highlighted.
-        *self.client_state.follow_mut(client_state().skill_tree_window().highlighted_skill()) = None;
+        #[cfg(feature = "debug")]
+        clear_measurement.stop();
 
-        // Apply the game state after all the UI work + rendering is done.
-        if let Err(_errors) = self.client_state.apply() {
-            #[cfg(feature = "debug")]
-            {
-                print_debug!("[{}] failed to apply {} updates: ", "error".red(), _errors.len());
-                _errors.into_iter().for_each(|error| print_debug!("path: {}", error.type_name));
-            }
-        }
-    }
+        // We can only apply the graphic changes and reconfigure the surface once the
+        // previous image was presented. Moving this function to the end of the
+        // function results in surface configuration errors under DX12.
+        self.update_settings();
 
-    /// Apply any graphics or interface setting changes that the user
-    /// dispatched during the previous frame.
-    ///
-    /// May reconfigure the GPU surface (MSAA, SSAA, present mode, shadow
-    /// resolution, etc.). Surface reconfiguration is only safe between
-    /// presenting the previous frame and acquiring the next swapchain image,
-    /// so this *must* be called after [`Self::update_client_state`] (so the
-    /// user's dispatched changes are visible) and *before*
-    /// `graphics_engine.wait_for_next_frame()`. Calling it after
-    /// `wait_for_next_frame` has been observed to cause surface configuration
-    /// errors under DX12.
-    #[inline(always)]
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn update_settings(&mut self) {
-        let graphics_settings = self.client_state.follow(client_state().graphics_settings());
-
-        if self.active_graphics_settings.vsync != graphics_settings.vsync {
-            self.graphics_engine.set_vsync(graphics_settings.vsync);
-            self.active_graphics_settings.vsync = graphics_settings.vsync;
-        }
-
-        if self.active_graphics_settings.limit_framerate != graphics_settings.limit_framerate {
-            self.graphics_engine.set_limit_framerate(graphics_settings.limit_framerate);
-            self.active_graphics_settings.limit_framerate = graphics_settings.limit_framerate;
-        }
-
-        if self.active_graphics_settings.triple_buffering != graphics_settings.triple_buffering {
-            self.graphics_engine.set_triple_buffering(graphics_settings.triple_buffering);
-            self.active_graphics_settings.triple_buffering = graphics_settings.triple_buffering;
-        }
-
-        if self.active_graphics_settings.texture_filtering != graphics_settings.texture_filtering {
-            self.graphics_engine.set_texture_sampler_type(graphics_settings.texture_filtering);
-            self.active_graphics_settings.texture_filtering = graphics_settings.texture_filtering;
-        }
-
-        if self.active_graphics_settings.msaa != graphics_settings.msaa {
-            self.graphics_engine.set_msaa(graphics_settings.msaa);
-            self.active_graphics_settings.msaa = graphics_settings.msaa;
-        }
-
-        if self.active_graphics_settings.ssaa != graphics_settings.ssaa {
-            self.graphics_engine.set_ssaa(graphics_settings.ssaa);
-            self.active_graphics_settings.ssaa = graphics_settings.ssaa;
-        }
-
-        if self.active_graphics_settings.screen_space_anti_aliasing != graphics_settings.screen_space_anti_aliasing {
-            self.graphics_engine
-                .set_screen_space_anti_aliasing(graphics_settings.screen_space_anti_aliasing);
-            self.active_graphics_settings.screen_space_anti_aliasing = graphics_settings.screen_space_anti_aliasing;
-        }
-
-        if self.active_graphics_settings.shadow_resolution != graphics_settings.shadow_resolution {
-            self.graphics_engine.set_shadow_resolution(graphics_settings.shadow_resolution);
-            self.active_graphics_settings.shadow_resolution = graphics_settings.shadow_resolution;
-        }
-
-        if self.active_graphics_settings.high_quality_interface != graphics_settings.high_quality_interface {
-            self.interface_renderer
-                .update_high_quality_interface(graphics_settings.high_quality_interface);
-            self.graphics_engine
-                .set_high_quality_interface(graphics_settings.high_quality_interface);
-            self.active_graphics_settings.high_quality_interface = graphics_settings.high_quality_interface;
-        }
-
-        let language = *self.client_state.follow(client_state().interface_settings().language());
-
-        if self.active_interface_settings.language != language {
-            *self.client_state.follow_mut(client_state().localization()) = Localization::load_language(&self.game_file_loader, language);
-            self.active_interface_settings.language = language;
-        }
-
-        let interface_settings = self.client_state.follow_mut(client_state().interface_settings());
-
-        if self.active_interface_settings.menu_theme != interface_settings.menu_theme {
-            let menu_theme = interface_settings.menu_theme.clone();
-            let theme = InterfaceTheme::load(state::theme::InterfaceThemeType::Menu, &menu_theme);
-            *self.client_state.follow_mut(client_state().menu_theme()) = theme;
-            self.active_interface_settings.menu_theme = menu_theme;
-        }
-
-        let interface_settings = self.client_state.follow(client_state().interface_settings());
-
-        if self.active_interface_settings.in_game_theme != interface_settings.in_game_theme {
-            let in_game_theme = interface_settings.in_game_theme.clone();
-            let theme = InterfaceTheme::load(InterfaceThemeType::InGame, &in_game_theme);
-            *self.client_state.follow_mut(client_state().in_game_theme()) = theme;
-            self.active_interface_settings.in_game_theme = in_game_theme;
-        }
-
-        let interface_settings = self.client_state.follow(client_state().interface_settings());
-
-        if self.active_interface_settings.world_theme != interface_settings.world_theme {
-            let world_theme = interface_settings.world_theme.clone();
-            let theme = WorldTheme::load(&world_theme);
-            *self.client_state.follow_mut(client_state().world_theme()) = theme;
-            self.active_interface_settings.world_theme = world_theme;
-        }
-    }
-
-    #[inline(always)]
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn update_interface_scaling(&mut self, scaling: Scaling) {
+        // TODO: Shouldn't this happen later? After the scaling has been potentially
+        // changed by the UI.
+        let scaling = *self.client_state.follow(client_state().interface_settings().scaling());
         self.bottom_interface_renderer.update_scaling(scaling);
         self.middle_interface_renderer.update_scaling(scaling);
         self.top_interface_renderer.update_scaling(scaling);
-    }
 
-    #[inline(always)]
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn request_entity_details(&mut self, input_report: &InputReport) {
+        let frame = self.graphics_engine.wait_for_next_frame();
+
+        #[cfg(feature = "debug")]
+        let timer_measurement = Profiler::start_measurement("update timers");
+
+        let delta_time = self.game_timer.update();
+        let animation_timer_ms = self.game_timer.get_animation_timer_ms();
+        let client_tick = self.game_timer.get_client_tick();
+
+        #[cfg(feature = "debug")]
+        timer_measurement.stop();
+
+        // TODO: Rename
+        let input_report = self.input_system.update_delta(client_tick);
+
+        self.networking_system.get_events(&mut self.network_event_buffer);
+
+        #[cfg(feature = "debug")]
+        let picker_measurement = Profiler::start_measurement("update picker target");
+
         if let PickerTarget::Entity(entity_id) = input_report.mouse_target
             && let Some(entity) = self
                 .client_state
@@ -932,12 +792,12 @@ impl<T: ClientHooks> Client<T> {
         {
             entity.set_details_requested();
         }
-    }
 
-    #[inline(always)]
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn handle_network_events(&mut self, client_tick: ClientTick) {
-        self.networking_system.get_events(&mut self.network_event_buffer);
+        #[cfg(feature = "debug")]
+        picker_measurement.stop();
+
+        #[cfg(feature = "debug")]
+        let network_event_measurement = Profiler::start_measurement("process network events");
 
         for event in self.network_event_buffer.drain() {
             self.hooks.inspect_network_event(&event);
@@ -1974,19 +1834,14 @@ impl<T: ClientHooks> Client<T> {
                 }
             }
         }
-    }
 
-    /// Returns whether or not the interface is focused.
-    #[inline(always)]
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn process_user_events(
-        &mut self,
-        input_report: &InputReport,
-        client_tick: ClientTick,
-        #[cfg(feature = "debug")] delta_time: f32,
-    ) -> bool {
+        #[cfg(feature = "debug")]
+        network_event_measurement.stop();
+
+        #[cfg(feature = "debug")]
+        let input_event_measurement = Profiler::start_measurement("process user events");
+
         self.interface.process_events(&mut self.input_event_buffer);
-
         let interface_has_focus = self.interface.has_focus();
 
         if self.interface.get_mouse_mode().is_rotating_camera() {
@@ -2072,7 +1927,7 @@ impl<T: ClientHooks> Client<T> {
                 InputEvent::LogOutCharacter => {
                     self.networking_system.disconnect_from_character_server();
                 }
-                InputEvent::Exit => SHUTDOWN_SIGNAL.store(true, Ordering::SeqCst),
+                InputEvent::Exit => event_loop.exit(),
                 InputEvent::ZoomCamera { zoom_factor } => self.player_camera.soft_zoom(zoom_factor),
                 InputEvent::RotateCamera { rotation } => self.player_camera.soft_rotate(rotation),
                 InputEvent::ResetCameraRotation => self.player_camera.reset_rotation(),
@@ -2639,15 +2494,15 @@ impl<T: ClientHooks> Client<T> {
                 #[cfg(feature = "debug")]
                 InputEvent::CameraLookAround { offset } => self.debug_camera.look_around(offset),
                 #[cfg(feature = "debug")]
-                InputEvent::CameraMoveForward => self.debug_camera.move_forward(delta_time),
+                InputEvent::CameraMoveForward => self.debug_camera.move_forward(delta_time as f32),
                 #[cfg(feature = "debug")]
-                InputEvent::CameraMoveBackward => self.debug_camera.move_backward(delta_time),
+                InputEvent::CameraMoveBackward => self.debug_camera.move_backward(delta_time as f32),
                 #[cfg(feature = "debug")]
-                InputEvent::CameraMoveLeft => self.debug_camera.move_left(delta_time),
+                InputEvent::CameraMoveLeft => self.debug_camera.move_left(delta_time as f32),
                 #[cfg(feature = "debug")]
-                InputEvent::CameraMoveRight => self.debug_camera.move_right(delta_time),
+                InputEvent::CameraMoveRight => self.debug_camera.move_right(delta_time as f32),
                 #[cfg(feature = "debug")]
-                InputEvent::CameraMoveUp => self.debug_camera.move_up(delta_time),
+                InputEvent::CameraMoveUp => self.debug_camera.move_up(delta_time as f32),
                 #[cfg(feature = "debug")]
                 InputEvent::CameraAccelerate => self.debug_camera.accelerate(),
                 #[cfg(feature = "debug")]
@@ -2657,41 +2512,12 @@ impl<T: ClientHooks> Client<T> {
             }
         }
 
-        interface_has_focus
-    }
+        #[cfg(feature = "debug")]
+        input_event_measurement.stop();
 
-    #[cfg(feature = "debug")]
-    #[inline(always)]
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn update_debug_windows(&mut self, delta_time: f64) {
-        let is_packet_inspector_open = self.interface.is_window_with_class_open(WindowClass::PacketInspector);
-        self.client_state
-            .follow_mut(client_state().packet_history())
-            .update(is_packet_inspector_open);
+        #[cfg(feature = "debug")]
+        let loads_measurement = Profiler::start_measurement("complete async loads");
 
-        self.client_state.follow_mut(client_state().cache_statistics()).update(
-            delta_time,
-            &self.map_loader,
-            &self.texture_loader,
-            &self.sprite_loader,
-            &self.font_loader,
-            &self.audio_engine,
-            &self.action_loader,
-            &self.animation_loader,
-            &self.effect_loader,
-        );
-    }
-
-    /// Drain finished async loads from the loader thread and apply their
-    /// results to client state. This is the only place that promotes
-    /// `self.map` from `None` to `Some` (when a map load completes), so it
-    /// must run before the `self.map` check in [`Self::update_and_render`].
-    ///
-    /// Called as late as possible in the frame to give the loader thread the
-    /// maximum window to finish in-flight work.
-    #[inline(always)]
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn update_loaded_resources(&mut self, client_tick: ClientTick) {
         for completed in self.async_loader.take_completed() {
             match completed {
                 (LoaderId::AnimationData(entity_id), LoadableResource::AnimationData(animation_data)) => {
@@ -2810,675 +2636,972 @@ impl<T: ClientHooks> Client<T> {
                 _ => {}
             }
         }
-    }
 
-    #[inline(always)]
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn update_main_camera(&mut self, window_size: ScreenSize, delta_time: f64, #[cfg(feature = "debug")] render_options: &RenderOptions) {
-        if self.client_state.try_follow(this_entity()).is_some() {
-            self.player_camera.update(delta_time);
-            self.player_camera.generate_view_projection(window_size);
-        } else {
-            self.start_camera.update(delta_time);
-            self.start_camera.generate_view_projection(window_size);
+        #[cfg(feature = "debug")]
+        loads_measurement.stop();
+
+        // Update the packet history callback.
+        #[cfg(feature = "debug")]
+        {
+            profile_block!("update packet history");
+
+            let is_packet_inspector_open = self.interface.is_window_with_class_open(WindowClass::PacketInspector);
+            self.client_state
+                .follow_mut(client_state().packet_history())
+                .update(is_packet_inspector_open);
         }
 
         #[cfg(feature = "debug")]
-        self.interface_renderer.update_render_options(render_options);
+        {
+            profile_block!("update cache statistics");
 
-        #[cfg(feature = "debug")]
-        if render_options.use_debug_camera {
-            self.debug_camera.generate_view_projection(window_size);
+            self.client_state.follow_mut(client_state().cache_statistics()).update(
+                delta_time,
+                &self.texture_loader,
+                &self.sprite_loader,
+                &self.font_loader,
+                &self.audio_engine,
+                &self.action_loader,
+                &self.animation_loader,
+                &self.effect_loader,
+            );
         }
-    }
 
-    /// Per-frame tick for all entities, dead entities, and ground items.
-    ///
-    /// Must be called after [`Self::handle_network_events`] so the entity
-    /// set reflects the latest spawn/despawn/move packets. Running this
-    /// with a stale entity list would tick entities that the network has
-    /// already removed, or miss new ones that just appeared (and on a map
-    /// transition, would tick entities from the previous map).
-    #[inline(always)]
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn update_entities(
-        &mut self,
-        map: &Map,
-        currently_playing: bool,
-        client_tick: ClientTick,
-        #[cfg(feature = "debug")] render_options: &RenderOptions,
-    ) {
-        let current_camera: &(dyn Camera + Send + Sync) = match currently_playing {
+        // Main map update and render loop
+        if let Some(map) = self.map.as_ref() {
             #[cfg(feature = "debug")]
-            _ if render_options.use_debug_camera => &self.debug_camera,
-            true => &self.player_camera,
-            false => &self.start_camera,
-        };
+            let update_main_camera_measurement = Profiler::start_measurement("update main camera");
 
-        self.client_state
-            .follow_mut(client_state().entities())
-            .iter_mut()
-            .for_each(|entity| entity.update(&self.audio_engine, map, current_camera, client_tick));
+            let window_size = self.graphics_engine.get_window_size();
+            let screen_size: ScreenSize = window_size.into();
 
-        self.client_state
-            .follow_mut(client_state().dead_entities())
-            .iter_mut()
-            .for_each(|entity| {
-                entity.update(&self.audio_engine, map, current_camera, client_tick);
-
-                if entity.is_death_animation_over() && !entity.is_fading() {
-                    entity.fade_out(DisappearanceReason::Died, client_tick);
-                }
-            });
-
-        self.client_state
-            .follow_mut(client_state().ground_items())
-            .iter_mut()
-            .for_each(|item| item.update(client_tick));
-
-        // Remove entities that have finished fading out.
-        self.client_state
-            .follow_mut(client_state().entities())
-            .retain(|entity| !entity.should_be_removed(client_tick));
-
-        self.client_state
-            .follow_mut(client_state().dead_entities())
-            .retain(|entity| !entity.should_be_removed(client_tick));
-
-        self.client_state
-            .follow_mut(client_state().ground_items())
-            .retain(|item| !item.should_be_removed(client_tick));
-    }
-
-    /// Fire any action that the player buffered while out of range or while
-    /// still moving (attack, pick up item). Must be called after
-    /// [`Self::update_entities`] so that the player's `stopped_moving` state
-    /// reflects this frame.
-    #[inline(always)]
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn process_buffered_action(&mut self) {
-        let Some(true) = self.client_state.try_follow(this_entity()).map(|player| player.stopped_moving()) else {
-            return;
-        };
-
-        let Some(buffered_action) = self.client_state.follow_mut(client_state().buffered_action()).take() else {
-            return;
-        };
-
-        match buffered_action {
-            BufferedAction::AttackEntity { entity_id } => {
-                let _ = self.networking_system.player_attack(entity_id);
-
-                let auto_attack = *self.client_state.follow(client_state().game_settings().auto_attack());
-                if auto_attack {
-                    *self.client_state.follow_mut(client_state().buffered_action()) = Some(BufferedAction::AttackEntity { entity_id });
-                }
+            if self.client_state.try_follow(this_entity()).is_some() {
+                self.player_camera.update(delta_time);
+                self.player_camera.generate_view_projection(window_size);
+            } else {
+                self.start_camera.update(delta_time);
+                self.start_camera.generate_view_projection(window_size);
             }
-            BufferedAction::PickUpItem { entity_id } => {
+
+            #[cfg(feature = "debug")]
+            let render_options = *self.client_state.follow(client_state().render_options());
+
+            #[cfg(feature = "debug")]
+            self.interface_renderer.update_render_options(&render_options);
+
+            #[cfg(feature = "debug")]
+            if render_options.use_debug_camera {
+                self.debug_camera.generate_view_projection(window_size);
+            }
+
+            #[cfg(feature = "debug")]
+            update_main_camera_measurement.stop();
+
+            #[cfg(feature = "debug")]
+            let update_entities_measurement = Profiler::start_measurement("update entities");
+
+            let currently_playing = self.client_state.try_follow(this_player()).is_some();
+
+            {
+                let current_camera: &(dyn Camera + Send + Sync) = match currently_playing {
+                    #[cfg(feature = "debug")]
+                    _ if render_options.use_debug_camera => &self.debug_camera,
+                    true => &self.player_camera,
+                    false => &self.start_camera,
+                };
+
+                self.client_state
+                    .follow_mut(client_state().entities())
+                    .iter_mut()
+                    .for_each(|entity| entity.update(&self.audio_engine, self.map.as_ref().unwrap(), current_camera, client_tick));
+
+                self.client_state
+                    .follow_mut(client_state().dead_entities())
+                    .iter_mut()
+                    .for_each(|entity| {
+                        entity.update(&self.audio_engine, self.map.as_ref().unwrap(), current_camera, client_tick);
+
+                        if entity.is_death_animation_over() && !entity.is_fading() {
+                            entity.fade_out(DisappearanceReason::Died, client_tick);
+                        }
+                    });
+
+                self.client_state
+                    .follow_mut(client_state().ground_items())
+                    .iter_mut()
+                    .for_each(|item| item.update(client_tick));
+
+                // Remove entities that have finished fading out.
+                self.client_state
+                    .follow_mut(client_state().entities())
+                    .retain(|entity| !entity.should_be_removed(client_tick));
+
+                self.client_state
+                    .follow_mut(client_state().dead_entities())
+                    .retain(|entity| !entity.should_be_removed(client_tick));
+
+                self.client_state
+                    .follow_mut(client_state().ground_items())
+                    .retain(|item| !item.should_be_removed(client_tick));
+
+                // Buffered attack (the player tried attacking while out of range).
+                let auto_attack = *self.client_state.follow(client_state().game_settings().auto_attack());
                 if self
                     .client_state
-                    .follow(client_state().ground_items())
-                    .iter()
-                    .any(|item| item.get_entity_id() == entity_id)
+                    .try_follow(this_entity())
+                    .is_some_and(|player| player.stopped_moving())
                 {
-                    let _ = self.networking_system.pick_up_item(entity_id);
-                }
-            }
-        }
-    }
+                    let buffered_action = self.client_state.follow_mut(client_state().buffered_action()).take();
 
-    #[inline(always)]
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn update_audio_engine(&self, current_camera: &dyn Camera) {
-        // We set the listener roughly at ear height.
-        const EAR_HEIGHT: Vector3<f32> = Vector3::new(0.0, 5.0, 0.0);
-        let listener = current_camera.focus_point() + EAR_HEIGHT;
+                    if let Some(buffered_action) = buffered_action {
+                        match buffered_action {
+                            BufferedAction::AttackEntity { entity_id } => {
+                                let _ = self.networking_system.player_attack(entity_id);
 
-        self.audio_engine
-            .set_spatial_listener(listener, current_camera.view_direction(), current_camera.look_up_vector());
-        self.audio_engine.update();
-    }
-
-    #[inline(always)]
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn create_point_light_set<'a>(
-        point_light_manager: &'a mut PointLightManager,
-        point_light_set_buffer: &mut ResourceSetBuffer<LightSourceKey>,
-        map: &Map,
-        effect_holder: &EffectHolder,
-        current_camera: &dyn Camera,
-        lighting_mode: LightingMode,
-    ) -> PointLightSet<'a> {
-        point_light_manager.prepare();
-
-        effect_holder.register_point_lights(point_light_manager, current_camera);
-
-        map.register_point_lights(point_light_manager, point_light_set_buffer, current_camera);
-
-        match lighting_mode {
-            LightingMode::Classic => point_light_manager.create_point_light_set(0),
-            LightingMode::Enhanced => point_light_manager.create_point_light_set(NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS),
-        }
-    }
-
-    /// Applies any buffered drag from the previous frame's input and draws the
-    /// per-frame top-level overlays (FPS counter when in debug, mouse cursor).
-    /// Must be called after the laid-out interface frame has been dropped so
-    /// that `self.interface` is no longer borrowed.
-    #[inline(always)]
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn render_ui_overlays(
-        &mut self,
-        input_report: &InputReport,
-        scaling: Scaling,
-        #[cfg(feature = "debug")] render_options: &RenderOptions,
-    ) {
-        if let Some(delta) = input_report.drag {
-            // TODO: The scaling should be removed here.
-            self.interface.handle_drag(delta, scaling.get_factor());
-        }
-
-        #[cfg(feature = "debug")]
-        if render_options.show_frames_per_second {
-            let world_theme = self.client_state.follow(client_state().world_theme());
-
-            self.top_interface_renderer.render_text(
-                &self.game_timer.last_frames_per_second().to_string(),
-                world_theme.overlay.text_offset,
-                world_theme.overlay.foreground_color,
-                world_theme.overlay.font_size,
-                AlignHorizontal::Left,
-            );
-        }
-
-        if self.show_interface {
-            self.mouse_cursor.render(
-                &self.top_interface_renderer,
-                input_report.mouse_position,
-                self.interface.get_mouse_mode().grabbed(),
-                *self.client_state.follow(client_state().world_theme().cursor().color()),
-                self.client_state.follow(client_state().interface_settings().scaling()).get_factor(),
-            );
-        }
-    }
-
-    #[inline(always)]
-    fn update_and_render(&mut self, event_loop: &ActiveEventLoop) {
-        if self.window.is_none() {
-            return;
-        }
-
-        if SHUTDOWN_SIGNAL.load(Ordering::SeqCst) {
-            event_loop.exit();
-            return;
-        }
-
-        // Clear the previous render instructions so we can rendering the new frame.
-        self.clear_render_instructions();
-
-        // It is important that we first apply any changes that were dispatched during
-        // the last frame.
-        self.update_client_state();
-
-        // We can only apply the graphic changes and reconfigure the surface once the
-        // previous image was presented. Moving this function to the end of the
-        // function results in surface configuration errors under DX12.
-        self.update_settings();
-
-        // TODO: Shouldn't this happen later? After the scaling has been potentially
-        // changed by the UI.
-        let scaling = *self.client_state.follow(client_state().interface_settings().scaling());
-        self.update_interface_scaling(scaling);
-
-        let FrameTimers {
-            delta_time,
-            client_tick,
-            animation_timer_ms,
-        } = self.game_timer.update();
-
-        let input_report = self.input_system.update_delta(client_tick);
-
-        self.request_entity_details(&input_report);
-
-        self.handle_network_events(client_tick);
-
-        let interface_has_focus = self.process_user_events(
-            &input_report,
-            client_tick,
-            #[cfg(feature = "debug")]
-            (delta_time as f32),
-        );
-
-        // Some debug windows, such as the packet history or cache statistics, require
-        // special update logic.
-        #[cfg(feature = "debug")]
-        self.update_debug_windows(delta_time);
-
-        // We run this last to give the loader thread as much time as possible to
-        // complete the loading. When starting the actual render process, we
-        // can't modify resources anymore until the next frame.
-        self.update_loaded_resources(client_tick);
-
-        #[cfg(feature = "debug")]
-        let render_options = *self.client_state.follow(client_state().render_options());
-
-        let screen_size = self.graphics_engine.get_window_size().into();
-        let currently_playing = self.client_state.try_follow(this_player()).is_some();
-
-        self.mouse_cursor.update(client_tick);
-
-        // Acquire the swapchain image as late as possible so all CPU-side
-        // preparation overlaps with the previous frame's GPU work. After this
-        // point we may not reconfigure the surface (see `update_settings`).
-        let maybe_frame = self.graphics_engine.wait_for_next_frame();
-
-        // If we don't have a map, the rendering ends here.
-        let Some(map) = self.map.clone() else {
-            if let Some(frame) = maybe_frame {
-                self.graphics_engine.render_next_frame(frame, Default::default());
-            }
-
-            return;
-        };
-
-        self.update_entities(
-            &map,
-            currently_playing,
-            client_tick,
-            #[cfg(feature = "debug")]
-            &render_options,
-        );
-
-        self.process_buffered_action();
-
-        self.update_main_camera(
-            screen_size,
-            delta_time,
-            #[cfg(feature = "debug")]
-            &render_options,
-        );
-
-        map.advance_videos(&self.queue, delta_time);
-
-        if let Some(player) = self.client_state.try_follow(this_entity()) {
-            self.player_camera.set_smoothed_focus_point(player.get_position());
-        }
-
-        // Update particles.
-        self.particle_holder.update(delta_time as f32);
-        self.effect_holder
-            .update(self.client_state.follow(client_state().entities()), delta_time as f32);
-
-        let current_camera: &(dyn Camera + Send + Sync) = match currently_playing {
-            #[cfg(feature = "debug")]
-            _ if render_options.use_debug_camera => &self.debug_camera,
-            true => &self.player_camera,
-            false => &self.start_camera,
-        };
-
-        let (view_matrix, projection_matrix) = current_camera.view_projection_matrices();
-        let camera_position = current_camera.camera_position().to_homogeneous();
-
-        #[cfg(feature = "debug")]
-        let update_shadow_camera_measurement = Profiler::start_measurement("update directional shadow camera");
-
-        let lighting_mode = *self.client_state.follow(client_state().graphics_settings().lighting_mode());
-        let shadow_resolution = *self.client_state.follow(client_state().graphics_settings().shadow_resolution());
-        let shadow_method = *self.client_state.follow(client_state().graphics_settings().shadow_method());
-        let shadow_detail = *self.client_state.follow(client_state().graphics_settings().shadow_detail());
-        let sdsm_enabled = *self.client_state.follow(client_state().graphics_settings().sdsm());
-
-        let use_sdsm = sdsm_enabled & !self.player_camera.is_rotating_or_zooming_fast();
-
-        let (directional_light_direction, directional_light_color) = map.directional_light();
-
-        match use_sdsm {
-            true => {
-                self.directional_shadow_camera.update_camera_sdsm(
-                    directional_light_direction,
-                    &view_matrix,
-                    &projection_matrix,
-                    shadow_resolution.directional_shadow_resolution(),
-                    self.directional_shadow_partitions.lock().unwrap().deref(),
-                );
-            }
-            false => {
-                self.directional_shadow_camera.update_camera_pssm(
-                    directional_light_direction,
-                    &view_matrix,
-                    &projection_matrix,
-                    shadow_resolution.directional_shadow_resolution(),
-                );
-            }
-        }
-
-        #[cfg(feature = "debug")]
-        update_shadow_camera_measurement.stop();
-
-        self.update_audio_engine(current_camera);
-
-        #[cfg(feature = "debug")]
-        let prepare_frame_measurement = Profiler::start_measurement("prepare frame");
-
-        #[cfg(feature = "debug")]
-        let hovered_marker_identifier = match input_report.mouse_target {
-            PickerTarget::Marker(marker_identifier) => Some(marker_identifier),
-            _ => None,
-        };
-
-        let point_light_set = Self::create_point_light_set(
-            &mut self.point_light_manager,
-            &mut self.point_light_set_buffer,
-            &map,
-            &self.effect_holder,
-            current_camera,
-            lighting_mode,
-        );
-
-        #[cfg(feature = "debug")]
-        prepare_frame_measurement.stop();
-
-        let mut indicator_instruction = None;
-        let mut water_instruction = None;
-
-        let mouse_mode = self.interface.get_mouse_mode();
-        let is_mouse_mode_default = mouse_mode.is_default();
-        let last_walking_destination = mouse_mode.walk_destination();
-
-        let mut interface_frame = {
-            #[cfg(feature = "debug")]
-            profile_block!("user interface");
-
-            let is_rotating_camera = mouse_mode.is_rotating_camera();
-            let is_grabbing = mouse_mode.is_grabbing();
-            let is_chat_open = self.interface.is_window_with_class_open(WindowClass::Chat);
-
-            let mut interface_frame = self
-                .interface
-                .lay_out_windows(&self.client_state, scaling.get_factor(), input_report.mouse_position);
-
-            // We can only decide what to do with the user input once we know if the mouse
-            // is hovering a window, so we buffer any actions for the next frame.
-
-            let is_interface_hovered = interface_frame.is_interface_hovered();
-
-            let cursor_state = match input_report.mouse_target {
-                _ if is_rotating_camera => MouseCursorState::RotateCamera,
-                _ if is_grabbing => MouseCursorState::GrabResource,
-                PickerTarget::Entity(entity_id) if !is_interface_hovered => {
-                    if self
-                        .client_state
-                        .follow(client_state().ground_items())
-                        .iter()
-                        .any(|item| item.get_entity_id() == entity_id)
-                    {
-                        MouseCursorState::HoverItem
-                    } else {
-                        self.client_state
-                            .follow(client_state().entities())
-                            .iter()
-                            .find(|entity| entity.get_entity_id() == entity_id)
-                            .map(|entity| match entity.get_entity_type() {
-                                EntityType::Npc => MouseCursorState::Dialog,
-                                EntityType::Warp => MouseCursorState::Warp,
-                                EntityType::Monster => MouseCursorState::Attack,
-                                _ => MouseCursorState::Default,
-                            })
-                            .unwrap_or(MouseCursorState::Default)
-                    }
-                }
-                _ => MouseCursorState::Default,
-            };
-            self.mouse_cursor.set_state(cursor_state, client_tick);
-
-            if let Some(mouse_button) = input_report.mouse_click {
-                if is_interface_hovered {
-                    interface_frame.click(&self.client_state, mouse_button);
-                } else {
-                    interface_frame.unfocus();
-
-                    if mouse_button == MouseButton::Left {
-                        match input_report.mouse_target {
-                            PickerTarget::Nothing => {}
-                            PickerTarget::Entity(entity_id) => {
-                                let is_ground_item = self
+                                if auto_attack {
+                                    *self.client_state.follow_mut(client_state().buffered_action()) =
+                                        Some(BufferedAction::AttackEntity { entity_id });
+                                }
+                            }
+                            BufferedAction::PickUpItem { entity_id } => {
+                                if self
                                     .client_state
                                     .follow(client_state().ground_items())
                                     .iter()
-                                    .any(|item| item.get_entity_id() == entity_id);
-
-                                if is_ground_item {
-                                    self.input_event_buffer.push(InputEvent::PickUpItem { entity_id })
-                                } else {
-                                    self.input_event_buffer.push(InputEvent::PlayerInteract { entity_id })
+                                    .any(|item| item.get_entity_id() == entity_id)
+                                {
+                                    let _ = self.networking_system.pick_up_item(entity_id);
                                 }
                             }
-                            PickerTarget::Tile { x, y } => {
-                                let destination = TilePosition { x, y };
-
-                                interface_frame.set_mouse_mode(MouseInputMode::Walk { destination });
-
-                                self.input_event_buffer.push(InputEvent::PlayerMove { destination });
-                            }
-                            #[cfg(feature = "debug")]
-                            PickerTarget::Marker(marker_identifier) => {
-                                self.input_event_buffer.push(InputEvent::OpenMarkerDetails { marker_identifier })
-                            }
                         }
-                    } else if mouse_button == MouseButton::Right && currently_playing {
-                        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(!render_options.use_debug_camera))]
-                        interface_frame.set_mouse_mode(MouseInputMode::RotateCamera);
-                    } else if mouse_button == MouseButton::DoubleRight && currently_playing {
-                        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(!render_options.use_debug_camera))]
-                        self.input_event_buffer.push(InputEvent::ResetCameraRotation);
                     }
                 }
-            } else if let Some(last_destination) = last_walking_destination
-                && let PickerTarget::Tile { x, y } = input_report.mouse_target
-                && input_report.left_mouse_button_down
-            {
-                let destination = TilePosition { x, y };
+            }
 
-                if last_destination != destination {
-                    interface_frame.set_mouse_mode(MouseInputMode::Walk { destination });
-                    self.input_event_buffer.push(InputEvent::PlayerMove { destination });
+            #[cfg(feature = "debug")]
+            update_entities_measurement.stop();
+
+            #[cfg(feature = "debug")]
+            let update_videos_measurement = Profiler::start_measurement("update videos");
+
+            map.advance_videos(&self.queue, delta_time);
+
+            #[cfg(feature = "debug")]
+            update_videos_measurement.stop();
+
+            if currently_playing {
+                // `manually_asserted` is safe because we are in the branch where `this_player`
+                // is not `None`.
+                let position = self.client_state.follow(this_entity().manually_asserted()).get_position();
+                self.player_camera.set_smoothed_focus_point(position);
+            }
+
+            let current_camera: &(dyn Camera + Send + Sync) = match currently_playing {
+                #[cfg(feature = "debug")]
+                _ if render_options.use_debug_camera => &self.debug_camera,
+                true => &self.player_camera,
+                false => &self.start_camera,
+            };
+
+            let (view_matrix, projection_matrix) = current_camera.view_projection_matrices();
+            let camera_position = current_camera.camera_position().to_homogeneous();
+
+            #[cfg(feature = "debug")]
+            let update_shadow_camera_measurement = Profiler::start_measurement("update directional shadow camera");
+
+            let lighting_mode = *self.client_state.follow(client_state().graphics_settings().lighting_mode());
+            let shadow_resolution = *self.client_state.follow(client_state().graphics_settings().shadow_resolution());
+            let shadow_method = *self.client_state.follow(client_state().graphics_settings().shadow_method());
+            let shadow_detail = *self.client_state.follow(client_state().graphics_settings().shadow_detail());
+            let sdsm_enabled = *self.client_state.follow(client_state().graphics_settings().sdsm());
+
+            let use_sdsm = sdsm_enabled & !self.player_camera.is_rotating_or_zooming_fast();
+
+            let ambient_light_color = map.ambient_light_color();
+
+            let (directional_light_direction, directional_light_color) = map.directional_light();
+
+            match use_sdsm {
+                true => {
+                    self.directional_shadow_camera.update_camera_sdsm(
+                        directional_light_direction,
+                        &view_matrix,
+                        &projection_matrix,
+                        shadow_resolution.directional_shadow_resolution(),
+                        self.directional_shadow_partitions.lock().unwrap().deref(),
+                    );
+                }
+                false => {
+                    self.directional_shadow_camera.update_camera_pssm(
+                        directional_light_direction,
+                        &view_matrix,
+                        &projection_matrix,
+                        shadow_resolution.directional_shadow_resolution(),
+                    );
                 }
             }
 
-            if input_report.mouse_button_released {
-                interface_frame.drop(&self.client_state);
-            }
+            let directional_light_view_projection_matrix = self.directional_shadow_camera.view_projection_matrix();
 
-            if let Some(delta) = input_report.scroll {
-                if is_interface_hovered {
-                    interface_frame.scroll(&self.client_state, delta);
-                } else {
-                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(!render_options.use_debug_camera))]
-                    self.input_event_buffer.push(InputEvent::ZoomCamera { zoom_factor: delta });
-                }
-            }
+            #[cfg(feature = "debug")]
+            update_shadow_camera_measurement.stop();
 
-            // Focus the chat if the interface is not focused, no other element is capturing
-            // the keyboard input, enter was pressed, and the chat
-            // window is open.
-            if (!interface_has_focus || !interface_frame.input_characters(&self.client_state, &input_report.characters))
-                && input_report.characters.contains(&'\x0d')
-                && is_chat_open
-            {
-                interface_frame.focus_element(ChatTextBox);
-            }
+            #[cfg(feature = "debug")]
+            let frame_measurement = Profiler::start_measurement("update audio engine");
 
-            interface_frame
-        };
+            // We set the listener roughly at ear height.
+            const EAR_HEIGHT: Vector3<f32> = Vector3::new(0.0, 5.0, 0.0);
+            let listener = current_camera.focus_point() + EAR_HEIGHT;
 
-        {
-            let mut render_context = MapRenderContext {
-                map: &map,
-                current_camera,
-                point_light_set: &point_light_set,
-                client_state: &self.client_state,
-                library: &self.library,
-                mouse_position: input_report.mouse_position,
-                mouse_target: input_report.mouse_target,
-                screen_size,
-                scaling,
-                client_tick,
-                animation_timer_ms,
-                currently_playing,
-                is_mouse_mode_default,
-                is_interface_hovered: interface_frame.is_interface_hovered(),
-                last_walking_destination,
-                buffered_action: *self.client_state.follow(client_state().buffered_action()),
-                #[cfg(feature = "debug")]
-                render_options: &render_options,
-                #[cfg(feature = "debug")]
-                hovered_marker_identifier,
-                #[cfg(feature = "debug")]
-                pathing_texture_set: &self.pathing_texture_set,
-                #[cfg(feature = "debug")]
-                tile_texture_set: &self.tile_texture_set,
-                #[cfg(feature = "debug")]
-                player_camera: &self.player_camera,
-                #[cfg(feature = "debug")]
-                start_camera: &self.start_camera,
-                model_batches: &mut self.model_batches,
-                model_instructions: &mut self.model_instructions,
-                entity_instructions: &mut self.entity_instructions,
-                directional_shadow_camera: &mut self.directional_shadow_camera,
-                directional_shadow_model_batches: &mut self.directional_shadow_model_batches,
-                directional_shadow_model_instructions: &mut self.directional_shadow_model_instructions,
-                directional_shadow_entity_instructions: &mut self.directional_shadow_entity_instructions,
-                point_shadow_camera: &mut self.point_shadow_camera,
-                point_shadow_model_instructions: &mut self.point_shadow_model_instructions,
-                point_light_with_shadow_instructions: &mut self.point_light_with_shadow_instructions,
-                point_light_instructions: &mut self.point_light_instructions,
-                directional_shadow_object_set_buffer: &mut self.directional_shadow_object_set_buffer,
-                point_shadow_object_set_buffer: &mut self.point_shadow_object_set_buffer,
-                deferred_object_set_buffer: &mut self.deferred_object_set_buffer,
-                indicator_instruction: &mut indicator_instruction,
-                water_instruction: &mut water_instruction,
-                particle_holder: &mut self.particle_holder,
-                effect_holder: &mut self.effect_holder,
-                effect_renderer: &mut self.effect_renderer,
-                bottom_interface_renderer: &self.bottom_interface_renderer,
-                middle_interface_renderer: &mut self.middle_interface_renderer,
-                #[cfg(feature = "debug")]
-                aabb_instructions: &mut self.aabb_instructions,
-                #[cfg(feature = "debug")]
-                circle_instructions: &mut self.circle_instructions,
-                #[cfg(feature = "debug")]
-                rectangle_instructions: &mut self.rectangle_instructions,
-                #[cfg(feature = "debug")]
-                bounding_box_object_set_buffer: &mut self.bounding_box_object_set_buffer,
-                #[cfg(feature = "debug")]
-                debug_marker_renderer: &mut self.debug_marker_renderer,
+            self.audio_engine
+                .set_spatial_listener(listener, current_camera.view_direction(), current_camera.look_up_vector());
+            self.audio_engine.update();
+
+            #[cfg(feature = "debug")]
+            frame_measurement.stop();
+
+            #[cfg(feature = "debug")]
+            let prepare_frame_measurement = Profiler::start_measurement("prepare frame");
+
+            self.particle_holder.update(delta_time as f32);
+            self.effect_holder
+                .update(self.client_state.follow(client_state().entities()), delta_time as f32);
+
+            self.mouse_cursor.update(client_tick);
+
+            let walk_indicator_color = *self.client_state.follow(client_state().world_theme().indicator().walking());
+
+            #[cfg(feature = "debug")]
+            let hovered_marker_identifier = match input_report.mouse_target {
+                PickerTarget::Marker(marker_identifier) => Some(marker_identifier),
+                _ => None,
             };
 
             #[cfg(feature = "debug")]
-            render_context.render_markers();
-            render_context.render_directional_shadows();
-            render_context.render_point_lights();
-            render_context.render_geometry();
+            let point_light_manager_measurement = Profiler::start_measurement("point light manager");
+
+            let point_light_set = {
+                self.point_light_manager.prepare();
+
+                self.effect_holder
+                    .register_point_lights(&mut self.point_light_manager, current_camera);
+
+                map.register_point_lights(&mut self.point_light_manager, &mut self.point_light_set_buffer, current_camera);
+
+                match lighting_mode {
+                    LightingMode::Classic => self.point_light_manager.create_point_light_set(0),
+                    LightingMode::Enhanced => self.point_light_manager.create_point_light_set(NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS),
+                }
+            };
+
             #[cfg(feature = "debug")]
-            render_context.render_bounding_boxes();
-            render_context.render_world_overlays();
+            point_light_manager_measurement.stop();
+
+            #[cfg(feature = "debug")]
+            prepare_frame_measurement.stop();
+
+            #[cfg(feature = "debug")]
+            let collect_instructions_measurement = Profiler::start_measurement("collect instructions");
+
+            let picker_position = ScreenPosition {
+                left: input_report.mouse_position.left.clamp(0.0, window_size.x as f32),
+                top: input_report.mouse_position.top.clamp(0.0, window_size.y as f32),
+            };
+            let mut indicator_instruction = None;
+            let mut water_instruction = None;
+
+            // Marker
+            {
+                #[cfg(feature = "debug")]
+                map.render_markers(
+                    &mut self.debug_marker_renderer,
+                    current_camera,
+                    &render_options,
+                    self.client_state.follow(client_state().entities()),
+                    &point_light_set,
+                    hovered_marker_identifier,
+                );
+
+                #[cfg(feature = "debug")]
+                map.render_markers(
+                    &mut self.middle_interface_renderer,
+                    current_camera,
+                    &render_options,
+                    self.client_state.follow(client_state().entities()),
+                    &point_light_set,
+                    hovered_marker_identifier,
+                );
+            }
+
+            // Directional Shadows
+            {
+                for partition_index in 0..PARTITION_COUNT {
+                    let partition_camera = self.directional_shadow_camera.get_partition_camera(partition_index);
+
+                    let object_set = map.cull_objects_with_frustum(
+                        &partition_camera,
+                        &mut self.directional_shadow_object_set_buffer,
+                        #[cfg(feature = "debug")]
+                        render_options.frustum_culling,
+                    );
+
+                    let offset = self.directional_shadow_model_instructions.len();
+                    let model_batches = &mut self.directional_shadow_model_batches[partition_index];
+                    let entity_instructions = &mut self.directional_shadow_entity_instructions[partition_index];
+
+                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_objects))]
+                    map.render_objects(
+                        &mut self.directional_shadow_model_instructions,
+                        &object_set,
+                        animation_timer_ms,
+                        &partition_camera,
+                    );
+
+                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_map))]
+                    map.render_ground(&mut self.directional_shadow_model_instructions);
+
+                    let count = self.directional_shadow_model_instructions.len() - offset;
+
+                    model_batches.push(ModelBatch {
+                        offset,
+                        count,
+                        texture_set: map.get_texture_set().clone(),
+                        vertex_buffer: map.get_model_vertex_buffer().clone(),
+                        index_buffer: map.get_model_index_buffer().clone(),
+                    });
+
+                    #[cfg(feature = "debug")]
+                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_map_tiles))]
+                    map.render_overlay_tiles(
+                        &mut self.directional_shadow_model_instructions,
+                        model_batches,
+                        &self.tile_texture_set,
+                    );
+
+                    #[cfg(feature = "debug")]
+                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_pathing))]
+                    map.render_entity_pathing(
+                        &mut self.directional_shadow_model_instructions,
+                        model_batches,
+                        self.client_state.follow(client_state().entities()),
+                        &self.pathing_texture_set,
+                    );
+
+                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_ground_items))]
+                    map.render_ground_items(
+                        entity_instructions,
+                        self.client_state.follow(client_state().ground_items()),
+                        &partition_camera,
+                        client_tick,
+                    );
+
+                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_entities))]
+                    map.render_entities(
+                        entity_instructions,
+                        self.client_state.follow(client_state().entities()),
+                        &partition_camera,
+                        client_tick,
+                    );
+
+                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_entities))]
+                    map.render_dead_entities(
+                        entity_instructions,
+                        self.client_state.follow(client_state().dead_entities()),
+                        &partition_camera,
+                        client_tick,
+                    );
+                }
+            }
+
+            // Point Lights and Shadows
+            {
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.enable_point_lights))]
+                point_light_set.render_point_lights(&mut self.point_light_instructions);
+
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.enable_point_lights))]
+                point_light_set.render_point_lights_with_shadows(
+                    map,
+                    &mut self.point_shadow_camera,
+                    &mut self.point_shadow_object_set_buffer,
+                    &mut self.point_shadow_model_instructions,
+                    &mut self.point_light_with_shadow_instructions,
+                    animation_timer_ms,
+                    #[cfg(feature = "debug")]
+                    &render_options,
+                );
+            }
+
+            // Geometry
+            {
+                let object_set = map.cull_objects_with_frustum(
+                    current_camera,
+                    &mut self.deferred_object_set_buffer,
+                    #[cfg(feature = "debug")]
+                    render_options.frustum_culling,
+                );
+
+                let offset = self.model_instructions.len();
+
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_objects))]
+                map.render_objects(&mut self.model_instructions, &object_set, animation_timer_ms, current_camera);
+
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_map))]
+                map.render_ground(&mut self.model_instructions);
+
+                let count = self.model_instructions.len() - offset;
+
+                self.model_batches.push(ModelBatch {
+                    offset,
+                    count,
+                    texture_set: map.get_texture_set().clone(),
+                    vertex_buffer: map.get_model_vertex_buffer().clone(),
+                    index_buffer: map.get_model_index_buffer().clone(),
+                });
+
+                #[cfg(feature = "debug")]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_map_tiles))]
+                map.render_overlay_tiles(&mut self.model_instructions, &mut self.model_batches, &self.tile_texture_set);
+
+                #[cfg(feature = "debug")]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_pathing))]
+                map.render_entity_pathing(
+                    &mut self.model_instructions,
+                    &mut self.model_batches,
+                    self.client_state.follow(client_state().entities()),
+                    &self.pathing_texture_set,
+                );
+
+                let entity_camera = match true {
+                    #[cfg(feature = "debug")]
+                    _ if *self.client_state.follow(client_state().render_options().show_entities_paper()) => &self.player_camera,
+                    _ => current_camera,
+                };
+
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_ground_items))]
+                map.render_ground_items(
+                    &mut self.entity_instructions,
+                    self.client_state.follow(client_state().ground_items()),
+                    entity_camera,
+                    client_tick,
+                );
+
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_entities))]
+                map.render_entities(
+                    &mut self.entity_instructions,
+                    self.client_state.follow(client_state().entities()),
+                    entity_camera,
+                    client_tick,
+                );
+
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_entities))]
+                map.render_dead_entities(
+                    &mut self.entity_instructions,
+                    self.client_state.follow(client_state().dead_entities()),
+                    entity_camera,
+                    client_tick,
+                );
+
+                #[cfg(feature = "debug")]
+                if render_options.show_entities_debug {
+                    map.render_entities_debug(
+                        &mut self.rectangle_instructions,
+                        self.client_state.follow(client_state().entities()),
+                        entity_camera,
+                    );
+
+                    map.render_entities_debug(
+                        &mut self.rectangle_instructions,
+                        self.client_state.follow(client_state().dead_entities()),
+                        entity_camera,
+                    );
+                }
+
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_water))]
+                map.render_water(&mut water_instruction, animation_timer_ms);
+
+                #[cfg(feature = "debug")]
+                if render_options.show_bounding_boxes {
+                    let culling_camera: &dyn Camera = match currently_playing {
+                        true => &self.player_camera,
+                        false => &self.start_camera,
+                    };
+
+                    let object_set = map.cull_objects_with_frustum(
+                        culling_camera,
+                        &mut self.bounding_box_object_set_buffer,
+                        #[cfg(feature = "debug")]
+                        render_options.frustum_culling,
+                    );
+
+                    map.render_bounding(&mut self.aabb_instructions, render_options.frustum_culling, &object_set);
+                }
+            }
+
+            //  Sprites and Interface
+            {
+                #[cfg(feature = "debug")]
+                if let Some(marker_identifier) = hovered_marker_identifier {
+                    map.render_marker_overlay(
+                        &mut self.aabb_instructions,
+                        &mut self.circle_instructions,
+                        current_camera,
+                        marker_identifier,
+                        &point_light_set,
+                        animation_timer_ms,
+                    );
+                }
+
+                self.particle_holder.render(
+                    &self.bottom_interface_renderer,
+                    current_camera,
+                    screen_size,
+                    scaling,
+                    self.client_state.follow(client_state().entities()),
+                );
+
+                self.effect_holder.render(&mut self.effect_renderer, current_camera);
+
+                if let Some(player) = self.client_state.try_follow(this_entity()) {
+                    #[cfg(feature = "debug")]
+                    profile_block!("render player status");
+
+                    player.render_status(
+                        &self.middle_interface_renderer,
+                        current_camera,
+                        self.client_state.follow(client_state().world_theme()),
+                        screen_size,
+                    );
+                }
+
+                let mouse_mode = self.interface.get_mouse_mode();
+                let is_mouse_mode_default = mouse_mode.is_default();
+                let last_walking_destination = mouse_mode.walk_destination();
+
+                let mut interface_frame = {
+                    #[cfg(feature = "debug")]
+                    profile_block!("user interface");
+
+                    let is_rotating_camera = mouse_mode.is_rotating_camera();
+                    let is_grabbing = mouse_mode.is_grabbing();
+                    let is_chat_open = self.interface.is_window_with_class_open(WindowClass::Chat);
+
+                    let mut interface_frame =
+                        self.interface
+                            .lay_out_windows(&self.client_state, scaling.get_factor(), input_report.mouse_position);
+
+                    // We can only decide what to do with the user input once we know if the mouse
+                    // is hovering a window, so we buffer any actions for the next frame.
+
+                    let is_interface_hovered = interface_frame.is_interface_hovered();
+
+                    let cursor_state = match input_report.mouse_target {
+                        _ if is_rotating_camera => MouseCursorState::RotateCamera,
+                        _ if is_grabbing => MouseCursorState::GrabResource,
+                        PickerTarget::Entity(entity_id) if !is_interface_hovered => {
+                            if self
+                                .client_state
+                                .follow(client_state().ground_items())
+                                .iter()
+                                .any(|item| item.get_entity_id() == entity_id)
+                            {
+                                MouseCursorState::HoverItem
+                            } else {
+                                self.client_state
+                                    .follow(client_state().entities())
+                                    .iter()
+                                    .find(|entity| entity.get_entity_id() == entity_id)
+                                    .map(|entity| match entity.get_entity_type() {
+                                        EntityType::Npc => MouseCursorState::Dialog,
+                                        EntityType::Warp => MouseCursorState::Warp,
+                                        EntityType::Monster => MouseCursorState::Attack,
+                                        _ => MouseCursorState::Default,
+                                    })
+                                    .unwrap_or(MouseCursorState::Default)
+                            }
+                        }
+                        _ => MouseCursorState::Default,
+                    };
+                    self.mouse_cursor.set_state(cursor_state, client_tick);
+
+                    if let Some(mouse_button) = input_report.mouse_click {
+                        if is_interface_hovered {
+                            interface_frame.click(&self.client_state, mouse_button);
+                        } else {
+                            interface_frame.unfocus();
+
+                            if mouse_button == MouseButton::Left {
+                                match input_report.mouse_target {
+                                    PickerTarget::Nothing => {}
+                                    PickerTarget::Entity(entity_id) => {
+                                        let is_ground_item = self
+                                            .client_state
+                                            .follow(client_state().ground_items())
+                                            .iter()
+                                            .any(|item| item.get_entity_id() == entity_id);
+
+                                        if is_ground_item {
+                                            self.input_event_buffer.push(InputEvent::PickUpItem { entity_id })
+                                        } else {
+                                            self.input_event_buffer.push(InputEvent::PlayerInteract { entity_id })
+                                        }
+                                    }
+                                    PickerTarget::Tile { x, y } => {
+                                        let destination = TilePosition { x, y };
+
+                                        interface_frame.set_mouse_mode(MouseInputMode::Walk { destination });
+
+                                        self.input_event_buffer.push(InputEvent::PlayerMove { destination });
+                                    }
+                                    #[cfg(feature = "debug")]
+                                    PickerTarget::Marker(marker_identifier) => {
+                                        self.input_event_buffer.push(InputEvent::OpenMarkerDetails { marker_identifier })
+                                    }
+                                }
+                            } else if mouse_button == MouseButton::Right && currently_playing {
+                                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(!render_options.use_debug_camera))]
+                                interface_frame.set_mouse_mode(MouseInputMode::RotateCamera);
+                            } else if mouse_button == MouseButton::DoubleRight && currently_playing {
+                                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(!render_options.use_debug_camera))]
+                                self.input_event_buffer.push(InputEvent::ResetCameraRotation);
+                            }
+                        }
+                    } else if let Some(last_destination) = last_walking_destination
+                        && let PickerTarget::Tile { x, y } = input_report.mouse_target
+                        && input_report.left_mouse_button_down
+                    {
+                        let destination = TilePosition { x, y };
+
+                        if last_destination != destination {
+                            interface_frame.set_mouse_mode(MouseInputMode::Walk { destination });
+                            self.input_event_buffer.push(InputEvent::PlayerMove { destination });
+                        }
+                    }
+
+                    if input_report.mouse_button_released {
+                        interface_frame.drop(&self.client_state);
+                    }
+
+                    if let Some(delta) = input_report.scroll {
+                        if is_interface_hovered {
+                            interface_frame.scroll(&self.client_state, delta);
+                        } else {
+                            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(!render_options.use_debug_camera))]
+                            self.input_event_buffer.push(InputEvent::ZoomCamera { zoom_factor: delta });
+                        }
+                    }
+
+                    // Focus the chat if the interface is not focused, no other element is capturing
+                    // the keyboard input, enter was pressed, and the chat
+                    // window is open.
+                    if (!interface_has_focus || !interface_frame.input_characters(&self.client_state, &input_report.characters))
+                        && input_report.characters.contains(&'\x0d')
+                        && is_chat_open
+                    {
+                        interface_frame.focus_element(ChatTextBox);
+                    }
+
+                    interface_frame
+                };
+
+                let buffered_action = *self.client_state.follow(client_state().buffered_action());
+
+                if let Some(BufferedAction::AttackEntity { entity_id }) = buffered_action
+                    && let Some(entity) = self
+                        .client_state
+                        .follow(client_state().entities())
+                        .iter()
+                        .find(|entity| entity.get_entity_id() == entity_id)
+                {
+                    entity.render_status(
+                        &self.middle_interface_renderer,
+                        current_camera,
+                        self.client_state.follow(client_state().world_theme()),
+                        screen_size,
+                    );
+                }
+
+                match input_report.mouse_target {
+                    PickerTarget::Tile { x, y } => {
+                        // Only show if the mouse mode is default or walking.
+                        if currently_playing
+                            && !interface_frame.is_interface_hovered()
+                            && (is_mouse_mode_default || last_walking_destination.is_some())
+                        {
+                            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_indicators))]
+                            map.render_walk_indicator(&mut indicator_instruction, walk_indicator_color, TilePosition { x, y });
+                        }
+                    }
+                    PickerTarget::Entity(entity_id) => {
+                        if !interface_frame.is_interface_hovered() && is_mouse_mode_default {
+                            if let Some(entity) = self
+                                .client_state
+                                .follow(client_state().entities())
+                                .iter()
+                                .find(|entity| entity.get_entity_id() == entity_id)
+                            {
+                                // Since the buffered attack entity will render its status anyway,
+                                // we make sure not to render it here again if it's the same.
+                                if !buffered_action.is_some_and(|buffered_action| buffered_action.is_attack_entity(entity_id)) {
+                                    entity.render_status(
+                                        &self.middle_interface_renderer,
+                                        current_camera,
+                                        self.client_state.follow(client_state().world_theme()),
+                                        screen_size,
+                                    );
+                                }
+
+                                if let Some(name) = &entity.get_details() {
+                                    let name = name.split('#').next().unwrap();
+                                    self.middle_interface_renderer
+                                        .render_hover_text(name, scaling, input_report.mouse_position);
+                                }
+                            } else if let Some(item) = self
+                                .client_state
+                                .follow(client_state().ground_items())
+                                .iter()
+                                .find(|item| item.get_entity_id() == entity_id)
+                            {
+                                let name = self.library.get::<ItemName>(ItemNameKey {
+                                    item_id: item.item_id,
+                                    is_identified: item.is_identified,
+                                });
+
+                                // TODO: Don't allocate every frame
+                                let text = format!("{name}: {}ea", item.quantity);
+                                self.middle_interface_renderer
+                                    .render_hover_text(&text, scaling, input_report.mouse_position);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+
+                let in_game_theme_path = client_state().in_game_theme().tooltip();
+                let menu_theme_path = client_state().menu_theme().tooltip();
+                let tooltip_theme = match currently_playing {
+                    true => self.client_state.follow(in_game_theme_path),
+                    false => self.client_state.follow(menu_theme_path),
+                };
+
+                interface_frame.render(
+                    &self.client_state,
+                    &self.interface_renderer,
+                    tooltip_theme,
+                    input_report.mouse_position,
+                );
+
+                drop(interface_frame);
+
+                if let Some(delta) = input_report.drag {
+                    // TODO: The scaling should be removed here.
+                    self.interface.handle_drag(delta, scaling.get_factor());
+                }
+
+                #[cfg(feature = "debug")]
+                if render_options.show_frames_per_second {
+                    let world_theme = self.client_state.follow(client_state().world_theme());
+
+                    self.top_interface_renderer.render_text(
+                        &self.game_timer.last_frames_per_second().to_string(),
+                        world_theme.overlay.text_offset,
+                        world_theme.overlay.foreground_color,
+                        world_theme.overlay.font_size,
+                        AlignHorizontal::Left,
+                    );
+                }
+
+                if self.show_interface {
+                    self.mouse_cursor.render(
+                        &self.top_interface_renderer,
+                        input_report.mouse_position,
+                        self.interface.get_mouse_mode().grabbed(),
+                        *self.client_state.follow(client_state().world_theme().cursor().color()),
+                        self.client_state.follow(client_state().interface_settings().scaling()).get_factor(),
+                    );
+                }
+            }
+
+            #[cfg(feature = "debug")]
+            collect_instructions_measurement.stop();
+
+            #[cfg(feature = "debug")]
+            let render_frame_measurement = Profiler::start_measurement("prepare next frame");
+
+            let interface_instructions = self.interface_renderer.get_instructions();
+            let bottom_layer_instructions = self.bottom_interface_renderer.get_instructions();
+            let middle_layer_instructions = self.middle_interface_renderer.get_instructions();
+            let top_layer_instructions = self.top_interface_renderer.get_instructions();
+
+            let render_instruction = RenderInstruction {
+                show_interface: self.show_interface,
+                picker_position,
+                uniforms: Uniforms {
+                    view_matrix,
+                    projection_matrix,
+                    camera_position,
+                    animation_timer_ms,
+                    ambient_light_color,
+                    enhanced_lighting: lighting_mode == LightingMode::Enhanced,
+                    shadow_method,
+                    shadow_detail,
+                    use_sdsm,
+                    sdsm_enabled,
+                },
+                indicator: indicator_instruction,
+                interface: interface_instructions.as_slice(),
+                bottom_layer_rectangles: bottom_layer_instructions.as_slice(),
+                middle_layer_rectangles: middle_layer_instructions.as_slice(),
+                top_layer_rectangles: top_layer_instructions.as_slice(),
+                directional_light: DirectionalLightInstruction {
+                    view_projection_matrix: directional_light_view_projection_matrix,
+                    direction: directional_light_direction,
+                    color: directional_light_color,
+                },
+                directional_light_partitions: &self.directional_shadow_camera.get_partition_instructions(),
+                point_light: &self.point_light_instructions,
+                point_light_with_shadows: &self.point_light_with_shadow_instructions,
+                model_batches: &self.model_batches,
+                models: &mut self.model_instructions,
+                entities: &mut self.entity_instructions,
+                directional_shadow_model_batches: &self.directional_shadow_model_batches,
+                directional_shadow_models: &self.directional_shadow_model_instructions,
+                directional_shadow_entities: &mut self.directional_shadow_entity_instructions,
+                point_shadow_models: &self.point_shadow_model_instructions,
+                point_shadow_entities: &self.point_shadow_entity_instructions,
+                effects: self.effect_renderer.get_instructions(),
+                water: water_instruction,
+                map_picker_tile_vertex_buffer: Some(map.get_tile_picker_vertex_buffer()),
+                map_picker_tile_index_buffer: Some(map.get_tile_picker_index_buffer()),
+                font_map_texture: Some(self.font_loader.get_font_map()),
+                #[cfg(feature = "debug")]
+                render_options,
+                #[cfg(feature = "debug")]
+                aabb: &self.aabb_instructions,
+                #[cfg(feature = "debug")]
+                circles: &self.circle_instructions,
+                #[cfg(feature = "debug")]
+                rectangles: &self.rectangle_instructions,
+                #[cfg(feature = "debug")]
+                marker: self.debug_marker_renderer.get_instructions(),
+            };
+
+            self.graphics_engine.render_next_frame(frame, render_instruction);
+
+            #[cfg(feature = "debug")]
+            render_frame_measurement.stop();
+        } else {
+            #[cfg(feature = "debug")]
+            let render_frame_measurement = Profiler::start_measurement("prepare next frame");
+
+            self.graphics_engine.render_next_frame(frame, RenderInstruction::default());
+
+            #[cfg(feature = "debug")]
+            render_frame_measurement.stop();
         }
 
-        let in_game_theme_path = client_state().in_game_theme().tooltip();
-        let menu_theme_path = client_state().menu_theme().tooltip();
-        let tooltip_theme = match currently_playing {
-            true => self.client_state.follow(in_game_theme_path),
-            false => self.client_state.follow(menu_theme_path),
-        };
+        // Unset the highlighted skill just before applying. That way, if the skill is
+        // still hovered the value will be the same as before, if not it will clear the
+        // highlighted.
+        *self.client_state.follow_mut(client_state().skill_tree_window().highlighted_skill()) = None;
 
-        interface_frame.render(
-            &self.client_state,
-            &self.interface_renderer,
-            tooltip_theme,
-            input_report.mouse_position,
-        );
-
-        drop(interface_frame);
-
-        self.render_ui_overlays(
-            &input_report,
-            scaling,
+        // Apply the game state after all the UI work + rendering is done.
+        if let Err(_errors) = self.client_state.apply() {
             #[cfg(feature = "debug")]
-            &render_options,
-        );
-
-        let picker_position = ScreenPosition {
-            left: input_report.mouse_position.left.clamp(0.0, screen_size.width),
-            top: input_report.mouse_position.top.clamp(0.0, screen_size.height),
-        };
-
-        let uniforms = Uniforms {
-            view_matrix,
-            projection_matrix,
-            camera_position,
-            animation_timer_ms,
-            ambient_light_color: map.ambient_light_color(),
-            enhanced_lighting: lighting_mode == LightingMode::Enhanced,
-            shadow_method,
-            shadow_detail,
-            use_sdsm,
-            sdsm_enabled,
-        };
-
-        let interface_instructions = self.interface_renderer.get_instructions();
-        let bottom_layer_instructions = self.bottom_interface_renderer.get_instructions();
-        let middle_layer_instructions = self.middle_interface_renderer.get_instructions();
-        let top_layer_instructions = self.top_interface_renderer.get_instructions();
-
-        let directional_light = DirectionalLightInstruction {
-            view_projection_matrix: self.directional_shadow_camera.view_projection_matrix(),
-            direction: directional_light_direction,
-            color: directional_light_color,
-        };
-
-        let render_instruction = RenderInstruction {
-            show_interface: self.show_interface,
-            picker_position,
-            uniforms,
-            indicator: indicator_instruction,
-            interface: interface_instructions.as_slice(),
-            bottom_layer_rectangles: bottom_layer_instructions.as_slice(),
-            middle_layer_rectangles: middle_layer_instructions.as_slice(),
-            top_layer_rectangles: top_layer_instructions.as_slice(),
-            directional_light,
-            directional_light_partitions: &self.directional_shadow_camera.get_partition_instructions(),
-            point_light: &self.point_light_instructions,
-            point_light_with_shadows: &self.point_light_with_shadow_instructions,
-            model_batches: &self.model_batches,
-            models: &mut self.model_instructions,
-            entities: &mut self.entity_instructions,
-            directional_shadow_model_batches: &self.directional_shadow_model_batches,
-            directional_shadow_models: &self.directional_shadow_model_instructions,
-            directional_shadow_entities: &mut self.directional_shadow_entity_instructions,
-            point_shadow_models: &self.point_shadow_model_instructions,
-            point_shadow_entities: &self.point_shadow_entity_instructions,
-            effects: self.effect_renderer.get_instructions(),
-            water: water_instruction,
-            map_picker_tile_vertex_buffer: Some(map.get_tile_picker_vertex_buffer()),
-            map_picker_tile_index_buffer: Some(map.get_tile_picker_index_buffer()),
-            font_map_texture: Some(self.font_loader.get_font_map()),
-            #[cfg(feature = "debug")]
-            render_options,
-            #[cfg(feature = "debug")]
-            aabb: &self.aabb_instructions,
-            #[cfg(feature = "debug")]
-            circles: &self.circle_instructions,
-            #[cfg(feature = "debug")]
-            rectangles: &self.rectangle_instructions,
-            #[cfg(feature = "debug")]
-            marker: self.debug_marker_renderer.get_instructions(),
-        };
-
-        if let Some(frame) = maybe_frame {
-            self.graphics_engine.render_next_frame(frame, render_instruction);
+            {
+                print_debug!("[{}] failed to apply {} updates: ", "error".red(), _errors.len());
+                _errors.into_iter().for_each(|error| print_debug!("path: {}", error.type_name));
+            }
         }
 
         self.hooks.inspect_state(&mut self.client_state);
+    }
+
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
+    fn update_settings(&mut self) {
+        let graphics_settings = self.client_state.follow(client_state().graphics_settings());
+
+        if self.active_graphics_settings.vsync != graphics_settings.vsync {
+            self.graphics_engine.set_vsync(graphics_settings.vsync);
+            self.active_graphics_settings.vsync = graphics_settings.vsync;
+        }
+
+        if self.active_graphics_settings.limit_framerate != graphics_settings.limit_framerate {
+            self.graphics_engine.set_limit_framerate(graphics_settings.limit_framerate);
+            self.active_graphics_settings.limit_framerate = graphics_settings.limit_framerate;
+        }
+
+        if self.active_graphics_settings.triple_buffering != graphics_settings.triple_buffering {
+            self.graphics_engine.set_triple_buffering(graphics_settings.triple_buffering);
+            self.active_graphics_settings.triple_buffering = graphics_settings.triple_buffering;
+        }
+
+        if self.active_graphics_settings.texture_filtering != graphics_settings.texture_filtering {
+            self.graphics_engine.set_texture_sampler_type(graphics_settings.texture_filtering);
+            self.active_graphics_settings.texture_filtering = graphics_settings.texture_filtering;
+        }
+
+        if self.active_graphics_settings.msaa != graphics_settings.msaa {
+            self.graphics_engine.set_msaa(graphics_settings.msaa);
+            self.active_graphics_settings.msaa = graphics_settings.msaa;
+        }
+
+        if self.active_graphics_settings.ssaa != graphics_settings.ssaa {
+            self.graphics_engine.set_ssaa(graphics_settings.ssaa);
+            self.active_graphics_settings.ssaa = graphics_settings.ssaa;
+        }
+
+        if self.active_graphics_settings.screen_space_anti_aliasing != graphics_settings.screen_space_anti_aliasing {
+            self.graphics_engine
+                .set_screen_space_anti_aliasing(graphics_settings.screen_space_anti_aliasing);
+            self.active_graphics_settings.screen_space_anti_aliasing = graphics_settings.screen_space_anti_aliasing;
+        }
+
+        if self.active_graphics_settings.shadow_resolution != graphics_settings.shadow_resolution {
+            self.graphics_engine.set_shadow_resolution(graphics_settings.shadow_resolution);
+            self.active_graphics_settings.shadow_resolution = graphics_settings.shadow_resolution;
+        }
+
+        if self.active_graphics_settings.high_quality_interface != graphics_settings.high_quality_interface {
+            self.interface_renderer
+                .update_high_quality_interface(graphics_settings.high_quality_interface);
+            self.graphics_engine
+                .set_high_quality_interface(graphics_settings.high_quality_interface);
+            self.active_graphics_settings.high_quality_interface = graphics_settings.high_quality_interface;
+        }
+
+        let language = *self.client_state.follow(client_state().interface_settings().language());
+
+        if self.active_interface_settings.language != language {
+            *self.client_state.follow_mut(client_state().localization()) = Localization::load_language(&self.game_file_loader, language);
+            self.active_interface_settings.language = language;
+        }
+
+        let interface_settings = self.client_state.follow_mut(client_state().interface_settings());
+
+        if self.active_interface_settings.menu_theme != interface_settings.menu_theme {
+            let menu_theme = interface_settings.menu_theme.clone();
+            let theme = InterfaceTheme::load(state::theme::InterfaceThemeType::Menu, &menu_theme);
+            *self.client_state.follow_mut(client_state().menu_theme()) = theme;
+            self.active_interface_settings.menu_theme = menu_theme;
+        }
+
+        let interface_settings = self.client_state.follow(client_state().interface_settings());
+
+        if self.active_interface_settings.in_game_theme != interface_settings.in_game_theme {
+            let in_game_theme = interface_settings.in_game_theme.clone();
+            let theme = InterfaceTheme::load(InterfaceThemeType::InGame, &in_game_theme);
+            *self.client_state.follow_mut(client_state().in_game_theme()) = theme;
+            self.active_interface_settings.in_game_theme = in_game_theme;
+        }
+
+        let interface_settings = self.client_state.follow(client_state().interface_settings());
+
+        if self.active_interface_settings.world_theme != interface_settings.world_theme {
+            let world_theme = interface_settings.world_theme.clone();
+            let theme = WorldTheme::load(&world_theme);
+            *self.client_state.follow_mut(client_state().world_theme()) = theme;
+            self.active_interface_settings.world_theme = world_theme;
+        }
     }
 }
 
@@ -3603,10 +3726,7 @@ impl<T: ClientHooks> ApplicationHandler for Client<T> {
                 }
             }
             WindowEvent::RedrawRequested => {
-                #[cfg(feature = "debug")]
-                let _measurement = threads::Main::start_frame();
-
-                self.update_and_render(event_loop);
+                self.render_frame(event_loop);
 
                 if let Some(window) = self.window.as_mut() {
                     window.request_redraw();
@@ -3625,397 +3745,6 @@ impl<T: ClientHooks> ApplicationHandler for Client<T> {
 
         if *self.client_state.follow(client_state().audio_settings().mute_on_focus_loss()) {
             self.audio_engine.mute(true);
-        }
-    }
-}
-
-/// Bundles all the borrows needed by the per-frame rendering pipeline so that
-/// they can be passed as a single `self` argument.
-struct MapRenderContext<'a, 'm: 'a> {
-    map: &'m Map,
-    current_camera: &'a (dyn Camera + Send + Sync),
-    point_light_set: &'a PointLightSet<'a>,
-    client_state: &'a State<ClientState>,
-    library: &'a Library,
-    mouse_position: ScreenPosition,
-    mouse_target: PickerTarget,
-    screen_size: ScreenSize,
-    scaling: Scaling,
-    client_tick: ClientTick,
-    animation_timer_ms: f32,
-    currently_playing: bool,
-    is_mouse_mode_default: bool,
-    is_interface_hovered: bool,
-    last_walking_destination: Option<TilePosition>,
-    buffered_action: Option<BufferedAction>,
-    #[cfg(feature = "debug")]
-    render_options: &'a RenderOptions,
-    #[cfg(feature = "debug")]
-    hovered_marker_identifier: Option<MarkerIdentifier>,
-    #[cfg(feature = "debug")]
-    pathing_texture_set: &'a Arc<TextureSet>,
-    #[cfg(feature = "debug")]
-    tile_texture_set: &'a Arc<TextureSet>,
-    #[cfg(feature = "debug")]
-    player_camera: &'a PlayerCamera,
-    #[cfg(feature = "debug")]
-    start_camera: &'a StartCamera,
-
-    // Mutable rendering state
-    model_batches: &'a mut Vec<ModelBatch>,
-    model_instructions: &'a mut Vec<ModelInstruction>,
-    entity_instructions: &'a mut Vec<EntityInstruction>,
-    directional_shadow_camera: &'a mut DirectionalShadowCamera,
-    directional_shadow_model_batches: &'a mut [Vec<ModelBatch>; PARTITION_COUNT],
-    directional_shadow_model_instructions: &'a mut Vec<ModelInstruction>,
-    directional_shadow_entity_instructions: &'a mut [Vec<EntityInstruction>; PARTITION_COUNT],
-    point_shadow_camera: &'a mut PointShadowCamera,
-    point_shadow_model_instructions: &'a mut Vec<ModelInstruction>,
-    point_light_with_shadow_instructions: &'a mut Vec<PointLightWithShadowInstruction>,
-    point_light_instructions: &'a mut Vec<PointLightInstruction>,
-    directional_shadow_object_set_buffer: &'a mut ResourceSetBuffer<ObjectKey>,
-    point_shadow_object_set_buffer: &'a mut ResourceSetBuffer<ObjectKey>,
-    deferred_object_set_buffer: &'a mut ResourceSetBuffer<ObjectKey>,
-    indicator_instruction: &'a mut Option<IndicatorInstruction>,
-    water_instruction: &'a mut Option<WaterInstruction<'m>>,
-    particle_holder: &'a mut ParticleHolder,
-    effect_holder: &'a mut EffectHolder,
-    effect_renderer: &'a mut EffectRenderer,
-    bottom_interface_renderer: &'a GameInterfaceRenderer,
-    middle_interface_renderer: &'a mut GameInterfaceRenderer,
-    #[cfg(feature = "debug")]
-    aabb_instructions: &'a mut Vec<DebugAabbInstruction>,
-    #[cfg(feature = "debug")]
-    circle_instructions: &'a mut Vec<DebugCircleInstruction>,
-    #[cfg(feature = "debug")]
-    rectangle_instructions: &'a mut Vec<DebugRectangleInstruction>,
-    #[cfg(feature = "debug")]
-    bounding_box_object_set_buffer: &'a mut ResourceSetBuffer<ObjectKey>,
-    #[cfg(feature = "debug")]
-    debug_marker_renderer: &'a mut DebugMarkerRenderer,
-}
-
-impl<'a, 'm: 'a> MapRenderContext<'a, 'm> {
-    #[inline(always)]
-    #[cfg(feature = "debug")]
-    #[korangar_debug::profile]
-    fn render_markers(&mut self) {
-        let entities = self.client_state.follow(client_state().entities());
-
-        self.map.render_markers(
-            self.debug_marker_renderer,
-            self.current_camera,
-            self.render_options,
-            entities,
-            self.point_light_set,
-            self.hovered_marker_identifier,
-        );
-
-        self.map.render_markers(
-            self.middle_interface_renderer,
-            self.current_camera,
-            self.render_options,
-            entities,
-            self.point_light_set,
-            self.hovered_marker_identifier,
-        );
-    }
-
-    #[inline(always)]
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn render_directional_shadows(&mut self) {
-        let entities = self.client_state.follow(client_state().entities());
-        let dead_entities = self.client_state.follow(client_state().dead_entities());
-        let ground_items = self.client_state.follow(client_state().ground_items());
-
-        for partition_index in 0..PARTITION_COUNT {
-            let partition_camera = self.directional_shadow_camera.get_partition_camera(partition_index);
-
-            let object_set = self.map.cull_objects_with_frustum(
-                &partition_camera,
-                self.directional_shadow_object_set_buffer,
-                #[cfg(feature = "debug")]
-                self.render_options.frustum_culling,
-            );
-
-            let offset = self.directional_shadow_model_instructions.len();
-            let model_batches = &mut self.directional_shadow_model_batches[partition_index];
-            let entity_instructions = &mut self.directional_shadow_entity_instructions[partition_index];
-
-            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(self.render_options.show_objects))]
-            self.map.render_objects(
-                self.directional_shadow_model_instructions,
-                &object_set,
-                self.animation_timer_ms,
-                &partition_camera,
-            );
-
-            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(self.render_options.show_map))]
-            self.map.render_ground(self.directional_shadow_model_instructions);
-
-            let count = self.directional_shadow_model_instructions.len() - offset;
-
-            model_batches.push(ModelBatch {
-                offset,
-                count,
-                texture_set: self.map.get_texture_set().clone(),
-                vertex_buffer: self.map.get_model_vertex_buffer().clone(),
-                index_buffer: self.map.get_model_index_buffer().clone(),
-            });
-
-            #[cfg(feature = "debug")]
-            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(self.render_options.show_map_tiles))]
-            self.map
-                .render_overlay_tiles(self.directional_shadow_model_instructions, model_batches, self.tile_texture_set);
-
-            #[cfg(feature = "debug")]
-            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(self.render_options.show_pathing))]
-            self.map.render_entity_pathing(
-                self.directional_shadow_model_instructions,
-                model_batches,
-                entities,
-                self.pathing_texture_set,
-            );
-
-            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(self.render_options.show_ground_items))]
-            self.map
-                .render_ground_items(entity_instructions, ground_items, &partition_camera, self.client_tick);
-
-            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(self.render_options.show_entities))]
-            self.map
-                .render_entities(entity_instructions, entities, &partition_camera, self.client_tick);
-
-            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(self.render_options.show_entities))]
-            self.map
-                .render_dead_entities(entity_instructions, dead_entities, &partition_camera, self.client_tick);
-        }
-    }
-
-    #[inline(always)]
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn render_point_lights(&mut self) {
-        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(self.render_options.enable_point_lights))]
-        self.point_light_set.render_point_lights(self.point_light_instructions);
-
-        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(self.render_options.enable_point_lights))]
-        self.point_light_set.render_point_lights_with_shadows(
-            self.map,
-            self.point_shadow_camera,
-            self.point_shadow_object_set_buffer,
-            self.point_shadow_model_instructions,
-            self.point_light_with_shadow_instructions,
-            self.animation_timer_ms,
-            #[cfg(feature = "debug")]
-            self.render_options,
-        );
-    }
-
-    #[inline(always)]
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn render_geometry(&mut self) {
-        let entities = self.client_state.follow(client_state().entities());
-        let dead_entities = self.client_state.follow(client_state().dead_entities());
-        let ground_items = self.client_state.follow(client_state().ground_items());
-
-        let offset = self.model_instructions.len();
-        let object_set = self.map.cull_objects_with_frustum(
-            self.current_camera,
-            self.deferred_object_set_buffer,
-            #[cfg(feature = "debug")]
-            self.render_options.frustum_culling,
-        );
-
-        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(self.render_options.show_objects))]
-        self.map.render_objects(
-            self.model_instructions,
-            &object_set,
-            self.animation_timer_ms,
-            self.current_camera,
-        );
-
-        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(self.render_options.show_map))]
-        self.map.render_ground(self.model_instructions);
-
-        self.model_batches.push(ModelBatch {
-            offset,
-            count: self.model_instructions.len() - offset,
-            texture_set: self.map.get_texture_set().clone(),
-            vertex_buffer: self.map.get_model_vertex_buffer().clone(),
-            index_buffer: self.map.get_model_index_buffer().clone(),
-        });
-
-        #[cfg(feature = "debug")]
-        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(self.render_options.show_map_tiles))]
-        self.map
-            .render_overlay_tiles(self.model_instructions, self.model_batches, self.tile_texture_set);
-
-        #[cfg(feature = "debug")]
-        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(self.render_options.show_pathing))]
-        self.map
-            .render_entity_pathing(self.model_instructions, self.model_batches, entities, self.pathing_texture_set);
-
-        let entity_camera: &dyn Camera = match true {
-            #[cfg(feature = "debug")]
-            _ if self.render_options.show_entities_paper => self.player_camera,
-            _ => self.current_camera,
-        };
-
-        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(self.render_options.show_ground_items))]
-        self.map
-            .render_ground_items(self.entity_instructions, ground_items, entity_camera, self.client_tick);
-
-        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(self.render_options.show_entities))]
-        self.map
-            .render_entities(self.entity_instructions, entities, entity_camera, self.client_tick);
-
-        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(self.render_options.show_entities))]
-        self.map
-            .render_dead_entities(self.entity_instructions, dead_entities, entity_camera, self.client_tick);
-
-        #[cfg(feature = "debug")]
-        if self.render_options.show_entities_debug {
-            self.map.render_entities_debug(self.rectangle_instructions, entities, entity_camera);
-            self.map
-                .render_entities_debug(self.rectangle_instructions, dead_entities, entity_camera);
-        }
-
-        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(self.render_options.show_water))]
-        self.map.render_water(self.water_instruction, self.animation_timer_ms);
-    }
-
-    #[inline(always)]
-    #[cfg(feature = "debug")]
-    #[korangar_debug::profile]
-    fn render_bounding_boxes(&mut self) {
-        if self.render_options.show_bounding_boxes {
-            let culling_camera: &dyn Camera = match self.currently_playing {
-                true => self.player_camera,
-                false => self.start_camera,
-            };
-
-            let object_set = self.map.cull_objects_with_frustum(
-                culling_camera,
-                self.bounding_box_object_set_buffer,
-                self.render_options.frustum_culling,
-            );
-
-            self.map
-                .render_bounding(self.aabb_instructions, self.render_options.frustum_culling, &object_set);
-        }
-    }
-
-    #[inline(always)]
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn render_world_overlays(&mut self) {
-        #[cfg(feature = "debug")]
-        if let Some(marker_identifier) = self.hovered_marker_identifier {
-            self.map.render_marker_overlay(
-                self.aabb_instructions,
-                self.circle_instructions,
-                self.current_camera,
-                marker_identifier,
-                self.point_light_set,
-                self.animation_timer_ms,
-            );
-        }
-
-        self.particle_holder.render(
-            self.bottom_interface_renderer,
-            self.current_camera,
-            self.screen_size,
-            self.scaling,
-            self.client_state.follow(client_state().entities()),
-        );
-
-        self.effect_holder.render(self.effect_renderer, self.current_camera);
-
-        if let Some(player) = self.client_state.try_follow(this_entity()) {
-            #[cfg(feature = "debug")]
-            profile_block!("render player status");
-
-            player.render_status(
-                self.middle_interface_renderer,
-                self.current_camera,
-                self.client_state.follow(client_state().world_theme()),
-                self.screen_size,
-            );
-        }
-
-        if let Some(BufferedAction::AttackEntity { entity_id }) = self.buffered_action
-            && let Some(entity) = self
-                .client_state
-                .follow(client_state().entities())
-                .iter()
-                .find(|entity| entity.get_entity_id() == entity_id)
-        {
-            entity.render_status(
-                self.middle_interface_renderer,
-                self.current_camera,
-                self.client_state.follow(client_state().world_theme()),
-                self.screen_size,
-            );
-        }
-
-        match self.mouse_target {
-            PickerTarget::Tile { x, y } => {
-                // Only show if the mouse mode is default or walking.
-                if self.currently_playing
-                    && !self.is_interface_hovered
-                    && (self.is_mouse_mode_default || self.last_walking_destination.is_some())
-                {
-                    let walk_indicator_color = *self.client_state.follow(client_state().world_theme().indicator().walking());
-
-                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(self.render_options.show_indicators))]
-                    self.map
-                        .render_walk_indicator(self.indicator_instruction, walk_indicator_color, TilePosition { x, y });
-                }
-            }
-            PickerTarget::Entity(entity_id) => {
-                if !self.is_interface_hovered && self.is_mouse_mode_default {
-                    if let Some(entity) = self
-                        .client_state
-                        .follow(client_state().entities())
-                        .iter()
-                        .find(|entity| entity.get_entity_id() == entity_id)
-                    {
-                        // Since the buffered attack entity will render its status anyway,
-                        // we make sure not to render it here again if it's the same.
-                        if !self
-                            .buffered_action
-                            .is_some_and(|buffered_action| buffered_action.is_attack_entity(entity_id))
-                        {
-                            entity.render_status(
-                                self.middle_interface_renderer,
-                                self.current_camera,
-                                self.client_state.follow(client_state().world_theme()),
-                                self.screen_size,
-                            );
-                        }
-
-                        if let Some(name) = &entity.get_details() {
-                            let name = name.split('#').next().unwrap();
-                            self.middle_interface_renderer
-                                .render_hover_text(name, self.scaling, self.mouse_position);
-                        }
-                    } else if let Some(item) = self
-                        .client_state
-                        .follow(client_state().ground_items())
-                        .iter()
-                        .find(|item| item.get_entity_id() == entity_id)
-                    {
-                        let name = self.library.get::<ItemName>(ItemNameKey {
-                            item_id: item.item_id,
-                            is_identified: item.is_identified,
-                        });
-
-                        // TODO: Don't allocate every frame
-                        let text = format!("{name}: {}ea", item.quantity);
-                        self.middle_interface_renderer
-                            .render_hover_text(&text, self.scaling, self.mouse_position);
-                    }
-                }
-            }
-            _ => {}
         }
     }
 }

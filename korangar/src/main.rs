@@ -1,5 +1,5 @@
 use clap::Parser;
-use korangar::Client;
+use korangar::{Client, NoHooks};
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -12,7 +12,7 @@ struct Arguments {
 fn main() {
     let arguments = Arguments::parse();
 
-    if let Some(mut client) = Client::init(arguments.sync_cache) {
+    if let Some(mut client) = Client::init(arguments.sync_cache, NoHooks) {
         client.run();
     }
 }

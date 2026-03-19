@@ -98,6 +98,7 @@ impl WaterPlane {
 
 #[derive(RustState)]
 pub struct Map {
+    resource_file: String,
     width: u16,
     height: u16,
     level_bound: AABB,
@@ -132,6 +133,7 @@ pub struct Map {
 impl Map {
     #[cfg(not(feature = "debug"))]
     pub fn new(
+        resource_file: String,
         width: u16,
         height: u16,
         level_bound: AABB,
@@ -153,6 +155,7 @@ impl Map {
         videos: Mutex<Vec<Video>>,
     ) -> Self {
         Self {
+            resource_file,
             width,
             height,
             level_bound,
@@ -177,6 +180,7 @@ impl Map {
 
     #[cfg(feature = "debug")]
     pub fn new(
+        resource_file: String,
         width: u16,
         height: u16,
         level_bound: AABB,
@@ -203,6 +207,7 @@ impl Map {
         map_data: MapData,
     ) -> Self {
         Self {
+            resource_file,
             width,
             height,
             level_bound,
@@ -232,6 +237,10 @@ impl Map {
 }
 
 impl Map {
+    pub fn resource_file(&self) -> &str {
+        &self.resource_file
+    }
+
     fn average_tile_height(tile: &Tile) -> f32 {
         (tile.southwest_corner_height + tile.southeast_corner_height + tile.northwest_corner_height + tile.northeast_corner_height) / 4.0
     }

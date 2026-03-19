@@ -329,6 +329,11 @@ struct Client {
     window: Option<Arc<Window>>,
 
     map: Option<Box<Map>>,
+    /// Caches the last visited map so that switching back to it avoids a full async reload.
+    /// This optimizes many scenarios where a player is portal skilling a monster or enter a shop
+    /// and returns to the city. A cheap tradeoff of memory (we hold 2 maps in memory) for speed.
+    previous_map: Option<Box<Map>>,
+
     client_state: State<ClientState>,
 }
 
@@ -731,6 +736,7 @@ impl Client {
             window: None,
 
             map: Some(map),
+            previous_map: None,
             client_state,
         })
     }
@@ -938,6 +944,7 @@ impl Client {
                         .connect_to_character_server(self.saved_packet_version, login_data, server);
 
                     self.map = None;
+                    self.previous_map = None;
 
                     self.particle_holder.clear();
                     self.effect_holder.clear();
@@ -1101,6 +1108,7 @@ impl Client {
                     self.client_state.follow_mut(client_state().dialog_window()).end();
 
                     self.map = None;
+                    self.previous_map = None;
 
                     self.particle_holder.clear();
                     self.effect_holder.clear();
@@ -1309,22 +1317,48 @@ impl Client {
                     }
                 }
                 NetworkEvent::ChangeMap { map_name, position } => {
-                    self.map = None;
-                    self.particle_holder.clear();
-                    self.effect_holder.clear();
-                    self.point_light_manager.clear();
-                    self.audio_engine.clear_ambient_sound();
+                    let is_same_map = self.map.as_ref().is_some_and(|map| map.resource_file() == map_name);
+                    let cached_previous = self.previous_map.as_ref().is_some_and(|map| map.resource_file() == map_name);
 
-                    // Only the player must stay alive between map changes.
+                    // Common cleanup for any map transition.
                     self.client_state.follow_mut(client_state().entities()).truncate(1);
                     self.client_state.follow_mut(client_state().dead_entities()).clear();
                     self.client_state.follow_mut(client_state().ground_items()).clear();
                     *self.client_state.follow_mut(client_state().buffered_action()) = None;
-
-                    // Close any remaining dialogs.
+                    self.particle_holder.clear();
+                    self.effect_holder.clear();
                     self.interface.close_window_with_class(WindowClass::Dialog);
 
-                    self.async_loader.request_map_load(map_name, Some(position));
+                    if is_same_map {
+                        // Same-map warp: reposition the player without reloading.
+                        let map = self.map.as_ref().unwrap();
+                        let player = self.client_state.follow_mut(this_entity().manually_asserted());
+                        player.set_position(map, position, client_tick);
+                        self.player_camera.set_focus_point(player.get_position());
+                        let _ = self.networking_system.map_loaded();
+                    } else if cached_previous {
+                        // Swap back to the cached previous map.
+                        let old_map = self.map.take();
+                        self.map = self.previous_map.take();
+                        self.previous_map = old_map;
+
+                        let map = self.map.as_ref().unwrap();
+                        map.set_ambient_sound_sources(&self.audio_engine);
+                        self.audio_engine.play_background_music_track(map.background_music_track_name());
+                        self.directional_shadow_camera.set_level_bound(map.get_level_bound());
+
+                        let player = self.client_state.follow_mut(this_entity().manually_asserted());
+                        player.set_position(map, position, client_tick);
+                        self.player_camera.set_focus_point(player.get_position());
+                        let _ = self.networking_system.map_loaded();
+                    } else {
+                        // Different map: save current, full teardown and async reload.
+                        self.previous_map = self.map.take();
+                        self.point_light_manager.clear();
+                        self.audio_engine.clear_ambient_sound();
+
+                        self.async_loader.request_map_load(map_name, Some(position));
+                    }
                 }
                 NetworkEvent::UpdateClientTick { client_tick, received_at } => {
                     self.game_timer.set_client_tick(client_tick, received_at);

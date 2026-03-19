@@ -8,6 +8,7 @@ extern crate core;
 pub(crate) mod backend;
 pub(crate) mod command;
 mod decibels;
+pub(crate) mod device_info;
 mod error;
 mod frame;
 pub(crate) mod listener;
@@ -41,6 +42,7 @@ use korangar_loaders::FileLoader;
 use rayon::spawn;
 
 use crate::backend::cpal::CpalBackend;
+pub use crate::device_info::{DeviceId, DeviceInfo, DeviceName};
 use crate::decibels::Decibels;
 use crate::frame::Frame;
 use crate::manager::{AudioManager, AudioManagerSettings};
@@ -149,9 +151,11 @@ struct EngineContext<F> {
 }
 
 impl<F: FileLoader> AudioEngine<F> {
-    /// Crates a new audio engine.
-    pub fn new(game_file_loader: Arc<F>) -> AudioEngine<F> {
-        let mut manager = AudioManager::<CpalBackend>::new(AudioManagerSettings::default()).expect("can't initialize audio kira");
+    /// Creates a new audio engine. `preferred_device` is a saved device ID
+    /// from a previous session, or `None` to use the system default.
+    pub fn new(game_file_loader: Arc<F>, preferred_device: Option<DeviceId>) -> AudioEngine<F> {
+        let mut manager =
+            AudioManager::<CpalBackend>::new(AudioManagerSettings::default(), preferred_device).expect("can't initialize audio engine");
         let background_music_track = manager
             .add_sub_track(TrackBuilder::default())
             .expect("can't create background music track");
@@ -205,6 +209,26 @@ impl<F: FileLoader> AudioEngine<F> {
     pub fn cache_statistics(&self) -> CacheStatistics {
         let context = self.engine_context.lock().unwrap();
         context.cache.statistics()
+    }
+
+    /// Returns info for all available output devices.
+    pub fn list_output_devices(&self) -> Vec<DeviceInfo> {
+        backend::cpal::OutputDevice::list_all()
+    }
+
+    /// Sets the preferred output device by its stable ID. `None` follows
+    /// the system default. If the specified device is unavailable, falls
+    /// back to the default.
+    pub fn set_output_device(&self, device: Option<DeviceId>) {
+        let context = self.engine_context.lock().unwrap();
+        context.manager.preference().set(device);
+    }
+
+    /// Returns the currently preferred output device ID, or `None` if
+    /// following the system default.
+    pub fn preferred_output_device(&self) -> Option<DeviceId> {
+        let context = self.engine_context.lock().unwrap();
+        context.manager.preference().get()
     }
 
     /// Mutes or unmutes the audio.

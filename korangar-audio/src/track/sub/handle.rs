@@ -1,10 +1,10 @@
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
 use cgmath::Point3;
 
 use super::{CommandWriters, SpatialTrackBuilder, SpatialTrackHandle, Track, TrackShared};
-use crate::backend::RendererShared;
 use crate::backend::resources::ResourceController;
 use crate::command::ValueChangeCommand;
 use crate::decibels::Decibels;
@@ -16,8 +16,7 @@ use crate::sound::{Sound, SoundData};
 /// When a [`TrackHandle`] is dropped, the corresponding mixer track will be
 /// removed.
 pub(crate) struct TrackHandle {
-    pub(crate) backend_sample_rate: u32,
-    pub(crate) renderer_shared: Arc<RendererShared>,
+    pub(crate) current_sample_rate: Arc<AtomicU32>,
     pub(crate) shared: Arc<TrackShared>,
     pub(crate) command_writers: CommandWriters,
     pub(crate) sound_controller: ResourceController<Box<dyn Sound>>,
@@ -26,10 +25,10 @@ pub(crate) struct TrackHandle {
 }
 
 impl TrackHandle {
-    /// Plays a sound.
+    /// Plays a sound, resampling to the device sample rate.
     pub(crate) fn play<D: SoundData>(&mut self, sound_data: D) -> Result<D::Handle, PlaySoundError<D::Error>> {
         let (sound, handle) = sound_data
-            .into_sound(self.backend_sample_rate)
+            .into_sound(self.current_sample_rate.load(Ordering::SeqCst))
             .map_err(PlaySoundError::IntoSoundError)?;
         self.sound_controller.insert(sound).map_err(|_| PlaySoundError::SoundLimitReached)?;
         Ok(handle)
@@ -41,7 +40,7 @@ impl TrackHandle {
         position: Point3<f32>,
         builder: SpatialTrackBuilder,
     ) -> Result<SpatialTrackHandle, ResourceLimitReached> {
-        let (track, handle) = builder.build(self.renderer_shared.clone(), self.internal_buffer_size, position);
+        let (track, handle) = builder.build(self.current_sample_rate.clone(), self.internal_buffer_size, position);
         self.sub_track_controller.insert(track)?;
         Ok(handle)
     }

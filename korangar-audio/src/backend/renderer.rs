@@ -1,30 +1,14 @@
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU32, Ordering};
-
 use super::resources::Resources;
 use crate::Frame;
 
-pub(crate) struct RendererShared {
-    pub(crate) sample_rate: AtomicU32,
-}
-
-impl RendererShared {
-    #[must_use]
-    pub(crate) fn new(sample_rate: u32) -> Self {
-        Self {
-            sample_rate: AtomicU32::new(sample_rate),
-        }
-    }
-}
-
 /// Produces [`Frame`]s of audio data to be consumed by a
 /// low-level audio API.
-///
-/// You will probably not need to interact with [`Renderer`]s
-/// directly unless you're writing a [`Backend`](super::Backend).
+/// 
+/// Walks the mixer tree (main track → sub-tracks → sounds) each callback,
+/// mixing all active audio into the output buffer.
 pub(crate) struct Renderer {
+    /// Time step per sample, derived from the device sample rate.
     dt: f64,
-    shared: Arc<RendererShared>,
     resources: Resources,
     internal_buffer_size: usize,
     temp_buffer: Vec<Frame>,
@@ -32,24 +16,21 @@ pub(crate) struct Renderer {
 
 impl Renderer {
     #[must_use]
-    pub(crate) fn new(shared: Arc<RendererShared>, internal_buffer_size: usize, resources: Resources) -> Self {
+    pub(crate) fn new(sample_rate: u32, internal_buffer_size: usize, resources: Resources) -> Self {
         Self {
-            dt: 1.0 / shared.sample_rate.load(Ordering::SeqCst) as f64,
-            shared,
+            dt: 1.0 / sample_rate as f64,
             resources,
             internal_buffer_size,
             temp_buffer: vec![Frame::ZERO; internal_buffer_size],
         }
     }
 
-    /// Called by the kira when the sample rate of the
-    /// audio output changes.
+    /// Called when the audio device's sample rate changes.
     pub(crate) fn on_change_sample_rate(&mut self, sample_rate: u32) {
         self.dt = 1.0 / sample_rate as f64;
-        self.shared.sample_rate.store(sample_rate, Ordering::SeqCst);
     }
 
-    /// Called by the kira when it's time to process
+    /// Called by the backend when it's time to process
     /// a new batch of samples.
     pub(crate) fn on_start_processing(&mut self) {
         self.resources.mixer.on_start_processing();

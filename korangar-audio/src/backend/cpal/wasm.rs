@@ -20,7 +20,7 @@ pub(crate) struct CpalBackend {
 impl Backend for CpalBackend {
     type Error = Error;
 
-    fn setup(_internal_buffer_size: usize) -> Result<(Self, u32), Self::Error> {
+    fn setup() -> Result<(Self, u32), Self::Error> {
         let (device, config) = default_device_and_config()?;
         let sample_rate = config.sample_rate.0;
 

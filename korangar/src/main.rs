@@ -413,7 +413,7 @@ impl Client {
         });
 
         time_phase!("create audio engine", {
-            let audio_engine = Arc::new(AudioEngine::new(game_file_loader.clone()));
+            let audio_engine = Arc::new(AudioEngine::new(game_file_loader.clone(), None));
             audio_engine.set_background_music_volume(0.1);
         });
 

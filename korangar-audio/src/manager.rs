@@ -6,41 +6,49 @@
 //! [`AudioManager`] is dropped, its audio output will be stopped.
 
 use std::sync::Arc;
+use std::sync::atomic::AtomicU32;
 
 use crate::backend::resources::{ResourceControllers, create_resources};
-use crate::backend::{Backend, DefaultBackend, Renderer, RendererShared};
+use crate::backend::{Backend, DefaultBackend, Renderer};
+use crate::device_info::{DeviceId, DeviceInfo, OutputDevicePreference};
 use crate::error::ResourceLimitReached;
 use crate::listener::ListenerHandle;
 use crate::track::{MainTrackBuilder, MainTrackHandle, TrackBuilder, TrackHandle};
+
+/// Size of the internal mixing buffer in frames.
+const INTERNAL_BUFFER_SIZE: usize = 256;
 
 /// Controls audio from gameplay code.
 pub(crate) struct AudioManager<B: Backend = DefaultBackend> {
     _backend: B,
     resource_controllers: ResourceControllers,
-    renderer_shared: Arc<RendererShared>,
-    internal_buffer_size: usize,
+    current_sample_rate: Arc<AtomicU32>,
+    preference: Arc<OutputDevicePreference>,
 }
 
 impl<B: Backend> AudioManager<B> {
     /// Creates a new [`AudioManager`].
-    pub(crate) fn new(settings: AudioManagerSettings) -> Result<Self, B::Error> {
-        let (mut backend, sample_rate) = B::setup(settings.internal_buffer_size)?;
-        let renderer_shared = Arc::new(RendererShared::new(sample_rate));
+    pub(crate) fn new(settings: AudioManagerSettings, preferred: Option<DeviceId>) -> Result<Self, B::Error> {
+        let (mut backend, device_info, preference) = B::setup(preferred)?;
+        let current_sample_rate = Arc::new(AtomicU32::new(device_info.sample_rate));
+
         let (resources, resource_controllers) =
-            create_resources(settings.capacities, settings.main_track_builder, settings.internal_buffer_size);
-        let renderer = Renderer::new(renderer_shared.clone(), settings.internal_buffer_size, resources);
-        backend.start(renderer)?;
+            create_resources(settings.capacities, settings.main_track_builder, INTERNAL_BUFFER_SIZE);
+
+        let renderer = Renderer::new(device_info.sample_rate, INTERNAL_BUFFER_SIZE, resources);
+
+        backend.start(renderer, current_sample_rate.clone())?;
         Ok(Self {
             _backend: backend,
             resource_controllers,
-            renderer_shared,
-            internal_buffer_size: settings.internal_buffer_size,
+            current_sample_rate,
+            preference,
         })
     }
 
     /// Creates a mixer sub-track.
     pub(crate) fn add_sub_track(&mut self, builder: TrackBuilder) -> Result<TrackHandle, ResourceLimitReached> {
-        let (track, handle) = builder.build(self.renderer_shared.clone(), self.internal_buffer_size);
+        let (track, handle) = builder.build(self.current_sample_rate.clone(), INTERNAL_BUFFER_SIZE);
         self.resource_controllers.sub_track_controller.insert(track)?;
         Ok(handle)
     }
@@ -56,6 +64,16 @@ impl<B: Backend> AudioManager<B> {
     #[must_use]
     pub(crate) fn main_track(&mut self) -> &mut MainTrackHandle {
         &mut self.resource_controllers.main_track_handle
+    }
+
+    /// Returns the device preference.
+    pub(crate) fn preference(&self) -> &Arc<OutputDevicePreference> {
+        &self.preference
+    }
+
+    /// Returns the current live sample rate.
+    pub(crate) fn sample_rate(&self) -> u32 {
+        self.current_sample_rate.load(std::sync::atomic::Ordering::SeqCst)
     }
 }
 
@@ -80,8 +98,6 @@ pub(crate) struct AudioManagerSettings {
     pub(crate) capacities: Capacities,
     /// Configures the main mixer track.
     pub(crate) main_track_builder: MainTrackBuilder,
-    /// Determines how often modulators will be updated (in samples).
-    pub(crate) internal_buffer_size: usize,
 }
 
 impl Default for AudioManagerSettings {
@@ -89,7 +105,6 @@ impl Default for AudioManagerSettings {
         Self {
             capacities: Capacities::default(),
             main_track_builder: MainTrackBuilder::default(),
-            internal_buffer_size: 256,
         }
     }
 }

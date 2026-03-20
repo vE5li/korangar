@@ -95,7 +95,11 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
 
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some(DRAWER_NAME),
-            bind_group_layouts: &[pass_bind_group_layouts[0], pass_bind_group_layouts[1], &bind_group_layout],
+            bind_group_layouts: &[
+                Some(pass_bind_group_layouts[0]),
+                Some(pass_bind_group_layouts[1]),
+                Some(&bind_group_layout),
+            ],
             immediate_size: 0,
         });
 
@@ -158,8 +162,8 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
             },
             depth_stencil: Some(DepthStencilState {
                 format: depth_attachment_formats[0],
-                depth_write_enabled: false,
-                depth_compare: CompareFunction::Greater,
+                depth_write_enabled: Some(false),
+                depth_compare: Some(CompareFunction::Greater),
                 stencil: StencilState::default(),
                 bias: DepthBiasState::default(),
             }),

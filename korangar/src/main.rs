@@ -91,8 +91,9 @@ use wgpu::Device;
 use wgpu::util::initialize_adapter_from_env_or_default;
 use wgpu::wgt::{Dx12SwapchainKind, Dx12UseFrameLatencyWaitableObject};
 use wgpu::{
-    BackendOptions, Backends, DeviceDescriptor, Dx12BackendOptions, Dx12Compiler, ExperimentalFeatures, GlBackendOptions, GlFenceBehavior,
-    Gles3MinorVersion, Instance, InstanceDescriptor, InstanceFlags, MemoryBudgetThresholds, MemoryHints, NoopBackendOptions, Queue, Trace,
+    BackendOptions, Backends, DeviceDescriptor, Dx12BackendOptions, Dx12Compiler, ExperimentalFeatures, ForceShaderModelToken,
+    GlBackendOptions, GlDebugFns, GlFenceBehavior, Gles3MinorVersion, Instance, InstanceDescriptor, InstanceFlags, MemoryBudgetThresholds,
+    MemoryHints, NoopBackendOptions, Queue, Trace,
 };
 use winit::application::ApplicationHandler;
 use winit::dpi::{LogicalSize, PhysicalSize};
@@ -342,7 +343,7 @@ impl Client {
         });
 
         time_phase!("create adapter", {
-            let instance = Instance::new(&InstanceDescriptor {
+            let instance = Instance::new(InstanceDescriptor {
                 backends: Backends::all().with_env(),
                 flags: InstanceFlags::from_build_config().with_env(),
                 memory_budget_thresholds: MemoryBudgetThresholds::default(),
@@ -350,14 +351,19 @@ impl Client {
                     gl: GlBackendOptions {
                         gles_minor_version: Gles3MinorVersion::Automatic,
                         fence_behavior: GlFenceBehavior::Normal,
+                        debug_fns: GlDebugFns::Auto,
                     },
                     dx12: Dx12BackendOptions {
                         shader_compiler: Dx12Compiler::StaticDxc.with_env(),
                         presentation_system: Dx12SwapchainKind::DxgiFromHwnd,
                         latency_waitable_object: Dx12UseFrameLatencyWaitableObject::Wait,
+                        force_shader_model: ForceShaderModelToken::default(),
+                        agility_sdk: None,
                     },
                     noop: NoopBackendOptions { enable: false },
                 },
+                // On Vulkan, Metal and Dx12, this is currently unused.
+                display: None,
             });
 
             let adapter = pollster::block_on(async { initialize_adapter_from_env_or_default(&instance, None).await.unwrap() });

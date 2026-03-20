@@ -2,7 +2,7 @@ use cgmath::Vector2;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, print_debug};
 use rust_state::RustState;
-use wgpu::{Adapter, Device, PresentMode, SurfaceConfiguration, SurfaceTexture, TextureFormat};
+use wgpu::{Adapter, CurrentSurfaceTexture, Device, PresentMode, SurfaceConfiguration, SurfaceTexture, TextureFormat};
 
 use crate::graphics::ScreenSize;
 
@@ -100,32 +100,31 @@ impl Surface {
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn acquire(&mut self) -> SurfaceTexture {
-        let frame = match self.surface.get_current_texture() {
-            Ok(frame) => frame,
-            // On timeout, we will just try again.
-            Err(wgpu::SurfaceError::Timeout) => self.surface
-                .get_current_texture()
-                .expect("Failed to acquire next surface texture!"),
-            Err(
-                wgpu::SurfaceError::Lost
-                | wgpu::SurfaceError::Other
-                // If OutOfMemory happens, reconfiguring may not help, but we might as well try.
-                | wgpu::SurfaceError::OutOfMemory
-                // If the surface is outdated, or was lost, reconfigure it.
-                | wgpu::SurfaceError::Outdated
-            ) => {
-                self.surface.configure(&self.device, &self.config);
-                self.surface
-                    .get_current_texture()
-                    .expect("Failed to acquire next surface texture!")
+        match self.surface.get_current_texture() {
+            CurrentSurfaceTexture::Success(texture) => texture,
+            CurrentSurfaceTexture::Suboptimal(texture) => {
+                self.invalid = true;
+                texture
             }
-        };
-
-        if frame.suboptimal {
-            self.invalid = true;
+            CurrentSurfaceTexture::Timeout
+            | CurrentSurfaceTexture::Occluded
+            | CurrentSurfaceTexture::Outdated
+            | CurrentSurfaceTexture::Lost
+            | CurrentSurfaceTexture::Validation => {
+                self.surface.configure(&self.device, &self.config);
+                match self.surface.get_current_texture() {
+                    CurrentSurfaceTexture::Success(texture) => texture,
+                    CurrentSurfaceTexture::Suboptimal(texture) => texture,
+                    CurrentSurfaceTexture::Timeout
+                    | CurrentSurfaceTexture::Occluded
+                    | CurrentSurfaceTexture::Outdated
+                    | CurrentSurfaceTexture::Lost
+                    | CurrentSurfaceTexture::Validation => {
+                        panic!("Failed to acquire next surface texture!");
+                    }
+                }
+            }
         }
-
-        frame
     }
 
     pub fn invalidate(&mut self) {

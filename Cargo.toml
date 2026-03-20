@@ -6,7 +6,7 @@ members = ["korangar", "ragnarok-*", "korangar-*"]
 arrayvec = "0.7"
 bitflags = "2"
 blake3 = { version = "1", default-features = true }
-block_compression = { version = "0.8", default-features = false }
+block_compression = { version = "0.9", default-features = false }
 bumpalo = "3"
 bytemuck = "1"
 cgmath = "0.18"
@@ -49,7 +49,7 @@ rand_aes = { version = "0.6", default-features = false }
 rav1d = { version = "1", git = "https://github.com/memorysafety/rav1d.git", rev = "c8019327ff0aa4c097475fa5f679561ea3abd983" }
 rayon = "1"
 reqwest = "0.13"
-resampler = "0.4"
+resampler = "0.5"
 ron = "0.12"
 rtrb = "0.3"
 rust-state = { git = "https://github.com/vE5li/rust-state" }
@@ -63,7 +63,7 @@ syn = "2"
 sys-locale = "0.3"
 tokio = { version = "1", default-features = false }
 walkdir = "2"
-wgpu = "28"
+wgpu = "29"
 winit = "0.30"
 
 [profile.release]

@@ -127,10 +127,14 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
 
         let pass_bind_group_layouts = Self::Context::bind_group_layout(device);
 
-        let bind_group_layouts: &[&BindGroupLayout] = if capabilities.bindless_support() == BindlessSupport::Full {
-            &[pass_bind_group_layouts[0], &bind_group_layout]
+        let bind_group_layouts: &[Option<&BindGroupLayout>] = if capabilities.bindless_support() == BindlessSupport::Full {
+            &[Some(pass_bind_group_layouts[0]), Some(&bind_group_layout)]
         } else {
-            &[pass_bind_group_layouts[0], &bind_group_layout, Texture::bind_group_layout(device)]
+            &[
+                Some(pass_bind_group_layouts[0]),
+                Some(&bind_group_layout),
+                Some(Texture::bind_group_layout(device)),
+            ]
         };
 
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
@@ -162,8 +166,8 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
             multisample: MultisampleState::default(),
             depth_stencil: Some(DepthStencilState {
                 format: render_pass_context.depth_attachment_output_format()[0],
-                depth_write_enabled: true,
-                depth_compare: CompareFunction::Greater,
+                depth_write_enabled: Some(true),
+                depth_compare: Some(CompareFunction::Greater),
                 stencil: StencilState::default(),
                 bias: DepthBiasState::default(),
             }),

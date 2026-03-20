@@ -192,7 +192,7 @@ impl Buffer<u64> {
         self.buffer.slice(..).map_async(wgpu::MapMode::Read, move |result| {
             match result {
                 Ok(_) => {
-                    let mapped = captured_buffer.slice(..).get_mapped_range_mut();
+                    let mapped = captured_buffer.slice(..).get_mapped_range();
 
                     if VALUE_SIZE <= mapped.len() {
                         // The mapped memory is not guaranteed to be aligned to u64.
@@ -224,7 +224,7 @@ impl Buffer<Partition> {
         self.buffer.slice(..).map_async(wgpu::MapMode::Read, move |result| {
             match result {
                 Ok(_) => {
-                    let mapped = captured_buffer.slice(..).get_mapped_range_mut();
+                    let mapped = captured_buffer.slice(..).get_mapped_range();
 
                     if VALUE_SIZE <= mapped.len() {
                         // The mapped memory is not guaranteed to be aligned to Partition.

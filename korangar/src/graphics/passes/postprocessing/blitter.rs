@@ -107,7 +107,7 @@ impl PostProcessingBlitterDrawer {
 
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some(DRAWER_NAME),
-            bind_group_layouts: &[pass_bind_group_layouts[0], &texture_bind_group_layout],
+            bind_group_layouts: &[Some(pass_bind_group_layouts[0]), Some(&texture_bind_group_layout)],
             immediate_size: 0,
         });
 

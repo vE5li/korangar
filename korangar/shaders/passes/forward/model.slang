@@ -42,8 +42,8 @@ struct ModelVertexOutput {
 [[vk::binding(0, 2)]] var instance_data: StructuredBuffer<ModelInstanceData>;
 [[vk::binding(0, 3)]] var texture: Texture2D;
 
-[[vk::constant_id(0)]] const var PASS_MODE: int;
-[[vk::constant_id(1)]] const var ALPHA_TO_COVERAGE_ACTIVATED: bool;
+[[vk::constant_id(0)]] const var ALPHA_TO_COVERAGE_ACTIVATED: bool;
+[[vk::constant_id(1)]] const var PASS_MODE: int;
 
 [[shader("vertex")]]
 func vs_main(input: ModelVertexInput) -> ModelVertexOutput {

@@ -31,7 +31,7 @@ impl Dispatch<{ BindGroupCount::Two }> for ReduceBoundsDispatcher {
 
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some(DISPATCHER_NAME),
-            bind_group_layouts: &[pass_bind_group_layouts[0], pass_bind_group_layouts[1]],
+            bind_group_layouts: &[Some(pass_bind_group_layouts[0]), Some(pass_bind_group_layouts[1])],
             immediate_size: 0,
         });
 

@@ -55,14 +55,21 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
         let pass_bind_group_layouts = Self::Context::bind_group_layout(device);
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some(DRAWER_NAME),
-            bind_group_layouts: &[pass_bind_group_layouts[0], &texture_bind_group_layout, &texture_bind_group_layout],
+            bind_group_layouts: &[
+                Some(pass_bind_group_layouts[0]),
+                Some(&texture_bind_group_layout),
+                Some(&texture_bind_group_layout),
+            ],
             immediate_size: 0,
         });
 
-        let constants = &[
-            // MSAA_SAMPLE_COUNT
-            ("0", f64::from(global_context.msaa.sample_count())),
-        ];
+        let constants: &[(&str, f64)] = match msaa_activated {
+            true => &[
+                // MSAA_SAMPLE_COUNT
+                ("0", f64::from(global_context.msaa.sample_count())),
+            ],
+            false => &[],
+        };
 
         let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
             label: Some(DRAWER_NAME),

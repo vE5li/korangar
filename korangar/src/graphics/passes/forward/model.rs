@@ -125,10 +125,10 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some(DRAWER_NAME),
             bind_group_layouts: &[
-                pass_bind_group_layouts[0],
-                pass_bind_group_layouts[1],
-                &bind_group_layout,
-                texture_bind_group,
+                Some(pass_bind_group_layouts[0]),
+                Some(pass_bind_group_layouts[1]),
+                Some(&bind_group_layout),
+                Some(texture_bind_group),
             ],
             immediate_size: 0,
         });
@@ -146,6 +146,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
                 PolygonMode::Line,
                 &color_attachment_formats,
                 ModelPassMode::Opaque,
+                false,
             )
         } else {
             Self::create_pipeline(
@@ -157,6 +158,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
                 PolygonMode::Fill,
                 &color_attachment_formats,
                 ModelPassMode::Opaque,
+                false,
             )
         };
 
@@ -169,6 +171,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
             PolygonMode::Fill,
             &color_attachment_formats,
             ModelPassMode::Opaque,
+            true,
         );
 
         let semi_transparent_pipeline = Self::create_pipeline(
@@ -180,6 +183,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
             PolygonMode::Fill,
             &color_attachment_formats,
             ModelPassMode::SemiOpaque,
+            true,
         );
 
         let transparent_pipeline = Self::create_pipeline(
@@ -191,6 +195,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::Three }, { DepthAtt
             PolygonMode::Fill,
             &color_attachment_formats,
             ModelPassMode::Transparent,
+            true,
         );
 
         Self {
@@ -461,6 +466,7 @@ impl ForwardModelDrawer {
         polygon_mode: PolygonMode,
         color_attachment_formats: &[TextureFormat; 3],
         pass_mode: ModelPassMode,
+        use_pipeline_constants: bool,
     ) -> RenderPipeline {
         let targets = match pass_mode {
             ModelPassMode::Opaque | ModelPassMode::SemiOpaque => [
@@ -526,7 +532,7 @@ impl ForwardModelDrawer {
         let opaque = pass_mode != ModelPassMode::Transparent;
         let alpha_to_coverage_activated = msaa.multisampling_activated() && opaque;
 
-        let constants = &[
+        let constants: &[(&str, f64)] = &[
             // ALPHA_TO_COVERAGE_ACTIVATED
             ("0", f64::from(u32::from(alpha_to_coverage_activated))),
             // PASS_MODE
@@ -539,17 +545,14 @@ impl ForwardModelDrawer {
             vertex: VertexState {
                 module: shader_module,
                 entry_point: Some("vs_main"),
-                compilation_options: PipelineCompilationOptions {
-                    constants,
-                    zero_initialize_workgroup_memory: false,
-                },
+                compilation_options: PipelineCompilationOptions::default(),
                 buffers: &[ModelVertex::buffer_layout()],
             },
             fragment: Some(FragmentState {
                 module: shader_module,
                 entry_point: if opaque { Some("opaque_main") } else { Some("transparent_main") },
                 compilation_options: PipelineCompilationOptions {
-                    constants,
+                    constants: if use_pipeline_constants { constants } else { &[] },
                     zero_initialize_workgroup_memory: false,
                 },
                 targets: &targets,
@@ -571,8 +574,8 @@ impl ForwardModelDrawer {
             },
             depth_stencil: Some(DepthStencilState {
                 format: render_pass_context.depth_attachment_output_format()[0],
-                depth_write_enabled: opaque,
-                depth_compare: CompareFunction::Greater,
+                depth_write_enabled: Some(opaque),
+                depth_compare: Some(CompareFunction::Greater),
                 stencil: StencilState::default(),
                 bias: DepthBiasState::default(),
             }),

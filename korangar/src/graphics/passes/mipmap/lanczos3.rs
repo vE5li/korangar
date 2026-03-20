@@ -20,7 +20,7 @@ impl Lanczos3Drawer {
 
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some(DRAWER_NAME),
-            bind_group_layouts: &[pass_bind_group_layouts[0]],
+            bind_group_layouts: &[Some(pass_bind_group_layouts[0])],
             immediate_size: 0,
         });
 

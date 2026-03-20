@@ -114,7 +114,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
 
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some(DRAWER_NAME),
-            bind_group_layouts: &[bind_group_layouts[0], &bind_group_layout],
+            bind_group_layouts: &[Some(bind_group_layouts[0]), Some(&bind_group_layout)],
             immediate_size: 0,
         });
 

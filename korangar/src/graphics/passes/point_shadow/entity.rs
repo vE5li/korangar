@@ -124,14 +124,18 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
 
         let pass_bind_group_layouts = Self::Context::bind_group_layout(device);
 
-        let bind_group_layouts: &[&BindGroupLayout] = if capabilities.bindless_support() == BindlessSupport::Full {
-            &[pass_bind_group_layouts[0], pass_bind_group_layouts[1], &bind_group_layout]
+        let bind_group_layouts: &[Option<&BindGroupLayout>] = if capabilities.bindless_support() == BindlessSupport::Full {
+            &[
+                Some(pass_bind_group_layouts[0]),
+                Some(pass_bind_group_layouts[1]),
+                Some(&bind_group_layout),
+            ]
         } else {
             &[
-                pass_bind_group_layouts[0],
-                pass_bind_group_layouts[1],
-                &bind_group_layout,
-                Texture::bind_group_layout(device),
+                Some(pass_bind_group_layouts[0]),
+                Some(pass_bind_group_layouts[1]),
+                Some(&bind_group_layout),
+                Some(Texture::bind_group_layout(device)),
             ]
         };
 
@@ -141,35 +145,27 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
             immediate_size: 0,
         });
 
-        let constants = &[("near_plane", NEAR_PLANE as f64)];
-
         let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
             label: Some(DRAWER_NAME),
             layout: Some(&pipeline_layout),
             vertex: VertexState {
                 module: &shader_module,
                 entry_point: Some("vs_main"),
-                compilation_options: PipelineCompilationOptions {
-                    constants,
-                    ..Default::default()
-                },
+                compilation_options: PipelineCompilationOptions::default(),
                 buffers: &[],
             },
             fragment: Some(FragmentState {
                 module: &shader_module,
                 entry_point: Some("fs_main"),
-                compilation_options: PipelineCompilationOptions {
-                    constants,
-                    ..Default::default()
-                },
+                compilation_options: PipelineCompilationOptions::default(),
                 targets: &[],
             }),
             primitive: PrimitiveState::default(),
             multisample: MultisampleState::default(),
             depth_stencil: Some(DepthStencilState {
                 format: render_pass_context.depth_attachment_output_format()[0],
-                depth_write_enabled: true,
-                depth_compare: CompareFunction::Greater,
+                depth_write_enabled: Some(true),
+                depth_compare: Some(CompareFunction::Greater),
                 stencil: StencilState::default(),
                 bias: DepthBiasState::default(),
             }),

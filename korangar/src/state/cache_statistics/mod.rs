@@ -4,12 +4,13 @@ use korangar_interface::window::StateWindow;
 use rust_state::RustState;
 
 use crate::interface::windows::WindowClass;
-use crate::loaders::{ActionLoader, AnimationLoader, EffectLoader, FontLoader, GameFileLoader, SpriteLoader, TextureLoader};
+use crate::loaders::{ActionLoader, AnimationLoader, EffectLoader, FontLoader, GameFileLoader, MapLoader, SpriteLoader, TextureLoader};
 
 #[derive(Clone, Copy, PartialEq, Default, RustState, StateElement, StateWindow)]
 #[window_class(WindowClass::CacheStatistics)]
 #[window_title("Cache Statistics")]
 pub struct CacheStatistics {
+    map_cache: korangar_container::CacheStatistics,
     texture_cache: korangar_container::CacheStatistics,
     sprite_cache: korangar_container::CacheStatistics,
     font_cache: korangar_container::CacheStatistics,
@@ -25,6 +26,7 @@ impl CacheStatistics {
     pub fn update(
         &mut self,
         delta_time: f64,
+        map_loader: &MapLoader,
         texture_loader: &TextureLoader,
         sprite_loader: &SpriteLoader,
         font_loader: &FontLoader,
@@ -38,6 +40,7 @@ impl CacheStatistics {
         if self.last_update >= 1.0 {
             self.last_update = 0.0;
 
+            self.map_cache = map_loader.cache_statistics();
             self.texture_cache = texture_loader.cache_statistics();
             self.sprite_cache = sprite_loader.cache_statistics();
             self.font_cache = font_loader.cache_statistics();

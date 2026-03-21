@@ -34,7 +34,8 @@ impl Backend for CpalBackend {
     fn setup(preferred: Option<DeviceId>) -> Result<(Self, DeviceInfo, Arc<OutputDevicePreference>), Self::Error> {
         let output = OutputDevice::resolve(preferred.as_ref())?;
         let device_info = output.device_info();
-        let preference = Arc::new(OutputDevicePreference::new(preferred));
+        let available = OutputDevice::list_all();
+        let preference = Arc::new(OutputDevicePreference::new(preferred, available));
         Ok((
             Self {
                 state: State::Uninitialized { output, preference: preference.clone() },
@@ -92,6 +93,9 @@ impl Backend for CpalBackend {
                         }
                     }
                 }
+
+                // Refresh the available device list for the UI.
+                preference.update_available_devices(OutputDevice::list_all());
             }
         });
 

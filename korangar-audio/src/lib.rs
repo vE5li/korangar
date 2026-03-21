@@ -211,9 +211,22 @@ impl<F: FileLoader> AudioEngine<F> {
         context.cache.statistics()
     }
 
-    /// Returns info for all available output devices.
+    /// Returns true if the available device list has changed since the
+    /// last call, and provides the updated list.
+    pub fn take_device_list_update(&self) -> Option<Vec<DeviceInfo>> {
+        let context = self.engine_context.lock().unwrap();
+        let preference = context.manager.preference();
+        if preference.take_devices_changed() {
+            Some(preference.available_devices())
+        } else {
+            None
+        }
+    }
+
+    /// Returns the current list of available output devices.
     pub fn list_output_devices(&self) -> Vec<DeviceInfo> {
-        backend::cpal::OutputDevice::list_all()
+        let context = self.engine_context.lock().unwrap();
+        context.manager.preference().available_devices()
     }
 
     /// Sets the preferred output device by its stable ID. `None` follows

@@ -79,6 +79,7 @@ use rust_state::{ManuallyAssertExt, State};
 use rust_state::{VecIndexExt, VecLookupExt};
 use settings::{
     AudioSettings, AudioSettingsPathExt, GraphicsSettingsCapabilities, GraphicsSettingsPathExt, InterfaceSettings, InterfaceSettingsPathExt,
+    OutputDeviceOption, OutputDeviceOptionId,
 };
 use state::hotbar::HotbarPathExt;
 use state::inventory::InventoryPathExt;
@@ -320,6 +321,7 @@ struct Client {
     #[cfg(not(feature = "debug"))]
     networking_system: NetworkingSystem<NoPacketCallback>,
     audio_engine: Arc<AudioEngine<GameFileLoader>>,
+    active_audio_settings: AudioSettings,
     active_interface_settings: InterfaceSettings,
     active_graphics_settings: GraphicsSettings,
     graphics_engine: GraphicsEngine,
@@ -413,8 +415,26 @@ impl Client {
         });
 
         time_phase!("create audio engine", {
-            let audio_engine = Arc::new(AudioEngine::new(game_file_loader.clone(), None));
+            let preferred_device = AudioSettings::load()
+                .and_then(|s| s.preferred_device_id.clone())
+                .map(korangar_audio::DeviceId::new);
+            let audio_engine = Arc::new(AudioEngine::new(game_file_loader.clone(), preferred_device));
             audio_engine.set_background_music_volume(0.1);
+
+            // Build the device list for audio settings.
+            let mut device_options = vec![OutputDeviceOption {
+                display_name: "System Default".to_string(),
+                device_id: None,
+                index: OutputDeviceOptionId(0),
+            }];
+            for (i, info) in audio_engine.list_output_devices().into_iter().enumerate() {
+                device_options.push(OutputDeviceOption {
+                    display_name: info.name.to_string(),
+                    device_id: Some(info.id.as_str().to_string()),
+                    index: OutputDeviceOptionId(i + 1),
+                });
+            }
+            let audio_settings = AudioSettings::new(device_options);
         });
 
         time_phase!("create resource managers", {
@@ -635,12 +655,14 @@ impl Client {
             let client_state = State::new(ClientState::new(
                 &game_file_loader,
                 graphics_settings.clone(),
+                audio_settings,
                 #[cfg(feature = "debug")]
                 packet_history,
             ));
         });
 
         let active_interface_settings = client_state.follow(crate::client_state().interface_settings()).clone();
+        let active_audio_settings = client_state.follow(crate::client_state().audio_settings()).clone();
 
         interface.open_window(LoginWindow::new(
             crate::client_state().login_window(),
@@ -722,6 +744,7 @@ impl Client {
             main_menu_click_sound_effect,
             networking_system,
             audio_engine,
+            active_audio_settings,
             active_interface_settings,
             active_graphics_settings: graphics_settings,
             graphics_engine,
@@ -3594,6 +3617,45 @@ impl Client {
             self.graphics_engine
                 .set_high_quality_interface(graphics_settings.high_quality_interface);
             self.active_graphics_settings.high_quality_interface = graphics_settings.high_quality_interface;
+        }
+
+        // Refresh the available device list if the backend detected a change.
+        if let Some(live_devices) = self.audio_engine.take_device_list_update() {
+            let mut device_options = vec![OutputDeviceOption {
+                display_name: "System Default".to_string(),
+                device_id: None,
+                index: OutputDeviceOptionId(0),
+            }];
+            for (i, info) in live_devices.into_iter().enumerate() {
+                device_options.push(OutputDeviceOption {
+                    display_name: info.name.to_string(),
+                    device_id: Some(info.id.as_str().to_string()),
+                    index: OutputDeviceOptionId(i + 1),
+                });
+            }
+            self.client_state
+                .follow_mut(client_state().audio_settings())
+                .available_output_devices = device_options;
+        }
+
+        // Detect audio settings changes.
+        let audio_settings = self.client_state.follow(client_state().audio_settings());
+        let selected_device = audio_settings.selected_output_device;
+        let mute_on_focus_loss = audio_settings.mute_on_focus_loss;
+
+        if selected_device != self.active_audio_settings.selected_output_device {
+            self.active_audio_settings.selected_output_device = selected_device;
+            let audio_settings = self.client_state.follow(client_state().audio_settings());
+            let new_device_id = audio_settings.selected_device_id().cloned();
+            self.audio_engine.set_output_device(new_device_id.as_ref().map(|id| korangar_audio::DeviceId::new(id.clone())));
+            let audio_settings = self.client_state.follow_mut(client_state().audio_settings());
+            audio_settings.preferred_device_id = new_device_id;
+            audio_settings.save();
+        }
+
+        if mute_on_focus_loss != self.active_audio_settings.mute_on_focus_loss {
+            self.active_audio_settings.mute_on_focus_loss = mute_on_focus_loss;
+            self.client_state.follow(client_state().audio_settings()).save();
         }
 
         let language = *self.client_state.follow(client_state().interface_settings().language());

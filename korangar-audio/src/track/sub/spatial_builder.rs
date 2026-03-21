@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use std::sync::atomic::AtomicU32;
 
 use cgmath::Point3;
 
@@ -69,7 +68,6 @@ impl SpatialTrackBuilder {
     #[must_use]
     pub(crate) fn build(
         self,
-        current_sample_rate: Arc<AtomicU32>,
         internal_buffer_size: usize,
         position: Point3<f32>,
     ) -> (Track, SpatialTrackHandle) {
@@ -94,7 +92,6 @@ impl SpatialTrackBuilder {
             temp_buffer: vec![Frame::ZERO; internal_buffer_size],
         };
         let handle = SpatialTrackHandle {
-            current_sample_rate,
             shared,
             sound_controller,
         };

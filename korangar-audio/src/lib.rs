@@ -37,7 +37,7 @@ use korangar_container::{
     CacheStatistics, Cacheable, GenerationalSlab, SimpleCache, SimpleSlab, create_generational_key, create_simple_key,
 };
 #[cfg(feature = "debug")]
-use korangar_debug::logging::{Colorize, print_debug};
+use korangar_debug::logging::{Colorize, Timer, print_debug};
 use korangar_loaders::FileLoader;
 use rayon::spawn;
 
@@ -109,6 +109,8 @@ enum AsyncLoadResult {
         path: String,
         key: SoundEffectKey,
         sound_effect: Box<StaticSoundData>,
+        #[cfg(feature = "debug")]
+        load_duration: Duration,
     },
     Error {
         path: String,
@@ -519,6 +521,12 @@ impl<F: FileLoader> EngineContext<F> {
                 continue;
             };
 
+            #[cfg(feature = "debug")]
+            {
+                let path = self.sound_effect_paths.get(sound_config.sound_effect_key).cloned().unwrap_or_default();
+                print_debug!("ambient sound entered range: {}", path);
+            }
+
             let position = sound_config.bounds.center();
 
             let spatial_track = SpatialTrackBuilder::new()
@@ -583,6 +591,14 @@ impl<F: FileLoader> EngineContext<F> {
         // Remove ambient sound that are out of reach.
         difference(&mut self.previous_query_result, &mut self.query_result, &mut self.scratchpad);
         for ambient_key in self.scratchpad.iter() {
+            #[cfg(feature = "debug")]
+            {
+                let path = self.ambient_sound.get(*ambient_key)
+                    .and_then(|c| self.sound_effect_paths.get(c.sound_effect_key))
+                    .cloned()
+                    .unwrap_or_default();
+                print_debug!("ambient sound left range: {}", path);
+            }
             let _ = self.active_spatial_tracks.remove(ambient_key);
             let _ = self.cycling_ambient.remove(ambient_key);
         }
@@ -666,7 +682,12 @@ impl<F: FileLoader> EngineContext<F> {
                     path: _path,
                     key,
                     sound_effect,
+                    #[cfg(feature = "debug")]
+                    load_duration: _duration,
                 } => {
+                    #[cfg(feature = "debug")]
+                    print_debug!("load sound effect from {} ({}ms)", _path.magenta(), _duration.as_millis());
+
                     self.loading_sound_effect.remove(&key);
 
                     if let Err(_error) = self.cache.insert(key, CachedSoundEffect(*sound_effect)) {
@@ -813,7 +834,10 @@ impl<F: FileLoader> EngineContext<F> {
             return;
         };
 
-        let data = match StreamingSoundData::from_file(path, true) {
+        #[cfg(feature = "debug")]
+        let _timer = Timer::new_dynamic(format!("load background music from {}", path.display()));
+
+        let data = match StreamingSoundData::from_file(&path, true) {
             Ok(sound_effect_data) => sound_effect_data,
             Err(_error) => {
                 #[cfg(feature = "debug")]
@@ -876,6 +900,9 @@ fn spawn_async_load(
     spawn(move || {
         let full_path = format!("{SOUND_EFFECT_BASE_PATH}\\{path}");
 
+        #[cfg(feature = "debug")]
+        let start = Instant::now();
+
         let data = match game_file_loader.get(&full_path) {
             Ok(data) => data,
             Err(error) => {
@@ -892,7 +919,13 @@ fn spawn_async_load(
                 return;
             }
         };
-        let _ = async_response_sender.send(AsyncLoadResult::Loaded { path, key, sound_effect });
+        let _ = async_response_sender.send(AsyncLoadResult::Loaded {
+            path,
+            key,
+            sound_effect,
+            #[cfg(feature = "debug")]
+            load_duration: start.elapsed(),
+        });
     });
 }
 

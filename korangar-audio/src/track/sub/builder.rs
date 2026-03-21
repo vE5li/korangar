@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use std::sync::atomic::AtomicU32;
 
 use super::{Track, TrackHandle, TrackShared, command_writers_and_readers};
 use crate::backend::resources::ResourceStorage;
@@ -14,7 +13,7 @@ pub(crate) struct TrackBuilder {}
 
 impl TrackBuilder {
     #[must_use]
-    pub(crate) fn build(self, current_sample_rate: Arc<AtomicU32>, internal_buffer_size: usize) -> (Track, TrackHandle) {
+    pub(crate) fn build(self, internal_buffer_size: usize) -> (Track, TrackHandle) {
         let (command_writers, command_readers) = command_writers_and_readers();
         let shared = Arc::new(TrackShared::new());
         let (sounds, sound_controller) = ResourceStorage::new(128);
@@ -31,7 +30,6 @@ impl TrackBuilder {
             temp_buffer: vec![Frame::ZERO; internal_buffer_size],
         };
         let handle = TrackHandle {
-            current_sample_rate,
             shared,
             command_writers,
             sound_controller,

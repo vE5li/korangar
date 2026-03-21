@@ -1,7 +1,7 @@
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU32, Ordering};
 
 use super::TrackShared;
+use crate::backend::MIXER_SAMPLE_RATE;
 use crate::backend::resources::ResourceController;
 use crate::error::PlaySoundError;
 use crate::sound::{Sound, SoundData};
@@ -11,7 +11,6 @@ use crate::sound::{Sound, SoundData};
 /// When a [`SpatialTrackHandle`] is dropped, the corresponding mixer
 /// track will be removed.
 pub(crate) struct SpatialTrackHandle {
-    pub(crate) current_sample_rate: Arc<AtomicU32>,
     pub(crate) shared: Arc<TrackShared>,
     pub(crate) sound_controller: ResourceController<Box<dyn Sound>>,
 }
@@ -20,7 +19,7 @@ impl SpatialTrackHandle {
     /// Plays a sound.
     pub(crate) fn play<D: SoundData>(&mut self, sound_data: D) -> Result<D::Handle, PlaySoundError<D::Error>> {
         let (sound, handle) = sound_data
-            .into_sound(self.current_sample_rate.load(Ordering::SeqCst))
+            .into_sound(MIXER_SAMPLE_RATE)
             .map_err(PlaySoundError::IntoSoundError)?;
         self.sound_controller.insert(sound).map_err(|_| PlaySoundError::SoundLimitReached)?;
         Ok(handle)

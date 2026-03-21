@@ -415,9 +415,15 @@ impl Client {
         });
 
         time_phase!("create audio engine", {
-            let preferred_device = AudioSettings::load()
-                .and_then(|s| s.preferred_device_id.clone())
+            let mut audio_settings = AudioSettings::new();
+            let preferred_device = audio_settings.preferred_device_id.clone()
                 .map(korangar_audio::DeviceId::new);
+            #[cfg(feature = "debug")]
+            match &preferred_device {
+                Some(id) => print_debug!("preferred audio device: {}", id.as_str().magenta()),
+                None => print_debug!("no preferred audio device, using system default"),
+            }
+
             let audio_engine = Arc::new(AudioEngine::new(game_file_loader.clone(), preferred_device));
             audio_engine.set_background_music_volume(0.1);
 
@@ -434,7 +440,7 @@ impl Client {
                     index: OutputDeviceOptionId(i + 1),
                 });
             }
-            let audio_settings = AudioSettings::new(device_options);
+            audio_settings.set_device_list(device_options);
         });
 
         time_phase!("create resource managers", {
@@ -3621,6 +3627,9 @@ impl Client {
 
         // Refresh the available device list if the backend detected a change.
         if let Some(live_devices) = self.audio_engine.take_device_list_update() {
+            let audio_settings = self.client_state.follow(client_state().audio_settings());
+            let current_device_id = audio_settings.selected_device_id().cloned();
+
             let mut device_options = vec![OutputDeviceOption {
                 display_name: "System Default".to_string(),
                 device_id: None,
@@ -3633,9 +3642,21 @@ impl Client {
                     index: OutputDeviceOptionId(i + 1),
                 });
             }
-            self.client_state
-                .follow_mut(client_state().audio_settings())
-                .available_output_devices = device_options;
+
+            // Find the previously selected device in the new list.
+            let new_selected = current_device_id
+                .as_ref()
+                .and_then(|id| {
+                    device_options.iter()
+                        .find(|d| d.device_id.as_ref() == Some(id))
+                        .map(|d| d.index)
+                })
+                .unwrap_or(OutputDeviceOptionId(0));
+
+            let audio_settings = self.client_state.follow_mut(client_state().audio_settings());
+            audio_settings.available_output_devices = device_options;
+            audio_settings.selected_output_device = new_selected;
+            self.active_audio_settings.selected_output_device = new_selected;
         }
 
         // Detect audio settings changes.

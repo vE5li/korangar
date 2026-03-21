@@ -1,8 +1,11 @@
 mod stream_manager;
 
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
+
+#[cfg(feature = "debug")]
+use korangar_debug::logging::{Colorize, print_debug};
 
 use self::stream_manager::StreamManager;
 use super::{Error, OutputDevice};
@@ -34,6 +37,22 @@ impl Backend for CpalBackend {
     fn setup(preferred: Option<DeviceId>) -> Result<(Self, DeviceInfo, Arc<OutputDevicePreference>), Self::Error> {
         let output = OutputDevice::resolve(preferred.as_ref())?;
         let device_info = output.device_info();
+        #[cfg(feature = "debug")]
+        {
+            let source = match &preferred {
+                Some(id) if device_info.id == *id => "preferred",
+                Some(_) => "default (preferred not found)",
+                None => "default",
+            };
+            print_debug!(
+                "[{}] using {} device {} ({}Hz, {} ch)",
+                "audio".magenta(),
+                source,
+                device_info.name,
+                device_info.sample_rate,
+                device_info.channels
+            );
+        }
         let available = OutputDevice::list_all();
         let preference = Arc::new(OutputDevicePreference::new(preferred, available));
         Ok((
@@ -45,7 +64,7 @@ impl Backend for CpalBackend {
         ))
     }
 
-    fn start(&mut self, renderer: Renderer, current_sample_rate: Arc<AtomicU32>) -> Result<(), Self::Error> {
+    fn start(&mut self, renderer: Renderer) -> Result<(), Self::Error> {
         let state = std::mem::replace(&mut self.state, State::Empty);
         let State::Uninitialized { output, preference } = state else {
             panic!("cannot initialize the audio backend multiple times");
@@ -85,9 +104,16 @@ impl Backend for CpalBackend {
 
                 if let Ok(target) = OutputDevice::resolve(preference.get().as_ref()) {
                     if needs_restart || target.id() != current_device.id() {
+                        #[cfg(feature = "debug")]
+                        {
+                            let info = target.device_info();
+                            print_debug!(
+                                "[{}] switching to device {} ({}Hz, {} ch)",
+                                "audio".magenta(), info.name, info.sample_rate, info.channels
+                            );
+                        }
                         manager.stop_stream();
                         if let Ok(consumer) = manager.start_stream(&target) {
-                            current_sample_rate.store(target.config.sample_rate, Ordering::SeqCst);
                             current_device = target;
                             error_consumer = consumer;
                         }

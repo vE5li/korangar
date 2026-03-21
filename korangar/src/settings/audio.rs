@@ -47,6 +47,19 @@ pub struct AudioSettings {
 }
 
 impl AudioSettings {
+    /// Sets the available device list and resolves the selected device
+    /// from the saved preference.
+    pub fn set_device_list(&mut self, device_list: Vec<OutputDeviceOption>) {
+        self.selected_output_device = self.preferred_device_id.as_ref()
+            .and_then(|saved_id| {
+                device_list.iter()
+                    .find(|d| d.device_id.as_deref() == Some(saved_id.as_str()))
+                    .map(|d| d.index)
+            })
+            .unwrap_or(OutputDeviceOptionId(0));
+        self.available_output_devices = device_list;
+    }
+
     /// Returns the preferred device ID derived from the current selection.
     pub fn selected_device_id(&self) -> Option<&String> {
         self.available_output_devices
@@ -69,23 +82,12 @@ impl Default for AudioSettings {
 impl AudioSettings {
     const FILE_NAME: &'static str = "client/audio_settings.ron";
 
-    pub fn new(device_list: Vec<OutputDeviceOption>) -> Self {
-        let mut settings = Self::load().unwrap_or_else(|| {
+    pub fn new() -> Self {
+        Self::load().unwrap_or_else(|| {
             #[cfg(feature = "debug")]
             print_debug!("failed to load audio settings from {}", Self::FILE_NAME.magenta());
             Default::default()
-        });
-
-        // Find which device in the list matches the saved preference.
-        settings.selected_output_device = settings.preferred_device_id.as_ref()
-            .and_then(|saved_id| {
-                device_list.iter()
-                    .find(|d| d.device_id.as_deref() == Some(saved_id.as_str()))
-                    .map(|d| d.index)
-            })
-            .unwrap_or(OutputDeviceOptionId(0));
-        settings.available_output_devices = device_list;
-        settings
+        })
     }
 
     pub fn load() -> Option<Self> {

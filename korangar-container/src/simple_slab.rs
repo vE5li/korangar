@@ -289,6 +289,14 @@ impl<I: SimpleKey, V> SecondarySimpleSlab<I, V> {
             _marker: PhantomData,
         }
     }
+
+    /// Returns the approximate number of bytes used up by the heap allocated
+    /// fields in this tree.
+    ///
+    /// This does not include the the size of this struct itself.
+    pub fn dynamic_size(&self) -> usize {
+        self.entries.len() * size_of::<Option<V>>()
+    }
 }
 
 /// Iterator over all non-empty entry slots.

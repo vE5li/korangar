@@ -36,7 +36,7 @@ pub enum LoadableResource {
     ItemSprite { texture: Arc<Texture> },
     SkillSprite { sprite: Arc<Sprite> },
     SkillActions { actions: Arc<Actions> },
-    Map { map: Box<Map>, position: Option<TilePosition> },
+    Map { map: Arc<Map>, position: Option<TilePosition> },
 }
 
 enum LoadStatus {
@@ -266,18 +266,28 @@ impl AsyncLoader {
     }
 
     pub fn request_map_load(&self, map_name: String, position: Option<TilePosition>) {
-        let map_loader = self.map_loader.clone();
-        let model_loader = self.model_loader.clone();
-        let texture_loader = self.texture_loader.clone();
-        let video_loader = self.video_loader.clone();
-        let library = self.library.clone();
+        match self.map_loader.get(&map_name) {
+            Some(map) => {
+                self.pending_loads.lock().unwrap().insert(
+                    LoaderId::Map(map_name.clone()),
+                    LoadStatus::Completed(LoadableResource::Map { map, position }),
+                );
+            }
+            None => {
+                let map_loader = self.map_loader.clone();
+                let model_loader = self.model_loader.clone();
+                let texture_loader = self.texture_loader.clone();
+                let video_loader = self.video_loader.clone();
+                let library = self.library.clone();
 
-        self.request_load(LoaderId::Map(map_name.clone()), move || {
-            #[cfg(feature = "debug")]
-            let _load_measurement = Profiler::start_measurement("map load");
-            let map = map_loader.load(map_name, &model_loader, texture_loader, video_loader.clone(), &library)?;
-            Ok(LoadableResource::Map { map, position })
-        });
+                self.request_load(LoaderId::Map(map_name.clone()), move || {
+                    #[cfg(feature = "debug")]
+                    let _load_measurement = Profiler::start_measurement("map load");
+                    let map = map_loader.load(map_name, &model_loader, texture_loader, video_loader.clone(), &library)?;
+                    Ok(LoadableResource::Map { map, position })
+                });
+            }
+        }
     }
 
     pub fn request_skill_tree_layout_load(&self, job_id: JobId, client_tick: ClientTick) -> SkillTreeLayout {

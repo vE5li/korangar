@@ -238,6 +238,8 @@ struct Client {
     effect_loader: Arc<EffectLoader>,
     font_loader: Arc<FontLoader>,
     #[cfg(feature = "debug")]
+    map_loader: Arc<MapLoader>,
+    #[cfg(feature = "debug")]
     sprite_loader: Arc<SpriteLoader>,
     texture_loader: Arc<TextureLoader>,
     library: Arc<Library>,
@@ -329,7 +331,7 @@ struct Client {
     device: Device,
     window: Option<Arc<Window>>,
 
-    map: Option<Box<Map>>,
+    map: Option<Arc<Map>>,
     client_state: State<ClientState>,
 }
 
@@ -663,6 +665,8 @@ impl Client {
             async_loader,
             effect_loader,
             font_loader,
+            #[cfg(feature = "debug")]
+            map_loader,
             #[cfg(feature = "debug")]
             sprite_loader,
             texture_loader,
@@ -2692,6 +2696,7 @@ impl Client {
 
             self.client_state.follow_mut(client_state().cache_statistics()).update(
                 delta_time,
+                &self.map_loader,
                 &self.texture_loader,
                 &self.sprite_loader,
                 &self.font_loader,

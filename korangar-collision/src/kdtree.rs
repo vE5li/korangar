@@ -421,6 +421,14 @@ impl<K: SimpleKey + Ord + Hash, O: Insertable> KDTree<K, O> {
             }
         }
     }
+
+    /// Returns the approximate number of bytes used up by the heap allocated
+    /// fields in this tree.
+    ///
+    /// This does not include the the size of this struct itself.
+    pub fn dynamic_size(&self) -> usize {
+        self.nodes.len() * size_of::<KDTreeNode<K>>() + self.objects.dynamic_size()
+    }
 }
 
 #[derive(Copy, Clone)]

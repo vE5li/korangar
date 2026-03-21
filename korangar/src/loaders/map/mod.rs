@@ -1,6 +1,7 @@
 mod vertices;
 mod water_plane;
 
+use std::num::{NonZeroU32, NonZeroUsize};
 use std::sync::{Arc, Mutex};
 
 use bytemuck::Pod;
@@ -8,9 +9,11 @@ use cgmath::Vector3;
 use hashbrown::HashMap;
 use korangar_audio::AudioEngine;
 use korangar_collision::{AABB, KDTree, Sphere};
-use korangar_container::SimpleSlab;
 #[cfg(feature = "debug")]
-use korangar_debug::logging::Timer;
+use korangar_container::CacheStatistics;
+use korangar_container::{SimpleCache, SimpleSlab};
+#[cfg(feature = "debug")]
+use korangar_debug::logging::{Colorize, Timer, print_debug};
 use korangar_loaders::FileLoader;
 use ragnarok_bytes::{ByteReader, FromBytes};
 use ragnarok_formats::map::{GatData, GroundData, MapData, MapResources};
@@ -27,6 +30,9 @@ use crate::{EffectSourceExt, LightSourceExt, Map, Object, ObjectKey, SoundSource
 
 pub const GROUND_TILE_SIZE: f32 = 10.0;
 pub const GAT_TILE_SIZE: f32 = 5.0;
+
+const MAX_CACHE_COUNT: u32 = 8;
+const MAX_CACHE_SIZE: usize = usize::MAX;
 
 #[cfg(feature = "debug")]
 fn assert_byte_reader_empty(mut byte_reader: ByteReader, file_name: &str) {
@@ -47,6 +53,7 @@ pub struct MapLoader {
     game_file_loader: Arc<GameFileLoader>,
     audio_engine: Arc<AudioEngine<GameFileLoader>>,
     bindless_support: BindlessSupport,
+    cache: Mutex<SimpleCache<String, Arc<Map>>>,
 }
 
 impl MapLoader {
@@ -63,11 +70,51 @@ impl MapLoader {
             game_file_loader,
             audio_engine,
             bindless_support,
+            cache: Mutex::new(SimpleCache::new(
+                NonZeroU32::new(MAX_CACHE_COUNT).unwrap(),
+                NonZeroUsize::new(MAX_CACHE_SIZE).unwrap(),
+            )),
         }
     }
-}
 
-impl MapLoader {
+    #[cfg(feature = "debug")]
+    pub fn cache_statistics(&self) -> CacheStatistics {
+        self.cache.lock().unwrap().statistics()
+    }
+
+    fn build_buffer_and_textures(
+        &self,
+        resource_file: &str,
+        texture_set_builder: TextureSetBuilder,
+        model_vertices: Vec<ModelVertex>,
+        model_indices: Vec<u32>,
+    ) -> BufferAndTextures {
+        let vertex_buffer = Arc::new(create_vertex_buffer(
+            &self.device,
+            &self.queue,
+            resource_file,
+            "map vertices",
+            &model_vertices,
+        ));
+        let index_buffer = Arc::new(create_index_buffer(
+            &self.device,
+            &self.queue,
+            resource_file,
+            "map indices",
+            &model_indices,
+        ));
+        let (texture_set, videos) = texture_set_builder.build();
+        let texture_set = Arc::new(texture_set);
+        let videos = Mutex::new(videos);
+
+        BufferAndTextures {
+            vertex_buffer,
+            index_buffer,
+            texture_set,
+            videos,
+        }
+    }
+
     pub fn load(
         &self,
         resource_file: String,
@@ -75,7 +122,7 @@ impl MapLoader {
         texture_loader: Arc<TextureLoader>,
         video_loader: Arc<VideoLoader>,
         library: &Library,
-    ) -> Result<Box<Map>, LoadError> {
+    ) -> Result<Arc<Map>, LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load map from {}", &resource_file));
 
@@ -258,7 +305,7 @@ impl MapLoader {
         let light_sources_kdtree = KDTree::from_objects(&light_source_spheres);
         let background_music_track_name = self.audio_engine.get_track_for_map(&map_file_name);
 
-        let map = Map::new(
+        let map = Arc::new(Map::new(
             gat_data.map_width as u16,
             gat_data.map_height as u16,
             object_kdtree.root_boundary(),
@@ -288,45 +335,29 @@ impl MapLoader {
             videos,
             #[cfg(feature = "debug")]
             map_data_clone,
-        );
+        ));
+
+        let _result = self.cache.lock().as_mut().unwrap().insert(resource_file.clone(), map.clone());
+
+        #[cfg(feature = "debug")]
+        if let Err(error) = _result {
+            print_debug!(
+                "[{}] map could not be added to cache. Path: '{}': {:?}",
+                "error".red(),
+                &resource_file,
+                error
+            );
+        }
 
         #[cfg(feature = "debug")]
         timer.stop();
 
-        Ok(Box::new(map))
+        Ok(map)
     }
 
-    fn build_buffer_and_textures(
-        &self,
-        resource_file: &str,
-        texture_set_builder: TextureSetBuilder,
-        model_vertices: Vec<ModelVertex>,
-        model_indices: Vec<u32>,
-    ) -> BufferAndTextures {
-        let vertex_buffer = Arc::new(create_vertex_buffer(
-            &self.device,
-            &self.queue,
-            resource_file,
-            "map vertices",
-            &model_vertices,
-        ));
-        let index_buffer = Arc::new(create_index_buffer(
-            &self.device,
-            &self.queue,
-            resource_file,
-            "map indices",
-            &model_indices,
-        ));
-        let (texture_set, videos) = texture_set_builder.build();
-        let texture_set = Arc::new(texture_set);
-        let videos = Mutex::new(videos);
-
-        BufferAndTextures {
-            vertex_buffer,
-            index_buffer,
-            texture_set,
-            videos,
-        }
+    pub fn get(&self, resource_file: &str) -> Option<Arc<Map>> {
+        let mut lock = self.cache.lock().unwrap();
+        lock.get(resource_file).cloned()
     }
 }
 

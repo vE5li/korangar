@@ -2,12 +2,13 @@ mod lighting;
 
 #[cfg(feature = "debug")]
 use std::collections::HashSet;
+use std::mem::size_of;
 use std::sync::{Arc, Mutex};
 
 use cgmath::{Deg, Matrix4, Point3, SquareMatrix, Vector3};
 use korangar_audio::AudioEngine;
 use korangar_collision::{AABB, Frustum, KDTree, Sphere};
-use korangar_container::{SimpleKey, SimpleSlab, create_simple_key};
+use korangar_container::{Cacheable, SimpleKey, SimpleSlab, create_simple_key};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::Colorize;
 #[cfg(feature = "debug")]
@@ -228,6 +229,25 @@ impl Map {
             videos,
             map_data,
         }
+    }
+}
+
+impl Cacheable for Map {
+    fn size(&self) -> usize {
+        #[cfg(not(feature = "debug"))]
+        let debug_fields = 0;
+        #[cfg(feature = "debug")]
+        let debug_fields = self.effect_sources.len() * size_of::<EffectSource>() + self.tile_submeshes.len() * size_of::<SubMesh>();
+
+        size_of::<Self>()
+            + self.tiles.len() * size_of::<Tile>()
+            + self.sub_meshes.len() * size_of::<SubMesh>()
+            + self.objects.count() as usize * size_of::<Object>()
+            + self.light_sources.count() as usize * size_of::<LightSource>()
+            + self.sound_sources.len() * size_of::<SoundSource>()
+            + self.object_kdtree.dynamic_size()
+            + self.light_source_kdtree.dynamic_size()
+            + debug_fields
     }
 }
 

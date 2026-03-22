@@ -804,7 +804,7 @@ impl Client {
         self.middle_interface_renderer.update_scaling(scaling);
         self.top_interface_renderer.update_scaling(scaling);
 
-        let frame = self.graphics_engine.wait_for_next_frame();
+        let maybe_frame = self.graphics_engine.wait_for_next_frame();
 
         #[cfg(feature = "debug")]
         let timer_measurement = Profiler::start_measurement("update timers");
@@ -3525,7 +3525,9 @@ impl Client {
                 marker: self.debug_marker_renderer.get_instructions(),
             };
 
-            self.graphics_engine.render_next_frame(frame, render_instruction);
+            if let Some(frame) = maybe_frame {
+                self.graphics_engine.render_next_frame(frame, render_instruction);
+            }
 
             #[cfg(feature = "debug")]
             render_frame_measurement.stop();
@@ -3533,7 +3535,9 @@ impl Client {
             #[cfg(feature = "debug")]
             let render_frame_measurement = Profiler::start_measurement("prepare next frame");
 
-            self.graphics_engine.render_next_frame(frame, RenderInstruction::default());
+            if let Some(frame) = maybe_frame {
+                self.graphics_engine.render_next_frame(frame, RenderInstruction::default());
+            }
 
             #[cfg(feature = "debug")]
             render_frame_measurement.stop();

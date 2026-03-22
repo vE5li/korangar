@@ -1,22 +1,21 @@
-//! Communication between the audio engine and the low-level audio API.
+use std::sync::Arc;
 
 pub(crate) mod cpal;
 mod renderer;
 pub(crate) mod resources;
 
-pub(crate) use renderer::*;
+pub(crate) use renderer::{MIXER_SAMPLE_RATE, Renderer};
+use crate::device_info::{DeviceId, DeviceInfo, OutputDevicePreference};
 
-/// The default kira used by [`AudioManager`](crate::AudioManager)s.
 pub(crate) type DefaultBackend = cpal::CpalBackend;
 
-/// Connects a [`Renderer`] to a lower level audio API.
+/// Connects a [`Renderer`] to a platform audio API.
 pub(crate) trait Backend: Sized {
-    /// Errors that can occur when using this kira.
     type Error;
 
-    /// Starts the kira and returns itself and the initial sample rate.
-    fn setup(internal_buffer_size: usize) -> Result<(Self, u32), Self::Error>;
+    /// Queries the platform for a suitable audio device.
+    fn setup(preferred: Option<DeviceId>) -> Result<(Self, DeviceInfo, Arc<OutputDevicePreference>), Self::Error>;
 
-    /// Sends the renderer to the kira to start audio playback.
+    /// Starts audio playback with the given renderer.
     fn start(&mut self, renderer: Renderer) -> Result<(), Self::Error>;
 }

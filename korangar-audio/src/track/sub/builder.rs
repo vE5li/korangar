@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use super::{Track, TrackHandle, TrackShared, command_writers_and_readers};
-use crate::backend::RendererShared;
 use crate::backend::resources::ResourceStorage;
 use crate::decibels::Decibels;
 use crate::frame::Frame;
@@ -14,8 +13,7 @@ pub(crate) struct TrackBuilder {}
 
 impl TrackBuilder {
     #[must_use]
-    pub(crate) fn build(self, renderer_shared: Arc<RendererShared>, internal_buffer_size: usize) -> (Track, TrackHandle) {
-        let backend_sample_rate = renderer_shared.sample_rate.load(std::sync::atomic::Ordering::SeqCst);
+    pub(crate) fn build(self, internal_buffer_size: usize) -> (Track, TrackHandle) {
         let (command_writers, command_readers) = command_writers_and_readers();
         let shared = Arc::new(TrackShared::new());
         let (sounds, sound_controller) = ResourceStorage::new(128);
@@ -32,8 +30,6 @@ impl TrackBuilder {
             temp_buffer: vec![Frame::ZERO; internal_buffer_size],
         };
         let handle = TrackHandle {
-            backend_sample_rate,
-            renderer_shared,
             shared,
             command_writers,
             sound_controller,

@@ -8,6 +8,7 @@ extern crate core;
 pub(crate) mod backend;
 pub(crate) mod command;
 mod decibels;
+pub(crate) mod device_info;
 mod error;
 mod frame;
 pub(crate) mod listener;
@@ -36,11 +37,12 @@ use korangar_container::{
     CacheStatistics, Cacheable, GenerationalSlab, SimpleCache, SimpleSlab, create_generational_key, create_simple_key,
 };
 #[cfg(feature = "debug")]
-use korangar_debug::logging::{Colorize, print_debug};
+use korangar_debug::logging::{Colorize, Timer, print_debug};
 use korangar_loaders::FileLoader;
 use rayon::spawn;
 
 use crate::backend::cpal::CpalBackend;
+pub use crate::device_info::{DeviceId, DeviceInfo, DeviceName};
 use crate::decibels::Decibels;
 use crate::frame::Frame;
 use crate::manager::{AudioManager, AudioManagerSettings};
@@ -107,6 +109,8 @@ enum AsyncLoadResult {
         path: String,
         key: SoundEffectKey,
         sound_effect: Box<StaticSoundData>,
+        #[cfg(feature = "debug")]
+        load_duration: Duration,
     },
     Error {
         path: String,
@@ -149,9 +153,11 @@ struct EngineContext<F> {
 }
 
 impl<F: FileLoader> AudioEngine<F> {
-    /// Crates a new audio engine.
-    pub fn new(game_file_loader: Arc<F>) -> AudioEngine<F> {
-        let mut manager = AudioManager::<CpalBackend>::new(AudioManagerSettings::default()).expect("can't initialize audio kira");
+    /// Creates a new audio engine. `preferred_device` is a saved device ID
+    /// from a previous session, or `None` to use the system default.
+    pub fn new(game_file_loader: Arc<F>, preferred_device: Option<DeviceId>) -> AudioEngine<F> {
+        let mut manager =
+            AudioManager::<CpalBackend>::new(AudioManagerSettings::default(), preferred_device).expect("can't initialize audio engine");
         let background_music_track = manager
             .add_sub_track(TrackBuilder::default())
             .expect("can't create background music track");
@@ -205,6 +211,39 @@ impl<F: FileLoader> AudioEngine<F> {
     pub fn cache_statistics(&self) -> CacheStatistics {
         let context = self.engine_context.lock().unwrap();
         context.cache.statistics()
+    }
+
+    /// Returns true if the available device list has changed since the
+    /// last call, and provides the updated list.
+    pub fn take_device_list_update(&self) -> Option<Vec<DeviceInfo>> {
+        let context = self.engine_context.lock().unwrap();
+        let preference = context.manager.preference();
+        if preference.take_devices_changed() {
+            Some(preference.available_devices())
+        } else {
+            None
+        }
+    }
+
+    /// Returns the current list of available output devices.
+    pub fn list_output_devices(&self) -> Vec<DeviceInfo> {
+        let context = self.engine_context.lock().unwrap();
+        context.manager.preference().available_devices()
+    }
+
+    /// Sets the preferred output device by its stable ID. `None` follows
+    /// the system default. If the specified device is unavailable, falls
+    /// back to the default.
+    pub fn set_output_device(&self, device: Option<DeviceId>) {
+        let context = self.engine_context.lock().unwrap();
+        context.manager.preference().set(device);
+    }
+
+    /// Returns the currently preferred output device ID, or `None` if
+    /// following the system default.
+    pub fn preferred_output_device(&self) -> Option<DeviceId> {
+        let context = self.engine_context.lock().unwrap();
+        context.manager.preference().get()
     }
 
     /// Mutes or unmutes the audio.
@@ -482,6 +521,12 @@ impl<F: FileLoader> EngineContext<F> {
                 continue;
             };
 
+            #[cfg(feature = "debug")]
+            {
+                let path = self.sound_effect_paths.get(sound_config.sound_effect_key).cloned().unwrap_or_default();
+                print_debug!("ambient sound entered range: {}", path);
+            }
+
             let position = sound_config.bounds.center();
 
             let spatial_track = SpatialTrackBuilder::new()
@@ -546,6 +591,14 @@ impl<F: FileLoader> EngineContext<F> {
         // Remove ambient sound that are out of reach.
         difference(&mut self.previous_query_result, &mut self.query_result, &mut self.scratchpad);
         for ambient_key in self.scratchpad.iter() {
+            #[cfg(feature = "debug")]
+            {
+                let path = self.ambient_sound.get(*ambient_key)
+                    .and_then(|c| self.sound_effect_paths.get(c.sound_effect_key))
+                    .cloned()
+                    .unwrap_or_default();
+                print_debug!("ambient sound left range: {}", path);
+            }
             let _ = self.active_spatial_tracks.remove(ambient_key);
             let _ = self.cycling_ambient.remove(ambient_key);
         }
@@ -629,7 +682,12 @@ impl<F: FileLoader> EngineContext<F> {
                     path: _path,
                     key,
                     sound_effect,
+                    #[cfg(feature = "debug")]
+                    load_duration: _duration,
                 } => {
+                    #[cfg(feature = "debug")]
+                    print_debug!("load sound effect from {} ({}ms)", _path.magenta(), _duration.as_millis());
+
                     self.loading_sound_effect.remove(&key);
 
                     if let Err(_error) = self.cache.insert(key, CachedSoundEffect(*sound_effect)) {
@@ -776,7 +834,10 @@ impl<F: FileLoader> EngineContext<F> {
             return;
         };
 
-        let data = match StreamingSoundData::from_file(path, true) {
+        #[cfg(feature = "debug")]
+        let _timer = Timer::new_dynamic(format!("load background music from {}", path.display()));
+
+        let data = match StreamingSoundData::from_file(&path, true) {
             Ok(sound_effect_data) => sound_effect_data,
             Err(_error) => {
                 #[cfg(feature = "debug")]
@@ -839,6 +900,9 @@ fn spawn_async_load(
     spawn(move || {
         let full_path = format!("{SOUND_EFFECT_BASE_PATH}\\{path}");
 
+        #[cfg(feature = "debug")]
+        let start = Instant::now();
+
         let data = match game_file_loader.get(&full_path) {
             Ok(data) => data,
             Err(error) => {
@@ -855,7 +919,13 @@ fn spawn_async_load(
                 return;
             }
         };
-        let _ = async_response_sender.send(AsyncLoadResult::Loaded { path, key, sound_effect });
+        let _ = async_response_sender.send(AsyncLoadResult::Loaded {
+            path,
+            key,
+            sound_effect,
+            #[cfg(feature = "debug")]
+            load_duration: start.elapsed(),
+        });
     });
 }
 

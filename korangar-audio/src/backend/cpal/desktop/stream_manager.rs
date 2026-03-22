@@ -1,16 +1,11 @@
 use std::ops::{Deref, DerefMut};
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
 
 use cpal::traits::{DeviceTrait, StreamTrait};
-use cpal::{BufferSize, Device, Stream, StreamConfig, StreamError};
+use cpal::{Stream, StreamError};
 use rtrb::{Consumer, Producer, RingBuffer};
 
-use super::super::{Error, default_device_and_config};
+use super::super::{Error, OutputDevice};
 use crate::backend::Renderer;
-
-const CHECK_STREAM_INTERVAL: Duration = Duration::from_millis(500);
 
 #[allow(clippy::large_enum_variant)]
 enum State {
@@ -24,113 +19,48 @@ enum State {
     },
 }
 
-pub(super) struct StreamManagerController {
-    should_drop: Arc<AtomicBool>,
-}
-
-impl StreamManagerController {
-    pub(crate) fn stop(&self) {
-        self.should_drop.store(true, Ordering::SeqCst);
-    }
-}
-
-/// Starts a cpal stream and restarts it if needed in the case of device changes
-/// or disconnections.
+/// Manages a single cpal audio stream.
 pub(super) struct StreamManager {
     state: State,
-    device_name: String,
-    sample_rate: u32,
-    buffer_size: BufferSize,
 }
 
 impl StreamManager {
-    pub(crate) fn start(
-        renderer: Renderer,
-        device: Device,
-        mut config: StreamConfig,
-        buffer_size: BufferSize,
-    ) -> Result<StreamManagerController, Error> {
-        let should_drop = Arc::new(AtomicBool::new(false));
-        let should_drop_clone = should_drop.clone();
-
-        let (mut initial_result_producer, mut initial_result_consumer) = RingBuffer::new(1);
-
-        std::thread::spawn(move || {
-            let mut stream_manager = StreamManager {
-                state: State::Idle { renderer },
-                device_name: device_name(&device),
-                sample_rate: config.sample_rate,
-                buffer_size,
-            };
-            let mut unhandled_stream_error_consumer = match stream_manager.start_stream(&device, &mut config) {
-                Ok(unhandled_stream_error_consumer) => {
-                    initial_result_producer.push(Ok(())).unwrap();
-                    unhandled_stream_error_consumer
-                }
-                Err(err) => {
-                    initial_result_producer.push(Err(err)).unwrap();
-                    return;
-                }
-            };
-            loop {
-                std::thread::sleep(CHECK_STREAM_INTERVAL);
-                if should_drop.load(Ordering::SeqCst) {
-                    break;
-                }
-                stream_manager.check_stream(&mut unhandled_stream_error_consumer);
-            }
-        });
-
-        loop {
-            if let Ok(result) = initial_result_consumer.pop() {
-                result?;
-                break;
-            }
-            std::thread::sleep(Duration::from_micros(100));
-        }
-
-        Ok(StreamManagerController {
-            should_drop: should_drop_clone,
-        })
-    }
-
-    /// Restarts the stream if the audio device gets disconnected.
-    fn check_stream(&mut self, unhandled_stream_error_consumer: &mut Consumer<StreamError>) {
-        if let State::Running { .. } = &self.state {
-            while let Ok(error) = unhandled_stream_error_consumer.pop() {
-                match error {
-                    // Check for device disconnection.
-                    StreamError::DeviceNotAvailable => {
-                        self.stop_stream();
-                        if let Ok((device, mut config)) = default_device_and_config() {
-                            *unhandled_stream_error_consumer = self.start_stream(&device, &mut config).unwrap();
-                        }
-                    }
-                    StreamError::StreamInvalidated | StreamError::BufferUnderrun | StreamError::BackendSpecific { err: _ } => {}
-                }
-            }
+    /// Creates a new stream manager in an idle state.
+    pub(super) fn new(renderer: Renderer) -> Self {
+        Self {
+            state: State::Idle { renderer },
         }
     }
 
-    fn start_stream(&mut self, device: &Device, config: &mut StreamConfig) -> Result<Consumer<StreamError>, Error> {
-        let mut renderer = if let State::Idle { renderer } = std::mem::replace(&mut self.state, State::Empty) {
-            renderer
-        } else {
+    /// Returns `true` if there are any stream errors that require a restart
+    /// (e.g. device disconnection).
+    pub(super) fn has_stream_error(&self, error_consumer: &mut Consumer<StreamError>) -> bool {
+        let mut needs_restart = false;
+        while let Ok(error) = error_consumer.pop() {
+            match error {
+                StreamError::DeviceNotAvailable => needs_restart = true,
+                StreamError::StreamInvalidated | StreamError::BufferUnderrun | StreamError::BackendSpecific { err: _ } => {}
+            }
+        }
+        needs_restart
+    }
+
+    /// Starts the stream on the given output device. Updates the renderer's
+    /// sample rate. Returns a consumer for stream errors.
+    pub(super) fn start_stream(
+        &mut self,
+        output: &OutputDevice,
+    ) -> Result<Consumer<StreamError>, Error> {
+        // Take the idle renderer, or panic if the stream is already running.
+        let State::Idle { mut renderer } = std::mem::replace(&mut self.state, State::Empty) else {
             panic!("trying to start a stream when the stream manager is not idle");
         };
-        config.buffer_size = self.buffer_size;
-        let device_name = device_name(device);
-        let sample_rate = config.sample_rate;
-        if sample_rate != self.sample_rate {
-            renderer.on_change_sample_rate(sample_rate);
-        }
-        self.device_name = device_name;
-        self.sample_rate = sample_rate;
+        renderer.on_change_sample_rate(output.config.sample_rate);
         let (mut renderer_wrapper, renderer_consumer) = SendOnDrop::new(renderer);
         let (mut unhandled_stream_error_producer, unhandled_stream_error_consumer) = RingBuffer::new(64);
-        let channels = config.channels;
-        let stream = device.build_output_stream(
-            config,
+        let channels = output.config.channels;
+        let stream = output.device.build_output_stream(
+            &output.config,
             move |data: &mut [f32], _| {
                 process_renderer(&mut renderer_wrapper, data, channels);
             },
@@ -144,7 +74,8 @@ impl StreamManager {
         Ok(unhandled_stream_error_consumer)
     }
 
-    fn stop_stream(&mut self) {
+    /// Stops the current stream, returning the stream manager to idle state.
+    pub(super) fn stop_stream(&mut self) {
         if let State::Running {
             mut renderer_consumer,
             stream,
@@ -162,12 +93,6 @@ impl StreamManager {
     }
 }
 
-fn device_name(device: &Device) -> String {
-    device
-        .description()
-        .map(|description| description.name().to_string())
-        .unwrap_or_else(|_| "device name unavailable".to_string())
-}
 fn process_renderer(renderer: &mut SendOnDrop<Renderer>, data: &mut [f32], channels: u16) {
     renderer.on_start_processing();
     renderer.process(data, channels);

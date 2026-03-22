@@ -1,7 +1,7 @@
-use cgmath::{Deg, Matrix4, Point3, Vector2, Vector3, Zero};
+use cgmath::{Deg, Matrix4, Point3, Vector3, Zero};
 
 use super::Camera;
-use crate::graphics::perspective_reverse_lh;
+use crate::graphics::{ScreenSize, perspective_reverse_lh};
 
 const VERTICAL_FOV: Deg<f32> = Deg(90.0);
 
@@ -52,7 +52,7 @@ impl Camera for PointShadowCamera {
         self.camera_position + self.view_direction
     }
 
-    fn generate_view_projection(&mut self, _window_size: Vector2<usize>) {
+    fn generate_view_projection(&mut self, _window_size: ScreenSize) {
         self.view_matrix = Matrix4::look_to_lh(self.camera_position, self.view_direction, self.look_up_vector);
         self.projection_matrix = perspective_reverse_lh(VERTICAL_FOV, 1.0);
         self.view_projection_matrix = self.projection_matrix * self.view_matrix;

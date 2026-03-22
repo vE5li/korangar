@@ -2,6 +2,12 @@ use std::time::Instant;
 
 use ragnarok_packets::ClientTick;
 
+pub struct FrameTimers {
+    pub delta_time: f64,
+    pub client_tick: ClientTick,
+    pub animation_timer_ms: f32,
+}
+
 pub struct GameTimer {
     global_timer: Instant,
     previous_elapsed: f64,
@@ -67,17 +73,8 @@ impl GameTimer {
         self.base_client_tick + (elapsed * 1000.0) + (elapsed * self.frequency * 1000.0)
     }
 
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn get_client_tick(&self) -> ClientTick {
-        let tick = self.get_client_tick_at(Instant::now());
-        ClientTick(tick.round() as u32)
-    }
-
-    pub fn get_animation_timer_ms(&self) -> f32 {
-        self.animation_timer_ms
-    }
-
-    pub fn update(&mut self) -> f64 {
+    #[cfg_attr(feature = "debug", korangar_debug::profile("update game timers"))]
+    pub fn update(&mut self) -> FrameTimers {
         let new_elapsed = self.global_timer.elapsed().as_secs_f64();
         let delta_time = new_elapsed - self.previous_elapsed;
 
@@ -92,7 +89,16 @@ impl GameTimer {
             self.frame_counter = 0;
         }
 
-        delta_time
+        let tick = self.get_client_tick_at(Instant::now());
+        let client_tick = ClientTick(tick.round() as u32);
+
+        let animation_timer_ms = self.animation_timer_ms;
+
+        FrameTimers {
+            delta_time,
+            client_tick,
+            animation_timer_ms,
+        }
     }
 
     #[cfg(feature = "debug")]
@@ -116,12 +122,12 @@ mod increment {
     fn update_increments_timers() {
         let mut game_timer = GameTimer::new();
 
-        let animation_timer_ms = game_timer.get_animation_timer_ms();
+        let animation_timer_ms = game_timer.animation_timer_ms;
 
         std::thread::sleep(std::time::Duration::from_millis(10));
         game_timer.update();
 
-        let updated_animation_timer_ms = game_timer.get_animation_timer_ms();
+        let updated_animation_timer_ms = game_timer.animation_timer_ms;
 
         assert!(updated_animation_timer_ms > animation_timer_ms);
     }

@@ -25,6 +25,9 @@ pub fn profile(name: InterfaceTokenStream, function: InterfaceTokenStream) -> In
     });
 
     let code = quote! {
+        // Some functions annotated with `korangar_debug::profile` are used during unit tests,
+        // which don't have the `PROFILER` set up. So we disable the measurements in tests.
+        #[cfg(not(test))]
         let _measurement = korangar_debug::profiling::Profiler::start_measurement(#name);
     }
     .into();

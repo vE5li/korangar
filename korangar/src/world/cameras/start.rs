@@ -1,7 +1,7 @@
-use cgmath::{Array, Deg, InnerSpace, Matrix4, Point3, Quaternion, Rad, Rotation, Rotation3, Vector2, Vector3, Zero};
+use cgmath::{Array, Deg, InnerSpace, Matrix4, Point3, Quaternion, Rad, Rotation, Rotation3, Vector3, Zero};
 
 use super::Camera;
-use crate::graphics::perspective_reverse_lh;
+use crate::graphics::{ScreenSize, perspective_reverse_lh};
 
 const DEFAULT_VIEW_ANGLE: f32 = 180_f32.to_radians();
 const DEFAULT_VIEW_DISTANCE: f32 = 150.0;
@@ -59,8 +59,8 @@ impl Camera for StartCamera {
         self.focus_point
     }
 
-    fn generate_view_projection(&mut self, window_size: Vector2<usize>) {
-        let aspect_ratio = window_size.x as f32 / window_size.y as f32;
+    fn generate_view_projection(&mut self, window_size: ScreenSize) {
+        let aspect_ratio = window_size.width / window_size.height;
         let camera_position = self.camera_position();
         self.view_matrix = Matrix4::look_to_lh(camera_position, self.view_direction, LOOK_UP);
         self.projection_matrix = perspective_reverse_lh(VERTICAL_FOV, aspect_ratio);

@@ -1,12 +1,14 @@
 use std::sync::Arc;
 
-use cgmath::{Matrix4, Point3, SquareMatrix, Vector2, Vector3, Zero};
+use cgmath::{Matrix4, Point3, SquareMatrix, Vector3};
 use korangar_collision::Sphere;
 use ragnarok_formats::map::LightSource;
 
 #[cfg(feature = "debug")]
 use crate::graphics::RenderOptions;
-use crate::graphics::{Buffer, ModelInstruction, ModelVertex, PointLightInstruction, PointLightWithShadowInstruction, TextureSet};
+use crate::graphics::{
+    Buffer, ModelInstruction, ModelVertex, PointLightInstruction, PointLightWithShadowInstruction, ScreenSize, TextureSet,
+};
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
 #[cfg(feature = "debug")]
@@ -248,7 +250,7 @@ impl PointLightSet<'_> {
             // TODO: Create an entity set, similar to the object set for better performance.
             for face_index in 0..6 {
                 point_shadow_camera.change_direction(face_index);
-                point_shadow_camera.generate_view_projection(Vector2::zero());
+                point_shadow_camera.generate_view_projection(ScreenSize::default());
 
                 view_projection_matrices[face_index as usize] = point_shadow_camera.view_projection_matrix();
                 (view_matrices[face_index as usize], _) = point_shadow_camera.view_projection_matrices();

@@ -1,10 +1,18 @@
+use clap::Parser;
 use korangar::Client;
 
-fn main() {
-    let args: Vec<String> = std::env::args().collect();
-    let sync_cache = args.len() > 1 && &args[1] == "sync-cache";
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
+struct Arguments {
+    /// Synchronize the asset cache and exit.
+    #[arg(long)]
+    sync_cache: bool,
+}
 
-    if let Some(mut client) = Client::init(sync_cache) {
+fn main() {
+    let arguments = Arguments::parse();
+
+    if let Some(mut client) = Client::init(arguments.sync_cache) {
         client.run();
     }
 }

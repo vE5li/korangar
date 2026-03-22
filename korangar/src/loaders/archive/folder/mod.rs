@@ -19,10 +19,7 @@ pub struct FolderArchive {
     /// separator, but our file system might not. This mapping lets us do a
     /// lookup from a unified format to the actual file name in the file system.
     ///
-    /// Example:
-    /// ```
-    /// "texture\\data\\angel.str" -> texture/data/Angel.str
-    /// ```
+    /// Example: "texture\\data\\angel.str" -> texture/data/Angel.str
     file_mapping: HashMap<String, PathBuf>,
 }
 

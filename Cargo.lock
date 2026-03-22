@@ -1898,6 +1898,7 @@ dependencies = [
  "bytemuck",
  "cgmath",
  "chrono",
+ "clap",
  "cosmic-text",
  "ctrlc",
  "ddsfile",

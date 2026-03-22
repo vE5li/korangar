@@ -1,3 +1,3 @@
 mod timer;
 
-pub use self::timer::GameTimer;
+pub use self::timer::{FrameTimers, GameTimer};

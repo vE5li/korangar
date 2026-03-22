@@ -11,6 +11,7 @@ bumpalo = { workspace = true, features = ["allocator_api"] }
 bytemuck = { workspace = true, features = ["derive", "extern_crate_std", "min_const_generics"] }
 cgmath = { workspace = true, features = ["mint", "serde"] }
 chrono = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
 cosmic-text = { workspace = true, features = ["std", "fontconfig"] }
 ctrlc = { workspace = true }
 ddsfile = { workspace = true }

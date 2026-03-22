@@ -18,7 +18,8 @@ pub use self::point_shadow::PointShadowCamera;
 pub use self::smoothed::SmoothedValue;
 pub use self::start::StartCamera;
 #[cfg(feature = "debug")]
-use crate::graphics::{ScreenPosition, ScreenSize};
+use crate::graphics::ScreenPosition;
+use crate::graphics::ScreenSize;
 
 const MAXIMUM_CAMERA_DISTANCE: f32 = 500.0;
 const MINIMUM_CAMERA_DISTANCE: f32 = 150.0;
@@ -30,8 +31,11 @@ const MINIMUM_CAMERA_DISTANCE: f32 = 150.0;
 /// +Z is into the screen.
 pub trait Camera {
     fn camera_position(&self) -> Point3<f32>;
+
     fn focus_point(&self) -> Point3<f32>;
-    fn generate_view_projection(&mut self, window_size: Vector2<usize>);
+
+    fn generate_view_projection(&mut self, window_size: ScreenSize);
+
     fn look_up_vector(&self) -> Vector3<f32>;
 
     fn view_projection_matrices(&self) -> (Matrix4<f32>, Matrix4<f32>);

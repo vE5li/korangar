@@ -1,6 +1,7 @@
 use cgmath::{Deg, InnerSpace, Matrix4, Point3, Quaternion, Rad, Rotation, Rotation3, Vector2, Vector3, Zero};
 
 use super::Camera;
+use crate::ScreenSize;
 use crate::graphics::perspective_reverse_lh;
 
 const LOOK_AROUND_SPEED: f32 = 0.005;
@@ -76,8 +77,8 @@ impl Camera for DebugCamera {
         self.camera_position + self.view_direction()
     }
 
-    fn generate_view_projection(&mut self, window_size: Vector2<usize>) {
-        let aspect_ratio = window_size.x as f32 / window_size.y as f32;
+    fn generate_view_projection(&mut self, window_size: ScreenSize) {
+        let aspect_ratio = window_size.width / window_size.height;
         self.view_matrix = Matrix4::look_to_lh(self.camera_position, self.view_direction(), LOOK_UP_VECTOR);
         self.projection_matrix = perspective_reverse_lh(VERTICAL_FOV, aspect_ratio);
         self.view_projection_matrix = self.projection_matrix * self.view_matrix;

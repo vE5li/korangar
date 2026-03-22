@@ -811,6 +811,7 @@ impl Map {
         Some((screen_position, screen_size))
     }
 
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn advance_videos(&self, queue: &Queue, delta_time: f64) {
         let mut videos = self.videos.lock().unwrap();
 

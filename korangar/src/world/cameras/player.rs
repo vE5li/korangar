@@ -1,7 +1,7 @@
-use cgmath::{Array, Deg, InnerSpace, Matrix4, Point3, Quaternion, Rad, Rotation, Rotation3, Vector2, Vector3, Zero};
+use cgmath::{Array, Deg, InnerSpace, Matrix4, Point3, Quaternion, Rad, Rotation, Rotation3, Vector3, Zero};
 
 use super::{Camera, MAXIMUM_CAMERA_DISTANCE, MINIMUM_CAMERA_DISTANCE, SmoothedValue};
-use crate::graphics::perspective_reverse_lh;
+use crate::graphics::{ScreenSize, perspective_reverse_lh};
 
 const ZOOM_SPEED: f32 = 1.0;
 const ROTATION_SPEED: f32 = 0.005;
@@ -102,8 +102,8 @@ impl Camera for PlayerCamera {
         self.focus_point.map(|component| component.get_current())
     }
 
-    fn generate_view_projection(&mut self, window_size: Vector2<usize>) {
-        let aspect_ratio = window_size.x as f32 / window_size.y as f32;
+    fn generate_view_projection(&mut self, window_size: ScreenSize) {
+        let aspect_ratio = window_size.width / window_size.height;
         self.view_matrix = Matrix4::look_to_lh(self.camera_position, self.view_direction, LOOK_UP);
         self.projection_matrix = perspective_reverse_lh(VERTICAL_FOV, aspect_ratio);
         self.view_projection_matrix = self.projection_matrix * self.view_matrix;

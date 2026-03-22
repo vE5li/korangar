@@ -1,8 +1,10 @@
-use cgmath::{EuclideanSpace, InnerSpace, Matrix4, Point3, SquareMatrix, Transform, Vector2, Vector3, Zero};
+use cgmath::{EuclideanSpace, InnerSpace, Matrix4, Point3, SquareMatrix, Transform, Vector3, Zero};
 use korangar_collision::{AABB, lerp};
 
 use super::Camera;
-use crate::graphics::{DirectionalLightPartitionInstruction, DirectionalShadowPartition, PARTITION_COUNT, orthographic_reverse_lh};
+use crate::graphics::{
+    DirectionalLightPartitionInstruction, DirectionalShadowPartition, PARTITION_COUNT, ScreenSize, orthographic_reverse_lh,
+};
 
 const ORIGIN: Point3<f32> = Point3::new(0.0, 0.0, 0.0);
 const LOOK_UP: Vector3<f32> = Vector3::new(0.0, 1.0, 0.0);
@@ -384,7 +386,7 @@ impl Camera for PartitionCamera {
         unimplemented!()
     }
 
-    fn generate_view_projection(&mut self, _window_size: Vector2<usize>) {
+    fn generate_view_projection(&mut self, _window_size: ScreenSize) {
         unimplemented!()
     }
 

@@ -32,6 +32,7 @@ pub struct GroundItem {
 }
 
 impl GroundItem {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         map: &Map,
         item_id: ItemId,

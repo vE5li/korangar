@@ -310,6 +310,7 @@ impl AnimationData {
         (texture_size, texture_position)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn render(
         &self,
         instructions: &mut Vec<EntityInstruction>,
@@ -359,6 +360,7 @@ impl AnimationData {
     }
 
     #[cfg(feature = "debug")]
+    #[allow(clippy::too_many_arguments)]
     pub fn render_debug(
         &self,
         instructions: &mut Vec<DebugRectangleInstruction>,

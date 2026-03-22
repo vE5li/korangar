@@ -23,6 +23,7 @@ pub struct CacheStatistics {
 }
 
 impl CacheStatistics {
+    #[allow(clippy::too_many_arguments)]
     pub fn update(
         &mut self,
         delta_time: f64,

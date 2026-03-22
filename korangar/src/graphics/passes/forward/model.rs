@@ -457,6 +457,7 @@ impl ForwardModelDrawer {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn create_pipeline(
         device: &Device,
         render_pass_context: &ForwardRenderPassContext,

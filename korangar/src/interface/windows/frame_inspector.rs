@@ -83,6 +83,7 @@ impl FrameInspectorView {
         1.0 - normalized_value.powf(0.4)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn render_lines<'a>(
         &'a self,
         layout_info: &'a BaseLayoutInfo,
@@ -136,6 +137,7 @@ impl FrameInspectorView {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn render_measurement<'a>(
         &'a self,
         layout_info: &'a BaseLayoutInfo,

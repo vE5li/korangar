@@ -65,6 +65,7 @@ pub struct AsyncLoader {
 }
 
 impl AsyncLoader {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         action_loader: Arc<ActionLoader>,
         animation_loader: Arc<AnimationLoader>,

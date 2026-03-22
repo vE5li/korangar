@@ -282,6 +282,7 @@ impl FontLoader {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn get_text_dimensions(
         &self,
         text: &str,
@@ -330,6 +331,7 @@ impl FontLoader {
     /// returns the size of the text in pixels.
     ///
     /// Does not clear the glyph buffer before writing into it.
+    #[allow(clippy::too_many_arguments)]
     pub fn layout_text(
         &self,
         text: &str,

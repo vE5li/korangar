@@ -1,5 +1,4 @@
 #![allow(incomplete_features)]
-#![allow(clippy::too_many_arguments)]
 #![feature(adt_const_params)]
 #![feature(allocator_api)]
 #![feature(generic_const_exprs)]

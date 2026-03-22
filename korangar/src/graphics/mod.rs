@@ -620,6 +620,7 @@ impl Prepare for GlobalContext {
 }
 
 impl GlobalContext {
+    #[allow(clippy::too_many_arguments)]
     fn new(
         device: &Device,
         queue: &Queue,
@@ -1648,6 +1649,7 @@ impl GlobalContext {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn create_forward_bind_group(
         device: &Device,
         directional_light_uniforms_buffer: &Buffer<DirectionalLightUniforms>,
@@ -1742,6 +1744,7 @@ impl GlobalContext {
     }
 
     #[cfg(feature = "debug")]
+    #[allow(clippy::too_many_arguments)]
     fn create_debug_bind_group(
         device: &Device,
         msaa: Msaa,

@@ -188,6 +188,7 @@ impl ModelLoader {
         Point3::from_vec(sum / vertices.len() as f32)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn process_node_mesh(
         bindless_support: BindlessSupport,
         version: InternalVersion,

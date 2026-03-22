@@ -62,6 +62,7 @@ pub struct Actions {
 }
 
 impl Actions {
+    #[allow(clippy::too_many_arguments)]
     pub fn render_sprite(
         &self,
         renderer: &impl SpriteRenderer,
@@ -85,6 +86,7 @@ impl Actions {
         self.render_sprite_frame(renderer, sprite, action_index, frame, position, screen_clip, color, scaling);
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn render_sprite_frame(
         &self,
         renderer: &impl SpriteRenderer,

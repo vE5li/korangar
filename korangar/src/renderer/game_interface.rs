@@ -269,6 +269,7 @@ impl GameInterfaceRenderer {
         });
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn render_indexed(
         &self,
         texture: Arc<Texture>,

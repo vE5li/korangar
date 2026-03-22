@@ -32,6 +32,7 @@ impl EffectRenderer {
         self.window_size = window_size;
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn render_effect(
         &mut self,
         camera: &dyn Camera,

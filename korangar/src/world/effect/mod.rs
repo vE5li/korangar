@@ -213,6 +213,7 @@ pub struct Frame {
 }
 
 impl Frame {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         frame_index: usize,
         frame_type: FrameType,
@@ -316,6 +317,7 @@ pub struct EffectWithLight {
 }
 
 impl EffectWithLight {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         effect: Arc<Effect>,
         frame_timer: FrameTimer,

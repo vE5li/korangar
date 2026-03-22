@@ -31,6 +31,7 @@ pub struct Node {
 }
 
 impl Node {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         version: InternalVersion,
         transform_matrix: Matrix4<f32>,
@@ -227,6 +228,7 @@ impl Node {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn render_geometry(
         &self,
         instructions: &mut Vec<ModelInstruction>,

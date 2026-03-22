@@ -61,6 +61,7 @@ impl PointLight {
         });
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn render_with_shadows(
         &self,
         instructions: &mut Vec<PointLightWithShadowInstruction>,
@@ -215,6 +216,7 @@ impl PointLightSet<'_> {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
+    #[allow(clippy::too_many_arguments)]
     pub fn render_point_lights_with_shadows(
         &self,
         map: &Map,

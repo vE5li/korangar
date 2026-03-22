@@ -117,6 +117,7 @@ impl TextureLoader {
         Arc::new(texture)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn create_raw_with_data(
         &self,
         name: &str,

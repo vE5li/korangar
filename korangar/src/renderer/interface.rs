@@ -184,6 +184,7 @@ impl InterfaceRenderer {
     }
 
     /// Add instruction for rendering a rectangle.
+    #[allow(clippy::too_many_arguments)]
     pub fn render_rectangle(
         &self,
         position: ScreenPosition,
@@ -258,6 +259,7 @@ impl InterfaceRenderer {
     }
 
     /// Add instructions for rendering glyphs.
+    #[allow(clippy::too_many_arguments)]
     pub fn render_text(
         &self,
         text: &str,

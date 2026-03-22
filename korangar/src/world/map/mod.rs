@@ -72,6 +72,7 @@ pub struct WaterPlane {
 }
 
 impl WaterPlane {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         water_opacity: f32,
         wave_height: f32,
@@ -131,7 +132,7 @@ pub struct Map {
 }
 
 impl Map {
-    #[cfg(not(feature = "debug"))]
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         width: u16,
         height: u16,
@@ -146,12 +147,17 @@ impl Map {
         objects: SimpleSlab<ObjectKey, Object>,
         light_sources: SimpleSlab<LightSourceKey, LightSource>,
         sound_sources: Vec<SoundSource>,
+        #[cfg(feature = "debug")] effect_sources: Vec<EffectSource>,
         tile_picker_vertex_buffer: Buffer<TileVertex>,
         tile_picker_index_buffer: Buffer<u32>,
+        #[cfg(feature = "debug")] tile_vertex_buffer: Arc<Buffer<ModelVertex>>,
+        #[cfg(feature = "debug")] tile_index_buffer: Arc<Buffer<u32>>,
+        #[cfg(feature = "debug")] tile_submeshes: Vec<SubMesh>,
         object_kdtree: KDTree<ObjectKey, AABB>,
         light_source_kdtree: KDTree<LightSourceKey, Sphere>,
         background_music_track_name: Option<String>,
         videos: Mutex<Vec<Video>>,
+        #[cfg(feature = "debug")] map_data: MapData,
     ) -> Self {
         Self {
             width,
@@ -167,66 +173,21 @@ impl Map {
             objects,
             light_sources,
             sound_sources,
-            tile_picker_vertex_buffer,
-            tile_picker_index_buffer,
-            object_kdtree,
-            light_source_kdtree,
-            background_music_track_name,
-            videos,
-        }
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn new(
-        width: u16,
-        height: u16,
-        level_bound: AABB,
-        lighting: Lighting,
-        water_plane: Option<WaterPlane>,
-        tiles: Vec<Tile>,
-        sub_meshes: Vec<SubMesh>,
-        vertex_buffer: Arc<Buffer<ModelVertex>>,
-        index_buffer: Arc<Buffer<u32>>,
-        texture_set: Arc<TextureSet>,
-        objects: SimpleSlab<ObjectKey, Object>,
-        light_sources: SimpleSlab<LightSourceKey, LightSource>,
-        sound_sources: Vec<SoundSource>,
-        effect_sources: Vec<EffectSource>,
-        tile_picker_vertex_buffer: Buffer<TileVertex>,
-        tile_picker_index_buffer: Buffer<u32>,
-        tile_vertex_buffer: Arc<Buffer<ModelVertex>>,
-        tile_index_buffer: Arc<Buffer<u32>>,
-        tile_submeshes: Vec<SubMesh>,
-        object_kdtree: KDTree<ObjectKey, AABB>,
-        light_source_kdtree: KDTree<LightSourceKey, Sphere>,
-        background_music_track_name: Option<String>,
-        videos: Mutex<Vec<Video>>,
-        map_data: MapData,
-    ) -> Self {
-        Self {
-            width,
-            height,
-            level_bound,
-            lighting,
-            water_plane,
-            tiles,
-            sub_meshes,
-            vertex_buffer,
-            index_buffer,
-            texture_set,
-            objects,
-            light_sources,
-            sound_sources,
+            #[cfg(feature = "debug")]
             effect_sources,
             tile_picker_vertex_buffer,
             tile_picker_index_buffer,
+            #[cfg(feature = "debug")]
             tile_vertex_buffer,
+            #[cfg(feature = "debug")]
             tile_index_buffer,
+            #[cfg(feature = "debug")]
             tile_submeshes,
             object_kdtree,
             light_source_kdtree,
             background_music_track_name,
             videos,
+            #[cfg(feature = "debug")]
             map_data,
         }
     }

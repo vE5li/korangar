@@ -172,6 +172,7 @@ impl GraphicsEngine {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn on_resume(
         &mut self,
         window: Arc<Window>,
@@ -903,6 +904,7 @@ impl GraphicsEngine {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
+    #[allow(clippy::too_many_arguments)]
     fn wait_and_submit_frame(
         &mut self,
         prepare_command_buffer: CommandBuffer,

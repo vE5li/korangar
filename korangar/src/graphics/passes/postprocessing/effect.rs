@@ -461,6 +461,7 @@ impl PostProcessingEffectDrawer {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn push_effect_batch(
         device: &Device,
         pipelines: &mut HashMap<(BlendFactor, BlendFactor), RenderPipeline>,

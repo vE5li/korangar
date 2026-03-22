@@ -99,29 +99,21 @@ impl Surface {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn acquire(&mut self) -> SurfaceTexture {
+    pub fn acquire(&mut self) -> Option<SurfaceTexture> {
         match self.surface.get_current_texture() {
-            CurrentSurfaceTexture::Success(texture) => texture,
+            CurrentSurfaceTexture::Success(texture) => Some(texture),
             CurrentSurfaceTexture::Suboptimal(texture) => {
                 self.invalid = true;
-                texture
+                Some(texture)
             }
-            CurrentSurfaceTexture::Timeout
-            | CurrentSurfaceTexture::Occluded
-            | CurrentSurfaceTexture::Outdated
-            | CurrentSurfaceTexture::Lost
-            | CurrentSurfaceTexture::Validation => {
+            CurrentSurfaceTexture::Timeout | CurrentSurfaceTexture::Occluded => None,
+            CurrentSurfaceTexture::Outdated | CurrentSurfaceTexture::Lost | CurrentSurfaceTexture::Validation => {
                 self.surface.configure(&self.device, &self.config);
                 match self.surface.get_current_texture() {
-                    CurrentSurfaceTexture::Success(texture) => texture,
-                    CurrentSurfaceTexture::Suboptimal(texture) => texture,
-                    CurrentSurfaceTexture::Timeout
-                    | CurrentSurfaceTexture::Occluded
-                    | CurrentSurfaceTexture::Outdated
-                    | CurrentSurfaceTexture::Lost
-                    | CurrentSurfaceTexture::Validation => {
-                        panic!("Failed to acquire next surface texture!");
-                    }
+                    CurrentSurfaceTexture::Success(texture) => Some(texture),
+                    CurrentSurfaceTexture::Suboptimal(texture) => Some(texture),
+                    CurrentSurfaceTexture::Timeout | CurrentSurfaceTexture::Occluded => None,
+                    CurrentSurfaceTexture::Outdated | CurrentSurfaceTexture::Lost | CurrentSurfaceTexture::Validation => None,
                 }
             }
         }

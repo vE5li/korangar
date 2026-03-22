@@ -755,7 +755,7 @@ impl GraphicsEngine {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn wait_for_next_frame(&mut self) -> SurfaceTexture {
+    pub fn wait_for_next_frame(&mut self) -> Option<SurfaceTexture> {
         // Before we wait for the next frame, we verify that the surface is still valid.
         if let Some(surface) = self.surface.as_mut()
             && surface.is_invalid()

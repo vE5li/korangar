@@ -70,7 +70,14 @@ impl Surface {
 
         let present_mode_info = PresentModeInfo::from_adapter(adapter, &surface);
 
-        config.format = surfaces_formats.first().copied().expect("not surface formats found");
+        // Korangar shades in linear space, so presenting to an sRGB surface is
+        // required to avoid the final image appearing noticeably darker than
+        // intended on screen.
+        config.format = surfaces_formats
+            .iter()
+            .copied()
+            .find(|f| f.is_srgb())
+            .unwrap_or_else(|| surfaces_formats.first().copied().expect("no surface formats found"));
         config.desired_maximum_frame_latency = match triple_buffering {
             true => 2,
             false => 1,

@@ -85,7 +85,7 @@ use state::inventory::InventoryPathExt;
 use state::localization::Localization;
 use state::skills::SkillTreePathExt;
 use state::theme::{CursorThemePathExt, IndicatorThemePathExt, InterfaceThemePathExt, WorldThemePathExt};
-use state::{ChatMessage, ClientState, ClientStatePathExt, client_state, this_entity, this_player};
+use state::{ChatMessage, ClientState, ClientStatePathExt, MinimapState, client_state, this_entity, this_player};
 #[cfg(feature = "debug")]
 use wgpu::Device;
 use wgpu::util::initialize_adapter_from_env_or_default;
@@ -105,6 +105,7 @@ use winit::window::{Icon, Window, WindowId};
 use crate::graphics::*;
 use crate::input::{InputEvent, InputSystem};
 use crate::interface::cursor::{MouseCursor, MouseCursorState};
+use crate::interface::minimap::create_minimap_state;
 use crate::interface::resource::{ItemSource, SkillSource};
 use crate::interface::windows::*;
 use crate::loaders::*;
@@ -745,6 +746,17 @@ impl Client {
         })
     }
 
+    fn clear_minimap_state(&mut self) {
+        *self.client_state.follow_mut(client_state().minimap()) = MinimapState::default();
+    }
+
+    fn update_minimap_state(&mut self, map_name: &str, map: &Map) {
+        let current_state = self.client_state.follow(client_state().minimap());
+        let next_state = create_minimap_state(&self.texture_loader, current_state, map_name, map);
+
+        *self.client_state.follow_mut(client_state().minimap()) = next_state;
+    }
+
     fn render_frame(&mut self, event_loop: &ActiveEventLoop) {
         if self.window.is_none() {
             return;
@@ -1106,6 +1118,11 @@ impl Client {
                         client_state().hotbar().skills(),
                         client_state().skill_tree().skills(),
                     ));
+                    *self.client_state.follow_mut(client_state().minimap()) = MinimapState::default();
+                    if !self.interface.is_window_with_class_open(WindowClass::Minimap) {
+                        self.interface
+                            .open_window(MinimapWindow::new(client_state().minimap(), client_state().entities()));
+                    }
 
                     // Put the dialog system in a well-defined state.
                     self.client_state.follow_mut(client_state().dialog_window()).end();
@@ -2051,6 +2068,16 @@ impl Client {
                         }
                     }
                 }
+                InputEvent::ToggleMinimapWindow => {
+                    if self.client_state.try_follow(this_entity()).is_some() {
+                        match self.interface.is_window_with_class_open(WindowClass::Minimap) {
+                            true => self.interface.close_window_with_class(WindowClass::Minimap),
+                            false => self
+                                .interface
+                                .open_window(MinimapWindow::new(client_state().minimap(), client_state().entities())),
+                        }
+                    }
+                }
                 InputEvent::CloseTopWindow => self.interface.close_top_window(&self.client_state),
                 InputEvent::ToggleShowInterface => self.show_interface = !self.show_interface,
                 InputEvent::SelectCharacter { slot } => {
@@ -2557,7 +2584,9 @@ impl Client {
         #[cfg(feature = "debug")]
         let loads_measurement = Profiler::start_measurement("complete async loads");
 
-        for completed in self.async_loader.take_completed() {
+        let completed_loads: Vec<_> = self.async_loader.take_completed().collect();
+
+        for completed in completed_loads {
             match completed {
                 (LoaderId::AnimationData(entity_id), LoadableResource::AnimationData(animation_data)) => {
                     if let Some(entity) = self
@@ -2594,9 +2623,12 @@ impl Client {
                         .follow_mut(client_state().inventory())
                         .update_item_sprite(item_id, texture);
                 }
-                (LoaderId::Map(..), LoadableResource::Map { map, position }) => {
+                (LoaderId::Map(map_name), LoadableResource::Map { map, position }) => {
                     match self.client_state.try_follow(this_player()).is_none() {
                         true => {
+                            self.clear_minimap_state();
+                            self.interface.close_window_with_class(WindowClass::Minimap);
+
                             // Load of main menu map
                             let map = self.map.insert(map);
 
@@ -2612,6 +2644,8 @@ impl Client {
                             self.directional_shadow_camera.set_level_bound(map.get_level_bound());
                         }
                         false => {
+                            self.update_minimap_state(&map_name, &map);
+
                             // Normal map switch
                             let map = self.map.insert(map);
 

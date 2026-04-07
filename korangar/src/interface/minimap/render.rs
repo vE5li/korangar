@@ -10,8 +10,9 @@ use super::projection::MinimapProjection;
 use crate::graphics::{Color, CornerDiameter, ShadowPadding};
 use crate::loaders::{FontSize, OverflowBehavior};
 use crate::renderer::LayoutExt;
-use crate::state::{ClientState, MinimapState, this_entity};
-use crate::world::{Direction, Entity};
+use crate::state::{this_entity, ClientState, MinimapState};
+use crate::world::Entity;
+use ragnarok_packets::Direction;
 
 pub struct MinimapLayoutInfo {
     map_area: Area,
@@ -110,7 +111,7 @@ where
                                 None => 0.0,
                             };
                             
-                            let mut area = projection.marker_area(marker.position, marker.size);
+                            let mut area = projection.marker_area(marker.tile_position, marker.size);
                             // Make the arrow slightly larger to be visible
                             area.width *= 2.0;
                             area.height *= 2.0;
@@ -123,7 +124,7 @@ where
                     }
 
                     layout.add_text(
-                        projection.marker_area(marker.position, marker.size),
+                        projection.marker_area(marker.tile_position, marker.size),
                         marker.symbol,
                         FontSize(marker.font_size),
                         marker.color,

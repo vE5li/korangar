@@ -4,7 +4,7 @@ use image::{Rgba, RgbaImage};
 use ragnarok_formats::map::{Tile, TileFlags};
 
 use crate::graphics::Texture;
-use crate::loaders::TextureLoader;
+use crate::loaders::{ImageType, TextureLoader};
 use crate::state::MinimapState;
 use crate::world::Map;
 

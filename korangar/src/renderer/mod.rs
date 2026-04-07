@@ -37,6 +37,9 @@ pub trait SpriteRenderer {
     );
 
     fn render_sdf(&self, texture: Arc<Texture>, position: ScreenPosition, size: ScreenSize, screen_clip: ScreenClip, color: Color);
+    
+    /// Render a rotated Signed Distance Field (SDF) based image.
+    fn render_rotated_sdf(&self, texture: Arc<Texture>, position: ScreenPosition, size: ScreenSize, screen_clip: ScreenClip, color: Color, rotation: f32);
 }
 
 /// Trait to render markers.

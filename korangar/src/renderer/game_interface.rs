@@ -60,13 +60,14 @@ impl SpriteRenderer for GameInterfaceRenderer {
         self.render_indexed(texture, position, size, color, 1, 0, smooth);
     }
 
-    fn render_sdf(
+    fn render_rotated_sdf(
         &self,
         texture: Arc<Texture>,
         screen_position: ScreenPosition,
         screen_size: ScreenSize,
         _screen_clip: ScreenClip,
         color: Color,
+        rotation: f32,
     ) {
         let screen_position = ScreenPosition {
             left: screen_position.left / self.window_size.width,
@@ -88,7 +89,19 @@ impl SpriteRenderer for GameInterfaceRenderer {
             texture_position,
             texture_size,
             texture,
+            rotation,
         });
+    }
+
+    fn render_sdf(
+        &self,
+        texture: Arc<Texture>,
+        screen_position: ScreenPosition,
+        screen_size: ScreenSize,
+        screen_clip: ScreenClip,
+        color: Color,
+    ) {
+        self.render_rotated_sdf(texture, screen_position, screen_size, screen_clip, color, 0.0);
     }
 }
 

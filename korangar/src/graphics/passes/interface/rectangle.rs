@@ -344,6 +344,7 @@ impl Prepare for InterfaceRectangleDrawer {
                         color,
                         corner_diameter,
                         texture,
+                        rotation,
                     } => {
                         let mut texture_index = texture_views.len() as i32;
                         let id = texture.get_id();
@@ -368,7 +369,7 @@ impl Prepare for InterfaceRectangleDrawer {
                             texture_size: [1.0, 1.0],
                             rectangle_type: 3,
                             texture_index,
-                            rotation: 0.0,
+                            rotation: *rotation,
                             padding: Default::default(),
                         });
                     }
@@ -475,6 +476,7 @@ impl Prepare for InterfaceRectangleDrawer {
                         color,
                         corner_diameter,
                         texture: _,
+                        rotation,
                     } => {
                         self.instance_data.push(InstanceData {
                             color: color.components_linear(),
@@ -488,7 +490,7 @@ impl Prepare for InterfaceRectangleDrawer {
                             texture_size: [1.0, 1.0],
                             rectangle_type: 3,
                             texture_index: 0,
-                            rotation: 0.0,
+                            rotation: *rotation,
                             padding: Default::default(),
                         });
                     }

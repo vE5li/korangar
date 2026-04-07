@@ -193,6 +193,7 @@ pub enum RectangleInstruction {
         texture_position: Vector2<f32>,
         texture_size: Vector2<f32>,
         texture: Arc<Texture>,
+        rotation: f32,
     },
     Text {
         screen_position: ScreenPosition,
@@ -231,6 +232,7 @@ pub enum InterfaceRectangleInstruction {
         color: Color,
         corner_diameter: CornerDiameter,
         texture: Arc<Texture>,
+        rotation: f32,
     },
     Text {
         screen_position: ScreenPosition,

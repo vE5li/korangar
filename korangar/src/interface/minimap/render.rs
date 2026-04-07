@@ -118,7 +118,7 @@ where
                             area.left -= marker.size / 2.0;
                             area.top -= marker.size / 2.0;
 
-                            layout.add_rotated_texture(area, arrow_texture.clone(), marker.color, true, rotation);
+                            layout.add_rotated_sdf(area, arrow_texture.clone(), marker.color, rotation);
                             return;
                         }
                     }

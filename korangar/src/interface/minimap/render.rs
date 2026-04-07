@@ -120,20 +120,24 @@ where
                             // to the character's walking direction to ensure the arrow points relative to what you see.
                             let total_rotation = direction_angle - view_angle;
 
+                            // `arrow_right.png` points exactly East (positive X) on the screen.
+                            // In our 2D screen coordinate system (X is right, Y is down),
+                            // we want North (0 rads in the minimap logic) to point UP (negative Y).
+                            // So we rotate by an additional -PI/2 to align "North" to "Up".
+                            let base_texture_rotation = -std::f32::consts::PI / 2.0;
+
                             // We negate the angle because the SDF shader needs negative rotation to turn clockwise on screen,
                             // matching the minimap's coordinate system.
-                            // The marker_player.png likely points North (up) by default,
-                            // which corresponds to pi/2 radians offset compared to arrow_right.png (East, 0 rads).
-                            // If it points North natively, we adjust the base angle so that walking East (0 rads) rotates it properly.
-                            let base_texture_rotation = std::f32::consts::PI / 2.0;
-                            let rotation = -(total_rotation - base_texture_rotation);
+                            // We also add PI (180 degrees) because the in-game direction enum maps "North" to looking DOWN
+                            // from the camera's default perspective, but on the minimap we want North to point UP.
+                            let rotation = -total_rotation + base_texture_rotation + std::f32::consts::PI;
                             
                             let mut area = projection.marker_area(marker.tile_position, marker.size);
-                            // Make the arrow significantly larger and sharper to be clearly visible
-                            area.width *= 2.0;
-                            area.height *= 2.0;
-                            area.left -= marker.size / 2.0;
-                            area.top -= marker.size / 2.0;
+                            // Make the arrow significantly larger but keep the base narrow so it forms a sharp pointer
+                            area.width *= 2.5;   // Length of the arrow
+                            area.height *= 1.2;  // Narrow base
+                            area.left -= marker.size * 0.75;
+                            area.top -= marker.size * 0.1;
 
                             // Use an explicit sharp color like bright yellow or cyan for the player marker instead of the generic green/white
                             let player_marker_color = Color::rgb_u8(255, 215, 0); // Bright Yellow

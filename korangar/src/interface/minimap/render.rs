@@ -103,9 +103,26 @@ where
                 .for_each(|marker| {
                     if marker.is_player {
                         if let Some(arrow_texture) = &minimap.arrow_texture {
-                            // view_angle is positive counter-clockwise, but in the SDF shader we 
-                            // need negative rotation to turn clockwise on screen.
-                            let rotation = -view_angle;
+                            // Map the 8-way walking direction to an angle in radians
+                            let direction_angle = match marker.player_direction {
+                                Some(ragnarok_packets::Direction::West) => 0.0,
+                                Some(ragnarok_packets::Direction::NorthWest) => std::f32::consts::PI / 4.0,
+                                Some(ragnarok_packets::Direction::North) => std::f32::consts::PI / 2.0,
+                                Some(ragnarok_packets::Direction::NorthEast) => 3.0 * std::f32::consts::PI / 4.0,
+                                Some(ragnarok_packets::Direction::East) => std::f32::consts::PI,
+                                Some(ragnarok_packets::Direction::SouthEast) => 5.0 * std::f32::consts::PI / 4.0,
+                                Some(ragnarok_packets::Direction::South) => 3.0 * std::f32::consts::PI / 2.0,
+                                Some(ragnarok_packets::Direction::SouthWest) => 7.0 * std::f32::consts::PI / 4.0,
+                                None => 0.0,
+                            };
+
+                            // Since the minimap renders top-down, we add the camera's view angle 
+                            // to the character's walking direction to ensure the arrow points relative to what you see.
+                            let total_rotation = direction_angle - view_angle;
+
+                            // We negate the angle because the SDF shader needs negative rotation to turn clockwise on screen,
+                            // matching the minimap's coordinate system.
+                            let rotation = -total_rotation;
                             
                             let mut area = projection.marker_area(marker.tile_position, marker.size);
                             // Make the arrow slightly larger to be visible

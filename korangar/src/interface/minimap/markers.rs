@@ -1,4 +1,4 @@
-use ragnarok_packets::{Direction, TilePosition};
+use ragnarok_packets::TilePosition;
 
 use crate::graphics::Color;
 use crate::world::{Entity, EntityType};
@@ -10,12 +10,10 @@ pub struct MinimapMarker {
     pub size: f32,
     pub font_size: f32,
     pub is_player: bool,
-    pub player_direction: Option<Direction>,
 }
 
 pub fn collect_minimap_markers(entities: &[Entity], player_entity: Option<&Entity>, base_size: f32) -> Vec<MinimapMarker> {
     let player_entity_id = player_entity.map(Entity::get_entity_id);
-    let player_direction = player_entity.map(Entity::get_direction).unwrap_or(Direction::South);
 
     entities
         .iter()
@@ -38,7 +36,6 @@ pub fn collect_minimap_markers(entities: &[Entity], player_entity: Option<&Entit
                 size,
                 font_size,
                 is_player,
-                player_direction: if is_player { Some(player_direction) } else { None },
             })
         })
         .collect()

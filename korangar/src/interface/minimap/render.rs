@@ -10,9 +10,8 @@ use super::projection::MinimapProjection;
 use crate::graphics::{Color, CornerDiameter, ShadowPadding};
 use crate::loaders::{FontSize, OverflowBehavior};
 use crate::renderer::LayoutExt;
-use crate::state::{this_entity, ClientState, MinimapState};
+use crate::state::{this_entity, ClientState, MinimapState, ClientStatePathExt};
 use crate::world::Entity;
-use ragnarok_packets::Direction;
 
 pub struct MinimapLayoutInfo {
     map_area: Area,
@@ -93,23 +92,20 @@ where
             let player_path = this_entity();
             let player_entity = state.try_get(&player_path);
             let marker_size = (projection.texture_area().width.min(projection.texture_area().height) / 40.0).clamp(4.0, 8.0);
+            
+            // To get camera info, we need a way to pass it here or just fallback to 0.0 rotation.
+            // Ideally, the camera should be accessible via state, but if not we can add it to ClientState
+            // For now, let's use the camera view angle from the layout or client state
+            let view_angle = *state.get(&crate::state::client_state().camera_view_angle());
 
             collect_minimap_markers(entities, player_entity, marker_size)
                 .into_iter()
                 .for_each(|marker| {
                     if marker.is_player {
                         if let Some(arrow_texture) = &minimap.arrow_texture {
-                            let rotation = match marker.player_direction {
-                                Some(Direction::West) => 0.0,
-                                Some(Direction::NorthWest) => std::f32::consts::PI / 4.0,
-                                Some(Direction::North) => std::f32::consts::PI / 2.0,
-                                Some(Direction::NorthEast) => 3.0 * std::f32::consts::PI / 4.0,
-                                Some(Direction::East) => std::f32::consts::PI,
-                                Some(Direction::SouthEast) => 5.0 * std::f32::consts::PI / 4.0,
-                                Some(Direction::South) => 3.0 * std::f32::consts::PI / 2.0,
-                                Some(Direction::SouthWest) => 7.0 * std::f32::consts::PI / 4.0,
-                                None => 0.0,
-                            };
+                            // view_angle is positive counter-clockwise, but in the SDF shader we 
+                            // need negative rotation to turn clockwise on screen.
+                            let rotation = -view_angle;
                             
                             let mut area = projection.marker_area(marker.tile_position, marker.size);
                             // Make the arrow slightly larger to be visible

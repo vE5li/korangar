@@ -98,4 +98,8 @@ impl Camera for DebugCamera {
     fn view_direction(&self) -> Vector3<f32> {
         self.orientation.rotate_vector(Vector3::unit_z())
     }
+
+    fn view_angle(&self) -> f32 {
+        0.0 // Debug camera doesn't strictly have a tracked yaw
+    }
 }

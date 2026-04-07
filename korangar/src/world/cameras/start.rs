@@ -82,4 +82,8 @@ impl Camera for StartCamera {
     fn view_direction(&self) -> Vector3<f32> {
         self.view_direction
     }
+
+    fn view_angle(&self) -> f32 {
+        self.view_angle
+    }
 }

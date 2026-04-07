@@ -146,6 +146,9 @@ pub struct ClientState {
     /// Graphics capabilities used in the graphics settings window.
     graphics_settings_capabilities: GraphicsSettingsCapabilities,
 
+    /// View angle of the current camera.
+    camera_view_angle: f32,
+
     /// The interface theme for the menu windows.
     menu_theme: InterfaceTheme,
     /// The interface theme for in-game windows.
@@ -405,6 +408,9 @@ impl ClientState {
             interface_settings_capabilities,
             graphics_settings,
             graphics_settings_capabilities,
+
+            camera_view_angle: 0.0,
+
             menu_theme,
             in_game_theme,
             world_theme,

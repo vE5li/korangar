@@ -2876,6 +2876,9 @@ impl Client {
                 true => &self.player_camera,
                 false => &self.start_camera,
             };
+            
+            // Push the camera view angle to the state for UI components like the minimap to use
+            *self.client_state.follow_mut(client_state().camera_view_angle()) = current_camera.view_angle();
 
             let (view_matrix, projection_matrix) = current_camera.view_projection_matrices();
             let camera_position = current_camera.camera_position().to_homogeneous();

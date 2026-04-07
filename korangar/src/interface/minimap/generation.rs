@@ -36,7 +36,7 @@ fn create_generated_minimap_texture(texture_loader: &TextureLoader, map_name: &s
 
     map.get_tiles().iter().enumerate().for_each(|(index, tile)| {
         let x = (index % map_width) as u32;
-        let y = (index / map_width) as u32;
+        let y = height.saturating_sub(1) - (index / map_width) as u32;
         let normalized_height = ((average_tile_height(tile) - lowest_height) / height_range).clamp(0.0, 1.0);
         let walkable = tile.flags.contains(TileFlags::WALKABLE);
         let base = if walkable {

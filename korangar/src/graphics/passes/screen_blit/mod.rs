@@ -15,7 +15,7 @@ pub(crate) struct ScreenBlitRenderPassContext {
     surface_texture_format: TextureFormat,
 }
 
-impl RenderPassContext<{ BindGroupCount::None }, { ColorAttachmentCount::One }, { DepthAttachmentCount::None }>
+impl RenderPassContext<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttachmentCount::None }>
     for ScreenBlitRenderPassContext
 {
     type PassData<'data> = &'data TextureView;
@@ -29,10 +29,10 @@ impl RenderPassContext<{ BindGroupCount::None }, { ColorAttachmentCount::One }, 
     fn create_pass<'encoder>(
         &mut self,
         encoder: &'encoder mut CommandEncoder,
-        _global_context: &GlobalContext,
+        global_context: &GlobalContext,
         pass_data: Self::PassData<'_>,
     ) -> RenderPass<'encoder> {
-        encoder.begin_render_pass(&RenderPassDescriptor {
+        let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
             label: Some(PASS_NAME),
             color_attachments: &[Some(RenderPassColorAttachment {
                 view: pass_data,
@@ -47,11 +47,14 @@ impl RenderPassContext<{ BindGroupCount::None }, { ColorAttachmentCount::One }, 
             timestamp_writes: None,
             occlusion_query_set: None,
             multiview_mask: None,
-        })
+        });
+
+        pass.set_bind_group(0, &global_context.global_bind_group, &[]);
+        pass
     }
 
-    fn bind_group_layout(_device: &Device) -> [&'static BindGroupLayout; 0] {
-        []
+    fn bind_group_layout(device: &Device) -> [&'static BindGroupLayout; 1] {
+        [GlobalContext::global_bind_group_layout(device)]
     }
 
     fn color_attachment_formats(&self) -> [TextureFormat; 1] {

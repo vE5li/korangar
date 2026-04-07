@@ -4,7 +4,7 @@ use wgpu::{
 };
 
 use crate::graphics::passes::screen_blit::ScreenBlitRenderPassContext;
-use crate::graphics::passes::{BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer};
+use crate::graphics::passes::{BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, RenderPassContext};
 use crate::graphics::shader_compiler::ShaderCompiler;
 use crate::graphics::{AttachmentTexture, Capabilities, GlobalContext};
 
@@ -14,7 +14,7 @@ pub(crate) struct ScreenBlitBlitterDrawer {
     pipeline: RenderPipeline,
 }
 
-impl Drawer<{ BindGroupCount::None }, { ColorAttachmentCount::One }, { DepthAttachmentCount::None }> for ScreenBlitBlitterDrawer {
+impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttachmentCount::None }> for ScreenBlitBlitterDrawer {
     type Context = ScreenBlitRenderPassContext;
     type DrawData<'data> = &'data AttachmentTexture;
 
@@ -42,9 +42,15 @@ impl Drawer<{ BindGroupCount::None }, { ColorAttachmentCount::One }, { DepthAtta
             false,
         );
 
+        let pass_bind_group_layouts = <Self as Drawer<
+            { BindGroupCount::One },
+            { ColorAttachmentCount::One },
+            { DepthAttachmentCount::None },
+        >>::Context::bind_group_layout(device);
+
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some(&label),
-            bind_group_layouts: &[Some(&texture_bind_group_layout)],
+            bind_group_layouts: &[Some(pass_bind_group_layouts[0]), Some(&texture_bind_group_layout)],
             immediate_size: 0,
         });
 
@@ -79,7 +85,7 @@ impl Drawer<{ BindGroupCount::None }, { ColorAttachmentCount::One }, { DepthAtta
 
     fn draw(&mut self, pass: &mut RenderPass<'_>, draw_data: Self::DrawData<'_>) {
         pass.set_pipeline(&self.pipeline);
-        pass.set_bind_group(0, draw_data.get_bind_group(), &[]);
+        pass.set_bind_group(1, draw_data.get_bind_group(), &[]);
         pass.draw(0..3, 0..1);
     }
 }

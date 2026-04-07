@@ -47,6 +47,18 @@ where
                     }
                 )
             },
+            split! {
+                children: (
+                    text! {
+                        text: "Brightness",
+                        overflow_behavior: OverflowBehavior::Shrink,
+                    },
+                    drop_down! {
+                        selected: self.settings_path.brightness(),
+                        options: self.capabilities_path.brightness_options(),
+                    }
+                )
+            },
             state_button! {
                 text: "Triple buffering",
                 state: self.settings_path.triple_buffering(),

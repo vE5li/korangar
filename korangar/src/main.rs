@@ -2850,6 +2850,7 @@ impl Client {
             let update_shadow_camera_measurement = Profiler::start_measurement("update directional shadow camera");
 
             let lighting_mode = *self.client_state.follow(client_state().graphics_settings().lighting_mode());
+            let brightness = *self.client_state.follow(client_state().graphics_settings().brightness());
             let shadow_resolution = *self.client_state.follow(client_state().graphics_settings().shadow_resolution());
             let shadow_method = *self.client_state.follow(client_state().graphics_settings().shadow_method());
             let shadow_detail = *self.client_state.follow(client_state().graphics_settings().shadow_detail());
@@ -3481,6 +3482,7 @@ impl Client {
                     camera_position,
                     animation_timer_ms,
                     ambient_light_color,
+                    brightness: brightness.factor(),
                     enhanced_lighting: lighting_mode == LightingMode::Enhanced,
                     shadow_method,
                     shadow_detail,

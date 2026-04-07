@@ -141,6 +141,10 @@ impl Color {
         });
         [linear[0] * self.alpha, linear[1] * self.alpha, linear[2] * self.alpha, self.alpha]
     }
+
+    pub fn components_premultiplied(self) -> [f32; 4] {
+        [self.red * self.alpha, self.green * self.alpha, self.blue * self.alpha, self.alpha]
+    }
 }
 
 impl From<Color> for cosmic_text::Color {

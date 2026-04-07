@@ -92,11 +92,13 @@ pub(crate) struct GlobalUniforms {
     interface_size: [u32; 2],
     pointer_position: [u32; 2],
     animation_timer: f32,
+    brightness: f32,
     point_light_count: u32,
     enhanced_lighting: u32,
     shadow_method: u32,
     shadow_detail: u32,
     use_sdsm: u32,
+    padding: [u32; 3],
 }
 
 #[derive(Copy, Clone, Pod, Zeroable)]
@@ -465,22 +467,24 @@ impl Prepare for GlobalContext {
             inverse_view_projection: view_projection.invert().unwrap_or_else(Matrix4::identity).into(),
             indicator_positions: indicator_positions.into(),
             indicator_color: indicator_color.components_linear(),
-            ambient_color: ambient_light_color.components_linear(),
+            ambient_color: ambient_light_color.components_premultiplied(),
             camera_position: instructions.uniforms.camera_position.into(),
             forward_size: [self.forward_size.width as u32, self.forward_size.height as u32],
             interface_size: [self.interface_size.width as u32, self.interface_size.height as u32],
             pointer_position: [instructions.picker_position.left as u32, instructions.picker_position.top as u32],
             animation_timer: instructions.uniforms.animation_timer_ms / 1000.0,
+            brightness: instructions.uniforms.brightness,
             point_light_count: (instructions.point_light_with_shadows.len() + instructions.point_light.len()) as u32,
             enhanced_lighting: instructions.uniforms.enhanced_lighting as u32,
             shadow_method: instructions.uniforms.shadow_method.into(),
             shadow_detail: instructions.uniforms.shadow_detail.into(),
             use_sdsm: instructions.uniforms.use_sdsm as u32,
+            padding: Default::default(),
         };
 
         self.directional_light_uniforms = DirectionalLightUniforms {
             view_projection: instructions.directional_light.view_projection_matrix.into(),
-            color: directional_light_color.components_linear(),
+            color: directional_light_color.components_premultiplied(),
             direction: instructions.directional_light.direction.extend(0.0).into(),
         };
 

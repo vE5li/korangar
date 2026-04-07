@@ -13,6 +13,8 @@ use crate::graphics::{
 #[derive(Clone, Serialize, Deserialize, RustState, StateElement)]
 pub struct GraphicsSettings {
     pub lighting_mode: LightingMode,
+    #[serde(default)]
+    pub brightness: Brightness,
     pub vsync: bool,
     pub limit_framerate: LimitFramerate,
     pub triple_buffering: bool,
@@ -31,6 +33,7 @@ impl Default for GraphicsSettings {
     fn default() -> Self {
         Self {
             lighting_mode: LightingMode::Enhanced,
+            brightness: Brightness::B100,
             vsync: true,
             limit_framerate: LimitFramerate::Unlimited,
             triple_buffering: true,
@@ -113,9 +116,86 @@ impl DropDownItem<LightingMode> for LightingMode {
     }
 }
 
+#[derive(Copy, Clone, PartialEq, Eq, Serialize, Deserialize, StateElement)]
+pub enum Brightness {
+    B50,
+    B60,
+    B70,
+    B80,
+    B90,
+    B100,
+    B110,
+    B120,
+    B130,
+    B140,
+    B150,
+    B160,
+    B170,
+    B180,
+    B190,
+    B200,
+}
+
+impl Default for Brightness {
+    fn default() -> Self {
+        Brightness::B100
+    }
+}
+
+impl Brightness {
+    pub fn factor(self) -> f32 {
+        match self {
+            Brightness::B50 => 0.5,
+            Brightness::B60 => 0.6,
+            Brightness::B70 => 0.7,
+            Brightness::B80 => 0.8,
+            Brightness::B90 => 0.9,
+            Brightness::B100 => 1.0,
+            Brightness::B110 => 1.1,
+            Brightness::B120 => 1.2,
+            Brightness::B130 => 1.3,
+            Brightness::B140 => 1.4,
+            Brightness::B150 => 1.5,
+            Brightness::B160 => 1.6,
+            Brightness::B170 => 1.7,
+            Brightness::B180 => 1.8,
+            Brightness::B190 => 1.9,
+            Brightness::B200 => 2.0,
+        }
+    }
+}
+
+impl DropDownItem<Brightness> for Brightness {
+    fn text(&self) -> &str {
+        match self {
+            Brightness::B50 => "50%",
+            Brightness::B60 => "60%",
+            Brightness::B70 => "70%",
+            Brightness::B80 => "80%",
+            Brightness::B90 => "90%",
+            Brightness::B100 => "100%",
+            Brightness::B110 => "110%",
+            Brightness::B120 => "120%",
+            Brightness::B130 => "130%",
+            Brightness::B140 => "140%",
+            Brightness::B150 => "150%",
+            Brightness::B160 => "160%",
+            Brightness::B170 => "170%",
+            Brightness::B180 => "180%",
+            Brightness::B190 => "190%",
+            Brightness::B200 => "200%",
+        }
+    }
+
+    fn value(&self) -> Brightness {
+        *self
+    }
+}
+
 #[derive(RustState, StateElement)]
 pub struct GraphicsSettingsCapabilities {
     lighting_modes: Vec<LightingMode>,
+    brightness_options: Vec<Brightness>,
     texture_filtering_options: Vec<TextureSamplerType>,
     limit_framerate_options: Vec<LimitFramerate>,
     supported_msaa: Vec<Msaa>,
@@ -131,6 +211,24 @@ impl Default for GraphicsSettingsCapabilities {
     fn default() -> Self {
         Self {
             lighting_modes: vec![LightingMode::Classic, LightingMode::Enhanced],
+            brightness_options: vec![
+                Brightness::B50,
+                Brightness::B60,
+                Brightness::B70,
+                Brightness::B80,
+                Brightness::B90,
+                Brightness::B100,
+                Brightness::B110,
+                Brightness::B120,
+                Brightness::B130,
+                Brightness::B140,
+                Brightness::B150,
+                Brightness::B160,
+                Brightness::B170,
+                Brightness::B180,
+                Brightness::B190,
+                Brightness::B200,
+            ],
             texture_filtering_options: vec![
                 TextureSamplerType::Nearest,
                 TextureSamplerType::Linear,

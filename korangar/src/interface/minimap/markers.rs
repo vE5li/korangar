@@ -42,14 +42,14 @@ pub fn collect_minimap_markers(entities: &[Entity], player_entity: Option<&Entit
 
 fn player_marker(direction: Direction) -> &'static str {
     match direction {
-        Direction::North => "↑",
-        Direction::NorthEast => "↗",
-        Direction::East => "→",
-        Direction::SouthEast => "↘",
-        Direction::South => "↓",
-        Direction::SouthWest => "↙",
-        Direction::West => "←",
-        Direction::NorthWest => "↖",
+        Direction::North => "N",
+        Direction::NorthEast => "NE",
+        Direction::East => "E",
+        Direction::SouthEast => "SE",
+        Direction::South => "S",
+        Direction::SouthWest => "SW",
+        Direction::West => "W",
+        Direction::NorthWest => "NW",
     }
 }
 

@@ -122,7 +122,11 @@ where
 
                             // We negate the angle because the SDF shader needs negative rotation to turn clockwise on screen,
                             // matching the minimap's coordinate system.
-                            let rotation = -total_rotation;
+                            // The marker_player.png likely points North (up) by default,
+                            // which corresponds to pi/2 radians offset compared to arrow_right.png (East, 0 rads).
+                            // If it points North natively, we adjust the base angle so that walking East (0 rads) rotates it properly.
+                            let base_texture_rotation = std::f32::consts::PI / 2.0;
+                            let rotation = -(total_rotation - base_texture_rotation);
                             
                             let mut area = projection.marker_area(marker.tile_position, marker.size);
                             // Make the arrow significantly larger and sharper to be clearly visible
@@ -134,8 +138,6 @@ where
                             // Use an explicit sharp color like bright yellow or cyan for the player marker instead of the generic green/white
                             let player_marker_color = Color::rgb_u8(255, 215, 0); // Bright Yellow
 
-                            // The arrow_right.png points exactly East (0 radians), so we don't need
-                            // an additional rotation offset like we might have needed with arrow_left.png.
                             layout.add_rotated_sdf(area, arrow_texture.clone(), player_marker_color, rotation);
                             return;
                         }

@@ -27,7 +27,7 @@ pub fn collect_minimap_markers(entities: &[Entity], player_entity: Option<&Entit
                 return None;
             }
 
-            let size = if is_player { base_size + 2.0 } else { base_size };
+            let size = if is_player { base_size * 1.5 } else { base_size }; // Make the player marker significantly larger
             let symbol = if is_player { "" } else { "●" };
             let font_size = size + if is_player { 8.0 } else { 6.0 };
 
@@ -46,7 +46,7 @@ pub fn collect_minimap_markers(entities: &[Entity], player_entity: Option<&Entit
 
 fn marker_color(entity_type: EntityType, is_player: bool) -> Color {
     if is_player {
-        return Color::rgb_u8(80, 255, 160);
+        return Color::rgb_u8(255, 215, 0); // Base color (can be overridden in render)
     }
 
     match entity_type {

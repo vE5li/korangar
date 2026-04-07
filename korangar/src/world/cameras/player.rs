@@ -72,10 +72,6 @@ impl PlayerCamera {
         rotation_velocity > ROTATION_SPEED_THRESHOLD || zoom_velocity > ZOOM_SPEED_THRESHOLD
     }
 
-    pub fn get_view_angle(&self) -> f32 {
-        self.view_angle.get_current()
-    }
-
     pub fn update(&mut self, delta_time: f64) {
         self.focus_point.x.update(delta_time);
         self.focus_point.y.update(delta_time);

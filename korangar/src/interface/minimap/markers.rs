@@ -9,6 +9,8 @@ pub struct MinimapMarker {
     pub color: Color,
     pub size: f32,
     pub font_size: f32,
+    pub is_player: bool,
+    pub player_direction: Option<Direction>,
 }
 
 pub fn collect_minimap_markers(entities: &[Entity], player_entity: Option<&Entity>, base_size: f32) -> Vec<MinimapMarker> {
@@ -26,7 +28,7 @@ pub fn collect_minimap_markers(entities: &[Entity], player_entity: Option<&Entit
             }
 
             let size = if is_player { base_size + 2.0 } else { base_size };
-            let symbol = if is_player { player_marker(player_direction) } else { "●" };
+            let symbol = if is_player { "" } else { "●" };
             let font_size = size + if is_player { 8.0 } else { 6.0 };
 
             Some(MinimapMarker {
@@ -35,22 +37,11 @@ pub fn collect_minimap_markers(entities: &[Entity], player_entity: Option<&Entit
                 color: marker_color(entity_type, is_player),
                 size,
                 font_size,
+                is_player,
+                player_direction: if is_player { Some(player_direction) } else { None },
             })
         })
         .collect()
-}
-
-fn player_marker(direction: Direction) -> &'static str {
-    match direction {
-        Direction::North => "N",
-        Direction::NorthEast => "NE",
-        Direction::East => "E",
-        Direction::SouthEast => "SE",
-        Direction::South => "S",
-        Direction::SouthWest => "SW",
-        Direction::West => "W",
-        Direction::NorthWest => "NW",
-    }
 }
 
 fn marker_color(entity_type: EntityType, is_player: bool) -> Color {

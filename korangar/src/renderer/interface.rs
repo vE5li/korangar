@@ -424,6 +424,46 @@ impl InterfaceRenderer {
     pub fn render_trash_can(&self, position: ScreenPosition, size: ScreenSize, clip: ScreenClip, color: Color) {
         self.render_sdf(self.trash_can_texture.clone(), position, size, clip, color);
     }
+
+    /// Render a sprite with an optional rotation (in radians).
+    pub fn render_rotated_texture(
+        &self,
+        texture: Arc<Texture>,
+        position: ScreenPosition,
+        size: ScreenSize,
+        mut screen_clip: ScreenClip,
+        color: Color,
+        smooth: bool,
+        rotation: f32,
+    ) {
+        if position.left > screen_clip.right
+            || position.top > screen_clip.bottom
+            || position.left + size.width < screen_clip.left
+            || position.top + size.height < screen_clip.top
+        {
+            return;
+        }
+
+        if self.high_quality_interface {
+            screen_clip = screen_clip * 2.0;
+        }
+
+        let screen_position = position / self.window_size;
+        let screen_size = size / self.window_size;
+
+        let corner_diameter = CornerDiameter::default();
+
+        self.instructions.borrow_mut().push(InterfaceRectangleInstruction::Sprite {
+            screen_position,
+            screen_size,
+            screen_clip,
+            color,
+            corner_diameter,
+            texture,
+            smooth,
+            rotation,
+        });
+    }
 }
 
 impl SpriteRenderer for InterfaceRenderer {
@@ -495,6 +535,7 @@ impl SpriteRenderer for InterfaceRenderer {
             corner_diameter,
             texture,
             smooth,
+            rotation: 0.0,
         });
     }
 
@@ -572,6 +613,7 @@ struct TextureInstruction {
     area: Area,
     color: Color,
     smooth: bool,
+    rotation: f32,
 }
 
 /// An instruction to render a sprite.
@@ -667,6 +709,7 @@ impl RenderLayer<ClientState> for InterfaceRenderer {
                 area,
                 color,
                 smooth,
+                rotation,
             }) => {
                 let position = ScreenPosition {
                     left: area.left,
@@ -678,7 +721,7 @@ impl RenderLayer<ClientState> for InterfaceRenderer {
                 };
                 let screen_clip = clips[clip_id.as_index()];
 
-                self.render_sprite(texture, position, size, screen_clip, color, smooth);
+                self.render_rotated_texture(texture, position, size, screen_clip, color, smooth, rotation);
             }
         }
     }
@@ -689,6 +732,9 @@ impl RenderLayer<ClientState> for InterfaceRenderer {
 pub trait LayoutExt<'a> {
     /// Add an instruction to render a texture.
     fn add_texture(&mut self, area: Area, texture: Arc<Texture>, color: Color, smooth: bool);
+
+    /// Add an instruction to render a texture with a given rotation.
+    fn add_rotated_texture(&mut self, area: Area, texture: Arc<Texture>, color: Color, smooth: bool, rotation: f32);
 
     /// Add an instruction to render a sprite.
     fn add_sprite(
@@ -704,6 +750,10 @@ pub trait LayoutExt<'a> {
 
 impl<'a> LayoutExt<'a> for WindowLayout<'a, ClientState> {
     fn add_texture(&mut self, area: Area, texture: Arc<Texture>, color: Color, smooth: bool) {
+        self.add_rotated_texture(area, texture, color, smooth, 0.0);
+    }
+
+    fn add_rotated_texture(&mut self, area: Area, texture: Arc<Texture>, color: Color, smooth: bool, rotation: f32) {
         let clip_id = self.get_active_clip_id();
         let area = self.scale_area(area);
 
@@ -713,6 +763,7 @@ impl<'a> LayoutExt<'a> for WindowLayout<'a, ClientState> {
             area,
             color,
             smooth,
+            rotation,
         }));
     }
 

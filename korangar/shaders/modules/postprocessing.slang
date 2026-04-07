@@ -46,6 +46,8 @@ public struct RectangleInstanceData {
     public var texture_size: float2;
     public var rectangle_type: uint;
     public var texture_index: int;
+    public var rotation: float;
+    public var padding: uint;
 }
 
 public struct DebugUniforms {

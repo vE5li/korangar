@@ -87,6 +87,8 @@ pub struct MinimapState {
     pub zoom: f32,
     #[hidden_element]
     pub texture: Option<Arc<crate::graphics::Texture>>,
+    #[hidden_element]
+    pub arrow_texture: Option<Arc<crate::graphics::Texture>>,
 }
 
 impl Default for MinimapState {
@@ -97,6 +99,7 @@ impl Default for MinimapState {
             height: 0,
             zoom: 1.0,
             texture: None,
+            arrow_texture: None,
         }
     }
 }

@@ -11,12 +11,15 @@ use crate::world::Map;
 pub fn create_minimap_state(texture_loader: &TextureLoader, previous: &MinimapState, map_name: &str, map: &Map) -> MinimapState {
     let texture = create_generated_minimap_texture(texture_loader, map_name, map);
 
+    let arrow_texture = texture_loader.get_or_load("arrow_left.png", ImageType::Sdf).ok();
+
     MinimapState {
         map_name: map_name.strip_suffix(".gat").unwrap_or(map_name).to_owned(),
         width: map.get_width(),
         height: map.get_height(),
         zoom: previous.zoom.max(1.0),
         texture: Some(texture),
+        arrow_texture,
     }
 }
 

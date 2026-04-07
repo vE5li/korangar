@@ -303,6 +303,7 @@ impl GameInterfaceRenderer {
             texture_size,
             linear_filtering: smooth,
             texture,
+            rotation: 0.0,
         });
     }
 }

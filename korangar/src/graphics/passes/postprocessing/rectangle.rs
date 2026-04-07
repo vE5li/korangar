@@ -43,7 +43,8 @@ pub(crate) struct InstanceData {
     texture_size: [f32; 2],
     rectangle_type: u32,
     texture_index: i32,
-    padding: [u32; 2],
+    rotation: f32,
+    padding: u32,
 }
 
 #[derive(Default, Copy, Clone)]
@@ -318,6 +319,7 @@ impl Prepare for PostProcessingRectangleDrawer {
                                 texture_size: [0.0; 2],
                                 rectangle_type: 0,
                                 texture_index: -1,
+                                rotation: 0.0,
                                 padding: Default::default(),
                             });
                         }
@@ -329,6 +331,7 @@ impl Prepare for PostProcessingRectangleDrawer {
                             texture_size,
                             linear_filtering,
                             texture,
+                            rotation,
                         } => {
                             let rectangle_type = if *linear_filtering { 1 } else { 2 };
 
@@ -351,6 +354,7 @@ impl Prepare for PostProcessingRectangleDrawer {
                                 texture_size: (*texture_size).into(),
                                 rectangle_type,
                                 texture_index,
+                                rotation: *rotation,
                                 padding: Default::default(),
                             });
                         }
@@ -381,6 +385,7 @@ impl Prepare for PostProcessingRectangleDrawer {
                                 texture_size: (*texture_size).into(),
                                 rectangle_type: 3,
                                 texture_index,
+                                rotation: 0.0,
                                 padding: Default::default(),
                             });
                         }
@@ -399,6 +404,7 @@ impl Prepare for PostProcessingRectangleDrawer {
                                 texture_size: (*texture_size).into(),
                                 rectangle_type: 4,
                                 texture_index: -1,
+                                rotation: 0.0,
                                 padding: Default::default(),
                             });
                         }
@@ -448,6 +454,7 @@ impl Prepare for PostProcessingRectangleDrawer {
                                 texture_size: [0.0; 2],
                                 rectangle_type: 0,
                                 texture_index: -1,
+                                rotation: 0.0,
                                 padding: Default::default(),
                             });
                         }
@@ -459,6 +466,7 @@ impl Prepare for PostProcessingRectangleDrawer {
                             texture_size,
                             linear_filtering,
                             texture: _,
+                            rotation,
                         } => {
                             let rectangle_type = if *linear_filtering { 1 } else { 2 };
 
@@ -470,6 +478,7 @@ impl Prepare for PostProcessingRectangleDrawer {
                                 texture_size: (*texture_size).into(),
                                 rectangle_type,
                                 texture_index: 0,
+                                rotation: *rotation,
                                 padding: Default::default(),
                             });
                         }
@@ -489,6 +498,7 @@ impl Prepare for PostProcessingRectangleDrawer {
                                 texture_size: (*texture_size).into(),
                                 rectangle_type: 3,
                                 texture_index: 0,
+                                rotation: 0.0,
                                 padding: Default::default(),
                             });
                         }
@@ -507,6 +517,7 @@ impl Prepare for PostProcessingRectangleDrawer {
                                 texture_size: (*texture_size).into(),
                                 rectangle_type: 4,
                                 texture_index: -1,
+                                rotation: 0.0,
                                 padding: Default::default(),
                             });
                         }

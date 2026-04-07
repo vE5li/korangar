@@ -11,7 +11,7 @@ use crate::graphics::{Color, CornerDiameter, ShadowPadding};
 use crate::loaders::{FontSize, OverflowBehavior};
 use crate::renderer::LayoutExt;
 use crate::state::{ClientState, MinimapState, this_entity};
-use crate::world::Entity;
+use crate::world::{Direction, Entity};
 
 pub struct MinimapLayoutInfo {
     map_area: Area,
@@ -96,8 +96,34 @@ where
             collect_minimap_markers(entities, player_entity, marker_size)
                 .into_iter()
                 .for_each(|marker| {
+                    if marker.is_player {
+                        if let Some(arrow_texture) = &minimap.arrow_texture {
+                            let rotation = match marker.player_direction {
+                                Some(Direction::West) => 0.0,
+                                Some(Direction::NorthWest) => std::f32::consts::PI / 4.0,
+                                Some(Direction::North) => std::f32::consts::PI / 2.0,
+                                Some(Direction::NorthEast) => 3.0 * std::f32::consts::PI / 4.0,
+                                Some(Direction::East) => std::f32::consts::PI,
+                                Some(Direction::SouthEast) => 5.0 * std::f32::consts::PI / 4.0,
+                                Some(Direction::South) => 3.0 * std::f32::consts::PI / 2.0,
+                                Some(Direction::SouthWest) => 7.0 * std::f32::consts::PI / 4.0,
+                                None => 0.0,
+                            };
+                            
+                            let mut area = projection.marker_area(marker.position, marker.size);
+                            // Make the arrow slightly larger to be visible
+                            area.width *= 2.0;
+                            area.height *= 2.0;
+                            area.left -= marker.size / 2.0;
+                            area.top -= marker.size / 2.0;
+
+                            layout.add_rotated_texture(area, arrow_texture.clone(), marker.color, true, rotation);
+                            return;
+                        }
+                    }
+
                     layout.add_text(
-                        projection.marker_area(marker.tile_position, marker.size),
+                        projection.marker_area(marker.position, marker.size),
                         marker.symbol,
                         FontSize(marker.font_size),
                         marker.color,

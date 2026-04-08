@@ -353,6 +353,7 @@ impl MarkerRenderer for GameInterfaceRenderer {
                 texture_position: Vector2::new(0.0, 0.0),
                 texture_size: Vector2::new(1.0, 1.0),
                 texture: texture.clone(),
+                rotation: 0.0,
             });
         }
     }

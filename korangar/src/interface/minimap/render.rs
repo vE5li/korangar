@@ -10,7 +10,7 @@ use super::projection::MinimapProjection;
 use crate::graphics::{Color, CornerDiameter, ShadowPadding};
 use crate::loaders::{FontSize, OverflowBehavior};
 use crate::renderer::LayoutExt;
-use crate::state::{this_entity, ClientState, MinimapState, ClientStatePathExt};
+use crate::state::{ClientState, MinimapState, this_entity};
 use crate::world::Entity;
 
 pub struct MinimapLayoutInfo {
@@ -84,7 +84,13 @@ where
         );
 
         if let Some(texture) = &minimap.texture {
-            let projection = MinimapProjection::new(layout_info.map_area, minimap.width, minimap.height, minimap.zoom, player_position);
+            let projection = MinimapProjection::new(
+                layout_info.map_area,
+                minimap.width,
+                minimap.height,
+                minimap.zoom,
+                player_position,
+            );
 
             layout.add_texture(projection.texture_area(), texture.clone(), Color::WHITE, false);
 
@@ -92,57 +98,47 @@ where
             let player_path = this_entity();
             let player_entity = state.try_get(&player_path);
             let marker_size = (projection.texture_area().width.min(projection.texture_area().height) / 40.0).clamp(4.0, 8.0);
-            
-            // To get camera info, we need a way to pass it here or just fallback to 0.0 rotation.
-            // Ideally, the camera should be accessible via state, but if not we can add it to ClientState
-            // For now, let's use the camera view angle from the layout or client state
-            let view_angle = *state.get(&crate::state::client_state().camera_view_angle());
 
             collect_minimap_markers(entities, player_entity, marker_size)
                 .into_iter()
                 .for_each(|marker| {
                     if marker.is_player {
                         if let Some(arrow_texture) = &minimap.arrow_texture {
-                            // Map the 8-way walking direction to an angle in radians
                             let direction_angle = match marker.player_direction {
-                                Some(ragnarok_packets::Direction::West) => 0.0,
-                                Some(ragnarok_packets::Direction::NorthWest) => std::f32::consts::PI / 4.0,
+                                Some(ragnarok_packets::Direction::East) => 0.0,
+                                Some(ragnarok_packets::Direction::NorthEast) => std::f32::consts::PI / 4.0,
                                 Some(ragnarok_packets::Direction::North) => std::f32::consts::PI / 2.0,
-                                Some(ragnarok_packets::Direction::NorthEast) => 3.0 * std::f32::consts::PI / 4.0,
-                                Some(ragnarok_packets::Direction::East) => std::f32::consts::PI,
-                                Some(ragnarok_packets::Direction::SouthEast) => 5.0 * std::f32::consts::PI / 4.0,
-                                Some(ragnarok_packets::Direction::South) => 3.0 * std::f32::consts::PI / 2.0,
-                                Some(ragnarok_packets::Direction::SouthWest) => 7.0 * std::f32::consts::PI / 4.0,
+                                Some(ragnarok_packets::Direction::NorthWest) => 3.0 * std::f32::consts::PI / 4.0,
+                                Some(ragnarok_packets::Direction::West) => std::f32::consts::PI,
+                                Some(ragnarok_packets::Direction::SouthWest) => -3.0 * std::f32::consts::PI / 4.0,
+                                Some(ragnarok_packets::Direction::South) => -std::f32::consts::PI / 2.0,
+                                Some(ragnarok_packets::Direction::SouthEast) => -std::f32::consts::PI / 4.0,
                                 None => 0.0,
                             };
+                            let rotation = direction_angle + std::f32::consts::PI;
 
-                            // Since the minimap renders top-down, we add the camera's view angle 
-                            // to the character's walking direction to ensure the arrow points relative to what you see.
-                            let total_rotation = direction_angle - view_angle;
-
-                            // `arrow_right.png` points exactly East (positive X) on the screen.
-                            // In our 2D screen coordinate system (X is right, Y is down),
-                            // we want North (0 rads in the minimap logic) to point UP (negative Y).
-                            // So we rotate by an additional -PI/2 to align "North" to "Up".
-                            let base_texture_rotation = -std::f32::consts::PI / 2.0;
-
-                            // We negate the angle because the SDF shader needs negative rotation to turn clockwise on screen,
-                            // matching the minimap's coordinate system.
-                            // We also add PI (180 degrees) because the in-game direction enum maps "North" to looking DOWN
-                            // from the camera's default perspective, but on the minimap we want North to point UP.
-                            let rotation = -total_rotation + base_texture_rotation + std::f32::consts::PI;
-                            
                             let mut area = projection.marker_area(marker.tile_position, marker.size);
-                            // Make the arrow significantly larger but keep the base narrow so it forms a sharp pointer
-                            area.width *= 2.5;   // Length of the arrow
-                            area.height *= 1.2;  // Narrow base
-                            area.left -= marker.size * 0.75;
-                            area.top -= marker.size * 0.1;
+                            area.width *= 1.6;
+                            area.height *= 0.9;
+                            area.left -= marker.size * 0.3;
+                            area.top += marker.size * 0.05;
 
-                            // Use an explicit sharp color like bright yellow or cyan for the player marker instead of the generic green/white
-                            let player_marker_color = Color::rgb_u8(255, 215, 0); // Bright Yellow
-
+                            let player_marker_color = Color::rgb_u8(255, 215, 0);
                             layout.add_rotated_sdf(area, arrow_texture.clone(), player_marker_color, rotation);
+
+                            let tip_offset = marker.size * 0.28;
+                            let tip_width = area.width * 0.48;
+                            let tip_height = area.height * 0.52;
+                            let tip_center_x = area.left + area.width / 2.0 + rotation.cos() * tip_offset;
+                            let tip_center_y = area.top + area.height / 2.0 - rotation.sin() * tip_offset;
+                            let tip_area = Area {
+                                left: tip_center_x - tip_width / 2.0,
+                                top: tip_center_y - tip_height / 2.0,
+                                width: tip_width,
+                                height: tip_height,
+                            };
+
+                            layout.add_rotated_sdf(tip_area, arrow_texture.clone(), Color::rgba_u8(20, 20, 20, 235), rotation);
                             return;
                         }
                     }
@@ -153,10 +149,7 @@ where
                         FontSize(marker.font_size),
                         marker.color,
                         Color::BLACK,
-                        HorizontalAlignment::Center {
-                            offset: 0.0,
-                            border: 0.0,
-                        },
+                        HorizontalAlignment::Center { offset: 0.0, border: 0.0 },
                         VerticalAlignment::Center { offset: 0.0 },
                         OverflowBehavior::Shrink,
                     );
@@ -169,10 +162,7 @@ where
             FontSize(14.0),
             Color::monochrome_u8(225),
             Color::rgb_u8(255, 180, 80),
-            HorizontalAlignment::Center {
-                offset: 0.0,
-                border: 4.0,
-            },
+            HorizontalAlignment::Center { offset: 0.0, border: 4.0 },
             VerticalAlignment::Center { offset: 0.0 },
             OverflowBehavior::Shrink,
         );

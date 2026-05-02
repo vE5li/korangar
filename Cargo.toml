@@ -12,15 +12,15 @@ bytemuck = "1"
 cgmath = "0.18"
 chrono = "0.4"
 clap = "4"
-cosmic-text = { version = "0.16", default-features = false }
+cosmic-text = { version = "0.18", default-features = false }
 cpal = "0.17"
 ctrlc = "3"
-ddsfile = "0.5"
+ddsfile = "0.6"
 encoding_rs = "0.8"
-etherparse = "0.19"
+etherparse = "0.20"
 fast-srgb8 = "1"
 flate2 = { version = "1", default-features = false }
-hashbrown = "0.16"
+hashbrown = "0.17"
 heck = "0.5"
 image = { version = "0.25", default-features = false }
 korangar-audio = { path = "korangar-audio" }
@@ -39,7 +39,7 @@ option-ext = "0.2"
 pcap = "2"
 pollster = "0.4"
 proc-macro2 = "1"
-quick-xml = "0.38"
+quick-xml = "0.39"
 quote = "1"
 ragnarok-bytes = { path = "ragnarok-bytes" }
 ragnarok-formats = { path = "ragnarok-formats" }
@@ -56,7 +56,7 @@ rust-state = { git = "https://github.com/vE5li/rust-state" }
 symphonia = { version = "0.5", default-features = false }
 send_wrapper = "0.6"
 serde = "1"
-sevenz-rust2 = { version = "0.20", default-features = false }
+sevenz-rust2 = { version = "0.21", default-features = false }
 smallvec = "1"
 spin_sleep = "1"
 syn = "2"

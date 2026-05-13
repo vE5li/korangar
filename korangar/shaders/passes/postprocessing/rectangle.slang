@@ -15,7 +15,17 @@ func vs_main(input: PostprocessingVertexInput) -> PostprocessingVertexOutput {
     let vertex = rectangle_vertex_data(input.vertex_index);
 
     let clip_size = instance.screen_size * 2.0;
-    let position = screen_to_clip_space(instance.screen_position) + vertex.xy * clip_size;
+    var rotated_vertex = vertex.xy * clip_size;
+    if (instance.rotation != 0.0) {
+        let center = float2(0.5, -0.5) * clip_size;
+        let c = cos(instance.rotation);
+        let s = sin(instance.rotation);
+        let p = rotated_vertex - center;
+        let rx = p.x * c - p.y * s;
+        let ry = p.x * s + p.y * c;
+        rotated_vertex = float2(rx, ry) + center;
+    }
+    let position = screen_to_clip_space(instance.screen_position) + rotated_vertex;
 
     var output: PostprocessingVertexOutput;
     output.position = float4(position, 0.0, 1.0);

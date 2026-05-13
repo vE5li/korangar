@@ -80,6 +80,9 @@ impl PlayerCamera {
         self.view_angle.update(delta_time);
 
         let view_distance = self.camera_distance.get_current();
+        // Since in Ragnarok / korangar math, map X is East-West and map Z is North-South,
+        // and we want North to be up on the minimap, we negate the yaw here so that 
+        // a positive rotation turns the arrow clockwise to match the screen's visual rotation.
         let view_angle = self.view_angle.get_current();
 
         let pitch_rotation = Quaternion::from_angle_x(CAMERA_PITCH);
@@ -123,5 +126,9 @@ impl Camera for PlayerCamera {
 
     fn view_direction(&self) -> Vector3<f32> {
         self.view_direction
+    }
+
+    fn view_angle(&self) -> f32 {
+        self.view_angle.get_current()
     }
 }

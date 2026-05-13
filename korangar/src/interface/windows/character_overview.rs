@@ -113,6 +113,10 @@ where
                     event: InputEvent::ToggleFriendListWindow,
                 },
                 button! {
+                    text: "Minimap",
+                    event: InputEvent::ToggleMinimapWindow,
+                },
+                button! {
                     text: client_state().localization().menu_button_text(),
                     event: InputEvent::ToggleMenuWindow,
                 },

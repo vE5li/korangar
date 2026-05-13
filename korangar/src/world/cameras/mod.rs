@@ -40,6 +40,7 @@ pub trait Camera {
 
     fn view_direction(&self) -> Vector3<f32>;
 
+    fn view_angle(&self) -> f32;
     fn billboard_matrix(&self, position: Point3<f32>, origin: Point3<f32>, size: Vector2<f32>) -> Matrix4<f32> {
         let view_direction = self.view_direction();
         let right_vector = self.look_up_vector().cross(view_direction).normalize();

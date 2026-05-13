@@ -79,6 +79,31 @@ impl ChatMessage {
     }
 }
 
+#[derive(RustState, StateElement)]
+pub struct MinimapState {
+    pub map_name: String,
+    pub width: u16,
+    pub height: u16,
+    pub zoom: f32,
+    #[hidden_element]
+    pub texture: Option<Arc<crate::graphics::Texture>>,
+    #[hidden_element]
+    pub arrow_texture: Option<Arc<crate::graphics::Texture>>,
+}
+
+impl Default for MinimapState {
+    fn default() -> Self {
+        Self {
+            map_name: String::new(),
+            width: 0,
+            height: 0,
+            zoom: 1.0,
+            texture: None,
+            arrow_texture: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, RustState, StateElement)]
 pub enum BufferedAction {
     AttackEntity { entity_id: EntityId },
@@ -120,6 +145,9 @@ pub struct ClientState {
     graphics_settings: GraphicsSettings,
     /// Graphics capabilities used in the graphics settings window.
     graphics_settings_capabilities: GraphicsSettingsCapabilities,
+
+    /// View angle of the current camera.
+    camera_view_angle: f32,
 
     /// The interface theme for the menu windows.
     menu_theme: InterfaceTheme,
@@ -172,6 +200,7 @@ pub struct ClientState {
     /// The name of the active character. This information is not available
     /// while playing if we don't save it here.
     player_name: String,
+    minimap: MinimapState,
     /// Player configured hotbar.
     hotbar: Hotbar,
     /// Player inventory.
@@ -328,6 +357,7 @@ impl ClientState {
             let sell_items = Vec::default();
             let sell_cart = Vec::default();
             let player_name = String::new();
+            let minimap = MinimapState::default();
             let hotbar = Hotbar::default();
             let inventory = Inventory::default();
             let skill_tree = SkillTree::default();
@@ -378,6 +408,9 @@ impl ClientState {
             interface_settings_capabilities,
             graphics_settings,
             graphics_settings_capabilities,
+
+            camera_view_angle: 0.0,
+
             menu_theme,
             in_game_theme,
             world_theme,
@@ -397,6 +430,7 @@ impl ClientState {
             sell_items,
             sell_cart,
             player_name,
+            minimap,
             hotbar,
             inventory,
             skill_tree,

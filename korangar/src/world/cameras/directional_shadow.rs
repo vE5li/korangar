@@ -403,4 +403,8 @@ impl Camera for PartitionCamera {
     fn view_direction(&self) -> Vector3<f32> {
         self.view_direction
     }
+
+    fn view_angle(&self) -> f32 {
+        0.0 // Shadow cameras don't have a tracked yaw
+    }
 }

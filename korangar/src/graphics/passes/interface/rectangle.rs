@@ -37,7 +37,8 @@ struct InstanceData {
     texture_size: [f32; 2],
     rectangle_type: u32,
     texture_index: i32,
-    padding: [f32; 2],
+    rotation: f32,
+    padding: f32,
 }
 
 pub(crate) struct InterfaceRectangleDrawer {
@@ -293,6 +294,7 @@ impl Prepare for InterfaceRectangleDrawer {
                             texture_size: [1.0, 1.0],
                             rectangle_type: 0,
                             texture_index: 0,
+                            rotation: 0.0,
                             padding: Default::default(),
                         });
                     }
@@ -304,6 +306,7 @@ impl Prepare for InterfaceRectangleDrawer {
                         corner_diameter,
                         texture,
                         smooth,
+                        rotation,
                     } => {
                         let rectangle_type = if *smooth { 1 } else { 2 };
 
@@ -330,6 +333,7 @@ impl Prepare for InterfaceRectangleDrawer {
                             texture_size: [1.0, 1.0],
                             rectangle_type,
                             texture_index,
+                            rotation: *rotation,
                             padding: Default::default(),
                         });
                     }
@@ -340,6 +344,7 @@ impl Prepare for InterfaceRectangleDrawer {
                         color,
                         corner_diameter,
                         texture,
+                        rotation,
                     } => {
                         let mut texture_index = texture_views.len() as i32;
                         let id = texture.get_id();
@@ -364,6 +369,7 @@ impl Prepare for InterfaceRectangleDrawer {
                             texture_size: [1.0, 1.0],
                             rectangle_type: 3,
                             texture_index,
+                            rotation: *rotation,
                             padding: Default::default(),
                         });
                     }
@@ -387,6 +393,7 @@ impl Prepare for InterfaceRectangleDrawer {
                             texture_size: (*texture_size).into(),
                             rectangle_type: 4,
                             texture_index: 0,
+                            rotation: 0.0,
                             padding: Default::default(),
                         });
                     }
@@ -429,6 +436,7 @@ impl Prepare for InterfaceRectangleDrawer {
                             texture_size: [1.0, 1.0],
                             rectangle_type: 0,
                             texture_index: 0,
+                            rotation: 0.0,
                             padding: Default::default(),
                         });
                     }
@@ -441,6 +449,7 @@ impl Prepare for InterfaceRectangleDrawer {
                         corner_diameter,
                         texture: _,
                         smooth,
+                        rotation,
                     } => {
                         let rectangle_type = if *smooth { 1 } else { 2 };
 
@@ -456,6 +465,7 @@ impl Prepare for InterfaceRectangleDrawer {
                             texture_size: [1.0, 1.0],
                             rectangle_type,
                             texture_index: 0,
+                            rotation: *rotation,
                             padding: Default::default(),
                         });
                     }
@@ -466,6 +476,7 @@ impl Prepare for InterfaceRectangleDrawer {
                         color,
                         corner_diameter,
                         texture: _,
+                        rotation,
                     } => {
                         self.instance_data.push(InstanceData {
                             color: color.components_linear(),
@@ -479,6 +490,7 @@ impl Prepare for InterfaceRectangleDrawer {
                             texture_size: [1.0, 1.0],
                             rectangle_type: 3,
                             texture_index: 0,
+                            rotation: *rotation,
                             padding: Default::default(),
                         });
                     }
@@ -502,6 +514,7 @@ impl Prepare for InterfaceRectangleDrawer {
                             texture_size: (*texture_size).into(),
                             rectangle_type: 4,
                             texture_index: 0,
+                            rotation: 0.0,
                             padding: Default::default(),
                         });
                     }

@@ -424,6 +424,46 @@ impl InterfaceRenderer {
     pub fn render_trash_can(&self, position: ScreenPosition, size: ScreenSize, clip: ScreenClip, color: Color) {
         self.render_sdf(self.trash_can_texture.clone(), position, size, clip, color);
     }
+
+    /// Render a sprite with an optional rotation (in radians).
+    pub fn render_rotated_texture(
+        &self,
+        texture: Arc<Texture>,
+        position: ScreenPosition,
+        size: ScreenSize,
+        mut screen_clip: ScreenClip,
+        color: Color,
+        smooth: bool,
+        rotation: f32,
+    ) {
+        if position.left > screen_clip.right
+            || position.top > screen_clip.bottom
+            || position.left + size.width < screen_clip.left
+            || position.top + size.height < screen_clip.top
+        {
+            return;
+        }
+
+        if self.high_quality_interface {
+            screen_clip = screen_clip * 2.0;
+        }
+
+        let screen_position = position / self.window_size;
+        let screen_size = size / self.window_size;
+
+        let corner_diameter = CornerDiameter::default();
+
+        self.instructions.borrow_mut().push(InterfaceRectangleInstruction::Sprite {
+            screen_position,
+            screen_size,
+            screen_clip,
+            color,
+            corner_diameter,
+            texture,
+            smooth,
+            rotation,
+        });
+    }
 }
 
 impl SpriteRenderer for InterfaceRenderer {
@@ -495,10 +535,11 @@ impl SpriteRenderer for InterfaceRenderer {
             corner_diameter,
             texture,
             smooth,
+            rotation: 0.0,
         });
     }
 
-    fn render_sdf(&self, texture: Arc<Texture>, position: ScreenPosition, size: ScreenSize, mut screen_clip: ScreenClip, color: Color) {
+    fn render_rotated_sdf(&self, texture: Arc<Texture>, position: ScreenPosition, size: ScreenSize, mut screen_clip: ScreenClip, color: Color, rotation: f32) {
         // If the SDF is not even within the bounds of the clip, discard it early
         // saving GPU resources.
         if position.left > screen_clip.right
@@ -557,7 +598,12 @@ impl SpriteRenderer for InterfaceRenderer {
             color,
             corner_diameter,
             texture,
+            rotation,
         });
+    }
+
+    fn render_sdf(&self, texture: Arc<Texture>, position: ScreenPosition, size: ScreenSize, screen_clip: ScreenClip, color: Color) {
+        self.render_rotated_sdf(texture, position, size, screen_clip, color, 0.0);
     }
 }
 
@@ -572,6 +618,7 @@ struct TextureInstruction {
     area: Area,
     color: Color,
     smooth: bool,
+    rotation: f32,
 }
 
 /// An instruction to render a sprite.
@@ -596,6 +643,8 @@ struct SpriteInstruction<'a> {
 pub enum CustomInstruction<'a> {
     /// An instruction to render a texture.
     Texture(TextureInstruction),
+    /// An instruction to render a rotated SDF.
+    RotatedSdf(TextureInstruction),
     /// An instruction to render a sprite.
     Sprite(SpriteInstruction<'a>),
 }
@@ -667,6 +716,7 @@ impl RenderLayer<ClientState> for InterfaceRenderer {
                 area,
                 color,
                 smooth,
+                rotation,
             }) => {
                 let position = ScreenPosition {
                     left: area.left,
@@ -678,7 +728,27 @@ impl RenderLayer<ClientState> for InterfaceRenderer {
                 };
                 let screen_clip = clips[clip_id.as_index()];
 
-                self.render_sprite(texture, position, size, screen_clip, color, smooth);
+                self.render_rotated_texture(texture, position, size, screen_clip, color, smooth, rotation);
+            }
+            CustomInstruction::RotatedSdf(TextureInstruction {
+                texture,
+                clip_id,
+                area,
+                color,
+                smooth: _,
+                rotation,
+            }) => {
+                let position = ScreenPosition {
+                    left: area.left,
+                    top: area.top,
+                };
+                let size = ScreenSize {
+                    width: area.width,
+                    height: area.height,
+                };
+                let screen_clip = clips[clip_id.as_index()];
+
+                self.render_rotated_sdf(texture, position, size, screen_clip, color, rotation);
             }
         }
     }
@@ -689,6 +759,9 @@ impl RenderLayer<ClientState> for InterfaceRenderer {
 pub trait LayoutExt<'a> {
     /// Add an instruction to render a texture.
     fn add_texture(&mut self, area: Area, texture: Arc<Texture>, color: Color, smooth: bool);
+
+    /// Add an instruction to render a texture with a given rotation.
+    fn add_rotated_sdf(&mut self, area: Area, texture: Arc<Texture>, color: Color, rotation: f32);
 
     /// Add an instruction to render a sprite.
     fn add_sprite(
@@ -713,6 +786,21 @@ impl<'a> LayoutExt<'a> for WindowLayout<'a, ClientState> {
             area,
             color,
             smooth,
+            rotation: 0.0,
+        }));
+    }
+
+    fn add_rotated_sdf(&mut self, area: Area, texture: Arc<Texture>, color: Color, rotation: f32) {
+        let clip_id = self.get_active_clip_id();
+        let area = self.scale_area(area);
+
+        self.add_custom_instruction(CustomInstruction::RotatedSdf(TextureInstruction {
+            texture,
+            clip_id,
+            area,
+            color,
+            smooth: false,
+            rotation,
         }));
     }
 

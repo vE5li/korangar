@@ -19,16 +19,22 @@ pub fn register_login_server_packets<Callback>(
 where
     Callback: PacketCallback,
 {
-    packet_handler.register(|packet: LoginServerLoginSuccessPacket| NetworkEvent::LoginServerConnected {
-        character_servers: packet.character_server_information,
-        login_data: LoginServerLoginData {
+    packet_handler.register(|packet: LoginServerLoginSuccessPacket_20170315| {
+        let character_servers = packet.character_server_information.into_iter().map(Into::into).collect();
+
+        let login_data = LoginServerLoginData {
             account_id: packet.account_id,
             login_id1: packet.login_id1,
             login_id2: packet.login_id2,
             sex: packet.sex,
-        },
+        };
+
+        NetworkEvent::LoginServerConnected {
+            character_servers,
+            login_data,
+        }
     })?;
-    packet_handler.register(|packet: LoginFailedPacket| {
+    packet_handler.register(|packet: LoginBannedPacked| {
         let (reason, message) = match packet.reason {
             LoginFailedReason::ServerClosed => (UnifiedLoginFailedReason::ServerClosed, "Server closed"),
             LoginFailedReason::AlreadyLoggedIn => (
@@ -68,7 +74,7 @@ pub fn register_character_server_packets<Callback>(
 where
     Callback: PacketCallback,
 {
-    packet_handler.register(|packet: LoginFailedPacket| {
+    packet_handler.register(|packet: LoginBannedPacked| {
         let reason = packet.reason;
         let message = match reason {
             LoginFailedReason::ServerClosed => "Server closed",
@@ -84,14 +90,18 @@ where
         },
     )?;
     packet_handler.register(|packet: RequestCharacterListSuccessPacket| NetworkEvent::CharacterList {
-        characters: packet.character_information,
+        characters: packet
+            .character_information
+            .into_iter()
+            .map(Into::into)
+            .collect::<Vec<CharacterInformation>>(),
     })?;
-    packet_handler.register_noop::<CharacterListPacket>()?;
+    packet_handler.register_noop::<CharacterListPacket_20211103>()?;
     packet_handler.register_noop::<CharacterSlotPagePacket>()?;
     packet_handler.register_noop::<CharacterBanListPacket>()?;
     packet_handler.register_noop::<LoginPincodePacket>()?;
     packet_handler.register_noop::<Packet0b18>()?;
-    packet_handler.register(|packet: CharacterSelectionSuccessPacket| {
+    packet_handler.register(|packet: CharacterSelectionSuccessPacket_20170315| {
         let login_data = CharacterServerLoginData {
             server_ip: IpAddr::V4(packet.map_server_ip.into()),
             server_port: packet.map_server_port,
@@ -117,7 +127,7 @@ where
         NetworkEvent::CharacterSelectionFailed { reason, message }
     })?;
     packet_handler.register(|packet: CreateCharacterSuccessPacket| NetworkEvent::CharacterCreated {
-        character_information: packet.character_information,
+        character_information: packet.character_information.into(),
     })?;
     packet_handler.register(|packet: CharacterCreationFailedPacket| {
         let reason = packet.reason;
@@ -163,7 +173,7 @@ where
     // handlers.
     let inventory_items: Rc<RefCell<Option<Vec<InventoryItem<NoMetadata>>>>> = Rc::new(RefCell::new(None));
 
-    packet_handler.register(|_: MapServerPingPacket| NoNetworkEvents)?;
+    packet_handler.register_noop::<MapServerPingPacket>()?;
     packet_handler.register(|packet: BroadcastMessagePacket| NetworkEvent::ChatMessage {
         text: packet.message,
         color: MessageColor::Broadcast,
@@ -246,16 +256,16 @@ where
     packet_handler.register(|packet: ResurrectionPacket| NetworkEvent::ResurrectPlayer {
         entity_id: packet.entity_id,
     })?;
-    packet_handler.register(|packet: EntityAppearPacket| NetworkEvent::AddEntity {
+    packet_handler.register(|packet: EntityAppearPacket_20141022| NetworkEvent::AddEntity {
         entity_data: packet.into(),
     })?;
-    packet_handler.register(|packet: EntityAppear2Packet| NetworkEvent::AddEntity {
+    packet_handler.register(|packet: EntityStandPacket_20141022| NetworkEvent::AddEntity {
         entity_data: packet.into(),
     })?;
-    packet_handler.register(|packet: MovingEntityAppearPacket| NetworkEvent::AddEntity {
+    packet_handler.register(|packet: MovingEntityAppearPacket_20141022| NetworkEvent::AddEntity {
         entity_data: packet.into(),
     })?;
-    packet_handler.register(|packet: EntityDisAppearPacket| NetworkEvent::RemoveEntity {
+    packet_handler.register(|packet: EntityDisappearedPacket| NetworkEvent::RemoveEntity {
         entity_id: packet.entity_id,
         reason: packet.reason,
     })?;
@@ -319,7 +329,7 @@ where
     packet_handler.register_noop::<AchievementUpdatePacket>()?;
     packet_handler.register_noop::<AchievementListPacket>()?;
     packet_handler.register_noop::<CriticalWeightUpdatePacket>()?;
-    packet_handler.register(|packet: SpriteChangePacket| match packet.sprite_type {
+    packet_handler.register(|packet: SpriteChangePacket_4| match packet.sprite_type {
         SpriteChangeType::Base => Some(NetworkEvent::ChangeJob {
             account_id: packet.account_id,
             job_id: JobId(packet.value as u16),
@@ -341,13 +351,13 @@ where
     packet_handler.register({
         let inventory_items = inventory_items.clone();
 
-        move |packet: RegularItemListPacket| {
+        move |packet: RegularItemListPacket_20180912| {
             inventory_items
                 .borrow_mut()
                 .as_mut()
                 .expect("Unexpected inventory packet")
                 .extend(packet.item_information.into_iter().map(|item_information| {
-                    let RegularItemInformation {
+                    let RegularItemInformation_20180912 {
                         index,
                         item_id,
                         item_type,
@@ -378,13 +388,13 @@ where
     packet_handler.register({
         let inventory_items = inventory_items.clone();
 
-        move |packet: EquippableItemListPacket| {
+        move |packet: EquippableItemListPacket_20200916| {
             inventory_items
                 .borrow_mut()
                 .as_mut()
                 .expect("Unexpected inventory packet")
                 .extend(packet.item_information.into_iter().map(|item| {
-                    let EquippableItemInformation {
+                    let EquippableItemInformation_20200916 {
                         index,
                         item_id,
                         item_type,
@@ -427,7 +437,7 @@ where
     packet_handler.register({
         let inventory_items = inventory_items.clone();
 
-        move |_: InventoyEndPacket| {
+        move |_: InventoryEndPacket| {
             let items = inventory_items.borrow_mut().take().expect("Unexpected inventory end packet");
             NetworkEvent::SetInventory { items }
         }
@@ -438,7 +448,7 @@ where
         let UpdateSkillTreePacket { skill_information } = packet;
         NetworkEvent::SkillTree { skill_information }
     })?;
-    packet_handler.register(|packet: UpdateHotkeysPacket| NetworkEvent::SetHotkeyData {
+    packet_handler.register(|packet: UpdateHotkeysPacket_20190522| NetworkEvent::SetHotkeyData {
         tab: packet.tab,
         hotkeys: packet
             .hotkeys
@@ -494,12 +504,12 @@ where
     packet_handler.register_noop::<DisplaySpecialEffectPacket>()?;
     packet_handler.register_noop::<DisplaySkillCooldownPacket>()?;
     packet_handler.register_noop::<DisplaySkillEffectAndDamagePacket>()?;
-    packet_handler.register(|packet: DisplaySkillEffectNoDamagePacket| NetworkEvent::HealEffect {
+    packet_handler.register(|packet: DisplaySkillEffectNoDamagePacket_20130731| NetworkEvent::HealEffect {
         entity_id: packet.destination_entity_id,
         heal_amount: packet.heal_amount as usize,
     })?;
     packet_handler.register_noop::<DisplayPlayerHealEffect>()?;
-    packet_handler.register_noop::<StatusChangePacket>()?;
+    packet_handler.register_noop::<StatusChangePacket_20120618>()?;
     packet_handler.register_noop::<QuestNotificationPacket1>()?;
     packet_handler.register_noop::<HuntingQuestNotificationPacket>()?;
     packet_handler.register_noop::<HuntingQuestUpdateObjectivePacket>()?;
@@ -533,8 +543,8 @@ where
         },
         _ => NetworkEvent::AddQuestEffect { quest_effect: packet },
     })?;
-    packet_handler.register(|packet: ItemPickupPacket| {
-        let ItemPickupPacket {
+    packet_handler.register(|packet: ItemPickupPacket_20200916| {
+        let ItemPickupPacket_20200916 {
             index,
             quantity,
             item_id,
@@ -619,16 +629,18 @@ where
         client_tick: packet.client_tick,
         received_at: Instant::now(),
     })?;
-    packet_handler.register(|packet: RequestPlayerDetailsSuccessPacket| NetworkEvent::UpdateEntityDetails {
-        entity_id: EntityId(packet.character_id.0),
-        name: packet.name,
-    })?;
+    packet_handler.register(
+        |packet: RequestPlayerDetailsSuccessPacket_20150225| NetworkEvent::UpdateEntityDetails {
+            entity_id: EntityId(packet.character_id.0),
+            name: packet.name,
+        },
+    )?;
     packet_handler.register(|packet: RequestEntityDetailsSuccessPacket| NetworkEvent::UpdateEntityDetails {
         entity_id: packet.entity_id,
         name: packet.name,
     })?;
-    packet_handler.register(|packet: UpdateEntityHealthPointsPacket| {
-        let UpdateEntityHealthPointsPacket {
+    packet_handler.register(|packet: UpdateMonsterHealthPointsPacket| {
+        let UpdateMonsterHealthPointsPacket {
             entity_id,
             health_points,
             maximum_health_points,
@@ -655,7 +667,7 @@ where
             attack_range,
         }
     })?;
-    packet_handler.register(|packet: DamagePacket1| match packet.damage_type {
+    packet_handler.register(|packet: DamagePacket| match packet.damage_type {
         DamageType::Damage => Some(NetworkEvent::DamageEffect {
             source_entity_id: packet.source_entity_id,
             destination_entity_id: packet.destination_entity_id,
@@ -679,7 +691,7 @@ where
         }),
         _ => None,
     })?;
-    packet_handler.register(|packet: DamagePacket3| match packet.damage_type {
+    packet_handler.register(|packet: DamagePacket_20131223| match packet.damage_type {
         DamageType::Damage => Some(NetworkEvent::DamageEffect {
             source_entity_id: packet.source_entity_id,
             destination_entity_id: packet.destination_entity_id,
@@ -708,15 +720,15 @@ where
 
         NetworkEvent::OpenDialog { text, npc_id }
     })?;
-    packet_handler.register(|packet: RequestEquipItemStatusPacket| match packet.result {
+    packet_handler.register(|packet: RequestEquipItemStatusPacket_20121205| match packet.result {
         RequestEquipItemStatus::Success => Some(NetworkEvent::UpdateEquippedPosition {
             index: packet.inventory_index,
             equipped_position: packet.equipped_position,
         }),
         _ => None,
     })?;
-    packet_handler.register(|packet: RequestUnequipItemStatusPacket| match packet.result {
-        RequestUnequipItemStatus::Success => Some(NetworkEvent::UpdateEquippedPosition {
+    packet_handler.register(|packet: RequestUnequipItemStatusPacket_20130000| match packet.result {
+        RequestUnequipItemStatus_20110824::Success => Some(NetworkEvent::UpdateEquippedPosition {
             index: packet.inventory_index,
             equipped_position: EquipPosition::NONE,
         }),
@@ -745,8 +757,8 @@ where
     })?;
     packet_handler.register_noop::<UseSkillSuccessPacket>()?;
     packet_handler.register_noop::<ToUseSkillSuccessPacket>()?;
-    packet_handler.register(|packet: NotifySkillUnitPacket| {
-        let NotifySkillUnitPacket {
+    packet_handler.register(|packet: NotifySkillUnitPacket_20130731| {
+        let NotifySkillUnitPacket_20130731 {
             entity_id,
             position,
             unit_id,
@@ -802,7 +814,7 @@ where
     packet_handler.register_noop::<ChangeMapCellPacket>()?;
     packet_handler.register_noop::<OpenMarketPacket>()?;
     packet_handler.register(|packet: BuyOrSellPacket| NetworkEvent::AskBuyOrSell { shop_id: packet.shop_id })?;
-    packet_handler.register(|packet: ShopItemListPacket| {
+    packet_handler.register(|packet: ShopItemListPacket_20210203| {
         let items = packet
             .items
             .into_iter()

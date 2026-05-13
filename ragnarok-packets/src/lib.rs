@@ -3,7 +3,6 @@
 
 pub mod handler;
 mod position;
-
 use std::net::Ipv4Addr;
 
 use ragnarok_bytes::{
@@ -152,6 +151,10 @@ pub struct AttackRange(pub u16);
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct JobId(pub u16);
 
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub struct TitleId(pub u32);
+
 #[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct ServerAddress(pub [u8; 4]);
@@ -232,6 +235,55 @@ pub enum Sex {
     Server,
 }
 
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub struct CharacterInformation {
+    pub character_id: CharacterId,
+    pub experience: i64,
+    pub money: i32,
+    pub job_experience: i64,
+    pub job_level: i32,
+    pub body_state: i32,
+    pub health_state: i32,
+    pub effect_state: i32,
+    pub virtue: i32,
+    pub honor: i32,
+    pub stat_points: i16,
+    pub health_points: i64,
+    pub maximum_health_points: i64,
+    pub spell_points: i64,
+    pub maximum_spell_points: i64,
+    pub movement_speed: i16,
+    pub job_id: JobId,
+    pub head: i16,
+    pub body: Option<i16>,
+    pub weapon: i16,
+    pub base_level: i16,
+    pub sp_point: i16,
+    pub accessory: i16,
+    pub shield: i16,
+    pub accessory_2: i16,
+    pub accessory_3: i16,
+    pub head_palette: i16,
+    pub body_palette: i16,
+    pub name: String,
+    pub strength: u8,
+    pub agility: u8,
+    pub vitality: u8,
+    pub intelligence: u8,
+    pub dexterity: u8,
+    pub luck: u8,
+    pub character_number: u8,
+    pub hair_color: u8,
+    pub b_is_changed_char: i16,
+    pub map_name: String,
+    pub deletion_reverse_date: i32,
+    pub robe_palette: i32,
+    pub character_slot_change_count: i32,
+    pub character_name_change_count: i32,
+    pub sex: Option<Sex>,
+}
+
 /// Sent by the client to the login server.
 /// The very first packet sent when logging in, it is sent after the user has
 /// entered email and password.
@@ -254,11 +306,12 @@ pub struct LoginServerLoginPacket {
 /// Sent by the login server as a response to [LoginServerLoginPacket]
 /// succeeding. After receiving this packet, the client will connect to one of
 /// the character servers provided by this packet.
+#[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Packet, ServerPacket, LoginServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x0AC4)]
 #[variable_length]
-pub struct LoginServerLoginSuccessPacket {
+pub struct LoginServerLoginSuccessPacket_20170315 {
     pub login_id1: u32,
     pub account_id: AccountId,
     pub login_id2: u32,
@@ -274,12 +327,33 @@ pub struct LoginServerLoginSuccessPacket {
     pub sex: Sex,
     pub auth_token: AuthToken,
     #[repeating_remaining]
+    pub character_server_information: Vec<CharacterServerInformation_20170315>,
+}
+
+/// Sent by the login server as a response to [LoginServerLoginPacket]
+/// succeeding. After receiving this packet, the client will connect to one of
+/// the character servers provided by this packet.
+#[derive(Debug, Clone, Packet, ServerPacket, LoginServer)]
+#[header(0x0069)]
+#[variable_length]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub struct LoginServerLoginSuccessPacket {
+    pub login_id1: i32,
+    pub account_id: AccountId,
+    pub login_id2: u32,
+    #[new_default]
+    pub ip_address: u32,
+    #[new_default]
+    pub last_login_time: [u8; 26],
+    pub sex: Sex,
+    #[repeating_remaining]
     pub character_server_information: Vec<CharacterServerInformation>,
 }
 
 /// Sent by the character server as a response to [CharacterServerLoginPacket]
 /// succeeding. Provides basic information about the number of available
 /// character slots.
+/// Only after 20130000.
 #[derive(Debug, Clone, Packet, ServerPacket, CharacterServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x082D)]
@@ -295,18 +369,34 @@ pub struct CharacterServerLoginSuccessPacket {
     pub unused: [u8; 20],
 }
 
+#[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Packet, ServerPacket, CharacterServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x006B)]
 #[variable_length]
-pub struct CharacterListPacket {
+pub struct CharacterListPacket_20211103 {
     pub maximum_slot_count: u8,
     pub available_slot_count: u8,
     pub vip_slot_count: u8,
     #[new_default]
     pub unknown: [u8; 20],
     #[repeating_remaining]
-    pub character_information: Vec<CharacterInformation>,
+    pub character_information: Vec<CharacterInformation_20211103>,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, CharacterServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x006B)]
+#[variable_length]
+pub struct CharacterListPacket_20100803 {
+    pub maximum_slot_count: u8,
+    pub available_slot_count: u8,
+    pub vip_slot_count: u8,
+    #[new_default]
+    pub unknown: [u8; 20],
+    #[repeating_remaining]
+    pub character_information: Vec<CharacterInformation_20100803>,
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket, CharacterServer)]
@@ -399,7 +489,7 @@ pub enum LoginFailedReason {
 #[derive(Debug, Clone, Packet, ServerPacket, LoginServer, CharacterServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x0081)]
-pub struct LoginFailedPacket {
+pub struct LoginBannedPacked {
     pub reason: LoginFailedReason,
 }
 
@@ -448,13 +538,14 @@ pub struct CharacterSelectionFailedPacket {
     pub reason: CharacterSelectionFailedReason,
 }
 
+#[allow(non_camel_case_types)]
 /// Sent by the character server as a response to [SelectCharacterPacket]
 /// succeeding. Provides a map server to connect to, along with the id of our
 /// selected character.
 #[derive(Debug, Clone, Packet, ServerPacket, CharacterServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x0AC5)]
-pub struct CharacterSelectionSuccessPacket {
+pub struct CharacterSelectionSuccessPacket_20170315 {
     pub character_id: CharacterId,
     #[length(16)]
     pub map_name: String,
@@ -463,6 +554,20 @@ pub struct CharacterSelectionSuccessPacket {
     // NOTE: Could be `new_default` but Rust doesn't implement `[u8; 128]: Default`.
     #[new_value([0; 128])]
     pub unknown: [u8; 128],
+}
+
+/// Sent by the character server as a response to [SelectCharacterPacket]
+/// succeeding. Provides a map server to connect to, along with the ID of our
+/// selected character.
+#[derive(Debug, Clone, Packet, ServerPacket, CharacterServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0071)]
+pub struct CharacterSelectionSuccessPacket {
+    pub character_id: CharacterId,
+    #[length(16)]
+    pub map_name: String,
+    pub map_server_ip: ServerAddress,
+    pub map_server_port: u16,
 }
 
 #[derive(Debug, Clone, ByteConvertable)]
@@ -476,8 +581,9 @@ pub enum CharacterCreationFailedReason {
     CharacterCerationFailed,
 }
 
-/// Sent by the character server as a response to [CreateCharacterPacket]
-/// failing. Provides a reason for the character creation failing.
+/// Sent by the character server as a response to
+/// [CreateCharacterPacket_20151001] failing. Provides a reason for the
+/// character creation failing.
 #[derive(Debug, Clone, Packet, ServerPacket, CharacterServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x006E)]
@@ -496,6 +602,34 @@ pub struct LoginServerKeepalivePacket {
     pub user_id: UserId,
 }
 
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub struct CharacterServerInformation_20170315 {
+    pub server_ip: ServerAddress,
+    pub server_port: u16,
+    #[length(20)]
+    pub server_name: String,
+    pub user_count: u16,
+    pub server_type: u16, // ServerType
+    pub display_new: u16, // bool16 ?
+    #[new_value([0; 128])]
+    pub unknown: [u8; 128],
+}
+
+impl From<CharacterServerInformation_20170315> for CharacterServerInformation {
+    fn from(value: CharacterServerInformation_20170315) -> Self {
+        CharacterServerInformation {
+            server_ip: value.server_ip,
+            server_port: value.server_port,
+            server_name: value.server_name,
+            user_count: value.user_count,
+            server_type: value.server_type,
+            display_new: value.display_new,
+        }
+    }
+}
+
 #[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct CharacterServerInformation {
@@ -506,8 +640,6 @@ pub struct CharacterServerInformation {
     pub user_count: u16,
     pub server_type: u16, // ServerType
     pub display_new: u16, // bool16 ?
-    #[new_value([0; 128])]
-    pub unknown: [u8; 128],
 }
 
 /// Sent by the client to the character server after after successfully logging
@@ -528,10 +660,11 @@ pub struct CharacterServerLoginPacket {
 /// Sent by the client to the map server after after successfully selecting a
 /// character. Attempts to log into the map server using the provided
 /// information.
+#[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x0436)]
-pub struct MapServerLoginPacket {
+pub struct MapServerLoginPacket_20211103 {
     pub account_id: AccountId,
     pub character_id: CharacterId,
     pub login_id1: u32,
@@ -539,6 +672,21 @@ pub struct MapServerLoginPacket {
     pub sex: Sex,
     #[new_default]
     pub unknown: [u8; 4],
+}
+
+/// Sent by the client to the map server after after successfully selecting a
+/// character. Attempts to log into the map server using the provided
+/// information.
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x086A)]
+pub struct MapServerLoginPacket_20120307 {
+    pub account_id: AccountId,
+    pub character_id: CharacterId,
+    pub login_id1: u32,
+    pub client_tick: ClientTick,
+    pub sex: Sex,
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
@@ -552,24 +700,63 @@ pub struct Packet8302 {
 /// a new character.
 /// Attempts to create a new character in an empty slot using the provided
 /// information.
+#[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Packet, ClientPacket, CharacterServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
-#[header(0x0A39)]
-pub struct CreateCharacterPacket {
+#[header(0x0970)]
+pub struct CreateCharacterPacket_20120307 {
     #[length(24)]
     pub name: String,
     pub slot: u8,
-    pub hair_color: u16,     // TODO: HairColor
-    pub hair_style: u16,     // TODO: HairStyle
-    pub start_job_id: JobId, // TODO: Job
+    pub hair_style: u16, // TODO: HairStyle
+    pub hair_color: u16, // TODO: HairColor
+}
+
+/// Sent by the client to the character server when the player tries to create
+/// a new character.
+/// Attempts to create a new character in an empty slot using the provided
+/// information.
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ClientPacket, CharacterServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0A39)]
+pub struct CreateCharacterPacket_20151001 {
+    #[length(24)]
+    pub name: String,
+    pub slot: u8,
+    pub hair_color: u16, // TODO: HairColor
+    pub hair_style: u16, // TODO: HairStyle
+    pub start_job_id: JobId,
     #[new_default]
     pub unknown: [u8; 2],
     pub sex: Sex,
 }
 
+/// Sent by the client to the character server when the player tries to create
+/// a new character.
+/// Attempts to create a new character in an empty slot using the provided
+/// information.
+#[derive(Debug, Clone, Packet, ClientPacket, CharacterServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0067)]
+pub struct CreateCharacterPacket {
+    #[length(24)]
+    pub name: String,
+    pub slot: u8,
+    pub str: u8,
+    pub agi: u8,
+    pub vit: u8,
+    pub int: u8,
+    pub dex: u8,
+    pub luk: u8,
+    pub hair_color: u16, // TODO: HairColor
+    pub hair_style: u16, // TODO: HairStyle
+}
+
+#[allow(non_camel_case_types)]
 #[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
-pub struct CharacterInformation {
+pub struct CharacterInformation_20211103 {
     pub character_id: CharacterId,
     pub experience: i64,
     pub money: i32,
@@ -594,8 +781,8 @@ pub struct CharacterInformation {
     pub sp_point: i16,
     pub accessory: i16,
     pub shield: i16,
-    pub accessory2: i16,
-    pub accessory3: i16,
+    pub accessory_2: i16,
+    pub accessory_3: i16,
     pub head_palette: i16,
     pub body_palette: i16,
     #[length(24)]
@@ -618,8 +805,160 @@ pub struct CharacterInformation {
     pub sex: Sex,
 }
 
+impl From<CharacterInformation_20211103> for CharacterInformation {
+    fn from(value: CharacterInformation_20211103) -> Self {
+        CharacterInformation {
+            character_id: value.character_id,
+            experience: value.experience,
+            money: value.money,
+            job_experience: value.job_experience,
+            job_level: value.job_level,
+            body_state: value.body_state,
+            health_state: value.health_state,
+            effect_state: value.effect_state,
+            virtue: value.virtue,
+            honor: value.honor,
+            stat_points: value.stat_points,
+            health_points: value.health_points,
+            maximum_health_points: value.maximum_health_points,
+            spell_points: value.spell_points,
+            maximum_spell_points: value.maximum_spell_points,
+            movement_speed: value.movement_speed,
+            job_id: value.job_id,
+            head: value.head,
+            body: Some(value.body),
+            weapon: value.weapon,
+            base_level: value.base_level,
+            sp_point: value.sp_point,
+            accessory: value.accessory,
+            shield: value.shield,
+            accessory_2: value.accessory_2,
+            accessory_3: value.accessory_3,
+            head_palette: value.head_palette,
+            body_palette: value.body_palette,
+            name: value.name,
+            strength: value.strength,
+            agility: value.agility,
+            vitality: value.vitality,
+            intelligence: value.intelligence,
+            dexterity: value.dexterity,
+            luck: value.luck,
+            character_number: value.character_number,
+            hair_color: value.hair_color,
+            b_is_changed_char: value.b_is_changed_char,
+            map_name: value.map_name,
+            deletion_reverse_date: value.deletion_reverse_date,
+            robe_palette: value.robe_palette,
+            character_slot_change_count: value.character_slot_change_count,
+            character_name_change_count: value.character_name_change_count,
+            sex: Some(value.sex),
+        }
+    }
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub struct CharacterInformation_20100803 {
+    pub character_id: CharacterId,
+    pub experience: i32,
+    pub money: i32,
+    pub job_experience: i32,
+    pub job_level: i32,
+    pub body_state: i32,
+    pub health_state: i32,
+    pub effect_state: i32,
+    pub virtue: i32,
+    pub honor: i32,
+    pub stat_points: i16,
+    pub health_points: i32,
+    pub maximum_health_points: i32,
+    pub spell_points: i16,
+    pub maximum_spell_points: i16,
+    pub movement_speed: i16,
+    pub job_id: JobId,
+    pub head: i16,
+    pub weapon: i16,
+    pub base_level: i16,
+    pub sp_point: i16,
+    pub accessory: i16,
+    pub shield: i16,
+    pub accessory_2: i16,
+    pub accessory_3: i16,
+    pub head_palette: i16,
+    pub body_palette: i16,
+    #[length(24)]
+    pub name: String,
+    pub strength: u8,
+    pub agility: u8,
+    pub vitality: u8,
+    pub intelligence: u8,
+    pub dexterity: u8,
+    pub luck: u8,
+    pub character_number: u8,
+    pub hair_color: u8,
+    pub b_is_changed_char: i16,
+    #[length(16)]
+    pub map_name: String,
+    pub deletion_reverse_date: i32,
+    pub robe_palette: i32,
+    pub character_slot_change_count: i32,
+    pub character_name_change_count: i32,
+}
+
+impl From<CharacterInformation_20100803> for CharacterInformation {
+    fn from(value: CharacterInformation_20100803) -> Self {
+        CharacterInformation {
+            character_id: value.character_id,
+            experience: value.experience as i64,
+            money: value.money,
+            job_experience: value.job_experience as i64,
+            job_level: value.job_level,
+            body_state: value.body_state,
+            health_state: value.health_state,
+            effect_state: value.effect_state,
+            virtue: value.virtue,
+            honor: value.honor,
+            stat_points: value.stat_points,
+            health_points: value.health_points as i64,
+            maximum_health_points: value.maximum_health_points as i64,
+            spell_points: value.spell_points as i64,
+            maximum_spell_points: value.maximum_spell_points as i64,
+            movement_speed: value.movement_speed,
+            job_id: value.job_id,
+            head: value.head,
+            body: None,
+            weapon: value.weapon,
+            base_level: value.base_level,
+            sp_point: value.sp_point,
+            accessory: value.accessory,
+            shield: value.shield,
+            accessory_2: value.accessory_2,
+            accessory_3: value.accessory_3,
+            head_palette: value.head_palette,
+            body_palette: value.body_palette,
+            name: value.name,
+            strength: value.strength,
+            agility: value.agility,
+            vitality: value.vitality,
+            intelligence: value.intelligence,
+            dexterity: value.dexterity,
+            luck: value.luck,
+            character_number: value.character_number,
+            hair_color: value.hair_color,
+            b_is_changed_char: value.b_is_changed_char,
+            map_name: value.map_name,
+            deletion_reverse_date: value.deletion_reverse_date,
+            robe_palette: value.robe_palette,
+            character_slot_change_count: value.character_slot_change_count,
+            character_name_change_count: value.character_name_change_count,
+            sex: None,
+        }
+    }
+}
+
 #[cfg(feature = "interface")]
-impl rust_state::VecItem for CharacterInformation {
+impl rust_state::VecItem for CharacterInformation_20211103 {
     // TODO: Use CharacterId
     type Id = u32;
 
@@ -628,14 +967,14 @@ impl rust_state::VecItem for CharacterInformation {
     }
 }
 
-/// Sent by the character server as a response to [CreateCharacterPacket]
-/// succeeding. Provides all character information of the newly created
-/// character.
+/// Sent by the character server as a response to
+/// [CreateCharacterPacket_20151001] succeeding. Provides all character
+/// information of the newly created character.
 #[derive(Debug, Clone, Packet, ServerPacket, CharacterServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x0B6F)]
 pub struct CreateCharacterSuccessPacket {
-    pub character_information: CharacterInformation,
+    pub character_information: CharacterInformation_20211103,
 }
 
 /// Sent by the client to the character server.
@@ -653,7 +992,7 @@ pub struct RequestCharacterListPacket {}
 #[variable_length]
 pub struct RequestCharacterListSuccessPacket {
     #[repeating_remaining]
-    pub character_information: Vec<CharacterInformation>,
+    pub character_information: Vec<CharacterInformation_20211103>,
 }
 
 /// Sent by the map server to the client.
@@ -665,10 +1004,21 @@ pub struct MapServerPingPacket {}
 
 /// Sent by the client to the map server when the player wants to move.
 /// Attempts to path the player towards the provided position.
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x035F)]
+pub struct RequestPlayerMovePacket_20120307 {
+    pub position: WorldPosition,
+}
+
+/// Sent by the client to the map server when the player wants to move.
+/// Attempts to path the player towards the provided position.
+#[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x0881)]
-pub struct RequestPlayerMovePacket {
+pub struct RequestPlayerMovePacket_20220406 {
     pub position: WorldPosition,
 }
 
@@ -790,19 +1140,47 @@ pub struct MessageTablePacket {
 /// Sent by the client to the map server when the user hovers over an entity.
 /// Attempts to fetch additional information about the entity, such as the
 /// display name.
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x096A)]
+pub struct RequestDetailsPacket_20120307 {
+    pub entity_id: EntityId,
+}
+
+/// Sent by the client to the map server when the user hovers over an entity.
+/// Attempts to fetch additional information about the entity, such as the
+/// display name.
+#[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x0368)]
-pub struct RequestDetailsPacket {
+pub struct RequestDetailsPacket_20220406 {
     pub entity_id: EntityId,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0195)]
+pub struct RequestPlayerDetailsSuccessPacket {
+    pub entity_id: EntityId,
+    #[length(24)]
+    pub name: String,
+    #[length(24)]
+    pub party_name: String,
+    #[length(24)]
+    pub guild_name: String,
+    #[length(24)]
+    pub position_name: String,
 }
 
 /// Sent by the map server to the client as a response to
 /// [RequestDetailsPacket]. Provides additional information about the player.
+#[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x0A30)]
-pub struct RequestPlayerDetailsSuccessPacket {
+pub struct RequestPlayerDetailsSuccessPacket_20150225 {
     pub character_id: CharacterId,
     #[length(24)]
     pub name: String,
@@ -812,7 +1190,7 @@ pub struct RequestPlayerDetailsSuccessPacket {
     pub guild_name: String,
     #[length(24)]
     pub position_name: String,
-    pub title_id: u32,
+    pub title_id: TitleId,
 }
 
 /// Sent by the map server to the client as a response to
@@ -827,6 +1205,38 @@ pub struct RequestEntityDetailsSuccessPacket {
     pub name: String,
     #[length(24)]
     pub title: String,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0194)]
+pub struct RequestPlayerNameSuccessPacket {
+    pub entity_id: EntityId,
+    #[length(24)]
+    pub name: String,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0AF7)]
+pub struct RequestPlayerNameSuccessPacket_20180221 {
+    pub entity_id: EntityId,
+    pub flag: u16,
+    #[length(24)]
+    pub name: String,
+}
+
+/// Sent by the map server as a basic name response for NPCs, homunculi,
+/// mercenaries, pets and elementals. Replaced by
+/// [`RequestEntityDetailsSuccessPacket`] in version 20180207.
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0095)]
+pub struct RequestNpcNameSuccessPacket {
+    pub entity_id: EntityId,
+    #[length(24)]
+    pub name: String,
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
@@ -881,12 +1291,21 @@ pub struct CriticalWeightUpdatePacket {
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
-#[header(0x01D7)]
+#[header(0x00C3)]
 pub struct SpriteChangePacket {
     pub account_id: AccountId,
     pub sprite_type: SpriteChangeType,
     pub value: u32,
-    pub value2: u32,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x01D7)]
+pub struct SpriteChangePacket_4 {
+    pub account_id: AccountId,
+    pub sprite_type: SpriteChangeType,
+    pub value: u32,
+    pub value_2: u32,
 }
 
 #[derive(Debug, Clone, ByteConvertable)]
@@ -921,12 +1340,13 @@ pub struct InventoyStartPacket {
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x0B0B)]
-pub struct InventoyEndPacket {
+pub struct InventoryEndPacket {
     pub inventory_type: u8,
     pub flag: u8, // maybe char ?
 }
 
-#[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
+// We derive default because on PACKETVER < 20150226, Item options didn't exist
+#[derive(Debug, Clone, Default, ByteConvertable, FixedByteSize)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct ItemOptions {
     pub index: u16,
@@ -961,9 +1381,24 @@ impl ToBytes for RegularItemFlags {
     }
 }
 
+#[allow(non_camel_case_types)]
 #[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
-pub struct RegularItemInformation {
+pub struct RegularItemInformation_20080102 {
+    pub index: InventoryIndex,
+    pub item_id: u16,
+    pub item_type: u8,
+    pub is_identified: u8,
+    pub amount: u16,
+    pub wear_state: u16,
+    pub slot: [u16; 4],
+    pub hire_expiration_date: u32,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub struct RegularItemInformation_20180912 {
     pub index: InventoryIndex,
     pub item_id: ItemId,
     pub item_type: u8,
@@ -974,14 +1409,31 @@ pub struct RegularItemInformation {
     pub flags: RegularItemFlags,
 }
 
+// 000 -> 0xa3,
+
+// 20071002 -> 0x1ee
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x02E8)]
+#[variable_length]
+pub struct RegularItemListPacket_20080102 {
+    #[repeating_remaining]
+    pub items: Vec<RegularItemInformation_20080102>,
+}
+
+// 20120925 -> 0x991
+
+#[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x0B09)]
 #[variable_length]
-pub struct RegularItemListPacket {
+pub struct RegularItemListPacket_20180912 {
     pub inventory_type: u8,
     #[repeating_remaining]
-    pub item_information: Vec<RegularItemInformation>,
+    pub item_information: Vec<RegularItemInformation_20180912>,
 }
 
 bitflags::bitflags! {
@@ -1016,6 +1468,130 @@ impl ToBytes for EquippableItemFlags {
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct EquippableItemInformation {
     pub index: InventoryIndex,
+    pub item_id: u16,
+    pub item_type: u8,
+    pub is_identified: u8,
+    pub equip_position: LegacyEquipPosition,
+    pub equipped_position: LegacyEquipPosition,
+    pub is_broken: u8,
+    pub refining_level: u8,
+    pub slot: [u16; 4],
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub struct EquippableItemInformation_20071002 {
+    pub index: InventoryIndex,
+    pub item_id: u16,
+    pub item_type: u8,
+    pub is_identified: u8,
+    pub equip_position: LegacyEquipPosition,
+    pub equipped_position: LegacyEquipPosition,
+    pub is_broken: u8,
+    pub refining_level: u8,
+    pub slot: [u16; 4],
+    pub hire_expiration_date: u32,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub struct EquippableItemInformation_20080102 {
+    pub index: InventoryIndex,
+    pub item_id: u16,
+    pub item_type: u8,
+    pub is_identified: u8,
+    pub equip_position: LegacyEquipPosition,
+    pub equipped_position: LegacyEquipPosition,
+    pub is_broken: u8,
+    pub refining_level: u8,
+    pub slot: [u16; 4],
+    pub hire_expiration_date: u32,
+    pub bind_on_equip_type: u16,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub struct EquippableItemInformation_20100629 {
+    pub index: InventoryIndex,
+    pub item_id: u16,
+    pub item_type: u8,
+    pub is_identified: u8,
+    pub equip_position: LegacyEquipPosition,
+    pub equipped_position: LegacyEquipPosition,
+    pub is_broken: u8,
+    pub refining_level: u8,
+    pub slot: [u16; 4],
+    pub hire_expiration_date: u32,
+    pub bind_on_equip_type: u16,
+    pub w_item_sprite_number: u16,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub struct EquippableItemInformation_20120925 {
+    pub index: InventoryIndex,
+    pub item_id: u16,
+    pub item_type: u8,
+    pub is_identified: u8,
+    pub equip_position: EquipPosition,
+    pub equipped_position: EquipPosition,
+    pub refining_level: u8,
+    pub slot: [u16; 4],
+    pub hire_expiration_date: u32,
+    pub bind_on_equip_type: u16,
+    pub w_item_sprite_number: u16,
+    pub flags: EquippableItemFlags,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub struct EquippableItemInformation_20150226 {
+    pub index: InventoryIndex,
+    pub item_id: u16,
+    pub item_type: u8,
+    pub equip_position: EquipPosition,
+    pub equipped_position: EquipPosition,
+    pub refining_level: u8,
+    pub slot: [u32; 4], // card ?
+    pub hire_expiration_date: u32,
+    pub bind_on_equip_type: u16,
+    pub w_item_sprite_number: u16,
+    pub option_count: u8,
+    // TODO: This is a compile time constant in rAthena. It should be in Korangar as well.
+    pub option_data: [ItemOptions; 5],
+    pub flags: EquippableItemFlags,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub struct EquippableItemInformation_20181121 {
+    pub index: InventoryIndex,
+    pub item_id: ItemId,
+    pub item_type: u8,
+    pub equip_position: EquipPosition,
+    pub equipped_position: EquipPosition,
+    pub refining_level: u8,
+    pub slot: [u32; 4], // card ?
+    pub hire_expiration_date: u32,
+    pub bind_on_equip_type: u16,
+    pub w_item_sprite_number: u16,
+    pub option_count: u8,
+    // TODO: This is a compile time constant in rAthena. It should be in Korangar as well.
+    pub option_data: [ItemOptions; 5],
+    pub flags: EquippableItemFlags,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub struct EquippableItemInformation_20200916 {
+    pub index: InventoryIndex,
     pub item_id: ItemId,
     pub item_type: u8,
     pub equip_position: EquipPosition,
@@ -1025,7 +1601,8 @@ pub struct EquippableItemInformation {
     pub bind_on_equip_type: u16,
     pub w_item_sprite_number: u16,
     pub option_count: u8,
-    pub option_data: [ItemOptions; 5], // fix count
+    // TODO: This is a compile time constant in rAthena. It should be in Korangar as well.
+    pub option_data: [ItemOptions; 5],
     pub refinement_level: u8,
     pub enchantment_level: u8,
     pub flags: EquippableItemFlags,
@@ -1033,12 +1610,83 @@ pub struct EquippableItemInformation {
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
-#[header(0x0B39)]
+#[header(0x00A4)]
 #[variable_length]
 pub struct EquippableItemListPacket {
+    #[repeating_remaining]
+    pub items: Vec<EquippableItemInformation>,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0295)]
+#[variable_length]
+pub struct EquippableItemListPacket_20071002 {
+    #[repeating_remaining]
+    pub items: Vec<EquippableItemInformation_20071002>,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x02D0)]
+#[variable_length]
+pub struct EquippableItemListPacket_20080102 {
+    #[repeating_remaining]
+    pub items: Vec<EquippableItemInformation_20080102>,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x02D0)]
+#[variable_length]
+pub struct EquippableItemListPacket_20100629 {
+    #[repeating_remaining]
+    pub items: Vec<EquippableItemInformation_20100629>,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0992)]
+#[variable_length]
+pub struct EquippableItemListPacket_20120925 {
+    #[repeating_remaining]
+    pub items: Vec<EquippableItemInformation_20120925>,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0A0D)]
+#[variable_length]
+pub struct EquippableItemListPacket_20150226 {
+    #[repeating_remaining]
+    pub items: Vec<EquippableItemInformation_20150226>,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0B0A)]
+#[variable_length]
+pub struct EquippableItemListPacket_20181121 {
     pub inventory_type: u8,
     #[repeating_remaining]
-    pub item_information: Vec<EquippableItemInformation>,
+    pub item_information: Vec<EquippableItemInformation_20181121>,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0B39)]
+#[variable_length]
+pub struct EquippableItemListPacket_20200916 {
+    pub inventory_type: u8,
+    #[repeating_remaining]
+    pub item_information: Vec<EquippableItemInformation_20200916>,
 }
 
 #[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
@@ -1384,7 +2032,8 @@ pub struct StatusChangeSequencePacket {
     pub state: u8,
 }
 
-/// Sent by the character server to the client when loading onto a new map.
+/// Sent by the map server to the client when loading onto a new map.
+/// For PACKETVER >= 20170830, includes `bonus_attack_speed`.
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x00BD)]
@@ -1418,6 +2067,14 @@ pub struct InitialStatsPacket {
     /// Always 0 on rAthena
     #[new_default]
     pub bonus_attack_speed: u16,
+}
+
+/// Map property notification sent on map load.
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0199)]
+pub struct MapPropertyPacket {
+    pub property: u16,
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
@@ -1552,10 +2209,20 @@ pub enum Action {
     TouchSkill,
 }
 
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0885)]
+pub struct RequestActionPacket_20120307 {
+    pub npc_id: EntityId,
+    pub action: Action,
+}
+
+#[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x0437)]
-pub struct RequestActionPacket {
+pub struct RequestActionPacket_20220406 {
     pub npc_id: EntityId,
     pub action: Action,
 }
@@ -1588,8 +2255,39 @@ pub struct RequestPlayerAttackFailedPacket {
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
-#[header(0x0977)]
+#[header(0x0106)]
 pub struct UpdateEntityHealthPointsPacket {
+    pub entity_id: EntityId,
+    pub health_points: u16,
+    pub maximum_health_points: u16,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x080E)]
+pub struct UpdateEntityHealthPointsPacket_20100119 {
+    pub entity_id: EntityId,
+    pub health_points: u32,
+    pub maximum_health_points: u32,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0BAB)]
+pub struct UpdateEntityHealthPointsPacket_20210504 {
+    pub entity_id: EntityId,
+    pub health_points: u32,
+    pub maximum_health_points: u32,
+    pub spell_points: u32,
+    pub maximum_spell_points: u32,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0977)]
+pub struct UpdateMonsterHealthPointsPacket {
     pub entity_id: EntityId,
     pub health_points: u32,
     pub maximum_health_points: u32,
@@ -1617,7 +2315,7 @@ pub enum DamageType {
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x008A)]
-pub struct DamagePacket1 {
+pub struct DamagePacket {
     pub source_entity_id: EntityId,
     pub destination_entity_id: EntityId,
     pub client_tick: ClientTick,
@@ -1630,11 +2328,29 @@ pub struct DamagePacket1 {
     pub damage_amount_2: i16,
 }
 
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x02E1)]
+pub struct DamagePacket_20071113 {
+    pub source_entity_id: EntityId,
+    pub destination_entity_id: EntityId,
+    pub client_tick: ClientTick,
+    pub attack_duration: u32,
+    pub damage_delay: u32,
+    pub damage_amount: i32,
+    pub number_of_hits: u16,
+    pub damage_type: DamageType,
+    /// Assassin dual wield damage.
+    pub damage_amount_2: i32,
+}
+
+#[allow(non_camel_case_types)]
 // FIX: This one is the attack animation one
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x08C8)]
-pub struct DamagePacket3 {
+pub struct DamagePacket_20131223 {
     pub source_entity_id: EntityId,
     pub destination_entity_id: EntityId,
     pub client_tick: ClientTick,
@@ -1656,11 +2372,21 @@ pub struct ServerTickPacket {
     pub client_tick: ClientTick,
 }
 
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0887)]
+#[ping]
+pub struct RequestServerTickPacket_20120307 {
+    pub client_tick: ClientTick,
+}
+
+#[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x0360)]
 #[ping]
-pub struct RequestServerTickPacket {
+pub struct RequestServerTickPacket_20220406 {
     pub client_tick: ClientTick,
 }
 
@@ -1704,16 +2430,56 @@ pub enum DisappearanceReason {
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x0080)]
-pub struct EntityDisAppearPacket {
+pub struct EntityDisappearedPacket {
     pub entity_id: EntityId,
     pub reason: DisappearanceReason,
 }
 
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0914)]
+#[variable_length]
+pub struct MovingEntityAppearPacket_20120221 {
+    pub object_type: u8,
+    pub entity_id: EntityId,
+    pub movement_speed: u16,
+    pub body_state: u16,
+    pub health_state: u16,
+    pub effect_state: u32,
+    pub job_id: JobId,
+    pub head: u16,
+    pub weapon: u32,
+    pub accessory: u16,
+    pub move_start_time: u32,
+    pub accessory_2: u16,
+    pub accessory_3: u16,
+    pub head_palette: u16,
+    pub body_palette: u16,
+    pub head_direction: u16,
+    pub robe: u16,
+    pub guild_id: u32,
+    pub emblem_version: u16,
+    pub honor: u16,
+    pub virtue: u32,
+    pub is_pk_mode_on: u8,
+    pub sex: Sex,
+    pub position: WorldPosition2,
+    pub x_size: u8,
+    pub y_size: u8,
+    pub c_level: u16,
+    pub font: u16,
+    pub maximum_health_points: i32,
+    pub health_points: i32,
+    pub is_boss: u8,
+}
+
+#[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x09FD)]
 #[variable_length]
-pub struct MovingEntityAppearPacket {
+pub struct MovingEntityAppearPacket_20141022 {
     pub object_type: u8,
     pub entity_id: EntityId,
     pub group_id: u32, // may be reversed - or completely wrong
@@ -1727,13 +2493,13 @@ pub struct MovingEntityAppearPacket {
     pub shield: u32,
     pub accessory: u16,
     pub move_start_time: u32,
-    pub accessory2: u16,
-    pub accessory3: u16,
+    pub accessory_2: u16,
+    pub accessory_3: u16,
     pub head_palette: u16,
     pub body_palette: u16,
     pub head_direction: u16,
     pub robe: u16,
-    pub guild_id: u32, // may be reversed - or completely wrong
+    pub guild_id: u32,
     pub emblem_version: u16,
     pub honor: u16,
     pub virtue: u32,
@@ -1762,11 +2528,50 @@ pub struct ResurrectionPacket {
     pub packet_type: u16,
 }
 
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x090F)]
+#[variable_length]
+pub struct EntityAppearPacket_20120221 {
+    pub object_type: u8,
+    pub entity_id: EntityId,
+    pub movement_speed: u16,
+    pub body_state: u16,
+    pub health_state: u16,
+    pub effect_state: u32,
+    pub job_id: JobId,
+    pub head: u16,
+    pub weapon: u32,
+    pub accessory: u16,
+    pub accessory_2: u16,
+    pub accessory_3: u16,
+    pub head_palette: u16,
+    pub body_palette: u16,
+    pub head_direction: u16,
+    pub robe: u16,
+    pub guild_id: u32,
+    pub emblem_version: u16,
+    pub honor: u16,
+    pub virtue: u32,
+    pub is_pk_mode_on: u8,
+    pub sex: Sex,
+    pub position: WorldPosition,
+    pub x_size: u8,
+    pub y_size: u8,
+    pub c_level: u16,
+    pub font: u16,
+    pub maximum_health_points: i32,
+    pub health_points: i32,
+    pub is_boss: u8,
+}
+
+#[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x09FE)]
 #[variable_length]
-pub struct EntityAppearPacket {
+pub struct EntityAppearPacket_20141022 {
     pub object_type: u8,
     pub entity_id: EntityId,
     pub group_id: u32, // may be reversed - or completely wrong
@@ -1779,13 +2584,13 @@ pub struct EntityAppearPacket {
     pub weapon: u32,
     pub shield: u32,
     pub accessory: u16,
-    pub accessory2: u16,
-    pub accessory3: u16,
+    pub accessory_2: u16,
+    pub accessory_3: u16,
     pub head_palette: u16,
     pub body_palette: u16,
     pub head_direction: u16,
     pub robe: u16,
-    pub guild_id: u32, // may be reversed - or completely wrong
+    pub guild_id: u32,
     pub emblem_version: u16,
     pub honor: u16,
     pub virtue: u32,
@@ -1804,11 +2609,51 @@ pub struct EntityAppearPacket {
     pub name: String,
 }
 
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0915)]
+#[variable_length]
+pub struct EntityStandPacket_20120221 {
+    pub object_type: u8,
+    pub entity_id: EntityId,
+    pub movement_speed: u16,
+    pub body_state: u16,
+    pub health_state: u16,
+    pub effect_state: u32,
+    pub job_id: JobId,
+    pub head: u16,
+    pub weapon: u32,
+    pub accessory: u16,
+    pub accessory_2: u16,
+    pub accessory_3: u16,
+    pub head_palette: u16,
+    pub body_palette: u16,
+    pub head_direction: u16,
+    pub robe: u16,
+    pub guild_id: u32,
+    pub emblem_version: u16,
+    pub honor: u16,
+    pub virtue: u32,
+    pub is_pk_mode_on: u8,
+    pub sex: Sex,
+    pub position: WorldPosition,
+    pub x_size: u8,
+    pub y_size: u8,
+    pub state: u8,
+    pub c_level: u16,
+    pub font: u16,
+    pub maximum_health_points: i32,
+    pub health_points: i32,
+    pub is_boss: u8,
+}
+
+#[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x09FF)]
 #[variable_length]
-pub struct EntityAppear2Packet {
+pub struct EntityStandPacket_20141022 {
     pub object_type: u8,
     pub entity_id: EntityId,
     pub group_id: u32, // may be reversed - or completely wrong
@@ -1821,8 +2666,8 @@ pub struct EntityAppear2Packet {
     pub weapon: u32,
     pub shield: u32,
     pub accessory: u16,
-    pub accessory2: u16,
-    pub accessory3: u16,
+    pub accessory_2: u16,
+    pub accessory_3: u16,
     pub head_palette: u16,
     pub body_palette: u16,
     pub head_direction: u16,
@@ -1913,10 +2758,48 @@ impl HotkeyData {
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
-#[header(0x0B20)]
+#[header(0x02B9)]
 pub struct UpdateHotkeysPacket {
+    /// 3 bars with 9 skills each.
+    pub hotkeys: [HotkeyData; 27],
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x07D9)]
+pub struct UpdateHotkeysPacket_20090603 {
+    /// 4 bars with 9 skills each.
+    pub hotkeys: [HotkeyData; 36],
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x07D9)]
+pub struct UpdateHotkeysPacket_20090617 {
+    /// 4 bars with 9 skills each, plus 2 Quick slots.
+    pub hotkeys: [HotkeyData; 38],
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0A00)]
+pub struct UpdateHotkeysPacket_20141022 {
+    pub rotate: u8,
+    /// 4 bars with 9 skills each, plus 2 Quick slots.
+    pub hotkeys: [HotkeyData; 38],
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0B20)]
+pub struct UpdateHotkeysPacket_20190522 {
     pub rotate: u8,
     pub tab: HotbarTab,
+    /// 4 bars with 9 skills each, plus 2 Quick slots.
     pub hotkeys: [HotkeyData; 38],
 }
 
@@ -3172,6 +4055,25 @@ pub struct DisplaySpecialEffectPacket {
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0284)]
+pub struct DisplaySpecialEffectWithValuePacket {
+    pub entity_id: EntityId,
+    pub effect_id: EffectId,
+    pub number: u32,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0B69)]
+pub struct DisplaySpecialEffectWithValuePacket_20191127 {
+    pub entity_id: EntityId,
+    pub effect_id: EffectId,
+    pub number: u64,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x043D)]
 pub struct DisplaySkillCooldownPacket {
     pub skill_id: SkillId,
@@ -3214,8 +4116,20 @@ pub struct DisplayPlayerHealEffect {
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
-#[header(0x09CB)]
+#[header(0x011A)]
 pub struct DisplaySkillEffectNoDamagePacket {
+    pub skill_id: SkillId,
+    pub heal_amount: u16,
+    pub destination_entity_id: EntityId,
+    pub source_entity_id: EntityId,
+    pub result: u8,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x09CB)]
+pub struct DisplaySkillEffectNoDamagePacket_20130731 {
     pub skill_id: SkillId,
     pub heal_amount: u32,
     pub destination_entity_id: EntityId,
@@ -3223,10 +4137,27 @@ pub struct DisplaySkillEffectNoDamagePacket {
     pub result: u8,
 }
 
+// 000 -> 0x196 (sc_notickType)
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x043F)]
+pub struct StatusChangePacket_20090114 {
+    pub index: u16,
+    pub entity_id: EntityId,
+    pub state: u8,
+    pub remaining: u32,
+    pub value_1: i32,
+    pub value_2: i32,
+    pub value_3: i32,
+}
+
+#[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x0983)]
-pub struct StatusChangePacket {
+pub struct StatusChangePacket_20120618 {
     pub index: u16,
     pub entity_id: EntityId,
     pub state: u8,
@@ -3496,8 +4427,102 @@ pub enum ItemPickupResult {
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
-#[header(0x0B41)]
+#[header(0x00A0)]
 pub struct ItemPickupPacket {
+    pub index: InventoryIndex,
+    pub count: u16,
+    pub item_id: u16,
+    pub is_identified: u8,
+    pub is_broken: u8,
+    pub refining_level: u8,
+    pub cards: [u16; 4],
+    pub equip_position: LegacyEquipPosition,
+    pub item_type: u8,
+    pub result: ItemPickupResult,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x029A)]
+pub struct ItemPickupPacket_20061218 {
+    pub index: InventoryIndex,
+    pub count: u16,
+    pub item_id: u16,
+    pub is_identified: u8,
+    pub is_broken: u8,
+    pub refining_level: u8,
+    pub cards: [u16; 4],
+    pub equip_position: LegacyEquipPosition,
+    pub item_type: u8,
+    pub result: ItemPickupResult,
+    pub hire_expiration_date: u32,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x02D4)]
+pub struct ItemPickupPacket_20071002 {
+    pub index: InventoryIndex,
+    pub count: u16,
+    pub item_id: u16,
+    pub is_identified: u8,
+    pub is_broken: u8,
+    pub refining_level: u8,
+    pub cards: [u16; 4],
+    pub equip_position: LegacyEquipPosition,
+    pub item_type: u8,
+    pub result: ItemPickupResult,
+    pub hire_expiration_date: u32,
+    pub bind_on_equip_type: u16,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0990)]
+pub struct ItemPickupPacket_20120925 {
+    pub index: InventoryIndex,
+    pub count: u16,
+    pub item_id: u16,
+    pub is_identified: u8,
+    pub is_broken: u8,
+    pub refining_level: u8,
+    pub cards: [u16; 4],
+    pub equip_position: EquipPosition,
+    pub item_type: u8,
+    pub result: ItemPickupResult,
+    pub hire_expiration_date: u32,
+    pub bind_on_equip_type: u16,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0X0A0C)]
+pub struct ItemPickupPacket_20150226 {
+    pub index: InventoryIndex,
+    pub count: u16,
+    pub item_id: u16,
+    pub is_identified: u8,
+    pub is_broken: u8,
+    pub refining_level: u8,
+    pub cards: [u16; 4],
+    pub equip_position: EquipPosition,
+    pub item_type: u8,
+    pub result: ItemPickupResult,
+    pub hire_expiration_date: u32,
+    pub bind_on_equip_type: u16,
+    // TODO: This is a compile time constant in rAthena. It should be in Korangar as well.
+    pub option_data: [ItemOptions; 5],
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0A37)]
+pub struct ItemPickupPacket_20160921 {
     pub index: InventoryIndex,
     pub quantity: u16,
     pub item_id: ItemId,
@@ -3509,7 +4534,30 @@ pub struct ItemPickupPacket {
     pub result: ItemPickupResult,
     pub hire_expiration_date: u32,
     pub bind_on_equip_type: u16,
-    pub option_data: [ItemOptions; 5], // fix count
+    // TODO: This is a compile time constant in rAthena. It should be in Korangar as well.
+    pub option_data: [ItemOptions; 5],
+    pub favorite: u8,
+    pub look: u16,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0B41)]
+pub struct ItemPickupPacket_20200916 {
+    pub index: InventoryIndex,
+    pub quantity: u16,
+    pub item_id: ItemId,
+    pub is_identified: u8,
+    pub is_broken: u8,
+    pub cards: [u32; 4],
+    pub equip_position: EquipPosition,
+    pub item_type: u8,
+    pub result: ItemPickupResult,
+    pub hire_expiration_date: u32,
+    pub bind_on_equip_type: u16,
+    // TODO: This is a compile time constant in rAthena. It should be in Korangar as well.
+    pub option_data: [ItemOptions; 5],
     pub favorite: u8,
     pub look: u16,
     pub refinement_level: u8,
@@ -3655,6 +4703,7 @@ bitflags::bitflags! {
         const COSTUME_HEAD_LOWER = 4196;
         const COSTUME_GARMENT = 8192;
         const AMMO = 32768;
+        // From here on out it's
         const SHADOW_ARMOR = 65536;
         const SHADOW_WEAPON = 131072;
         const SHADOW_SHIELD = 262144;
@@ -3675,7 +4724,7 @@ impl FixedByteSize for EquipPosition {
 
 impl FromBytes for EquipPosition {
     fn from_bytes(byte_reader: &mut ByteReader) -> ConversionResult<Self> {
-        <Self as bitflags::Flags>::Bits::from_bytes(byte_reader).map(|raw| Self::from_bits(raw).expect("Invalid equip position"))
+        <Self as bitflags::Flags>::Bits::from_bytes(byte_reader).map(|bits| Self::from_bits(bits).expect("invalid equip position"))
     }
 }
 
@@ -3685,10 +4734,43 @@ impl ToBytes for EquipPosition {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub struct LegacyEquipPosition(pub EquipPosition);
+
+impl FixedByteSize for LegacyEquipPosition {
+    fn size_in_bytes() -> usize {
+        u16::size_in_bytes()
+    }
+}
+
+impl FromBytes for LegacyEquipPosition {
+    fn from_bytes(byte_reader: &mut ByteReader) -> ConversionResult<Self> {
+        let bits = u16::from_bytes(byte_reader)? as u32;
+        Ok(Self(EquipPosition::from_bits(bits).expect("invalid equip position")))
+    }
+}
+
+impl ToBytes for LegacyEquipPosition {
+    fn to_bytes(&self, byte_writer: &mut ByteWriter) -> ConversionResult<usize> {
+        // TODO: Check if any invalid combinations are active.
+        (self.0.bits() as u16).to_bytes(byte_writer)
+    }
+}
+
+#[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x00A9)]
+pub struct RequestEquipItemPacket {
+    pub inventory_index: InventoryIndex,
+    pub equip_position: LegacyEquipPosition,
+}
+
+#[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x0998)]
-pub struct RequestEquipItemPacket {
+pub struct RequestEquipItemPacket_20120925 {
     pub inventory_index: InventoryIndex,
     pub equip_position: EquipPosition,
 }
@@ -3703,8 +4785,29 @@ pub enum RequestEquipItemStatus {
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
-#[header(0x0999)]
+#[header(0x00AA)]
 pub struct RequestEquipItemStatusPacket {
+    pub inventory_index: InventoryIndex,
+    pub equipped_position: LegacyEquipPosition,
+    pub result: u8,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x00AA)]
+pub struct RequestEquipItemStatusPacket_20101123 {
+    pub inventory_index: InventoryIndex,
+    pub equipped_position: LegacyEquipPosition,
+    pub view_id: u16,
+    pub result: u8,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0999)]
+pub struct RequestEquipItemStatusPacket_20121205 {
     pub inventory_index: InventoryIndex,
     pub equipped_position: EquipPosition,
     pub view_id: u16,
@@ -3741,20 +4844,49 @@ pub struct RequestUnequipItemPacket {
     pub inventory_index: InventoryIndex,
 }
 
-#[derive(Debug, Clone, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable, PartialEq, Eq)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub enum RequestUnequipItemStatus {
+    Failed,
+    Success,
+}
+
+#[allow(non_camel_case_types)]
+/// Success and failure cases inverse from [`RequestUnequipItemStatus`].
+#[derive(Debug, Clone, ByteConvertable, PartialEq, Eq)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub enum RequestUnequipItemStatus_20110824 {
     Success,
     Failed,
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
-#[header(0x099A)]
+#[header(0x00AC)]
 pub struct RequestUnequipItemStatusPacket {
     pub inventory_index: InventoryIndex,
-    pub equipped_position: EquipPosition,
+    pub equipped_position: LegacyEquipPosition,
     pub result: RequestUnequipItemStatus,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x08D1)]
+pub struct RequestUnequipItemStatusPacket_20110824 {
+    pub inventory_index: InventoryIndex,
+    pub equipped_position: LegacyEquipPosition,
+    pub result: RequestUnequipItemStatus_20110824,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x099A)]
+pub struct RequestUnequipItemStatusPacket_20130000 {
+    pub inventory_index: InventoryIndex,
+    pub equipped_position: EquipPosition,
+    pub result: RequestUnequipItemStatus_20110824,
 }
 
 #[derive(Debug, Clone, ByteConvertable)]
@@ -3812,10 +4944,21 @@ pub struct DisconnectResponsePacket {
     pub result: DisconnectResponseStatus,
 }
 
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0889)]
+pub struct UseSkillAtIdPacket_20120307 {
+    pub skill_level: SkillLevel,
+    pub skill_id: SkillId,
+    pub target_id: EntityId,
+}
+
+#[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x0438)]
-pub struct UseSkillAtIdPacket {
+pub struct UseSkillAtIdPacket_20220406 {
     pub skill_level: SkillLevel,
     pub skill_id: SkillId,
     pub target_id: EntityId,
@@ -3823,8 +4966,18 @@ pub struct UseSkillAtIdPacket {
 
 #[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
-#[header(0x0AF4)]
+#[header(0x0438)]
 pub struct UseSkillOnGroundPacket {
+    pub skill_level: SkillLevel,
+    pub skill_id: SkillId,
+    pub target_position: TilePosition,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0AF4)]
+pub struct UseSkillOnGroundPacket_20180207 {
     pub skill_level: SkillLevel,
     pub skill_id: SkillId,
     pub target_position: TilePosition,
@@ -4069,8 +5222,36 @@ pub enum UnitId {
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
-#[header(0x09CA)]
+#[header(0x011F)]
 pub struct NotifySkillUnitPacket {
+    pub entity_id: EntityId,
+    pub creator_id: EntityId,
+    pub x_position: u16,
+    pub y_position: u16,
+    pub unit_id: u8,
+    pub visible: u8,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x08C7)]
+#[variable_length]
+pub struct NotifySkillUnitPacket_20110718 {
+    pub entity_id: EntityId,
+    pub creator_id: EntityId,
+    pub x_position: u16,
+    pub y_position: u16,
+    pub unit_id: u8,
+    pub radius_range: i8,
+    pub visible: u8,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x09CA)]
+pub struct NotifySkillUnitPacket_20130731 {
     pub lenght: u16,
     pub entity_id: EntityId,
     pub creator_id: EntityId,
@@ -4108,10 +5289,20 @@ pub struct Friend {
     pub name: String,
 }
 
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0369)]
+pub struct AddFriendPacket_20120307 {
+    #[length(24)]
+    pub name: String,
+}
+
+#[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x0202)]
-pub struct AddFriendPacket {
+pub struct AddFriendPacket_20220406 {
     #[length(24)]
     pub name: String,
 }
@@ -4304,6 +5495,16 @@ pub struct OpenMarketPacket {
 #[derive(Debug, Clone, FixedByteSize, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct ShopItemInformation {
+    pub price: Price,
+    pub discount_price: Price,
+    pub item_type: u8,
+    pub item_id: u16,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, FixedByteSize, ByteConvertable)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub struct ShopItemInformation_20210203 {
     pub item_id: ItemId,
     pub price: Price,
     pub discount_price: Price,
@@ -4314,11 +5515,21 @@ pub struct ShopItemInformation {
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
-#[header(0x0B77)]
+#[header(0x00C6)]
 #[variable_length]
 pub struct ShopItemListPacket {
     #[repeating_remaining]
     pub items: Vec<ShopItemInformation>,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0B77)]
+#[variable_length]
+pub struct ShopItemListPacket_20210203 {
+    #[repeating_remaining]
+    pub items: Vec<ShopItemInformation_20210203>,
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
@@ -4366,6 +5577,13 @@ pub enum BuyItemResult {
     ItemSoldOut,
     #[numeric_value(14)]
     NotEnoughGoods,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x00CA)]
+pub struct BuyItemsResultPacket {
+    pub result: BuyItemResult,
 }
 
 #[derive(Debug, Clone, ByteConvertable, FixedByteSize)]

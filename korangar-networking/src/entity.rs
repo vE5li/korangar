@@ -15,7 +15,12 @@ pub struct EntityData {
 }
 
 impl EntityData {
-    pub fn from_character(account_id: AccountId, character_information: &CharacterInformation, position: WorldPosition) -> Self {
+    pub fn from_character(
+        account_id: AccountId,
+        character_information: &CharacterInformation,
+        position: WorldPosition,
+        account_sex: Sex,
+    ) -> Self {
         Self {
             entity_id: EntityId(account_id.0),
             movement_speed: character_information.movement_speed as u16,
@@ -26,13 +31,13 @@ impl EntityData {
             health_points: character_information.health_points as i32,
             maximum_health_points: character_information.maximum_health_points as i32,
             head_direction: 0, // TODO: get correct rotation
-            sex: character_information.sex,
+            sex: character_information.sex.unwrap_or(account_sex),
         }
     }
 }
 
-impl From<EntityAppearPacket> for EntityData {
-    fn from(packet: EntityAppearPacket) -> Self {
+impl From<EntityAppearPacket_20141022> for EntityData {
+    fn from(packet: EntityAppearPacket_20141022) -> Self {
         Self {
             entity_id: packet.entity_id,
             movement_speed: packet.movement_speed,
@@ -48,8 +53,8 @@ impl From<EntityAppearPacket> for EntityData {
     }
 }
 
-impl From<EntityAppear2Packet> for EntityData {
-    fn from(packet: EntityAppear2Packet) -> Self {
+impl From<EntityStandPacket_20141022> for EntityData {
+    fn from(packet: EntityStandPacket_20141022) -> Self {
         Self {
             entity_id: packet.entity_id,
             movement_speed: packet.movement_speed,
@@ -65,8 +70,61 @@ impl From<EntityAppear2Packet> for EntityData {
     }
 }
 
-impl From<MovingEntityAppearPacket> for EntityData {
-    fn from(packet: MovingEntityAppearPacket) -> Self {
+impl From<MovingEntityAppearPacket_20141022> for EntityData {
+    fn from(packet: MovingEntityAppearPacket_20141022) -> Self {
+        let (origin, destination) = packet.position.to_origin_destination();
+
+        Self {
+            entity_id: packet.entity_id,
+            movement_speed: packet.movement_speed,
+            job_id: packet.job_id,
+            head: packet.head,
+            position: origin,
+            destination: Some(destination),
+            health_points: packet.health_points,
+            maximum_health_points: packet.maximum_health_points,
+            head_direction: packet.head_direction as usize,
+            sex: packet.sex,
+        }
+    }
+}
+
+impl From<EntityAppearPacket_20120221> for EntityData {
+    fn from(packet: EntityAppearPacket_20120221) -> Self {
+        Self {
+            entity_id: packet.entity_id,
+            movement_speed: packet.movement_speed,
+            job_id: packet.job_id,
+            head: packet.head,
+            position: packet.position,
+            destination: None,
+            health_points: packet.health_points,
+            maximum_health_points: packet.maximum_health_points,
+            head_direction: packet.head_direction as usize,
+            sex: packet.sex,
+        }
+    }
+}
+
+impl From<EntityStandPacket_20120221> for EntityData {
+    fn from(packet: EntityStandPacket_20120221) -> Self {
+        Self {
+            entity_id: packet.entity_id,
+            movement_speed: packet.movement_speed,
+            job_id: packet.job_id,
+            head: packet.head,
+            position: packet.position,
+            destination: None,
+            health_points: packet.health_points,
+            maximum_health_points: packet.maximum_health_points,
+            head_direction: packet.head_direction as usize,
+            sex: packet.sex,
+        }
+    }
+}
+
+impl From<MovingEntityAppearPacket_20120221> for EntityData {
+    fn from(packet: MovingEntityAppearPacket_20120221) -> Self {
         let (origin, destination) = packet.position.to_origin_destination();
 
         Self {

@@ -3,7 +3,6 @@ use std::sync::Arc;
 use cgmath::Point3;
 
 use super::{SpatialData, SpatialTrackHandle, Track, TrackShared, command_writers_and_readers};
-use crate::backend::RendererShared;
 use crate::backend::resources::ResourceStorage;
 use crate::decibels::Decibels;
 use crate::frame::Frame;
@@ -69,11 +68,9 @@ impl SpatialTrackBuilder {
     #[must_use]
     pub(crate) fn build(
         self,
-        renderer_shared: Arc<RendererShared>,
         internal_buffer_size: usize,
         position: Point3<f32>,
     ) -> (Track, SpatialTrackHandle) {
-        let backend_sample_rate = renderer_shared.sample_rate.load(std::sync::atomic::Ordering::SeqCst);
         let (_command_writers, command_readers) = command_writers_and_readers();
         let shared = Arc::new(TrackShared::new());
         let (sounds, sound_controller) = ResourceStorage::new(128);
@@ -95,7 +92,6 @@ impl SpatialTrackBuilder {
             temp_buffer: vec![Frame::ZERO; internal_buffer_size],
         };
         let handle = SpatialTrackHandle {
-            backend_sample_rate,
             shared,
             sound_controller,
         };

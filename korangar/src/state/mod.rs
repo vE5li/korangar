@@ -246,11 +246,11 @@ impl ClientState {
     pub fn new(
         game_file_loader: &GameFileLoader,
         graphics_settings: GraphicsSettings,
+        audio_settings: AudioSettings,
         #[cfg(feature = "debug")] packet_history: PacketHistory,
     ) -> Self {
         time_phase!("load settings", {
             let mut login_settings = LoginSettings::new();
-            let audio_settings = AudioSettings::new();
             let game_settings = GameSettings::new();
             let interface_settings = InterfaceSettings::new();
             let interface_settings_capabilities = InterfaceSettingsCapabilities::default();

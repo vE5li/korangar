@@ -20,3 +20,9 @@ korangar/*.7z
 
 # Idea
 .idea/
+
+# Task tracking
+docs/
+
+# Logs
+logs/

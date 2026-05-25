@@ -21,4 +21,6 @@ public struct GlobalUniforms {
     public var shadow_method: uint;
     public var shadow_detail: uint;
     public var use_sdsm: uint;
+    public var directional_light_color: float4;
+    public var directional_light_direction: float4;
 };

@@ -123,8 +123,8 @@ func calculate_wave_color(world_position: float3, normal: float3) -> float4 {
 
     if (global_uniforms.enhanced_lighting != 0) {
         // Directional light
-        let light_percent = saturate(dot(normalize(-directional_light.direction.xyz), normal));
-        let directional_light_color = light_percent * directional_light.color.rgb;
+        let light_percent = saturate(dot(normalize(-global_uniforms.directional_light_direction.xyz), normal));
+        let directional_light_color = light_percent * global_uniforms.directional_light_color.rgb;
 
         final_color *= global_uniforms.ambient_color.rgb + directional_light_color;
     }

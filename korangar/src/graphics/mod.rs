@@ -97,6 +97,8 @@ pub(crate) struct GlobalUniforms {
     shadow_method: u32,
     shadow_detail: u32,
     use_sdsm: u32,
+    directional_light_color: [f32; 4],
+    directional_light_direction: [f32; 4],
 }
 
 #[derive(Copy, Clone, Pod, Zeroable)]
@@ -476,6 +478,8 @@ impl Prepare for GlobalContext {
             shadow_method: instructions.uniforms.shadow_method.into(),
             shadow_detail: instructions.uniforms.shadow_detail.into(),
             use_sdsm: instructions.uniforms.use_sdsm as u32,
+            directional_light_color: directional_light_color.components_linear(),
+            directional_light_direction: instructions.directional_light.direction.extend(0.0).into(),
         };
 
         self.directional_light_uniforms = DirectionalLightUniforms {
@@ -974,7 +978,7 @@ impl GlobalContext {
 
         shadow_factory.new_attachment_array(
             "directional shadow map",
-            TextureFormat::Depth16Unorm,
+            TextureFormat::Depth32Float,
             AttachmentTextureType::DepthAttachment,
             PARTITION_COUNT as u32,
         )

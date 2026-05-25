@@ -131,7 +131,7 @@ func fragment(input: ModelBindlessVertexOutput) -> float4 {
 
         var ambient_light_contribution = global_uniforms.ambient_color.rgb;
 
-        let light_direction = normalize(-directional_light.direction.xyz);
+        let light_direction = normalize(-global_uniforms.directional_light_direction.xyz);
         let light_percent = max(dot(light_direction, normal), 0.0);
 
         let linear_view_z = depth::nonLinearToLinear(input.position.z);
@@ -185,7 +185,7 @@ func fragment(input: ModelBindlessVertexOutput) -> float4 {
         let translucence = shadow_translucence.SampleLevel(linear_sampler, float3(shadow_coords.xy, partition_index), 0.0).r;
         visibility *= translucence;
 
-        let directional_light_contribution = directional_light.color.rgb * light_percent * visibility;
+        let directional_light_contribution = global_uniforms.directional_light_color.rgb * light_percent * visibility;
 
         var point_light_contribution = float3(0.0);
         for (var index = 0; index < light_count; index++) {

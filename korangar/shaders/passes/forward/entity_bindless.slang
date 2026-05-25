@@ -156,7 +156,7 @@ func fragment(input: ForwardEntityBindlessVertexOutput) -> ForwardEntityFragment
         var ambient_light_contribution = global_uniforms.ambient_color.rgb;
 
         // Directional light
-        let light_direction = normalize(-directional_light.direction.xyz);
+        let light_direction = normalize(-global_uniforms.directional_light_direction.xyz);
         var light_percent = 1.0;
 
         if (global_uniforms.enhanced_lighting != 0) {
@@ -209,7 +209,7 @@ func fragment(input: ForwardEntityBindlessVertexOutput) -> ForwardEntityFragment
             }
         }
 
-        let directional_light_contribution = directional_light.color.rgb * light_percent * visibility;
+        let directional_light_contribution = global_uniforms.directional_light_color.rgb * light_percent * visibility;
 
         // Point lights
         var point_light_contribution = float3(0.0);

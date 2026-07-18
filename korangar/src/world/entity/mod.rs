@@ -1,3 +1,4 @@
+use std::num::NonZeroU32;
 use std::string::String;
 use std::sync::Arc;
 
@@ -443,6 +444,10 @@ impl Common {
     pub fn update(&mut self, audio_engine: &AudioEngine<GameFileLoader>, map: &Map, camera: &dyn Camera, client_tick: ClientTick) {
         self.update_movement(map, client_tick);
         self.animation_state.update(client_tick);
+
+        if self.animation_state.is_casting_complete() {
+            self.animation_state.finish_cast(self.entity_type, client_tick);
+        }
 
         if self.fade_state.is_fading() && self.fade_state.is_done_fading_in(client_tick) {
             self.fade_state = FadeState::Opaque;
@@ -1240,7 +1245,9 @@ impl Entity {
     pub fn fade_out(&mut self, reason: DisappearanceReason, client_tick: ClientTick) {
         const DIED_FADE_DURATION_MS: u32 = 2000;
 
-        let fade_state = &mut self.get_common_mut().fade_state;
+        let common = self.get_common_mut();
+        common.animation_state.clear_cast();
+        let fade_state = &mut common.fade_state;
 
         let fade_duration = match reason {
             DisappearanceReason::OutOfSight => FADE_IN_DURATION_MS,
@@ -1338,6 +1345,16 @@ impl Entity {
         self.get_common_mut().animation_state.idle(entity_type, client_tick);
     }
 
+    pub fn set_casting(&mut self, cast_time: NonZeroU32, client_tick: ClientTick) {
+        let entity_type = self.get_entity_type();
+        self.get_common_mut().animation_state.cast(entity_type, cast_time, client_tick);
+    }
+
+    pub fn cancel_casting(&mut self, client_tick: ClientTick) {
+        let entity_type = self.get_entity_type();
+        self.get_common_mut().animation_state.finish_cast(entity_type, client_tick);
+    }
+
     pub fn set_pickup(&mut self, client_tick: ClientTick) {
         let entity_type = self.get_entity_type();
         self.get_common_mut().animation_state.pickup(entity_type, client_tick);
@@ -1430,6 +1447,44 @@ impl Entity {
             Self::Player(player) => player.render_status(renderer, camera, theme, window_size),
             Self::Npc(npc) => npc.render_status(renderer, camera, theme, window_size),
         }
+    }
+
+    /// Renders server-authoritative skill cast progress above the entity.
+    pub fn render_cast_bar(&self, renderer: &GameInterfaceRenderer, camera: &dyn Camera, theme: &WorldTheme, window_size: ScreenSize) {
+        let common = self.get_common();
+        let Some(progress) = common.animation_state.casting_progress() else {
+            return;
+        };
+
+        let clip_space_position = camera.view_projection_matrix() * common.world_position.to_homogeneous();
+        if clip_space_position.w <= 0.0
+            || !clip_space_position.x.is_finite()
+            || !clip_space_position.y.is_finite()
+            || !clip_space_position.w.is_finite()
+        {
+            return;
+        }
+
+        let screen_position = camera.clip_to_screen_space(clip_space_position);
+        if !screen_position.x.is_finite() || !screen_position.y.is_finite() {
+            return;
+        }
+
+        let position = ScreenPosition {
+            left: screen_position.x * window_size.width,
+            top: screen_position.y * window_size.height - 30.0,
+        };
+        let size = ScreenSize {
+            width: theme.status_bar.enemy_bar_width,
+            height: theme.status_bar.enemy_health_height,
+        };
+
+        renderer.render_rectangle(
+            position - theme.status_bar.border_size - ScreenSize::only_width(size.width / 2.0),
+            size + theme.status_bar.border_size * 2.0,
+            theme.status_bar.background_color,
+        );
+        renderer.render_bar(position, size, theme.status_bar.activity_point_color, 1.0, progress);
     }
 }
 

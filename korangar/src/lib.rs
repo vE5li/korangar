@@ -44,6 +44,7 @@ mod world;
 
 use std::io::Cursor;
 use std::net::{SocketAddr, ToSocketAddrs};
+use std::num::NonZeroU32;
 use std::ops::Deref;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
@@ -1175,6 +1176,27 @@ impl Client {
                         entity.set_idle(client_tick);
                     }
                 }
+                NetworkEvent::EntityStartCasting { entity_id, cast_time } => {
+                    if let Some(cast_time) = NonZeroU32::new(cast_time)
+                        && let Some(entity) = self
+                            .client_state
+                            .follow_mut(client_state().entities())
+                            .iter_mut()
+                            .find(|entity| entity.get_entity_id() == entity_id)
+                    {
+                        entity.set_casting(cast_time, client_tick);
+                    }
+                }
+                NetworkEvent::EntityCancelCasting { entity_id } => {
+                    if let Some(entity) = self
+                        .client_state
+                        .follow_mut(client_state().entities())
+                        .iter_mut()
+                        .find(|entity| entity.get_entity_id() == entity_id)
+                    {
+                        entity.cancel_casting(client_tick);
+                    }
+                }
                 NetworkEvent::DisplayEmotion { entity_id, emotion } => {
                     if let Some(entity) = self
                         .client_state
@@ -1512,7 +1534,11 @@ impl Client {
                     self.audio_engine.clear_ambient_sound();
 
                     // Only the player must stay alive between map changes.
-                    self.client_state.follow_mut(client_state().entities()).truncate(1);
+                    let entities = self.client_state.follow_mut(client_state().entities());
+                    if let Some(player) = entities.first_mut() {
+                        player.cancel_casting(client_tick);
+                    }
+                    entities.truncate(1);
                     self.client_state.follow_mut(client_state().dead_entities()).clear();
                     self.client_state.follow_mut(client_state().ground_items()).clear();
                     *self.client_state.follow_mut(client_state().buffered_action()) = None;
@@ -4191,6 +4217,16 @@ impl<'a, 'm: 'a> MapRenderContext<'a, 'm> {
 
         self.effect_holder.render(self.effect_renderer, self.current_camera);
 
+        let world_theme = self.client_state.follow(client_state().world_theme());
+        for entity in self.client_state.follow(client_state().entities()).iter() {
+            entity.render_cast_bar(
+                self.middle_interface_renderer,
+                self.current_camera,
+                world_theme,
+                self.screen_size,
+            );
+        }
+
         if let Some(player) = self.client_state.try_follow(this_entity()) {
             #[cfg(feature = "debug")]
             profile_block!("render player status");
@@ -4198,7 +4234,7 @@ impl<'a, 'm: 'a> MapRenderContext<'a, 'm> {
             player.render_status(
                 self.middle_interface_renderer,
                 self.current_camera,
-                self.client_state.follow(client_state().world_theme()),
+                world_theme,
                 self.screen_size,
             );
         }
@@ -4213,7 +4249,7 @@ impl<'a, 'm: 'a> MapRenderContext<'a, 'm> {
             entity.render_status(
                 self.middle_interface_renderer,
                 self.current_camera,
-                self.client_state.follow(client_state().world_theme()),
+                world_theme,
                 self.screen_size,
             );
         }
@@ -4249,7 +4285,7 @@ impl<'a, 'm: 'a> MapRenderContext<'a, 'm> {
                             entity.render_status(
                                 self.middle_interface_renderer,
                                 self.current_camera,
-                                self.client_state.follow(client_state().world_theme()),
+                                world_theme,
                                 self.screen_size,
                             );
                         }

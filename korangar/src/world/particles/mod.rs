@@ -1,3 +1,5 @@
+mod skill_effect;
+
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -8,6 +10,7 @@ use korangar_interface::application::Clip;
 use ragnarok_packets::{EntityId, QuestColor, QuestEffectPacket};
 use rand_aes::tls::rand_f32;
 
+pub use self::skill_effect::*;
 use crate::graphics::{Color, ScreenClip, ScreenPosition, ScreenSize, Texture};
 use crate::loaders::{FontSize, ImageType, Scaling, Sprite, TextureLoader};
 use crate::renderer::{GameInterfaceRenderer, SpriteRenderer};
@@ -49,6 +52,22 @@ impl SkillDamageDisplay {
             },
         }
     }
+
+    pub fn split_for_hits(self, hit_count: i16) -> Vec<Self> {
+        let Self::Damage { amount, is_critical } = self else {
+            return (self != Self::Suppressed).then_some(self).into_iter().collect();
+        };
+        let hit_count = usize::try_from(hit_count).unwrap_or(1).clamp(1, 32);
+        let base_amount = amount / hit_count as u32;
+        let remainder = amount % hit_count as u32;
+
+        (0..hit_count)
+            .map(|index| Self::Damage {
+                amount: base_amount + u32::from(index < remainder as usize),
+                is_critical,
+            })
+            .collect()
+    }
 }
 
 #[cfg(test)]
@@ -76,6 +95,27 @@ mod skill_damage_display_tests {
             amount: 123,
             is_critical: false,
         });
+    }
+
+    #[test]
+    fn multi_hit_damage_is_split_without_losing_the_total() {
+        let displays = SkillDamageDisplay::Damage {
+            amount: 103,
+            is_critical: false,
+        }
+        .split_for_hits(4);
+        let total: u32 = displays
+            .iter()
+            .map(|display| match display {
+                SkillDamageDisplay::Damage { amount, .. } => *amount,
+                _ => 0,
+            })
+            .sum();
+
+        assert_eq!(displays.len(), 4);
+        assert_eq!(total, 103);
+        assert_eq!(SkillDamageDisplay::Miss.split_for_hits(10), vec![SkillDamageDisplay::Miss]);
+        assert!(SkillDamageDisplay::Suppressed.split_for_hits(10).is_empty());
     }
 }
 
@@ -270,6 +310,128 @@ impl Particle for Emote {
     }
 }
 
+/// A one-shot or repeating ACT/SPR animation that follows an entity.
+pub struct EntityAttachedSprite {
+    entity_id: EntityId,
+    attachment_key: Option<u32>,
+    position: Point3<f32>,
+    position_offset: Vector3<f32>,
+    sprite: Arc<Sprite>,
+    actions: Arc<Actions>,
+    action_index: usize,
+    timer: f32,
+    repeating: bool,
+    maximum_duration: Option<f32>,
+    scaling: f32,
+}
+
+impl EntityAttachedSprite {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        entity_id: EntityId,
+        attachment_key: Option<u32>,
+        entity_position: Point3<f32>,
+        position_offset: Vector3<f32>,
+        sprite: Arc<Sprite>,
+        actions: Arc<Actions>,
+        action_index: usize,
+        repeating: bool,
+        maximum_duration: Option<f32>,
+        scaling: f32,
+    ) -> Self {
+        Self {
+            entity_id,
+            attachment_key,
+            position: entity_position,
+            position_offset,
+            sprite,
+            actions,
+            action_index,
+            timer: 0.0,
+            repeating,
+            maximum_duration,
+            scaling,
+        }
+    }
+
+    fn action_index(&self) -> Option<usize> {
+        (!self.actions.actions.is_empty()).then(|| self.action_index % self.actions.actions.len())
+    }
+
+    fn frame_time(&self) -> Option<f32> {
+        let action_index = self.action_index()?;
+        let delay = self.actions.delays.get(action_index).copied().unwrap_or_default();
+        Some((delay * 50.0).max(1.0))
+    }
+
+    fn frame_count(&self) -> Option<usize> {
+        let action_index = self.action_index()?;
+        let frame_count = self.actions.actions[action_index].motions.len();
+        (frame_count > 0).then_some(frame_count)
+    }
+
+    fn update(&mut self, entities: &[Entity], local_entity: Option<(EntityId, Point3<f32>)>, delta_time: f32) -> bool {
+        if let Some((_, position)) = local_entity.filter(|(entity_id, _)| *entity_id == self.entity_id) {
+            self.position = position;
+        } else if let Some(entity) = entities.iter().find(|entity| entity.get_entity_id() == self.entity_id) {
+            self.position = entity.get_position();
+        }
+
+        self.timer += delta_time * 1000.0;
+
+        if self
+            .maximum_duration
+            .is_some_and(|maximum_duration| self.timer >= maximum_duration * 1000.0)
+        {
+            return false;
+        }
+
+        let Some(frame_count) = self.frame_count() else {
+            return false;
+        };
+        let Some(frame_time) = self.frame_time() else {
+            return false;
+        };
+
+        self.repeating || self.timer < frame_count as f32 * frame_time
+    }
+
+    fn render(&self, renderer: &GameInterfaceRenderer, camera: &dyn Camera, window_size: ScreenSize) {
+        let Some(action_index) = self.action_index() else {
+            return;
+        };
+        let Some(frame_count) = self.frame_count() else {
+            return;
+        };
+        let Some(frame_time) = self.frame_time() else {
+            return;
+        };
+
+        let clip_space_position = camera.view_projection_matrix() * (self.position + self.position_offset).to_homogeneous();
+        let screen_position = camera.clip_to_screen_space(clip_space_position);
+        let final_position = ScreenPosition {
+            left: screen_position.x * window_size.width,
+            top: screen_position.y * window_size.height,
+        };
+        let frame = (self.timer / frame_time) as usize;
+        let frame = match self.repeating {
+            true => frame % frame_count,
+            false => frame.min(frame_count.saturating_sub(1)),
+        };
+
+        self.actions.render_sprite_frame(
+            renderer,
+            &self.sprite,
+            action_index,
+            frame,
+            final_position,
+            ScreenClip::unbound(),
+            Color::WHITE,
+            self.scaling,
+        );
+    }
+}
+
 pub struct QuestIcon {
     position: Point3<f32>,
     texture: Arc<Texture>,
@@ -326,12 +488,36 @@ impl QuestIcon {
 #[derive(Default)]
 pub struct ParticleHolder {
     particles: Vec<Box<dyn Particle + Send + Sync>>,
+    entity_particles: Vec<Box<dyn EntityParticle + Send + Sync>>,
+    attached_sprites: Vec<EntityAttachedSprite>,
     quest_icons: HashMap<EntityId, QuestIcon>,
 }
 
 impl ParticleHolder {
     pub fn spawn_particle(&mut self, particle: Box<dyn Particle + Send + Sync>) {
         self.particles.push(particle);
+    }
+
+    pub fn spawn_entity_particle(&mut self, particle: Box<dyn EntityParticle + Send + Sync>) {
+        self.entity_particles.push(particle);
+    }
+
+    pub fn spawn_attached_sprite(&mut self, sprite: EntityAttachedSprite) {
+        if let Some(attachment_key) = sprite.attachment_key {
+            self.remove_attached_sprite(sprite.entity_id, attachment_key);
+        }
+        self.attached_sprites.push(sprite);
+    }
+
+    pub fn remove_attached_sprite(&mut self, entity_id: EntityId, attachment_key: u32) {
+        self.attached_sprites
+            .retain(|sprite| sprite.entity_id != entity_id || sprite.attachment_key != Some(attachment_key));
+    }
+
+    pub fn has_attached_sprite(&self, entity_id: EntityId, attachment_key: u32) -> bool {
+        self.attached_sprites
+            .iter()
+            .any(|sprite| sprite.entity_id == entity_id && sprite.attachment_key == Some(attachment_key))
     }
 
     pub fn add_quest_icon(&mut self, texture_loader: &TextureLoader, map: &Map, quest_effect: QuestEffectPacket) {
@@ -348,12 +534,23 @@ impl ParticleHolder {
 
     pub fn clear(&mut self) {
         self.particles.clear();
+        self.entity_particles.clear();
+        self.attached_sprites.clear();
         self.quest_icons.clear();
     }
 
-    #[cfg_attr(feature = "debug", korangar_debug::profile("update particles"))]
+    #[allow(dead_code)]
     pub fn update(&mut self, delta_time: f32) {
+        self.update_with_local_entity(&[], None, delta_time);
+    }
+
+    #[cfg_attr(feature = "debug", korangar_debug::profile("update particles"))]
+    pub fn update_with_local_entity(&mut self, entities: &[Entity], local_entity: Option<(EntityId, Point3<f32>)>, delta_time: f32) {
         self.particles.retain_mut(|particle| particle.update(delta_time));
+        self.entity_particles
+            .retain_mut(|particle| particle.update(entities, local_entity, delta_time));
+        self.attached_sprites
+            .retain_mut(|sprite| sprite.update(entities, local_entity, delta_time));
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile("render particles"))]
@@ -368,6 +565,12 @@ impl ParticleHolder {
         self.particles
             .iter()
             .for_each(|particle| particle.render(renderer, camera, window_size));
+        self.entity_particles
+            .iter()
+            .for_each(|particle| particle.render(renderer, camera, window_size));
+        self.attached_sprites
+            .iter()
+            .for_each(|sprite| sprite.render(renderer, camera, window_size));
 
         entities
             .iter()

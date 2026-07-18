@@ -16,7 +16,7 @@ use crate::world::MarkerIdentifier;
 use crate::world::{Camera, PointLightId, PointLightManager};
 
 pub trait EffectBase {
-    fn update(&mut self, entities: &[crate::world::Entity], delta_time: f32) -> bool;
+    fn update(&mut self, entities: &[crate::world::Entity], local_entity: Option<(EntityId, Point3<f32>)>, delta_time: f32) -> bool;
 
     fn mark_for_deletion(&mut self);
 
@@ -302,6 +302,22 @@ impl EffectCenter {
     }
 }
 
+fn resolve_entity_position(
+    entity_id: EntityId,
+    entities: &[crate::world::Entity],
+    local_entity: Option<(EntityId, Point3<f32>)>,
+) -> Option<Point3<f32>> {
+    local_entity
+        .filter(|(local_entity_id, _)| *local_entity_id == entity_id)
+        .map(|(_, position)| position)
+        .or_else(|| {
+            entities
+                .iter()
+                .find(|entity| entity.get_entity_id() == entity_id)
+                .map(|entity| entity.get_position())
+        })
+}
+
 pub struct EffectWithLight {
     effect: Arc<Effect>,
     frame_timer: FrameTimer,
@@ -368,13 +384,12 @@ impl EffectWithLight {
 }
 
 impl EffectBase for EffectWithLight {
-    fn update(&mut self, entities: &[crate::world::Entity], delta_time: f32) -> bool {
+    fn update(&mut self, entities: &[crate::world::Entity], local_entity: Option<(EntityId, Point3<f32>)>, delta_time: f32) -> bool {
         const FADE_SPEED: f32 = 5.0;
 
         if let EffectCenter::Entity(entity_id, position) = &mut self.center
-            && let Some(entity) = entities.iter().find(|entity| entity.get_entity_id() == *entity_id)
+            && let Some(new_position) = resolve_entity_position(*entity_id, entities, local_entity)
         {
-            let new_position = entity.get_position();
             *position = new_position;
         }
 
@@ -456,8 +471,19 @@ impl EffectHolder {
         self.effects.clear();
     }
 
+    #[allow(dead_code)]
     pub fn update(&mut self, entities: &[crate::world::Entity], delta_time: f32) {
-        self.effects.retain_mut(|(effect, _)| effect.update(entities, delta_time));
+        self.update_with_local_entity(entities, None, delta_time);
+    }
+
+    pub fn update_with_local_entity(
+        &mut self,
+        entities: &[crate::world::Entity],
+        local_entity: Option<(EntityId, Point3<f32>)>,
+        delta_time: f32,
+    ) {
+        self.effects
+            .retain_mut(|(effect, _)| effect.update(entities, local_entity, delta_time));
     }
 
     pub fn register_point_lights(&self, point_light_manager: &mut PointLightManager, camera: &dyn Camera) {
@@ -468,5 +494,22 @@ impl EffectHolder {
 
     pub fn render(&self, renderer: &mut EffectRenderer, camera: &dyn Camera) {
         self.effects.iter().for_each(|(effect, _)| effect.render(renderer, camera));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn entity_effects_resolve_the_separately_stored_local_entity() {
+        let entity_id = EntityId(7);
+        let position = Point3::new(1.0, 2.0, 3.0);
+
+        assert_eq!(
+            resolve_entity_position(entity_id, &[], Some((entity_id, position))),
+            Some(position)
+        );
+        assert_eq!(resolve_entity_position(entity_id, &[], Some((EntityId(8), position))), None);
     }
 }

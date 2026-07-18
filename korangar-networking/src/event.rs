@@ -78,6 +78,11 @@ pub enum NetworkEvent {
     PlayerStandUp {
         entity_id: EntityId,
     },
+    /// Show an emotion above an entity.
+    DisplayEmotion {
+        entity_id: EntityId,
+        emotion: u8,
+    },
     /// Add an entity to the list of entities that the client is aware of.
     AddEntity {
         entity_data: EntityData,

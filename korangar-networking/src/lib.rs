@@ -726,6 +726,12 @@ where
         }
     }
 
+    pub fn send_emotion(&mut self, emotion: u8) -> Result<(), NotConnectedError> {
+        match self.map_server_packet_version()? {
+            SupportedPacketVersion::_20220406 => self.send_map_server_packet(RequestEmotionPacket::new(emotion)),
+        }
+    }
+
     pub fn pick_up_item(&mut self, entity_id: EntityId) -> Result<(), NotConnectedError> {
         match self.map_server_packet_version()? {
             SupportedPacketVersion::_20220406 => self.send_map_server_packet(ItemPickupRequestPacket::new(entity_id)),
@@ -897,9 +903,11 @@ where
 
 #[cfg(test)]
 mod packet_handlers {
-    use ragnarok_packets::handler::NoPacketCallback;
+    use ragnarok_bytes::{ByteReader, ByteWriter};
+    use ragnarok_packets::handler::{HandlerResult, NoPacketCallback};
+    use ragnarok_packets::{DisplayEmotionPacket, EntityId, PacketExt, RequestEmotionPacket};
 
-    use crate::{NetworkingSystem, SupportedPacketVersion};
+    use crate::{NetworkEvent, NetworkingSystem, SupportedPacketVersion};
 
     #[test]
     fn login_server() {
@@ -917,5 +925,34 @@ mod packet_handlers {
     fn map_server() {
         let result = NetworkingSystem::create_map_server_packet_handler(NoPacketCallback, SupportedPacketVersion::_20220406);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn emotion_request_uses_expected_header() {
+        let mut writer = ByteWriter::new();
+        RequestEmotionPacket { emotion: 3 }.packet_to_bytes(&mut writer).unwrap();
+
+        assert_eq!(writer.as_slice(), &[0xBF, 0x00, 0x03]);
+    }
+
+    #[test]
+    fn display_emotion_packet_preserves_entity_and_emotion() {
+        let mut handler = NetworkingSystem::create_map_server_packet_handler(NoPacketCallback, SupportedPacketVersion::_20220406).unwrap();
+        let packet = DisplayEmotionPacket {
+            entity_id: EntityId(0x1234_5678),
+            emotion: 3,
+        };
+        let mut writer = ByteWriter::new();
+        packet.packet_to_bytes(&mut writer).unwrap();
+        let mut reader = ByteReader::without_metadata(writer.as_slice());
+
+        let HandlerResult::Ok(events) = handler.process_one(&mut reader) else {
+            panic!("display-emotion packet was not handled");
+        };
+
+        assert!(matches!(events.0.as_slice(), [NetworkEvent::DisplayEmotion {
+            entity_id: EntityId(0x1234_5678),
+            emotion: 3,
+        }]));
     }
 }

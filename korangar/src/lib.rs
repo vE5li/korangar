@@ -179,7 +179,6 @@ fn initialize_shutdown_signal() {
 
 pub struct Client {
     game_file_loader: Arc<GameFileLoader>,
-    #[cfg(feature = "debug")]
     action_loader: Arc<ActionLoader>,
     #[cfg(feature = "debug")]
     animation_loader: Arc<AnimationLoader>,
@@ -188,7 +187,6 @@ pub struct Client {
     font_loader: Arc<FontLoader>,
     #[cfg(feature = "debug")]
     map_loader: Arc<MapLoader>,
-    #[cfg(feature = "debug")]
     sprite_loader: Arc<SpriteLoader>,
     texture_loader: Arc<TextureLoader>,
     library: Arc<Library>,
@@ -644,7 +642,6 @@ impl Client {
 
         Some(Self {
             game_file_loader,
-            #[cfg(feature = "debug")]
             action_loader,
             #[cfg(feature = "debug")]
             animation_loader,
@@ -653,7 +650,6 @@ impl Client {
             font_loader,
             #[cfg(feature = "debug")]
             map_loader,
-            #[cfg(feature = "debug")]
             sprite_loader,
             texture_loader,
             library,
@@ -1079,6 +1075,19 @@ impl Client {
                         .find(|entity| entity.get_entity_id() == entity_id)
                     {
                         entity.set_idle(client_tick);
+                    }
+                }
+                NetworkEvent::DisplayEmotion { entity_id, emotion } => {
+                    if let Some(entity) = self
+                        .client_state
+                        .follow(client_state().entities())
+                        .iter()
+                        .find(|entity| entity.get_entity_id() == entity_id)
+                        && let Ok(sprite) = self.sprite_loader.get_or_load("이팩트\\emotion.spr")
+                        && let Ok(actions) = self.action_loader.get_or_load("이팩트\\emotion.act")
+                    {
+                        self.particle_holder
+                            .spawn_particle(Box::new(Emote::new(entity.get_position(), sprite, actions, emotion as usize)));
                     }
                 }
                 NetworkEvent::AccountId { .. } => {}
@@ -2282,6 +2291,9 @@ impl Client {
                     }
                     _ => {}
                 },
+                InputEvent::SendEmotion { emotion } => {
+                    let _ = self.networking_system.send_emotion(emotion);
+                }
                 InputEvent::MoveSkill {
                     source,
                     destination,

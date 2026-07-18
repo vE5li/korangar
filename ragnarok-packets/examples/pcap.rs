@@ -319,6 +319,7 @@ fn main() {
         RequestWarpToMapPacket,
         RequestDetailsPacket,
         RequestActionPacket,
+        RequestEmotionPacket,
         GlobalMessagePacket,
         StartDialogPacket,
         NextDialogPacket,

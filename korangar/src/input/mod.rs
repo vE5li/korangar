@@ -254,6 +254,26 @@ impl InputSystem {
             events.push(InputEvent::CloseTopWindow);
         }
 
+        // The first nine emotions, matching the Alt + 1-9 binds of the
+        // official client.
+        const EMOTION_KEYS: [KeyCode; 9] = [
+            KeyCode::Digit1,
+            KeyCode::Digit2,
+            KeyCode::Digit3,
+            KeyCode::Digit4,
+            KeyCode::Digit5,
+            KeyCode::Digit6,
+            KeyCode::Digit7,
+            KeyCode::Digit8,
+            KeyCode::Digit9,
+        ];
+
+        for (emotion, key_code) in EMOTION_KEYS.into_iter().enumerate() {
+            if alt_down && self.get_key(key_code).pressed() {
+                events.push(InputEvent::SendEmotion { emotion: emotion as u8 });
+            }
+        }
+
         if self.get_key(KeyCode::KeyJ).pressed() {
             events.push(InputEvent::CastSkill { slot: HotbarSlot(0) });
         }

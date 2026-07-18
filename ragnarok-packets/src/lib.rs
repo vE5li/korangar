@@ -124,6 +124,39 @@ pub struct EntityId(pub u32);
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct SkillId(pub u16);
 
+/// rAthena's `useskill_fail_cause`.
+///
+/// This remains a newtype instead of an enum so packets containing newer,
+/// unknown failure codes can still be decoded and inspected.
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub struct SkillUseFailureCode(pub u8);
+
+impl SkillUseFailureCode {
+    pub const COOLDOWN: Self = Self(4);
+    pub const FAILED: Self = Self(10);
+    pub const GENERIC: Self = Self(0);
+    pub const INVALID_DIRECTION: Self = Self(18);
+    pub const INVALID_POSITION: Self = Self(26);
+    pub const INVALID_TARGET: Self = Self(11);
+    pub const MISSING_ITEMS: Self = Self(3);
+    pub const NEED_AMMUNITION: Self = Self(84);
+    pub const NEED_BLUE_GEMSTONE: Self = Self(8);
+    pub const NEED_COINS: Self = Self(85);
+    pub const NEED_COMBO_SKILL: Self = Self(73);
+    pub const NEED_EQUIPMENT: Self = Self(72);
+    pub const NEED_HOLY_WATER: Self = Self(13);
+    pub const NEED_ITEM: Self = Self(71);
+    pub const NEED_OTHER_SKILL: Self = Self(16);
+    pub const NEED_RED_GEMSTONE: Self = Self(7);
+    pub const NEED_SPIRITS: Self = Self(74);
+    pub const NOT_ENOUGH_HP: Self = Self(2);
+    pub const NOT_ENOUGH_MONEY: Self = Self(5);
+    pub const NOT_ENOUGH_SP: Self = Self(1);
+    pub const OVERWEIGHT: Self = Self(9);
+    pub const WRONG_WEAPON: Self = Self(6);
+}
+
 #[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct SkillLevel(pub u16);
@@ -3882,15 +3915,58 @@ pub struct UseSkillSuccessPacket {
     pub attack_motion: u32,
 }
 
+/// Modern `ZC_ACK_TOUSESKILL` result for a requested skill use.
+///
+/// This is the 14-byte layout used since the 2018 packet versions.
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x0110)]
 pub struct ToUseSkillSuccessPacket {
     pub skill_id: SkillId,
-    pub btype: i32,
+    /// Failure-specific detail. For example, a required item quantity or
+    /// prerequisite skill id.
+    pub detail: i32,
     pub item_id: ItemId,
+    /// Zero when the skill was rejected; nonzero for a successful
+    /// acknowledgement.
     pub flag: u8,
-    pub cause: u8,
+    pub cause: SkillUseFailureCode,
+}
+
+#[cfg(test)]
+mod skill_use_result_packet_tests {
+    use super::*;
+
+    #[test]
+    fn modern_skill_rejection_has_exact_wire_layout() {
+        let expected = [
+            0x10, 0x01, // header
+            0x34, 0x12, // skill id
+            0xFE, 0xFF, 0xFF, 0xFF, // signed detail: -2
+            0xEF, 0xCD, 0xAB, 0x89, // item id
+            0x00, // rejected
+            0x47, // required item
+        ];
+        let packet = ToUseSkillSuccessPacket {
+            skill_id: SkillId(0x1234),
+            detail: -2,
+            item_id: ItemId(0x89AB_CDEF),
+            flag: 0,
+            cause: SkillUseFailureCode::NEED_ITEM,
+        };
+
+        let mut writer = ByteWriter::new();
+        assert_eq!(packet.packet_to_bytes(&mut writer).unwrap(), expected.len());
+        assert_eq!(writer.as_slice(), expected);
+
+        let mut reader = ByteReader::without_metadata(&expected);
+        let decoded = ToUseSkillSuccessPacket::packet_from_bytes(&mut reader).unwrap();
+        assert_eq!(decoded.skill_id, packet.skill_id);
+        assert_eq!(decoded.detail, packet.detail);
+        assert_eq!(decoded.item_id, packet.item_id);
+        assert_eq!(decoded.flag, packet.flag);
+        assert_eq!(decoded.cause, packet.cause);
+    }
 }
 
 #[cfg(test)]

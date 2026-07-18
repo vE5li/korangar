@@ -494,7 +494,10 @@ where
 
         NetworkEvent::AddChoiceButtons { choices, npc_id }
     })?;
-    packet_handler.register_noop::<DisplaySpecialEffectPacket>()?;
+    packet_handler.register(|packet: DisplaySpecialEffectPacket| NetworkEvent::SpecialEffect {
+        entity_id: packet.entity_id,
+        effect_id: packet.effect_id,
+    })?;
     packet_handler.register_noop::<DisplaySkillCooldownPacket>()?;
     packet_handler.register(|packet: DisplaySkillEffectAndDamagePacket| NetworkEvent::SkillDamage {
         skill_id: packet.skill_id,
@@ -508,12 +511,22 @@ where
         hit_count: packet.hit_count,
         action: packet.action,
     })?;
-    packet_handler.register(|packet: DisplaySkillEffectNoDamagePacket| NetworkEvent::HealEffect {
-        entity_id: packet.destination_entity_id,
-        heal_amount: packet.heal_amount as usize,
+    packet_handler.register(|packet: DisplaySkillEffectNoDamagePacket| NetworkEvent::SkillEffectNoDamage {
+        skill_id: packet.skill_id,
+        heal_amount: packet.heal_amount,
+        destination_entity_id: packet.destination_entity_id,
+        source_entity_id: packet.source_entity_id,
+        result: packet.result,
     })?;
     packet_handler.register_noop::<DisplayPlayerHealEffect>()?;
-    packet_handler.register_noop::<StatusChangePacket>()?;
+    packet_handler.register(|packet: StatusChangePacket| NetworkEvent::StatusChange {
+        status_index: packet.index,
+        entity_id: packet.entity_id,
+        state: packet.state,
+        duration_in_milliseconds: packet.duration_in_milliseconds,
+        remaining_in_milliseconds: packet.remaining_in_milliseconds,
+        values: packet.value,
+    })?;
     packet_handler.register_noop::<QuestNotificationPacket1>()?;
     packet_handler.register_noop::<HuntingQuestNotificationPacket>()?;
     packet_handler.register_noop::<HuntingQuestUpdateObjectivePacket>()?;
@@ -539,7 +552,13 @@ where
     })?;
     packet_handler.register_noop::<DisplayGainedExperiencePacket>()?;
     packet_handler.register_noop::<DisplayImagePacket>()?;
-    packet_handler.register_noop::<StateChangePacket>()?;
+    packet_handler.register(|packet: StateChangePacket| NetworkEvent::EntityStateChange {
+        entity_id: packet.entity_id,
+        body_state: packet.body_state,
+        health_state: packet.health_state,
+        effect_state: packet.effect_state,
+        is_pk_mode_on: packet.is_pk_mode_on,
+    })?;
 
     packet_handler.register(|packet: QuestEffectPacket| match packet.effect {
         QuestEffect::None => NetworkEvent::RemoveQuestEffect {
@@ -758,8 +777,14 @@ where
         },
     })?;
     packet_handler.register(|packet: UseSkillSuccessPacket| NetworkEvent::EntityStartCasting {
-        entity_id: packet.source_entity,
+        source_entity_id: packet.source_entity,
+        destination_entity_id: packet.destination_entity,
+        position: packet.position,
+        skill_id: packet.skill_id,
+        element: packet.element,
         cast_time: packet.delay_time,
+        disposable: packet.disposable,
+        attack_motion: packet.attack_motion,
     })?;
     packet_handler.register(|packet: CancelSkillCastPacket| NetworkEvent::EntityCancelCasting {
         entity_id: packet.entity_id,
@@ -775,22 +800,36 @@ where
     packet_handler.register(|packet: NotifySkillUnitPacket| {
         let NotifySkillUnitPacket {
             entity_id,
+            creator_id,
             position,
             unit_id,
+            range,
+            visible,
+            skill_level,
             ..
         } = packet;
 
         NetworkEvent::AddSkillUnit {
             entity_id,
+            creator_id,
             unit_id,
             position,
+            range,
+            visible,
+            skill_level,
         }
     })?;
     packet_handler.register(|packet: SkillUnitDisappearPacket| {
         let SkillUnitDisappearPacket { entity_id } = packet;
         NetworkEvent::RemoveSkillUnit { entity_id }
     })?;
-    packet_handler.register_noop::<NotifyGroundSkillPacket>()?;
+    packet_handler.register(|packet: NotifyGroundSkillPacket| NetworkEvent::GroundSkill {
+        skill_id: packet.skill_id,
+        source_entity_id: packet.entity_id,
+        skill_level: packet.level,
+        position: packet.position,
+        start_time: packet.start_time,
+    })?;
     packet_handler.register(|packet: FriendListPacket| NetworkEvent::SetFriendList {
         friend_list: packet.friend_list,
     })?;
@@ -879,7 +918,7 @@ where
 mod skill_packet_tests {
     use ragnarok_bytes::ByteReader;
     use ragnarok_packets::handler::{HandlerResult, NoPacketCallback, PacketHandler};
-    use ragnarok_packets::{ClientTick, EntityId, ItemId, SkillId, SkillUseFailureCode};
+    use ragnarok_packets::{ClientTick, EffectId, EntityId, ItemId, SkillId, SkillLevel, SkillUseFailureCode, TilePosition, UnitId};
 
     use super::register_map_server_packets;
     use crate::NetworkEvent;
@@ -910,8 +949,14 @@ mod skill_packet_tests {
             panic!("cast start packet was not handled");
         };
         assert!(matches!(start_events.as_slice(), [NetworkEvent::EntityStartCasting {
-            entity_id: EntityId(0x0102_0304),
-            cast_time: 1000
+            source_entity_id: EntityId(0x0102_0304),
+            destination_entity_id: EntityId(0x0506_0708),
+            position: TilePosition { x: 0x1112, y: 0x1314 },
+            skill_id: SkillId(0x1516),
+            element: 0x1718_191A,
+            cast_time: 1000,
+            disposable: 0x1F,
+            attack_motion: 0x2021_2223,
         }]));
 
         let HandlerResult::Ok(NetworkEventList(cancel_events)) = handler.process_one(&mut reader) else {
@@ -995,6 +1040,157 @@ mod skill_packet_tests {
             skill_level: -2,
             hit_count: -4,
             action: 14,
+        }]));
+        assert_eq!(reader.remaining_bytes(), []);
+    }
+
+    #[test]
+    fn preserves_entity_and_no_damage_skill_effect_context() {
+        let mut handler = PacketHandler::<NetworkEventList, NoPacketCallback>::default();
+        register_map_server_packets(&mut handler).unwrap();
+
+        let packets = [
+            0xF3, 0x01, // ZC_NOTIFY_EFFECT
+            0x04, 0x03, 0x02, 0x01, // entity
+            0x00, 0x00, 0x00, 0x00, // EF_HIT1
+            0xCB, 0x09, // ZC_SKILL_NODAMAGE
+            0x34, 0x12, // skill id
+            0x78, 0x56, 0x34, 0x12, // heal amount / protocol value
+            0x08, 0x07, 0x06, 0x05, // destination entity
+            0x04, 0x03, 0x02, 0x01, // source entity
+            0x9A, // result
+        ];
+        let mut reader = ByteReader::without_metadata(&packets);
+
+        let HandlerResult::Ok(NetworkEventList(special_effect_events)) = handler.process_one(&mut reader) else {
+            panic!("special effect packet was not handled");
+        };
+        assert!(matches!(special_effect_events.as_slice(), [NetworkEvent::SpecialEffect {
+            entity_id: EntityId(0x0102_0304),
+            effect_id: EffectId::Hit1,
+        }]));
+
+        let HandlerResult::Ok(NetworkEventList(no_damage_events)) = handler.process_one(&mut reader) else {
+            panic!("no-damage skill effect packet was not handled");
+        };
+        assert!(matches!(no_damage_events.as_slice(), [NetworkEvent::SkillEffectNoDamage {
+            skill_id: SkillId(0x1234),
+            heal_amount: 0x1234_5678,
+            destination_entity_id: EntityId(0x0506_0708),
+            source_entity_id: EntityId(0x0102_0304),
+            result: 0x9A,
+        }]));
+        assert_eq!(reader.remaining_bytes(), []);
+    }
+
+    #[test]
+    fn preserves_ground_skill_and_skill_unit_context() {
+        let mut handler = PacketHandler::<NetworkEventList, NoPacketCallback>::default();
+        register_map_server_packets(&mut handler).unwrap();
+
+        let packets = [
+            0x17, 0x01, // ZC_NOTIFY_GROUNDSKILL
+            0x34, 0x12, // skill id
+            0x04, 0x03, 0x02, 0x01, // source entity
+            0x06, 0x00, // skill level
+            0x12, 0x11, // x
+            0x14, 0x13, // y
+            0x0D, 0x0C, 0x0B, 0x0A, // start tick
+            0xCA, 0x09, // ZC_SKILL_ENTRY3
+            0x17, 0x00, // packet length
+            0x08, 0x07, 0x06, 0x05, // unit entity
+            0x04, 0x03, 0x02, 0x01, // creator
+            0x16, 0x15, // x
+            0x18, 0x17, // y
+            0xEF, 0xBE, 0xAD, 0xDE, // unknown/new unit id
+            0x09, // range
+            0x01, // visible
+            0x07, // skill level
+        ];
+        let mut reader = ByteReader::without_metadata(&packets);
+
+        let HandlerResult::Ok(NetworkEventList(ground_events)) = handler.process_one(&mut reader) else {
+            panic!("ground skill packet was not handled");
+        };
+        assert!(matches!(ground_events.as_slice(), [NetworkEvent::GroundSkill {
+            skill_id: SkillId(0x1234),
+            source_entity_id: EntityId(0x0102_0304),
+            skill_level: SkillLevel(6),
+            position: TilePosition { x: 0x1112, y: 0x1314 },
+            start_time: ClientTick(0x0A0B_0C0D),
+        }]));
+
+        let HandlerResult::Ok(NetworkEventList(unit_events)) = handler.process_one(&mut reader) else {
+            panic!("skill unit packet was not handled");
+        };
+        assert!(matches!(unit_events.as_slice(), [NetworkEvent::AddSkillUnit {
+            entity_id: EntityId(0x0506_0708),
+            creator_id: EntityId(0x0102_0304),
+            unit_id: UnitId(0xDEAD_BEEF),
+            position: TilePosition { x: 0x1516, y: 0x1718 },
+            range: 9,
+            visible: 1,
+            skill_level: 7,
+        }]));
+        assert_eq!(reader.remaining_bytes(), []);
+    }
+
+    #[test]
+    fn preserves_complete_status_change_context() {
+        let mut handler = PacketHandler::<NetworkEventList, NoPacketCallback>::default();
+        register_map_server_packets(&mut handler).unwrap();
+
+        let packet = [
+            0x83, 0x09, // ZC_MSG_STATE_CHANGE3
+            0x34, 0x12, // status index
+            0x04, 0x03, 0x02, 0x01, // entity
+            0x02, // state
+            0x78, 0x56, 0x34, 0x12, // duration
+            0xEF, 0xCD, 0xAB, 0x09, // remaining
+            0x01, 0x00, 0x00, 0x00, // value 1
+            0x02, 0x00, 0x00, 0x00, // value 2
+            0x03, 0x00, 0x00, 0x00, // value 3
+        ];
+        let mut reader = ByteReader::without_metadata(&packet);
+
+        let HandlerResult::Ok(NetworkEventList(events)) = handler.process_one(&mut reader) else {
+            panic!("status change packet was not handled");
+        };
+        assert!(matches!(events.as_slice(), [NetworkEvent::StatusChange {
+            status_index: 0x1234,
+            entity_id: EntityId(0x0102_0304),
+            state: 2,
+            duration_in_milliseconds: 0x1234_5678,
+            remaining_in_milliseconds: 0x09AB_CDEF,
+            values: [1, 2, 3],
+        }]));
+        assert_eq!(reader.remaining_bytes(), []);
+    }
+
+    #[test]
+    fn preserves_complete_entity_state_change_context() {
+        let mut handler = PacketHandler::<NetworkEventList, NoPacketCallback>::default();
+        register_map_server_packets(&mut handler).unwrap();
+
+        let packet = [
+            0x29, 0x02, // ZC_STATE_CHANGE
+            0x04, 0x03, 0x02, 0x01, // entity
+            0x12, 0x11, // body state
+            0x14, 0x13, // health state
+            0x78, 0x56, 0x34, 0x12, // effect/option state
+            0x01, // PK mode
+        ];
+        let mut reader = ByteReader::without_metadata(&packet);
+
+        let HandlerResult::Ok(NetworkEventList(events)) = handler.process_one(&mut reader) else {
+            panic!("entity state change packet was not handled");
+        };
+        assert!(matches!(events.as_slice(), [NetworkEvent::EntityStateChange {
+            entity_id: EntityId(0x0102_0304),
+            body_state: 0x1112,
+            health_state: 0x1314,
+            effect_state: 0x1234_5678,
+            is_pk_mode_on: 1,
         }]));
         assert_eq!(reader.remaining_bytes(), []);
     }

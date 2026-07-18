@@ -4086,199 +4086,196 @@ mod skill_cast_packet_tests {
     }
 }
 
-#[derive(Debug, Clone, ByteConvertable)]
+/// The server-side type of a persistent skill unit.
+///
+/// This is intentionally an open newtype instead of an enum. Servers can add
+/// unit ids independently of the client packet version, and an unknown id must
+/// not make packet decoding (including Packet Inspector decoding) fail.
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
-#[numeric_type(u32)]
-pub enum UnitId {
-    #[numeric_value(0x7E)]
-    Safetywall,
-    Firewall,
-    WarpWaiting,
-    WarpActive,
-    Benedictio,
-    Sanctuary,
-    Magnus,
-    Pneuma,
-    Dummyskill,
-    FirepillarWaiting,
-    FirepillarActive,
-    HiddenTrap,
-    Trap,
-    HiddenWarpNpc,
-    UsedTraps,
-    Icewall,
-    Quagmire,
-    Blastmine,
-    Skidtrap,
-    Anklesnare,
-    Venomdust,
-    Landmine,
-    Shockwave,
-    Sandman,
-    Flasher,
-    Freezingtrap,
-    Claymoretrap,
-    Talkiebox,
-    Volcano,
-    Deluge,
-    Violentgale,
-    Landprotector,
-    Lullaby,
-    Richmankim,
-    Eternalchaos,
-    Drumbattlefield,
-    Ringnibelungen,
-    Rokisweil,
-    Intoabyss,
-    Siegfried,
-    Dissonance,
-    Whistle,
-    Assassincross,
-    Poembragi,
-    Appleidun,
-    Uglydance,
-    Humming,
-    Dontforgetme,
-    Fortunekiss,
-    Serviceforyou,
-    Graffiti,
-    Demonstration,
-    Callfamily,
-    Gospel,
-    Basilica,
-    Moonlit,
-    Fogwall,
-    Spiderweb,
-    Gravitation,
-    Hermode,
-    Kaensin,
-    Suiton,
-    Tatamigaeshi,
-    Kaen,
-    GrounddriftWind,
-    GrounddriftDark,
-    GrounddriftPoison,
-    GrounddriftWater,
-    GrounddriftFire,
-    Deathwave,
-    Waterattack,
-    Windattack,
-    Earthquake,
-    Evilland,
-    DarkRunner,
-    DarkTransfer,
-    Epiclesis,
-    Earthstrain,
-    Manhole,
-    Dimensiondoor,
-    Chaospanic,
-    Maelstrom,
-    Bloodylust,
-    Feintbomb,
-    Magentatrap,
-    Cobalttrap,
-    Maizetrap,
-    Verduretrap,
-    Firingtrap,
-    Iceboundtrap,
-    Electricshocker,
-    Clusterbomb,
-    Reverberation,
-    SevereRainstorm,
-    Firewalk,
-    Electricwalk,
-    Netherworld,
-    PsychicWave,
-    CloudKill,
-    Poisonsmoke,
-    Neutralbarrier,
-    Stealthfield,
-    Warmer,
-    ThornsTrap,
-    Wallofthorn,
-    DemonicFire,
-    FireExpansionSmokePowder,
-    FireExpansionTearGas,
-    HellsPlant,
-    VacuumExtreme,
-    Banding,
-    FireMantle,
-    WaterBarrier,
-    Zephyr,
-    PowerOfGaia,
-    FireInsignia,
-    WaterInsignia,
-    WindInsignia,
-    EarthInsignia,
-    PoisonMist,
-    LavaSlide,
-    VolcanicAsh,
-    ZenkaiWater,
-    ZenkaiLand,
-    ZenkaiFire,
-    ZenkaiWind,
-    Makibishi,
-    Venomfog,
-    Icemine,
-    Flamecross,
-    Hellburning,
-    MagmaEruption,
-    KingsGrace,
-    GlitteringGreed,
-    BTrap,
-    FireRain,
-    Catnippowder,
-    Nyanggrass,
-    Creatingstar,
-    Dummy0,
-    RainOfCrystal,
-    MysteryIllusion,
-    #[numeric_value(269)]
-    StrantumTremor,
-    ViolentQuake,
-    AllBloom,
-    TornadoStorm,
-    FloralFlareRoad,
-    AstralStrike,
-    CrossRain,
-    PneumaticusProcella,
-    AbyssSquare,
-    AcidifiedZoneWater,
-    AcidifiedZoneGround,
-    AcidifiedZoneWind,
-    AcidifiedZoneFire,
-    LightningLand,
-    VenomSwamp,
-    Conflagration,
-    CaneOfEvilEye,
-    TwinklingGalaxy,
-    StarCannon,
-    GrenadesDropping,
-    #[numeric_value(290)]
-    Fuumashouaku,
-    MissionBombard,
-    TotemOfTutelary,
-    HyunRoksBreeze,
-    Shinkirou, // mirage
-    JackFrostNova,
-    GroundGravitation,
-    #[numeric_value(298)]
-    Kunaiwaikyoku,
-    #[numeric_value(20852)]
-    Deepblindtrap,
-    Solidtrap,
-    Swifttrap,
-    Flametrap,
-    #[numeric_value(0xC1)]
-    GdLeadership,
-    #[numeric_value(0xC2)]
-    GdGlorywounds,
-    #[numeric_value(0xC3)]
-    GdSoulcold,
-    #[numeric_value(0xC4)]
-    GdHawkeyes,
-    #[numeric_value(0x190)]
-    Max,
+pub struct UnitId(pub u32);
+
+#[allow(non_upper_case_globals)]
+impl UnitId {
+    pub const AbyssSquare: Self = Self(277);
+    pub const AcidifiedZoneFire: Self = Self(281);
+    pub const AcidifiedZoneGround: Self = Self(279);
+    pub const AcidifiedZoneWater: Self = Self(278);
+    pub const AcidifiedZoneWind: Self = Self(280);
+    pub const AllBloom: Self = Self(271);
+    pub const Anklesnare: Self = Self(145);
+    pub const Appleidun: Self = Self(170);
+    pub const Assassincross: Self = Self(168);
+    pub const AstralStrike: Self = Self(274);
+    pub const BTrap: Self = Self(260);
+    pub const Banding: Self = Self(236);
+    pub const Basilica: Self = Self(180);
+    pub const Benedictio: Self = Self(130);
+    pub const Blastmine: Self = Self(143);
+    pub const Bloodylust: Self = Self(208);
+    pub const Callfamily: Self = Self(178);
+    pub const CaneOfEvilEye: Self = Self(285);
+    pub const Catnippowder: Self = Self(262);
+    pub const Chaospanic: Self = Self(206);
+    pub const Claymoretrap: Self = Self(152);
+    pub const CloudKill: Self = Self(224);
+    pub const Clusterbomb: Self = Self(217);
+    pub const Cobalttrap: Self = Self(211);
+    pub const Conflagration: Self = Self(284);
+    pub const Creatingstar: Self = Self(264);
+    pub const CrossRain: Self = Self(275);
+    pub const DarkRunner: Self = Self(200);
+    pub const DarkTransfer: Self = Self(201);
+    pub const Deathwave: Self = Self(195);
+    pub const Deepblindtrap: Self = Self(20852);
+    pub const Deluge: Self = Self(155);
+    pub const DemonicFire: Self = Self(231);
+    pub const Demonstration: Self = Self(177);
+    pub const Dimensiondoor: Self = Self(205);
+    pub const Dissonance: Self = Self(166);
+    pub const Dontforgetme: Self = Self(173);
+    pub const Drumbattlefield: Self = Self(161);
+    pub const Dummy0: Self = Self(265);
+    pub const Dummyskill: Self = Self(134);
+    pub const EarthInsignia: Self = Self(244);
+    pub const Earthquake: Self = Self(198);
+    pub const Earthstrain: Self = Self(203);
+    pub const Electricshocker: Self = Self(216);
+    pub const Electricwalk: Self = Self(221);
+    pub const Epiclesis: Self = Self(202);
+    pub const Eternalchaos: Self = Self(160);
+    pub const Evilland: Self = Self(199);
+    pub const Feintbomb: Self = Self(209);
+    pub const FireExpansionSmokePowder: Self = Self(232);
+    pub const FireExpansionTearGas: Self = Self(233);
+    pub const FireInsignia: Self = Self(241);
+    pub const FireMantle: Self = Self(237);
+    pub const FireRain: Self = Self(261);
+    pub const FirepillarActive: Self = Self(136);
+    pub const FirepillarWaiting: Self = Self(135);
+    pub const Firewalk: Self = Self(220);
+    pub const Firewall: Self = Self(127);
+    pub const Firingtrap: Self = Self(214);
+    pub const Flamecross: Self = Self(255);
+    pub const Flametrap: Self = Self(20855);
+    pub const Flasher: Self = Self(150);
+    pub const FloralFlareRoad: Self = Self(273);
+    pub const Fogwall: Self = Self(182);
+    pub const Fortunekiss: Self = Self(174);
+    pub const Freezingtrap: Self = Self(151);
+    pub const Fuumashouaku: Self = Self(290);
+    pub const GdGlorywounds: Self = Self(194);
+    pub const GdHawkeyes: Self = Self(196);
+    pub const GdLeadership: Self = Self(193);
+    pub const GdSoulcold: Self = Self(195);
+    pub const GlitteringGreed: Self = Self(259);
+    pub const Gospel: Self = Self(179);
+    pub const Graffiti: Self = Self(176);
+    pub const Gravitation: Self = Self(184);
+    pub const GrenadesDropping: Self = Self(288);
+    pub const GroundGravitation: Self = Self(296);
+    pub const GrounddriftDark: Self = Self(191);
+    pub const GrounddriftFire: Self = Self(194);
+    pub const GrounddriftPoison: Self = Self(192);
+    pub const GrounddriftWater: Self = Self(193);
+    pub const GrounddriftWind: Self = Self(190);
+    pub const Hellburning: Self = Self(256);
+    pub const HellsPlant: Self = Self(234);
+    pub const Hermode: Self = Self(185);
+    pub const HiddenTrap: Self = Self(137);
+    pub const HiddenWarpNpc: Self = Self(139);
+    pub const Humming: Self = Self(172);
+    pub const HyunRoksBreeze: Self = Self(293);
+    pub const Iceboundtrap: Self = Self(215);
+    pub const Icemine: Self = Self(254);
+    pub const Icewall: Self = Self(141);
+    pub const Intoabyss: Self = Self(164);
+    pub const JackFrostNova: Self = Self(295);
+    pub const Kaen: Self = Self(189);
+    pub const Kaensin: Self = Self(186);
+    pub const KingsGrace: Self = Self(258);
+    pub const Kunaiwaikyoku: Self = Self(298);
+    pub const Landmine: Self = Self(147);
+    pub const Landprotector: Self = Self(157);
+    pub const LavaSlide: Self = Self(246);
+    pub const LightningLand: Self = Self(282);
+    pub const Lullaby: Self = Self(158);
+    pub const Maelstrom: Self = Self(207);
+    pub const Magentatrap: Self = Self(210);
+    pub const MagmaEruption: Self = Self(257);
+    pub const Magnus: Self = Self(132);
+    pub const Maizetrap: Self = Self(212);
+    pub const Makibishi: Self = Self(252);
+    pub const Manhole: Self = Self(204);
+    pub const Max: Self = Self(400);
+    pub const MissionBombard: Self = Self(291);
+    pub const Moonlit: Self = Self(181);
+    pub const MysteryIllusion: Self = Self(267);
+    pub const Netherworld: Self = Self(222);
+    pub const Neutralbarrier: Self = Self(226);
+    pub const Nyanggrass: Self = Self(263);
+    pub const Pneuma: Self = Self(133);
+    pub const PneumaticusProcella: Self = Self(276);
+    pub const Poembragi: Self = Self(169);
+    pub const PoisonMist: Self = Self(245);
+    pub const Poisonsmoke: Self = Self(225);
+    pub const PowerOfGaia: Self = Self(240);
+    pub const PsychicWave: Self = Self(223);
+    pub const Quagmire: Self = Self(142);
+    pub const RainOfCrystal: Self = Self(266);
+    pub const Reverberation: Self = Self(218);
+    pub const Richmankim: Self = Self(159);
+    pub const Ringnibelungen: Self = Self(162);
+    pub const Rokisweil: Self = Self(163);
+    pub const Safetywall: Self = Self(126);
+    pub const Sanctuary: Self = Self(131);
+    pub const Sandman: Self = Self(149);
+    pub const Serviceforyou: Self = Self(175);
+    pub const SevereRainstorm: Self = Self(219);
+    pub const Shinkirou: Self = Self(294);
+    pub const Shockwave: Self = Self(148);
+    pub const Siegfried: Self = Self(165);
+    pub const Skidtrap: Self = Self(144);
+    pub const Solidtrap: Self = Self(20853);
+    pub const Spiderweb: Self = Self(183);
+    pub const StarCannon: Self = Self(287);
+    pub const Stealthfield: Self = Self(227);
+    pub const StrantumTremor: Self = Self(269);
+    pub const Suiton: Self = Self(187);
+    pub const Swifttrap: Self = Self(20854);
+    pub const Talkiebox: Self = Self(153);
+    pub const Tatamigaeshi: Self = Self(188);
+    pub const ThornsTrap: Self = Self(229);
+    pub const TornadoStorm: Self = Self(272);
+    pub const TotemOfTutelary: Self = Self(292);
+    pub const Trap: Self = Self(138);
+    pub const TwinklingGalaxy: Self = Self(286);
+    pub const Uglydance: Self = Self(171);
+    pub const UsedTraps: Self = Self(140);
+    pub const VacuumExtreme: Self = Self(235);
+    pub const VenomSwamp: Self = Self(283);
+    pub const Venomdust: Self = Self(146);
+    pub const Venomfog: Self = Self(253);
+    pub const Verduretrap: Self = Self(213);
+    pub const ViolentQuake: Self = Self(270);
+    pub const Violentgale: Self = Self(156);
+    pub const VolcanicAsh: Self = Self(247);
+    pub const Volcano: Self = Self(154);
+    pub const Wallofthorn: Self = Self(230);
+    pub const Warmer: Self = Self(228);
+    pub const WarpActive: Self = Self(129);
+    pub const WarpWaiting: Self = Self(128);
+    pub const WaterBarrier: Self = Self(238);
+    pub const WaterInsignia: Self = Self(242);
+    pub const Waterattack: Self = Self(196);
+    pub const Whistle: Self = Self(167);
+    pub const WindInsignia: Self = Self(243);
+    pub const Windattack: Self = Self(197);
+    pub const ZenkaiFire: Self = Self(250);
+    pub const ZenkaiLand: Self = Self(249);
+    pub const ZenkaiWater: Self = Self(248);
+    pub const ZenkaiWind: Self = Self(251);
+    pub const Zephyr: Self = Self(239);
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
@@ -4304,6 +4301,43 @@ pub struct NotifyGroundSkillPacket {
     pub level: SkillLevel,
     pub position: TilePosition,
     pub start_time: ClientTick,
+}
+
+#[cfg(test)]
+mod skill_unit_packet_tests {
+    use super::*;
+
+    #[test]
+    fn unknown_skill_unit_id_round_trips_without_decode_failure() {
+        let expected = [
+            0xCA, 0x09, // header
+            0x17, 0x00, // packet length
+            0x08, 0x07, 0x06, 0x05, // unit entity
+            0x04, 0x03, 0x02, 0x01, // creator
+            0x12, 0x11, // x
+            0x14, 0x13, // y
+            0xEF, 0xBE, 0xAD, 0xDE, // unknown/new unit id
+            0x09, // range
+            0x01, // visible
+            0x07, // skill level
+        ];
+
+        let mut reader = ByteReader::without_metadata(&expected);
+        let decoded = NotifySkillUnitPacket::packet_from_bytes(&mut reader).unwrap();
+        assert_eq!(decoded.lenght, expected.len() as u16);
+        assert_eq!(decoded.entity_id, EntityId(0x0506_0708));
+        assert_eq!(decoded.creator_id, EntityId(0x0102_0304));
+        assert_eq!(decoded.position, TilePosition { x: 0x1112, y: 0x1314 });
+        assert_eq!(decoded.unit_id, UnitId(0xDEAD_BEEF));
+        assert_eq!(decoded.range, 9);
+        assert_eq!(decoded.visible, 1);
+        assert_eq!(decoded.skill_level, 7);
+        assert_eq!(reader.remaining_bytes(), []);
+
+        let mut writer = ByteWriter::new();
+        assert_eq!(decoded.packet_to_bytes(&mut writer).unwrap(), expected.len());
+        assert_eq!(writer.as_slice(), expected);
+    }
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]

@@ -71,7 +71,7 @@ use networking::{PacketHistory, PacketHistoryCallback};
 use ragnarok_packets::handler::NoPacketCallback;
 use ragnarok_packets::{
     AttackRange, BuyShopItemsResult, CharacterServerInformation, ClientTick, Direction, DisappearanceReason, EntityId, HotbarSlot,
-    SellItemsResult, SkillId, SkillLevel, SkillType, SkillUseFailureCode, TilePosition, UnitId, WorldPosition,
+    SellItemsResult, SkillId, SkillLevel, SkillType, SkillUseFailureCode, TilePosition, WorldPosition,
 };
 use renderer::InterfaceRenderer;
 use rust_state::{ManuallyAssertExt, State};
@@ -133,6 +133,7 @@ const ITEM_PICKUP_RANGE: AttackRange = AttackRange(1);
 // through the graphics settings. For now I just chose an arbitrary smaller
 // number that should be playable on most devices.
 const NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS: usize = 6;
+const SKILL_SOUND_LOAD_TIMEOUT_SECONDS: f32 = 1.0;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct ArmedSkill {
@@ -145,6 +146,102 @@ struct ArmedSkill {
 struct ActiveContinuousSkill {
     skill_id: SkillId,
     held_by: Option<HotbarSlot>,
+}
+
+#[derive(Clone, Copy)]
+struct PendingSkillEffect {
+    remaining_delay: f32,
+    recipe: SkillVisualRecipe,
+    source_entity_id: EntityId,
+    destination_entity_id: EntityId,
+    ground_position: Option<TilePosition>,
+    unit_entity_id: Option<EntityId>,
+}
+
+#[derive(Clone, Copy)]
+struct PendingSkillSound {
+    timing: SkillSoundSequenceTiming,
+    recipe: SkillSoundRecipe,
+    sound_effect_key: SoundEffectKey,
+    source_entity_id: EntityId,
+    destination_entity_id: EntityId,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct SkillSoundSequenceTiming {
+    next_delay: f32,
+    load_wait_remaining: f32,
+    hit_interval: f32,
+    hits_remaining: usize,
+}
+
+impl SkillSoundSequenceTiming {
+    fn new(next_delay: f32, hit_interval: f32, hits_remaining: usize) -> Self {
+        Self {
+            next_delay: next_delay.max(0.0),
+            load_wait_remaining: SKILL_SOUND_LOAD_TIMEOUT_SECONDS,
+            hit_interval,
+            hits_remaining: hits_remaining.max(1),
+        }
+    }
+
+    /// Advances the sequence and returns how much of this frame elapsed after
+    /// the next hit became due.
+    fn wait_elapsed_if_due(&mut self, delta_time: f32) -> Option<f32> {
+        if self.next_delay > delta_time {
+            self.next_delay -= delta_time;
+            return None;
+        }
+
+        let wait_elapsed = (delta_time - self.next_delay).max(0.0);
+        self.next_delay = 0.0;
+        Some(wait_elapsed)
+    }
+
+    /// Records a successful playback and returns whether the sequence remains
+    /// active.
+    fn playback_succeeded(&mut self) -> bool {
+        self.hits_remaining = self.hits_remaining.saturating_sub(1);
+        if self.hits_remaining == 0 {
+            return false;
+        }
+
+        self.next_delay = self.hit_interval;
+        self.load_wait_remaining = SKILL_SOUND_LOAD_TIMEOUT_SECONDS;
+        true
+    }
+
+    /// Records time spent waiting for decoded audio and returns whether the
+    /// sequence should retry.
+    fn playback_unavailable(&mut self, wait_elapsed: f32) -> bool {
+        self.load_wait_remaining -= wait_elapsed;
+        self.load_wait_remaining > 0.0
+    }
+}
+
+#[derive(Clone, Copy)]
+struct PendingSkillSprite {
+    remaining_delay: f32,
+    recipe: SkillSpriteVisualRecipe,
+    source_entity_id: EntityId,
+    destination_entity_id: EntityId,
+    play_sound: bool,
+}
+
+#[derive(Clone, Copy)]
+struct PendingSkillDamageParticle {
+    remaining_delay: f32,
+    destination_entity_id: EntityId,
+    display: SkillDamageDisplay,
+}
+
+#[derive(Clone, Copy)]
+struct PendingProceduralSkillVisual {
+    remaining_delay: f32,
+    recipe: SkillProceduralVisualRecipe,
+    source_entity_id: EntityId,
+    destination_entity_id: EntityId,
+    sequence_index: usize,
 }
 
 fn is_skill_target_confirmation(mouse_button: MouseButton) -> bool {
@@ -342,6 +439,11 @@ pub struct Client {
     particle_holder: ParticleHolder,
     point_light_manager: PointLightManager,
     effect_holder: EffectHolder,
+    pending_skill_effects: Vec<PendingSkillEffect>,
+    pending_skill_sounds: Vec<PendingSkillSound>,
+    pending_skill_sprites: Vec<PendingSkillSprite>,
+    pending_skill_damage_particles: Vec<PendingSkillDamageParticle>,
+    pending_procedural_skill_visuals: Vec<PendingProceduralSkillVisual>,
     path_finder: PathFinder,
 
     point_light_set_buffer: ResourceSetBuffer<LightSourceKey>,
@@ -697,6 +799,12 @@ impl Client {
             let tile_texture_set = Arc::new(tile_texture_set);
 
             let main_menu_click_sound_effect = audio_engine.load(MAIN_MENU_CLICK_SOUND_EFFECT);
+            // Multi-hit skill sounds are scheduled only fractions of a second
+            // apart. Start loading the verified GRF WAVs during client setup so
+            // first-use async loading cannot collapse those requests together.
+            for sound_path in SKILL_SOUND_PATHS {
+                let _ = audio_engine.load(sound_path);
+            }
         });
 
         time_phase!("load default map", {
@@ -795,6 +903,11 @@ impl Client {
             particle_holder,
             point_light_manager,
             effect_holder,
+            pending_skill_effects: Vec::new(),
+            pending_skill_sounds: Vec::new(),
+            pending_skill_sprites: Vec::new(),
+            pending_skill_damage_particles: Vec::new(),
+            pending_procedural_skill_visuals: Vec::new(),
             path_finder,
             point_light_set_buffer,
             directional_shadow_object_set_buffer,
@@ -1002,6 +1115,587 @@ impl Client {
         }
     }
 
+    fn entity_position(&self, entity_id: EntityId) -> Option<Point3<f32>> {
+        self.client_state
+            .follow(client_state().entities())
+            .iter()
+            .find(|entity| entity.get_entity_id() == entity_id)
+            .map(Entity::get_position)
+            .or_else(|| {
+                self.client_state
+                    .follow(client_state().dead_entities())
+                    .iter()
+                    .find(|entity| entity.get_entity_id() == entity_id)
+                    .map(Entity::get_position)
+            })
+            .or_else(|| {
+                self.client_state
+                    .try_follow(this_entity())
+                    .filter(|entity| entity.get_entity_id() == entity_id)
+                    .map(Entity::get_position)
+            })
+    }
+
+    fn spawn_skill_visual(
+        &mut self,
+        recipe: SkillVisualRecipe,
+        source_entity_id: EntityId,
+        destination_entity_id: EntityId,
+        ground_position: Option<TilePosition>,
+        unit_entity_id: Option<EntityId>,
+    ) {
+        let (center, effect_position) = match recipe.anchor {
+            SkillVisualAnchor::SourceEntity => {
+                let Some(position) = self.entity_position(source_entity_id) else {
+                    return;
+                };
+                (EffectCenter::Entity(source_entity_id, position), position)
+            }
+            SkillVisualAnchor::DestinationEntity => {
+                let Some(position) = self.entity_position(destination_entity_id) else {
+                    return;
+                };
+                (EffectCenter::Entity(destination_entity_id, position), position)
+            }
+            SkillVisualAnchor::GroundPosition | SkillVisualAnchor::SkillUnit => {
+                let Some(map) = &self.map else {
+                    return;
+                };
+                let Some(tile_position) = ground_position else {
+                    return;
+                };
+                let Some(position) = map.get_world_position(tile_position) else {
+                    #[cfg(feature = "debug")]
+                    print_debug!("[{}] skill effect at {:?} is out of map bounds", "error".red(), tile_position);
+                    return;
+                };
+                (EffectCenter::Position(position), position)
+            }
+        };
+
+        if let Some(sound_path) = recipe.sound_path {
+            let sound_effect = self.audio_engine.load(sound_path);
+            self.audio_engine
+                .play_spatial_sound_effect(sound_effect, effect_position, recipe.sound_range);
+        }
+
+        let effect = match self.effect_loader.get_or_load(recipe.effect_path, &self.texture_loader) {
+            Ok(effect) => effect,
+            Err(_error) => {
+                #[cfg(feature = "debug")]
+                print_debug!(
+                    "[{}] failed to load skill effect '{}': {:?}",
+                    "error".red(),
+                    recipe.effect_path,
+                    _error
+                );
+                return;
+            }
+        };
+        let frame_timer = effect.new_frame_timer();
+        let effect_offset = Vector3::new(recipe.effect_offset[0], recipe.effect_offset[1], recipe.effect_offset[2]);
+
+        let effect: Box<dyn EffectBase + Send + Sync> = match recipe.light {
+            Some(light) => Box::new(EffectWithLight::new(
+                effect,
+                frame_timer,
+                center,
+                effect_offset,
+                next_dynamic_point_light_id(),
+                Vector3::new(light.offset[0], light.offset[1], light.offset[2]),
+                light.color,
+                light.intensity,
+                recipe.repeating,
+            )),
+            None => Box::new(EffectWithLight::without_light(
+                effect,
+                frame_timer,
+                center,
+                effect_offset,
+                recipe.repeating,
+            )),
+        };
+
+        match unit_entity_id {
+            Some(entity_id) => self.effect_holder.add_unit(effect, entity_id),
+            None => self.effect_holder.add_effect(effect),
+        }
+    }
+
+    fn queue_skill_damage_visual(
+        &mut self,
+        recipe: SkillVisualRecipe,
+        source_entity_id: EntityId,
+        destination_entity_id: EntityId,
+        hit_count: i16,
+        initial_delay: f32,
+    ) {
+        let repeat_delays = std::iter::once(0.0).chain(skill_effect_repeat_delays(recipe.hit_interval, hit_count));
+
+        for repeat_delay in repeat_delays {
+            let remaining_delay = initial_delay + repeat_delay;
+            if remaining_delay <= 0.0 {
+                self.spawn_skill_visual(recipe, source_entity_id, destination_entity_id, None, None);
+            } else {
+                self.pending_skill_effects.push(PendingSkillEffect {
+                    recipe,
+                    source_entity_id,
+                    destination_entity_id,
+                    remaining_delay,
+                    ground_position: None,
+                    unit_entity_id: None,
+                });
+            }
+        }
+    }
+
+    fn update_pending_skill_effects(&mut self, delta_time: f32) {
+        let pending_effects = std::mem::take(&mut self.pending_skill_effects);
+
+        for mut pending in pending_effects {
+            pending.remaining_delay -= delta_time;
+
+            if pending.remaining_delay <= 0.0 {
+                self.spawn_skill_visual(
+                    pending.recipe,
+                    pending.source_entity_id,
+                    pending.destination_entity_id,
+                    pending.ground_position,
+                    pending.unit_entity_id,
+                );
+            } else {
+                self.pending_skill_effects.push(pending);
+            }
+        }
+    }
+
+    fn queue_ground_skill_visual(
+        &mut self,
+        recipe: SkillVisualRecipe,
+        source_entity_id: EntityId,
+        ground_position: TilePosition,
+        initial_delay: f32,
+    ) {
+        if initial_delay <= 0.0 {
+            self.spawn_skill_visual(recipe, source_entity_id, source_entity_id, Some(ground_position), None);
+        } else {
+            self.pending_skill_effects.push(PendingSkillEffect {
+                remaining_delay: initial_delay,
+                recipe,
+                source_entity_id,
+                destination_entity_id: source_entity_id,
+                ground_position: Some(ground_position),
+                unit_entity_id: None,
+            });
+        }
+    }
+
+    fn spawn_skill_sprite_visual(
+        &mut self,
+        recipe: SkillSpriteVisualRecipe,
+        source_entity_id: EntityId,
+        destination_entity_id: EntityId,
+        play_sound: bool,
+    ) {
+        let entity_id = match recipe.anchor {
+            SkillVisualAnchor::SourceEntity => source_entity_id,
+            SkillVisualAnchor::DestinationEntity => destination_entity_id,
+            SkillVisualAnchor::GroundPosition | SkillVisualAnchor::SkillUnit => return,
+        };
+        let Some(position) = self.entity_position(entity_id) else {
+            return;
+        };
+
+        if play_sound && let Some(sound_path) = recipe.sound_path {
+            let sound_effect = self.audio_engine.load(sound_path);
+            self.audio_engine
+                .play_spatial_sound_effect(sound_effect, position, recipe.sound_range);
+        }
+
+        let sprite = match self.sprite_loader.get_or_load(recipe.sprite_path) {
+            Ok(sprite) => sprite,
+            Err(_error) => {
+                #[cfg(feature = "debug")]
+                print_debug!(
+                    "[{}] failed to load skill sprite '{}': {:?}",
+                    "error".red(),
+                    recipe.sprite_path,
+                    _error
+                );
+                return;
+            }
+        };
+        let actions = match self.action_loader.get_or_load(recipe.action_path) {
+            Ok(actions) => actions,
+            Err(_error) => {
+                #[cfg(feature = "debug")]
+                print_debug!(
+                    "[{}] failed to load skill actions '{}': {:?}",
+                    "error".red(),
+                    recipe.action_path,
+                    _error
+                );
+                return;
+            }
+        };
+
+        self.particle_holder.spawn_attached_sprite(EntityAttachedSprite::new(
+            entity_id,
+            recipe.attachment_key,
+            position,
+            Vector3::new(recipe.position_offset[0], recipe.position_offset[1], recipe.position_offset[2]),
+            sprite,
+            actions,
+            recipe.action_index,
+            recipe.repeating,
+            recipe.maximum_duration,
+            recipe.scaling,
+        ));
+    }
+
+    fn queue_skill_sprite_visual(
+        &mut self,
+        recipe: SkillSpriteVisualRecipe,
+        source_entity_id: EntityId,
+        destination_entity_id: EntityId,
+        play_sound: bool,
+        initial_delay: f32,
+    ) {
+        if initial_delay <= 0.0 {
+            self.spawn_skill_sprite_visual(recipe, source_entity_id, destination_entity_id, play_sound);
+        } else {
+            self.pending_skill_sprites.push(PendingSkillSprite {
+                remaining_delay: initial_delay,
+                recipe,
+                source_entity_id,
+                destination_entity_id,
+                play_sound,
+            });
+        }
+    }
+
+    fn update_pending_skill_sprites(&mut self, delta_time: f32) {
+        let pending_sprites = std::mem::take(&mut self.pending_skill_sprites);
+
+        for mut pending in pending_sprites {
+            pending.remaining_delay -= delta_time;
+
+            if pending.remaining_delay <= 0.0 {
+                self.spawn_skill_sprite_visual(
+                    pending.recipe,
+                    pending.source_entity_id,
+                    pending.destination_entity_id,
+                    pending.play_sound,
+                );
+            } else {
+                self.pending_skill_sprites.push(pending);
+            }
+        }
+    }
+
+    fn spawn_skill_damage_particle(&mut self, destination_entity_id: EntityId, display: SkillDamageDisplay) {
+        let Some(position) = self.entity_position(destination_entity_id) else {
+            return;
+        };
+        let particle: Box<dyn Particle + Send + Sync> = match display {
+            SkillDamageDisplay::Suppressed => return,
+            SkillDamageDisplay::Miss => Box::new(Miss::new(position)),
+            SkillDamageDisplay::Damage { amount, is_critical } => Box::new(DamageNumber::new(position, amount.to_string(), is_critical)),
+        };
+        self.particle_holder.spawn_particle(particle);
+    }
+
+    fn queue_skill_damage_particle(
+        &mut self,
+        destination_entity_id: EntityId,
+        display: SkillDamageDisplay,
+        hit_count: i16,
+        hit_interval: Option<f32>,
+        initial_delay: f32,
+    ) {
+        let displays = match hit_interval {
+            Some(_) => display.split_for_hits(hit_count),
+            None => (display != SkillDamageDisplay::Suppressed).then_some(display).into_iter().collect(),
+        };
+
+        for (hit_index, display) in displays.into_iter().enumerate() {
+            let remaining_delay = initial_delay + hit_interval.unwrap_or_default() * hit_index as f32;
+            if remaining_delay <= 0.0 {
+                self.spawn_skill_damage_particle(destination_entity_id, display);
+            } else {
+                self.pending_skill_damage_particles.push(PendingSkillDamageParticle {
+                    remaining_delay,
+                    destination_entity_id,
+                    display,
+                });
+            }
+        }
+    }
+
+    fn update_pending_skill_damage_particles(&mut self, delta_time: f32) {
+        let pending_particles = std::mem::take(&mut self.pending_skill_damage_particles);
+
+        for mut pending in pending_particles {
+            pending.remaining_delay -= delta_time;
+
+            if pending.remaining_delay <= 0.0 {
+                self.spawn_skill_damage_particle(pending.destination_entity_id, pending.display);
+            } else {
+                self.pending_skill_damage_particles.push(pending);
+            }
+        }
+    }
+
+    fn load_skill_particle_texture(&self, path: &str) -> Option<Arc<Texture>> {
+        self.texture_loader
+            .get_or_load(path, ImageType::Color)
+            .inspect_err(|_error| {
+                #[cfg(feature = "debug")]
+                print_debug!(
+                    "[{}] failed to load skill particle texture '{}': {:?}",
+                    "error".red(),
+                    path,
+                    _error
+                );
+            })
+            .ok()
+    }
+
+    fn spawn_procedural_skill_visual(
+        &mut self,
+        recipe: SkillProceduralVisualRecipe,
+        source_entity_id: EntityId,
+        destination_entity_id: EntityId,
+        sequence_index: usize,
+        initial_elapsed: f32,
+    ) {
+        let mut particle: Box<dyn EntityParticle + Send + Sync> = match recipe.kind {
+            SkillProceduralVisualKind::ColdBolt => {
+                let Some(position) = self.entity_position(destination_entity_id) else {
+                    return;
+                };
+                let Some(arrow_texture) = self.load_skill_particle_texture(ICE_ARROW_TEXTURE_PATH) else {
+                    return;
+                };
+                let Some(impact_texture) = self.load_skill_particle_texture(ICE_IMPACT_TEXTURE_PATH) else {
+                    return;
+                };
+
+                Box::new(ColdBoltParticle::new(
+                    destination_entity_id,
+                    position,
+                    arrow_texture,
+                    impact_texture,
+                    sequence_index,
+                ))
+            }
+            SkillProceduralVisualKind::ColdImpact => {
+                let Some(position) = self.entity_position(destination_entity_id) else {
+                    return;
+                };
+                let Some(arrow_texture) = self.load_skill_particle_texture(ICE_ARROW_TEXTURE_PATH) else {
+                    return;
+                };
+                let Some(impact_texture) = self.load_skill_particle_texture(ICE_IMPACT_TEXTURE_PATH) else {
+                    return;
+                };
+
+                Box::new(ColdBoltParticle::impact(
+                    destination_entity_id,
+                    position,
+                    arrow_texture,
+                    impact_texture,
+                ))
+            }
+            SkillProceduralVisualKind::FrostDiver => {
+                let Some(destination_position) = self.entity_position(destination_entity_id) else {
+                    return;
+                };
+                let source_position = self
+                    .entity_position(source_entity_id)
+                    .unwrap_or(destination_position + Vector3::new(-22.0, 12.0, 0.0));
+                let Some(projectile_texture) = self.load_skill_particle_texture(FROST_DIVER_TEXTURE_PATH) else {
+                    return;
+                };
+                let Some(impact_texture) = self.load_skill_particle_texture(ICE_IMPACT_TEXTURE_PATH) else {
+                    return;
+                };
+
+                Box::new(FrostDiverParticle::new(
+                    None,
+                    Some(destination_entity_id),
+                    source_position,
+                    destination_position,
+                    projectile_texture,
+                    impact_texture,
+                ))
+            }
+            SkillProceduralVisualKind::FrostDiverPreview => {
+                let Some(destination_position) = self.entity_position(destination_entity_id) else {
+                    return;
+                };
+                let source_position = destination_position + Vector3::new(-22.0, 12.0, 0.0);
+                let Some(projectile_texture) = self.load_skill_particle_texture(FROST_DIVER_TEXTURE_PATH) else {
+                    return;
+                };
+
+                Box::new(FrostDiverParticle::travel_only(
+                    source_position,
+                    destination_entity_id,
+                    destination_position,
+                    projectile_texture,
+                ))
+            }
+            SkillProceduralVisualKind::FrostDiverImpact => {
+                let Some(position) = self.entity_position(destination_entity_id) else {
+                    return;
+                };
+                let Some(impact_texture) = self.load_skill_particle_texture(ICE_IMPACT_TEXTURE_PATH) else {
+                    return;
+                };
+
+                Box::new(FrostDiverParticle::impact(destination_entity_id, position, impact_texture))
+            }
+        };
+
+        if initial_elapsed > 0.0 && !particle.update(&[], None, initial_elapsed) {
+            return;
+        }
+
+        self.particle_holder.spawn_entity_particle(particle);
+    }
+
+    fn queue_procedural_skill_visual(
+        &mut self,
+        recipe: SkillProceduralVisualRecipe,
+        source_entity_id: EntityId,
+        destination_entity_id: EntityId,
+        hit_count: i16,
+        initial_delay: f32,
+    ) {
+        let repeat_delays = std::iter::once(0.0).chain(skill_effect_repeat_delays(recipe.hit_interval, hit_count));
+
+        for (sequence_index, repeat_delay) in repeat_delays.enumerate() {
+            let remaining_delay = initial_delay + repeat_delay;
+            if remaining_delay <= 0.0 {
+                self.spawn_procedural_skill_visual(recipe, source_entity_id, destination_entity_id, sequence_index, 0.0);
+            } else {
+                self.pending_procedural_skill_visuals.push(PendingProceduralSkillVisual {
+                    remaining_delay,
+                    recipe,
+                    source_entity_id,
+                    destination_entity_id,
+                    sequence_index,
+                });
+            }
+        }
+    }
+
+    fn update_pending_procedural_skill_visuals(&mut self, delta_time: f32) {
+        let pending_visuals = std::mem::take(&mut self.pending_procedural_skill_visuals);
+
+        for mut pending in pending_visuals {
+            pending.remaining_delay -= delta_time;
+
+            if pending.remaining_delay <= 0.0 {
+                self.spawn_procedural_skill_visual(
+                    pending.recipe,
+                    pending.source_entity_id,
+                    pending.destination_entity_id,
+                    pending.sequence_index,
+                    -pending.remaining_delay,
+                );
+            } else {
+                self.pending_procedural_skill_visuals.push(pending);
+            }
+        }
+    }
+
+    fn play_skill_sound(
+        &self,
+        recipe: SkillSoundRecipe,
+        source_entity_id: EntityId,
+        destination_entity_id: EntityId,
+        ground_position: Option<TilePosition>,
+    ) {
+        let position = match recipe.anchor {
+            SkillVisualAnchor::SourceEntity => self.entity_position(source_entity_id),
+            SkillVisualAnchor::DestinationEntity => self.entity_position(destination_entity_id),
+            SkillVisualAnchor::GroundPosition | SkillVisualAnchor::SkillUnit => {
+                let map = self.map.as_ref();
+                ground_position.and_then(|position| map.and_then(|map| map.get_world_position(position)))
+            }
+        };
+        let Some(position) = position else {
+            return;
+        };
+
+        let sound_effect = self.audio_engine.load(recipe.sound_path);
+        self.audio_engine
+            .play_spatial_sound_effect(sound_effect, position, recipe.sound_range);
+    }
+
+    fn play_skill_damage_sound(
+        &mut self,
+        recipe: SkillSoundRecipe,
+        source_entity_id: EntityId,
+        destination_entity_id: EntityId,
+        hit_count: i16,
+        initial_delay: f32,
+    ) {
+        let hits_remaining = 1 + skill_effect_repeat_delays(recipe.hit_interval, hit_count).len();
+        let sound_effect_key = self.audio_engine.load(recipe.sound_path);
+        let mut pending = PendingSkillSound {
+            timing: SkillSoundSequenceTiming::new(initial_delay, recipe.hit_interval.unwrap_or_default(), hits_remaining),
+            recipe,
+            sound_effect_key,
+            source_entity_id,
+            destination_entity_id,
+        };
+
+        if self.update_skill_sound_sequence(&mut pending, 0.0) {
+            self.pending_skill_sounds.push(pending);
+        }
+    }
+
+    fn update_skill_sound_sequence(&self, pending: &mut PendingSkillSound, delta_time: f32) -> bool {
+        let Some(wait_elapsed) = pending.timing.wait_elapsed_if_due(delta_time) else {
+            return true;
+        };
+
+        let entity_id = match pending.recipe.anchor {
+            SkillVisualAnchor::SourceEntity => pending.source_entity_id,
+            SkillVisualAnchor::DestinationEntity => pending.destination_entity_id,
+            SkillVisualAnchor::GroundPosition | SkillVisualAnchor::SkillUnit => return false,
+        };
+        let Some(position) = self.entity_position(entity_id) else {
+            return false;
+        };
+
+        if self
+            .audio_engine
+            .try_play_spatial_sound_effect(pending.sound_effect_key, position, pending.recipe.sound_range)
+        {
+            pending.timing.playback_succeeded()
+        } else {
+            // The entry may have been evicted between sequence hits. `load`
+            // deduplicates in-flight work and restarts loading for an existing
+            // key that is no longer cached.
+            pending.sound_effect_key = self.audio_engine.load(pending.recipe.sound_path);
+            pending.timing.playback_unavailable(wait_elapsed)
+        }
+    }
+
+    fn update_pending_skill_sounds(&mut self, delta_time: f32) {
+        let pending_sounds = std::mem::take(&mut self.pending_skill_sounds);
+
+        for mut pending in pending_sounds {
+            if self.update_skill_sound_sequence(&mut pending, delta_time) {
+                self.pending_skill_sounds.push(pending);
+            }
+        }
+    }
+
     #[inline(always)]
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     fn handle_network_events(&mut self, client_tick: ClientTick) {
@@ -1118,10 +1812,7 @@ impl Client {
 
                     self.map = None;
 
-                    self.particle_holder.clear();
-                    self.effect_holder.clear();
-                    self.point_light_manager.clear();
-                    self.audio_engine.clear_ambient_sound();
+                    self.clear_world_feedback();
 
                     self.client_state.follow_mut(client_state().entities()).clear();
                     self.client_state.follow_mut(client_state().dead_entities()).clear();
@@ -1176,13 +1867,17 @@ impl Client {
                         entity.set_idle(client_tick);
                     }
                 }
-                NetworkEvent::EntityStartCasting { entity_id, cast_time } => {
+                NetworkEvent::EntityStartCasting {
+                    source_entity_id,
+                    cast_time,
+                    ..
+                } => {
                     if let Some(cast_time) = NonZeroU32::new(cast_time)
                         && let Some(entity) = self
                             .client_state
                             .follow_mut(client_state().entities())
                             .iter_mut()
-                            .find(|entity| entity.get_entity_id() == entity_id)
+                            .find(|entity| entity.get_entity_id() == source_entity_id)
                     {
                         entity.set_casting(cast_time, client_tick);
                     }
@@ -1317,10 +2012,7 @@ impl Client {
 
                     self.map = None;
 
-                    self.particle_holder.clear();
-                    self.effect_holder.clear();
-                    self.point_light_manager.clear();
-                    self.audio_engine.clear_ambient_sound();
+                    self.clear_world_feedback();
                 }
                 NetworkEvent::CharacterCreated { character_information } => {
                     self.client_state
@@ -1340,6 +2032,9 @@ impl Client {
                         .open_window(ErrorWindow::new("Failed to switch character slots".to_owned()));
                 }
                 NetworkEvent::AddEntity { entity_data } => {
+                    let effect_state = entity_data.effect_state;
+                    let mut sight_entity_id = None;
+
                     if let Some(map) = &self.map
                         && let Some(npc) = Npc::new(&self.library, map, &mut self.path_finder, entity_data, client_tick)
                     {
@@ -1372,6 +2067,14 @@ impl Client {
                         npc.generate_pathing_mesh(&self.device, &self.queue, self.graphics_engine.bindless_support(), map);
 
                         entities.push(npc);
+
+                        if effect_state & OPTION_SIGHT != 0 {
+                            sight_entity_id = Some(entity_id);
+                        }
+                    }
+
+                    if let Some(entity_id) = sight_entity_id {
+                        self.spawn_skill_sprite_visual(sight_sprite_visual(), entity_id, entity_id, false);
                     }
                 }
                 NetworkEvent::RemoveEntity { entity_id, reason } => {
@@ -1417,6 +2120,8 @@ impl Client {
                             entity.fade_out(reason, client_tick);
                         }
                     }
+
+                    self.particle_holder.remove_attached_sprite(entity_id, SIGHT_ATTACHMENT_KEY);
 
                     // If the entity that was removed had an attack buffered we remove the entity
                     // from the buffer.
@@ -1528,10 +2233,7 @@ impl Client {
                     self.stop_active_continuous_skill();
                     self.input_system.clear_hotbar_key_ownership();
                     self.map = None;
-                    self.particle_holder.clear();
-                    self.effect_holder.clear();
-                    self.point_light_manager.clear();
-                    self.audio_engine.clear_ambient_sound();
+                    self.clear_world_feedback();
 
                     // Only the player must stay alive between map changes.
                     let entities = self.client_state.follow_mut(client_state().entities());
@@ -1657,38 +2359,55 @@ impl Client {
                     }
                 }
                 NetworkEvent::SkillDamage {
+                    skill_id,
+                    source_entity_id,
                     destination_entity_id,
+                    start_time,
                     damage,
+                    hit_count,
                     action,
                     ..
                 } => {
                     // Skill hits intentionally provide number feedback only.
                     // Normal DamageEffect also drives auto-attacks and sprite
                     // actions, which must not be triggered by this packet.
-                    if let Some(entity) = self
-                        .client_state
-                        .follow(client_state().entities())
-                        .iter()
-                        .find(|entity| entity.get_entity_id() == destination_entity_id)
-                        .or_else(|| {
-                            self.client_state
-                                .try_follow(this_entity())
-                                .filter(|player| player.get_entity_id() == destination_entity_id)
-                        })
-                    {
-                        let particle: Option<Box<dyn Particle + Send + Sync>> = match SkillDamageDisplay::from_packet(damage, action) {
-                            SkillDamageDisplay::Suppressed => None,
-                            SkillDamageDisplay::Miss => Some(Box::new(Miss::new(entity.get_position()))),
-                            SkillDamageDisplay::Damage { amount, is_critical } => Some(Box::new(DamageNumber::new(
-                                entity.get_position(),
-                                amount.to_string(),
-                                is_critical,
-                            ))),
-                        };
-
-                        if let Some(particle) = particle {
-                            self.particle_holder.spawn_particle(particle);
-                        }
+                    let initial_delay = skill_effect_initial_delay(start_time, client_tick);
+                    let visual_recipe = skill_damage_visual(skill_id);
+                    let sprite_recipe = skill_damage_sprite_visual(skill_id, action);
+                    let procedural_recipe = skill_damage_procedural_visual(skill_id);
+                    let sound_recipe = skill_damage_sound(skill_id);
+                    let hit_interval = visual_recipe
+                        .and_then(|recipe| recipe.hit_interval)
+                        .or_else(|| procedural_recipe.and_then(|recipe| recipe.hit_interval))
+                        .or_else(|| sound_recipe.and_then(|recipe| recipe.hit_interval))
+                        .or_else(|| skill_damage_number_interval(skill_id));
+                    self.queue_skill_damage_particle(
+                        destination_entity_id,
+                        SkillDamageDisplay::from_packet(damage, action),
+                        hit_count,
+                        hit_interval,
+                        initial_delay,
+                    );
+                    if let Some(recipe) = visual_recipe {
+                        self.queue_skill_damage_visual(recipe, source_entity_id, destination_entity_id, hit_count, initial_delay);
+                    }
+                    if let Some(recipe) = sprite_recipe {
+                        self.queue_skill_sprite_visual(recipe, source_entity_id, destination_entity_id, true, initial_delay);
+                    }
+                    if let Some(recipe) = procedural_recipe {
+                        self.queue_procedural_skill_visual(recipe, source_entity_id, destination_entity_id, hit_count, initial_delay);
+                    }
+                    if let Some(recipe) = sound_recipe {
+                        self.play_skill_damage_sound(recipe, source_entity_id, destination_entity_id, hit_count, initial_delay);
+                    }
+                    if let Some((recipe, followup_delay)) = skill_damage_followup_sound(skill_id) {
+                        self.play_skill_damage_sound(
+                            recipe,
+                            source_entity_id,
+                            destination_entity_id,
+                            1,
+                            initial_delay + followup_delay,
+                        );
                     }
                 }
                 NetworkEvent::EntityPickUpItem { entity_id, item_entity_id } => {
@@ -1714,16 +2433,41 @@ impl Client {
                         }
                     }
                 }
-                NetworkEvent::HealEffect { entity_id, heal_amount } => {
-                    if let Some(entity) = self
-                        .client_state
-                        .follow(client_state().entities())
-                        .iter()
-                        .find(|entity| entity.get_entity_id() == entity_id)
-                        .or_else(|| self.client_state.try_follow(this_entity()))
+                NetworkEvent::SkillEffectNoDamage {
+                    skill_id,
+                    heal_amount,
+                    destination_entity_id,
+                    source_entity_id,
+                    result,
+                } => {
+                    if result != 0
+                        && should_display_heal_number(skill_id)
+                        && heal_amount > 0
+                        && let Some(entity) = self
+                            .client_state
+                            .follow(client_state().entities())
+                            .iter()
+                            .find(|entity| entity.get_entity_id() == destination_entity_id)
+                            .or_else(|| {
+                                self.client_state
+                                    .try_follow(this_entity())
+                                    .filter(|entity| entity.get_entity_id() == destination_entity_id)
+                            })
                     {
                         self.particle_holder
                             .spawn_particle(Box::new(HealNumber::new(entity.get_position(), heal_amount.to_string())));
+                    }
+
+                    if result != 0 {
+                        if let Some(recipe) = no_damage_skill_visual(skill_id) {
+                            self.spawn_skill_visual(recipe, source_entity_id, destination_entity_id, None, None);
+                        }
+                        if let Some(recipe) = no_damage_sprite_visual(skill_id) {
+                            self.spawn_skill_sprite_visual(recipe, source_entity_id, destination_entity_id, true);
+                        }
+                        if let Some(recipe) = no_damage_skill_sound(skill_id) {
+                            self.play_skill_sound(recipe, source_entity_id, destination_entity_id, None);
+                        }
                     }
                 }
                 NetworkEvent::UpdateEntityHealth {
@@ -1878,6 +2622,7 @@ impl Client {
                 }
                 NetworkEvent::LoggedOut => {
                     self.clear_skill_cast_state();
+                    self.clear_world_feedback();
                     self.networking_system.disconnect_from_map_server();
                 }
                 NetworkEvent::FriendRequest { requestee } => {
@@ -1892,87 +2637,88 @@ impl Client {
                     self.client_state.follow_mut(client_state().friend_list()).push(friend);
                 }
                 NetworkEvent::VisualEffect { effect_path, entity_id } => {
-                    let effect = self.effect_loader.get_or_load(effect_path, &self.texture_loader).unwrap();
+                    let Some(position) = self.entity_position(entity_id) else {
+                        continue;
+                    };
+                    let effect = match self.effect_loader.get_or_load(effect_path, &self.texture_loader) {
+                        Ok(effect) => effect,
+                        Err(_error) => {
+                            #[cfg(feature = "debug")]
+                            print_debug!(
+                                "[{}] failed to load entity effect '{}': {:?}",
+                                "error".red(),
+                                effect_path,
+                                _error
+                            );
+                            continue;
+                        }
+                    };
                     let frame_timer = effect.new_frame_timer();
 
                     self.effect_holder.add_effect(Box::new(EffectWithLight::new(
                         effect,
                         frame_timer,
-                        EffectCenter::Entity(entity_id, Point3::new(0.0, 0.0, 0.0)),
+                        EffectCenter::Entity(entity_id, position),
                         Vector3::new(0.0, 9.0, 0.0),
-                        // FIX: The point light id needs to be unique.
-                        // The point light manager uses the id to decide which point light
-                        // renders with a shadow. Having duplicate ids might cause some
-                        // visual artifacts, such as flickering, as the point lights switch
-                        // between shadows and no shadows.
-                        PointLightId::new(entity_id.0),
+                        next_dynamic_point_light_id(),
                         Vector3::new(0.0, 12.0, 0.0),
                         Color::WHITE,
                         50.0,
                         false,
                     )));
                 }
+                NetworkEvent::SpecialEffect { entity_id, effect_id } => {
+                    if let Some(recipe) = special_effect_visual(effect_id) {
+                        self.spawn_skill_visual(recipe, entity_id, entity_id, None, None);
+                    }
+                    if let Some(recipe) = special_effect_sprite_visual(effect_id) {
+                        self.spawn_skill_sprite_visual(recipe, entity_id, entity_id, true);
+                    }
+                    if let Some(recipe) = special_effect_procedural_visual(effect_id) {
+                        self.spawn_procedural_skill_visual(recipe, entity_id, entity_id, 0, 0.0);
+                    }
+                    if let Some(recipe) = special_effect_sound(effect_id) {
+                        self.play_skill_sound(recipe, entity_id, entity_id, None);
+                    }
+                }
+                NetworkEvent::GroundSkill {
+                    skill_id,
+                    source_entity_id,
+                    position,
+                    start_time,
+                    ..
+                } => {
+                    if let Some(recipe) = ground_skill_visual(skill_id) {
+                        self.queue_ground_skill_visual(
+                            recipe,
+                            source_entity_id,
+                            position,
+                            skill_effect_initial_delay(start_time, client_tick),
+                        );
+                    }
+                }
+                NetworkEvent::StatusChange { .. } => {}
+                NetworkEvent::EntityStateChange {
+                    entity_id, effect_state, ..
+                } => {
+                    if effect_state & OPTION_SIGHT == 0 {
+                        self.particle_holder.remove_attached_sprite(entity_id, SIGHT_ATTACHMENT_KEY);
+                    } else if !self.particle_holder.has_attached_sprite(entity_id, SIGHT_ATTACHMENT_KEY) {
+                        self.spawn_skill_sprite_visual(sight_sprite_visual(), entity_id, entity_id, false);
+                    }
+                }
                 NetworkEvent::AddSkillUnit {
                     entity_id,
+                    creator_id,
                     unit_id,
                     position,
+                    visible,
+                    ..
                 } => {
-                    let Some(map) = &self.map else {
-                        continue;
-                    };
-
-                    match unit_id {
-                        UnitId::Firewall => {
-                            let Some(position) = map.get_world_position(position) else {
-                                #[cfg(feature = "debug")]
-                                print_debug!("[{}] entity with id {:?} is out of map bounds", "error".red(), entity_id);
-                                continue;
-                            };
-
-                            let effect = self.effect_loader.get_or_load("firewall.str", &self.texture_loader).unwrap();
-                            let frame_timer = effect.new_frame_timer();
-
-                            self.effect_holder.add_unit(
-                                Box::new(EffectWithLight::new(
-                                    effect,
-                                    frame_timer,
-                                    EffectCenter::Position(position),
-                                    Vector3::new(0.0, 0.0, 0.0),
-                                    PointLightId::new(unit_id as u32),
-                                    Vector3::new(0.0, 6.0, 0.0),
-                                    Color::rgb_u8(255, 30, 0),
-                                    60.0,
-                                    true,
-                                )),
-                                entity_id,
-                            );
-                        }
-                        UnitId::Pneuma => {
-                            let Some(position) = map.get_world_position(position) else {
-                                #[cfg(feature = "debug")]
-                                print_debug!("[{}] entity with id {:?} is out of map bounds", "error".red(), entity_id);
-                                continue;
-                            };
-
-                            let effect = self.effect_loader.get_or_load("pneuma1.str", &self.texture_loader).unwrap();
-                            let frame_timer = effect.new_frame_timer();
-
-                            self.effect_holder.add_unit(
-                                Box::new(EffectWithLight::new(
-                                    effect,
-                                    frame_timer,
-                                    EffectCenter::Position(position),
-                                    Vector3::new(0.0, 0.0, 0.0),
-                                    PointLightId::new(unit_id as u32),
-                                    Vector3::new(0.0, 6.0, 0.0),
-                                    Color::rgb_u8(83, 220, 108),
-                                    40.0,
-                                    false,
-                                )),
-                                entity_id,
-                            );
-                        }
-                        _ => {}
+                    if visible != 0
+                        && let Some(recipe) = skill_unit_visual(unit_id)
+                    {
+                        self.spawn_skill_visual(recipe, creator_id, entity_id, Some(position), Some(entity_id));
                     }
                 }
                 NetworkEvent::RemoveSkillUnit { entity_id } => {
@@ -2174,6 +2920,19 @@ impl Client {
         self.armed_skill = None;
         self.active_continuous_skill = None;
         self.input_system.clear_hotbar_key_ownership();
+    }
+
+    fn clear_world_feedback(&mut self) {
+        self.particle_holder.clear();
+        self.effect_holder.clear();
+        self.pending_skill_effects.clear();
+        self.pending_skill_sounds.clear();
+        self.pending_skill_sprites.clear();
+        self.pending_skill_damage_particles.clear();
+        self.pending_procedural_skill_visuals.clear();
+        self.point_light_manager.clear();
+        self.audio_engine.clear_ambient_sound();
+        self.audio_engine.clear_queued_sound_effects();
     }
 
     fn stop_active_continuous_skill(&mut self) {
@@ -3415,9 +4174,28 @@ impl Client {
         }
 
         // Update particles.
-        self.particle_holder.update(delta_time as f32);
-        self.effect_holder
-            .update(self.client_state.follow(client_state().entities()), delta_time as f32);
+        self.update_pending_skill_effects(delta_time as f32);
+        self.update_pending_skill_sounds(delta_time as f32);
+        self.update_pending_skill_sprites(delta_time as f32);
+        self.update_pending_skill_damage_particles(delta_time as f32);
+        let local_entity = self
+            .client_state
+            .try_follow(this_entity())
+            .map(|entity| (entity.get_entity_id(), entity.get_position()));
+        self.particle_holder.update_with_local_entity(
+            self.client_state.follow(client_state().entities()),
+            local_entity,
+            delta_time as f32,
+        );
+        // Delayed procedural particles are spawned after existing particles
+        // advance. Their per-event overshoot is applied on creation, preserving
+        // multi-hit phase spacing even when one frame crosses several deadlines.
+        self.update_pending_procedural_skill_visuals(delta_time as f32);
+        self.effect_holder.update_with_local_entity(
+            self.client_state.follow(client_state().entities()),
+            local_entity,
+            delta_time as f32,
+        );
 
         let current_camera: &(dyn Camera + Send + Sync) = match currently_playing {
             #[cfg(feature = "debug")]
@@ -4414,6 +5192,19 @@ mod skill_casting_tests {
         )
     }
 
+    fn update_sound_timing(timing: &mut SkillSoundSequenceTiming, delta_time: f32, ready: bool, playback_count: &mut usize) -> bool {
+        let Some(wait_elapsed) = timing.wait_elapsed_if_due(delta_time) else {
+            return true;
+        };
+
+        if ready {
+            *playback_count += 1;
+            timing.playback_succeeded()
+        } else {
+            timing.playback_unavailable(wait_elapsed)
+        }
+    }
+
     #[test]
     fn targeted_skills_only_accept_live_entities() {
         assert_eq!(
@@ -4528,5 +5319,59 @@ mod skill_casting_tests {
             (Some(skill_id), false)
         );
         assert_eq!(active_skill, None);
+    }
+
+    #[test]
+    fn ready_multi_hit_sound_plays_first_hit_immediately() {
+        let mut timing = SkillSoundSequenceTiming::new(0.0, 0.12, 3);
+        let mut playback_count = 0;
+
+        assert!(update_sound_timing(&mut timing, 0.0, true, &mut playback_count));
+        assert_eq!(playback_count, 1);
+        assert_eq!(timing.hits_remaining, 2);
+        assert!((timing.next_delay - 0.12).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn unavailable_multi_hit_sound_preserves_hits_and_spacing_after_load() {
+        let mut timing = SkillSoundSequenceTiming::new(0.0, 0.12, 3);
+        let mut playback_count = 0;
+
+        assert!(update_sound_timing(&mut timing, 0.0, false, &mut playback_count));
+        assert_eq!(timing.hits_remaining, 3);
+
+        // The asset becomes ready at t=0.50. Subsequent calls at t=0.61 and
+        // t=0.62 demonstrate that the second hit is not emitted in the same
+        // frame as the delayed first hit.
+        assert!(update_sound_timing(&mut timing, 0.50, true, &mut playback_count));
+        assert_eq!(playback_count, 1);
+        assert!(update_sound_timing(&mut timing, 0.11, true, &mut playback_count));
+        assert_eq!(playback_count, 1);
+        assert!(update_sound_timing(&mut timing, 0.01, true, &mut playback_count));
+        assert_eq!(playback_count, 2);
+        assert!(!update_sound_timing(&mut timing, 0.12, true, &mut playback_count));
+        assert_eq!(playback_count, 3);
+    }
+
+    #[test]
+    fn unavailable_skill_sound_expires_after_one_second() {
+        let mut timing = SkillSoundSequenceTiming::new(0.0, 0.12, 3);
+        let mut playback_count = 0;
+
+        assert!(update_sound_timing(&mut timing, 0.5, false, &mut playback_count));
+        assert!(!update_sound_timing(&mut timing, 0.5, false, &mut playback_count));
+        assert_eq!(playback_count, 0);
+        assert_eq!(timing.hits_remaining, 3);
+    }
+
+    #[test]
+    fn large_frame_delta_emits_at_most_one_sequence_hit() {
+        let mut timing = SkillSoundSequenceTiming::new(0.0, 0.12, 3);
+        let mut playback_count = 0;
+
+        assert!(update_sound_timing(&mut timing, 0.0, true, &mut playback_count));
+        assert!(update_sound_timing(&mut timing, 10.0, true, &mut playback_count));
+        assert_eq!(playback_count, 2);
+        assert_eq!(timing.hits_remaining, 1);
     }
 }

@@ -164,10 +164,20 @@ pub enum NetworkEvent {
         is_critical: bool,
     },
     /// An entity started casting a skill.
+    ///
+    /// All server-provided routing data is retained so consumers can attach
+    /// cast visuals to the source, destination, or ground position without
+    /// having to infer it from an outgoing request.
     EntityStartCasting {
-        entity_id: EntityId,
+        source_entity_id: EntityId,
+        destination_entity_id: EntityId,
+        position: TilePosition,
+        skill_id: SkillId,
+        element: u32,
         /// Cast duration in milliseconds.
         cast_time: u32,
+        disposable: u8,
+        attack_motion: u32,
     },
     /// The server cancelled an entity's active skill cast.
     EntityCancelCasting {
@@ -195,9 +205,49 @@ pub enum NetworkEvent {
         entity_id: EntityId,
         item_entity_id: EntityId,
     },
-    HealEffect {
+    /// A skill effect that resolved without a damage packet.
+    ///
+    /// Despite the protocol field name, `heal_amount` is also used by
+    /// non-healing skills, so the complete packet context is preserved.
+    SkillEffectNoDamage {
+        skill_id: SkillId,
+        heal_amount: u32,
+        destination_entity_id: EntityId,
+        source_entity_id: EntityId,
+        result: u8,
+    },
+    /// An effect requested for a specific entity by its protocol effect id.
+    SpecialEffect {
         entity_id: EntityId,
-        heal_amount: usize,
+        effect_id: EffectId,
+    },
+    /// A non-damaging skill effect positioned on the ground.
+    GroundSkill {
+        skill_id: SkillId,
+        source_entity_id: EntityId,
+        skill_level: SkillLevel,
+        position: TilePosition,
+        start_time: ClientTick,
+    },
+    /// A status effect started, changed, or ended on an entity.
+    StatusChange {
+        status_index: u16,
+        entity_id: EntityId,
+        state: u8,
+        duration_in_milliseconds: u32,
+        remaining_in_milliseconds: u32,
+        values: [u32; 3],
+    },
+    /// The complete option-state masks currently active on an entity.
+    ///
+    /// Effects such as Sight are represented by bits in `effect_state`, so
+    /// consumers need both set and cleared masks to manage their lifecycle.
+    EntityStateChange {
+        entity_id: EntityId,
+        body_state: u16,
+        health_state: u16,
+        effect_state: u32,
+        is_pk_mode_on: u8,
     },
     UpdateStat {
         stat_type: StatType,
@@ -258,8 +308,12 @@ pub enum NetworkEvent {
     },
     AddSkillUnit {
         entity_id: EntityId,
+        creator_id: EntityId,
         unit_id: UnitId,
         position: TilePosition,
+        range: u8,
+        visible: u8,
+        skill_level: u8,
     },
     RemoveSkillUnit {
         entity_id: EntityId,

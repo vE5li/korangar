@@ -179,6 +179,11 @@ pub enum InputEvent {
         /// Slot of the hotbar that the skill is bound to.
         slot: HotbarSlot,
     },
+    /// Cycle the selected cast level of a hotbar skill.
+    CycleSkillLevel {
+        /// Slot of the hotbar to update.
+        slot: HotbarSlot,
+    },
     /// Add a new friend.
     AddFriend {
         /// Name of the character to befriend.

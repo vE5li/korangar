@@ -2394,6 +2394,28 @@ impl Client {
                         let _ = self.networking_system.stop_channeling_skill(skill.skill_id);
                     }
                 }
+                InputEvent::CycleSkillLevel { slot } => {
+                    let learned_maximum_level = self
+                        .client_state
+                        .follow(client_state().hotbar())
+                        .get_skill_in_slot(slot)
+                        .as_ref()
+                        .and_then(|skill| {
+                            self.client_state
+                                .follow(client_state().skill_tree().skills())
+                                .iter()
+                                .find(|learned_skill| learned_skill.skill_id == skill.skill_id)
+                                .map(|learned_skill| learned_skill.skill_level)
+                        });
+
+                    if let Some(learned_maximum_level) = learned_maximum_level {
+                        self.client_state.follow_mut(client_state().hotbar()).cycle_skill_level(
+                            &mut self.networking_system,
+                            slot,
+                            learned_maximum_level,
+                        );
+                    }
+                }
                 InputEvent::AddFriend { character_name } => {
                     if character_name.len() > 24 {
                         #[cfg(feature = "debug")]

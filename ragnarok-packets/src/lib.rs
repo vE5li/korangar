@@ -3219,6 +3219,7 @@ pub struct DisplaySkillCooldownPacket {
     pub until: ClientTick,
 }
 
+/// `ZC_NOTIFY_SKILL`, sent when a skill hit resolves.
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x01DE)]
@@ -3227,12 +3228,65 @@ pub struct DisplaySkillEffectAndDamagePacket {
     pub source_entity_id: EntityId,
     pub destination_entity_id: EntityId,
     pub start_time: ClientTick,
-    pub soruce_delay: u32,
-    pub destination_delay: u32,
-    pub damage: u32,
-    pub level: SkillLevel,
-    pub div: u16,
-    pub skill_type: u8,
+    pub source_motion: i32,
+    pub target_motion: i32,
+    /// Negative values are server-side display sentinels and must not be
+    /// interpreted as damage amounts.
+    pub damage: i32,
+    pub skill_level: i16,
+    pub hit_count: i16,
+    pub action: i8,
+}
+
+#[cfg(test)]
+mod skill_damage_packet_tests {
+    use super::*;
+
+    #[test]
+    fn skill_damage_packet_preserves_signed_wire_fields() {
+        let expected = [
+            0xDE, 0x01, // header
+            0x34, 0x12, // skill id
+            0x04, 0x03, 0x02, 0x01, // source entity
+            0x08, 0x07, 0x06, 0x05, // destination entity
+            0x0D, 0x0C, 0x0B, 0x0A, // start tick
+            0xFE, 0xFF, 0xFF, 0xFF, // source motion: -2
+            0xFD, 0xFF, 0xFF, 0xFF, // target motion: -3
+            0xD0, 0x8A, 0xFF, 0xFF, // damage sentinel: -30000
+            0xFE, 0xFF, // skill level: -2
+            0xFC, 0xFF, // hit count: -4
+            0x0E, // action: 14
+        ];
+        let packet = DisplaySkillEffectAndDamagePacket {
+            skill_id: SkillId(0x1234),
+            source_entity_id: EntityId(0x0102_0304),
+            destination_entity_id: EntityId(0x0506_0708),
+            start_time: ClientTick(0x0A0B_0C0D),
+            source_motion: -2,
+            target_motion: -3,
+            damage: -30000,
+            skill_level: -2,
+            hit_count: -4,
+            action: 14,
+        };
+
+        let mut writer = ByteWriter::new();
+        assert_eq!(packet.packet_to_bytes(&mut writer).unwrap(), expected.len());
+        assert_eq!(writer.as_slice(), expected);
+
+        let mut reader = ByteReader::without_metadata(&expected);
+        let decoded = DisplaySkillEffectAndDamagePacket::packet_from_bytes(&mut reader).unwrap();
+        assert_eq!(decoded.skill_id, packet.skill_id);
+        assert_eq!(decoded.source_entity_id, packet.source_entity_id);
+        assert_eq!(decoded.destination_entity_id, packet.destination_entity_id);
+        assert_eq!(decoded.start_time.0, packet.start_time.0);
+        assert_eq!(decoded.source_motion, packet.source_motion);
+        assert_eq!(decoded.target_motion, packet.target_motion);
+        assert_eq!(decoded.damage, packet.damage);
+        assert_eq!(decoded.skill_level, packet.skill_level);
+        assert_eq!(decoded.hit_count, packet.hit_count);
+        assert_eq!(decoded.action, packet.action);
+    }
 }
 
 #[derive(Debug, Clone, ByteConvertable)]

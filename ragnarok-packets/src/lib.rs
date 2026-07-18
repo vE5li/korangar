@@ -1575,6 +1575,25 @@ pub struct ItemPickupRequestPacket {
     pub entity_id: EntityId,
 }
 
+/// Sent by the client to throw an item from the inventory on the ground
+/// (`CZ_ITEM_THROW`).
+#[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0363)]
+pub struct DropItemPacket {
+    pub inventory_index: InventoryIndex,
+    pub amount: u16,
+}
+
+/// Sent by the map server to acknowledge a [`DropItemPacket`]
+/// (`ZC_ITEM_THROW_ACK`). An amount of zero means the drop was rejected.
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x00AF)]
+pub struct DropItemAckPacket {
+    pub inventory_index: InventoryIndex,
+    pub amount: u16,
+}
 #[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x00F3)]

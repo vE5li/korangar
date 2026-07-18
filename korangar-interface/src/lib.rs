@@ -681,6 +681,27 @@ impl<App: Application> InterfaceFrame<'_, App> {
         self.hovered_window.is_some()
     }
 
+    /// Checks whether the given position lies within the display area of any
+    /// window.
+    ///
+    /// Unlike [`is_interface_hovered`](Self::is_interface_hovered) this is
+    /// independent of the mouse mode: in custom mouse modes windows only
+    /// count as hovered when an element explicitly marks them, so this is
+    /// the right check for "was the mouse released outside of the
+    /// interface".
+    pub fn is_position_over_window(&self, position: App::Position) -> bool {
+        self.windows.iter().any(|wrapper| {
+            let area = &wrapper.display_information.real_area;
+            let width = area.width * self.interface_scaling;
+            let height = wrapper.display_information.display_height * self.interface_scaling;
+
+            position.left() >= area.left
+                && position.left() <= area.left + width
+                && position.top() >= area.top
+                && position.top() <= area.top + height
+        })
+    }
+
     #[cfg_attr(feature = "debug", korangar_debug::profile("render user interface"))]
     pub fn render(
         &mut self,

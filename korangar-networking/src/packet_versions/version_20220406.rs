@@ -496,7 +496,18 @@ where
     })?;
     packet_handler.register_noop::<DisplaySpecialEffectPacket>()?;
     packet_handler.register_noop::<DisplaySkillCooldownPacket>()?;
-    packet_handler.register_noop::<DisplaySkillEffectAndDamagePacket>()?;
+    packet_handler.register(|packet: DisplaySkillEffectAndDamagePacket| NetworkEvent::SkillDamage {
+        skill_id: packet.skill_id,
+        source_entity_id: packet.source_entity_id,
+        destination_entity_id: packet.destination_entity_id,
+        start_time: packet.start_time,
+        source_motion: packet.source_motion,
+        target_motion: packet.target_motion,
+        damage: packet.damage,
+        skill_level: packet.skill_level,
+        hit_count: packet.hit_count,
+        action: packet.action,
+    })?;
     packet_handler.register(|packet: DisplaySkillEffectNoDamagePacket| NetworkEvent::HealEffect {
         entity_id: packet.destination_entity_id,
         heal_amount: packet.heal_amount as usize,
@@ -868,7 +879,7 @@ where
 mod skill_packet_tests {
     use ragnarok_bytes::ByteReader;
     use ragnarok_packets::handler::{HandlerResult, NoPacketCallback, PacketHandler};
-    use ragnarok_packets::{EntityId, ItemId, SkillId, SkillUseFailureCode};
+    use ragnarok_packets::{ClientTick, EntityId, ItemId, SkillId, SkillUseFailureCode};
 
     use super::register_map_server_packets;
     use crate::NetworkEvent;
@@ -947,6 +958,44 @@ mod skill_packet_tests {
             panic!("skill success acknowledgement was not handled");
         };
         assert!(success_events.is_empty());
+        assert_eq!(reader.remaining_bytes(), []);
+    }
+
+    #[test]
+    fn maps_every_signed_skill_damage_field_to_the_event() {
+        let mut handler = PacketHandler::<NetworkEventList, NoPacketCallback>::default();
+        register_map_server_packets(&mut handler).unwrap();
+
+        let packet = [
+            0xDE, 0x01, // ZC_NOTIFY_SKILL
+            0x34, 0x12, // skill id
+            0x04, 0x03, 0x02, 0x01, // source entity
+            0x08, 0x07, 0x06, 0x05, // destination entity
+            0x0D, 0x0C, 0x0B, 0x0A, // start tick
+            0xFE, 0xFF, 0xFF, 0xFF, // source motion: -2
+            0xFD, 0xFF, 0xFF, 0xFF, // target motion: -3
+            0xD0, 0x8A, 0xFF, 0xFF, // damage sentinel: -30000
+            0xFE, 0xFF, // skill level: -2
+            0xFC, 0xFF, // hit count: -4
+            0x0E, // action: 14
+        ];
+        let mut reader = ByteReader::without_metadata(&packet);
+
+        let HandlerResult::Ok(NetworkEventList(events)) = handler.process_one(&mut reader) else {
+            panic!("skill damage packet was not handled");
+        };
+        assert!(matches!(events.as_slice(), [NetworkEvent::SkillDamage {
+            skill_id: SkillId(0x1234),
+            source_entity_id: EntityId(0x0102_0304),
+            destination_entity_id: EntityId(0x0506_0708),
+            start_time: ClientTick(0x0A0B_0C0D),
+            source_motion: -2,
+            target_motion: -3,
+            damage: -30000,
+            skill_level: -2,
+            hit_count: -4,
+            action: 14,
+        }]));
         assert_eq!(reader.remaining_bytes(), []);
     }
 }

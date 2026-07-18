@@ -1656,6 +1656,41 @@ impl Client {
                         self.particle_holder.spawn_particle(particle);
                     }
                 }
+                NetworkEvent::SkillDamage {
+                    destination_entity_id,
+                    damage,
+                    action,
+                    ..
+                } => {
+                    // Skill hits intentionally provide number feedback only.
+                    // Normal DamageEffect also drives auto-attacks and sprite
+                    // actions, which must not be triggered by this packet.
+                    if let Some(entity) = self
+                        .client_state
+                        .follow(client_state().entities())
+                        .iter()
+                        .find(|entity| entity.get_entity_id() == destination_entity_id)
+                        .or_else(|| {
+                            self.client_state
+                                .try_follow(this_entity())
+                                .filter(|player| player.get_entity_id() == destination_entity_id)
+                        })
+                    {
+                        let particle: Option<Box<dyn Particle + Send + Sync>> = match SkillDamageDisplay::from_packet(damage, action) {
+                            SkillDamageDisplay::Suppressed => None,
+                            SkillDamageDisplay::Miss => Some(Box::new(Miss::new(entity.get_position()))),
+                            SkillDamageDisplay::Damage { amount, is_critical } => Some(Box::new(DamageNumber::new(
+                                entity.get_position(),
+                                amount.to_string(),
+                                is_critical,
+                            ))),
+                        };
+
+                        if let Some(particle) = particle {
+                            self.particle_holder.spawn_particle(particle);
+                        }
+                    }
+                }
                 NetworkEvent::EntityPickUpItem { entity_id, item_entity_id } => {
                     let item_position = self
                         .client_state

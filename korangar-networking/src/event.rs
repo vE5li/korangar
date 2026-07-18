@@ -173,6 +173,24 @@ pub enum NetworkEvent {
     EntityCancelCasting {
         entity_id: EntityId,
     },
+    /// A skill hit resolved.
+    ///
+    /// Signed protocol fields are retained because the server uses negative
+    /// values as display controls and sentinels. This stays separate from
+    /// [`NetworkEvent::DamageEffect`] so skill hits cannot advance normal
+    /// auto-attacks or replace sprite animations.
+    SkillDamage {
+        skill_id: SkillId,
+        source_entity_id: EntityId,
+        destination_entity_id: EntityId,
+        start_time: ClientTick,
+        source_motion: i32,
+        target_motion: i32,
+        damage: i32,
+        skill_level: i16,
+        hit_count: i16,
+        action: i8,
+    },
     EntityPickUpItem {
         entity_id: EntityId,
         item_entity_id: EntityId,

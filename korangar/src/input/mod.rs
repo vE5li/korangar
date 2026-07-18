@@ -254,6 +254,10 @@ impl InputSystem {
             events.push(InputEvent::CloseTopWindow);
         }
 
+        if self.get_key(KeyCode::Insert).pressed() {
+            events.push(InputEvent::ToggleSit);
+        }
+
         // The first nine emotions, matching the Alt + 1-9 binds of the
         // official client.
         const EMOTION_KEYS: [KeyCode; 9] = [

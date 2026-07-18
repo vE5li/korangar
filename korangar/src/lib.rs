@@ -69,8 +69,8 @@ use networking::{PacketHistory, PacketHistoryCallback};
 #[cfg(not(feature = "debug"))]
 use ragnarok_packets::handler::NoPacketCallback;
 use ragnarok_packets::{
-    AttackRange, BuyShopItemsResult, CharacterServerInformation, ClientTick, Direction, DisappearanceReason, HotbarSlot, SellItemsResult,
-    SkillId, SkillLevel, SkillType, TilePosition, UnitId, WorldPosition,
+    AttackRange, BuyShopItemsResult, CharacterServerInformation, ClientTick, Direction, DisappearanceReason, EntityId, HotbarSlot,
+    SellItemsResult, SkillId, SkillLevel, SkillType, TilePosition, UnitId, WorldPosition,
 };
 use renderer::InterfaceRenderer;
 use rust_state::{ManuallyAssertExt, State};
@@ -1075,6 +1075,16 @@ impl Client {
                         .find(|entity| entity.get_entity_id() == entity_id)
                     {
                         entity.set_idle(client_tick);
+                    }
+                }
+                NetworkEvent::PlayerSitDown { entity_id } => {
+                    if let Some(entity) = self
+                        .client_state
+                        .follow_mut(client_state().entities())
+                        .iter_mut()
+                        .find(|entity| entity.get_entity_id() == entity_id)
+                    {
+                        entity.set_sitting(client_tick);
                     }
                 }
                 NetworkEvent::DisplayEmotion { entity_id, emotion } => {
@@ -2293,6 +2303,22 @@ impl Client {
                     }
                     _ => {}
                 },
+                InputEvent::ToggleSit => {
+                    if let Some(login_data) = &self.saved_login_data {
+                        let player_entity_id = EntityId(login_data.account_id.0);
+                        let is_sitting = self
+                            .client_state
+                            .follow(client_state().entities())
+                            .iter()
+                            .find(|entity| entity.get_entity_id() == player_entity_id)
+                            .is_some_and(|entity| entity.is_sitting());
+
+                        let _ = match is_sitting {
+                            true => self.networking_system.stand_up(),
+                            false => self.networking_system.sit_down(),
+                        };
+                    }
+                }
                 InputEvent::SendEmotion { emotion } => {
                     let _ = self.networking_system.send_emotion(emotion);
                 }

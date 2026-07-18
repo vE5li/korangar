@@ -1338,6 +1338,15 @@ impl Entity {
         self.get_common_mut().animation_state.idle(entity_type, client_tick);
     }
 
+    pub fn set_sitting(&mut self, client_tick: ClientTick) {
+        let entity_type = self.get_entity_type();
+        self.get_common_mut().animation_state.sit(entity_type, client_tick);
+    }
+
+    pub fn is_sitting(&self) -> bool {
+        self.get_common().animation_state.is_sit()
+    }
+
     pub fn set_pickup(&mut self, client_tick: ClientTick) {
         let entity_type = self.get_entity_type();
         self.get_common_mut().animation_state.pickup(entity_type, client_tick);

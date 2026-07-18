@@ -677,8 +677,13 @@ where
             entity_id: packet.source_entity_id,
             item_entity_id: packet.destination_entity_id,
         }),
+        DamageType::SitDown => Some(NetworkEvent::PlayerSitDown {
+            // For sit and stand notifications rAthena sets the source entity
+            // id and leaves the destination at zero.
+            entity_id: packet.source_entity_id,
+        }),
         DamageType::StandUp => Some(NetworkEvent::PlayerStandUp {
-            entity_id: packet.destination_entity_id,
+            entity_id: packet.source_entity_id,
         }),
         _ => None,
     })?;
@@ -701,8 +706,13 @@ where
             entity_id: packet.source_entity_id,
             item_entity_id: packet.destination_entity_id,
         }),
+        DamageType::SitDown => Some(NetworkEvent::PlayerSitDown {
+            // For sit and stand notifications rAthena sets the source entity
+            // id and leaves the destination at zero.
+            entity_id: packet.source_entity_id,
+        }),
         DamageType::StandUp => Some(NetworkEvent::PlayerStandUp {
-            entity_id: packet.destination_entity_id,
+            entity_id: packet.source_entity_id,
         }),
         _ => None,
     })?;

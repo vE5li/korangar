@@ -5,7 +5,7 @@ use korangar_debug::profiling::FrameMeasurement;
 use korangar_interface::event::{ClickHandler, Event, EventQueue};
 use korangar_networking::{InventoryItem, ShopItem};
 use ragnarok_packets::{
-    AccountId, BuyOrSellOption, CharacterId, CharacterServerInformation, EntityId, HotbarSlot, ShopId, SkillId, SkillLevel,
+    AccountId, BuyOrSellOption, CharacterId, CharacterServerInformation, EntityId, HotbarSlot, ShopId, SkillId, SkillLevel, SkillType,
     SoldItemInformation, StatUpType, TilePosition,
 };
 use rust_state::State;
@@ -200,6 +200,17 @@ pub enum InputEvent {
         skill_level: SkillLevel,
         /// Validated entity or ground destination.
         target: SkillCastTarget,
+    },
+    /// Cast a learned skill directly from the skill tree.
+    CastLearnedSkill {
+        /// Id of the skill to cast.
+        skill_id: SkillId,
+        /// Selected level at which to cast the skill.
+        skill_level: SkillLevel,
+        /// Server-provided targeting behavior.
+        skill_type: SkillType,
+        /// Ownership semantics for continuous skills.
+        activation: SkillActivation,
     },
     /// Stop a skill.
     StopSkill {

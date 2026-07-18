@@ -8,7 +8,7 @@ use ragnarok_packets::{HotbarSlot, SkillLevel};
 use rust_state::{Path, State};
 
 use crate::graphics::{Color, CornerDiameter, ShadowPadding};
-use crate::input::{InputEvent, MouseInputMode};
+use crate::input::{InputEvent, MouseInputMode, SkillActivation};
 use crate::interface::resource::SkillSource;
 use crate::loaders::{FontSize, OverflowBehavior};
 use crate::renderer::LayoutExt;
@@ -100,11 +100,26 @@ impl ClickHandler<ClientState> for SkillBoxLevelHandler {
     }
 }
 
+/// Double-clicking a hotbar slot casts or toggles the skill in it.
+struct SkillBoxCastHandler {
+    slot: HotbarSlot,
+}
+
+impl ClickHandler<ClientState> for SkillBoxCastHandler {
+    fn handle_click(&self, _: &State<ClientState>, queue: &mut EventQueue<ClientState>) {
+        queue.queue(InputEvent::CastSkill {
+            slot: self.slot,
+            activation: SkillActivation::Toggle,
+        });
+    }
+}
+
 pub struct SkillBox<A, B> {
     learnable_skill_path: A,
     learned_skill_path: B,
     handler: SkillBoxHandler<A>,
     level_handler: Option<SkillBoxLevelHandler>,
+    cast_handler: Option<SkillBoxCastHandler>,
     level_display: LevelDisplay,
     source: SkillSource,
 }
@@ -118,14 +133,17 @@ where
     /// and not intended to be called manually.
     #[inline(always)]
     pub fn component_new(learnable_skill_path: A, learned_skill_path: B, source: SkillSource) -> Self {
+        let hotbar_slot = match source {
+            SkillSource::Hotbar { slot } => Some(slot),
+            SkillSource::SkillTree => None,
+        };
+
         Self {
             learnable_skill_path,
             learned_skill_path,
             handler: SkillBoxHandler::new(learnable_skill_path, source),
-            level_handler: match source {
-                SkillSource::Hotbar { slot } => Some(SkillBoxLevelHandler { slot }),
-                SkillSource::SkillTree => None,
-            },
+            level_handler: hotbar_slot.map(|slot| SkillBoxLevelHandler { slot }),
+            cast_handler: hotbar_slot.map(|slot| SkillBoxCastHandler { slot }),
             level_display: LevelDisplay::default(),
             source,
         }
@@ -230,6 +248,10 @@ where
 
             if is_hovered {
                 layout.register_click_handler(MouseButton::Left, &self.handler);
+
+                if let Some(cast_handler) = &self.cast_handler {
+                    layout.register_click_handler(MouseButton::DoubleLeft, cast_handler);
+                }
 
                 if learnable_skill.can_select_level
                     && let Some(level_handler) = &self.level_handler

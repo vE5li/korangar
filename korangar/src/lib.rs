@@ -2579,6 +2579,14 @@ impl Client {
                         self.cast_resolved_skill(skill_id, skill_level, skill_type, activation, Some(slot));
                     }
                 }
+                InputEvent::CastLearnedSkill {
+                    skill_id,
+                    skill_level,
+                    skill_type,
+                    activation,
+                } => {
+                    self.cast_resolved_skill(skill_id, skill_level, skill_type, activation, None);
+                }
                 InputEvent::CastSkillAt {
                     skill_id,
                     skill_level,

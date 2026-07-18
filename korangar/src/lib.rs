@@ -3460,6 +3460,7 @@ impl Client {
             if let Some(mouse_button) = input_report.mouse_click {
                 if armed_skill.is_some() && is_skill_target_cancellation(mouse_button) {
                     interface_frame.unfocus();
+                    armed_skill = None;
                     clear_armed_skill = true;
                 } else if is_interface_hovered {
                     interface_frame.click(&self.client_state, mouse_button);
@@ -3551,6 +3552,12 @@ impl Client {
             interface_frame
         };
 
+        let is_interface_hovered = interface_frame.is_interface_hovered();
+        let skill_target_highlight = match (is_interface_hovered, armed_skill, input_report.mouse_target, armed_skill_target) {
+            (false, Some(_), PickerTarget::Entity(entity_id), Some(_)) => Some((entity_id, Color::rgb_u8(255, 130, 130))),
+            _ => None,
+        };
+
         if clear_armed_skill {
             self.armed_skill = None;
         }
@@ -3570,8 +3577,9 @@ impl Client {
                 animation_timer_ms,
                 currently_playing,
                 is_mouse_mode_default,
-                is_interface_hovered: interface_frame.is_interface_hovered(),
+                is_interface_hovered,
                 last_walking_destination,
+                skill_target_highlight,
                 buffered_action: *self.client_state.follow(client_state().buffered_action()),
                 #[cfg(feature = "debug")]
                 render_options: &render_options,
@@ -3895,6 +3903,7 @@ struct MapRenderContext<'a, 'm: 'a> {
     is_mouse_mode_default: bool,
     is_interface_hovered: bool,
     last_walking_destination: Option<TilePosition>,
+    skill_target_highlight: Option<(EntityId, Color)>,
     buffered_action: Option<BufferedAction>,
     #[cfg(feature = "debug")]
     render_options: &'a RenderOptions,
@@ -4031,7 +4040,7 @@ impl<'a, 'm: 'a> MapRenderContext<'a, 'm> {
 
             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(self.render_options.show_entities))]
             self.map
-                .render_entities(entity_instructions, entities, &partition_camera, self.client_tick);
+                .render_entities(entity_instructions, entities, &partition_camera, self.client_tick, None);
 
             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(self.render_options.show_entities))]
             self.map
@@ -4113,8 +4122,13 @@ impl<'a, 'm: 'a> MapRenderContext<'a, 'm> {
             .render_ground_items(self.entity_instructions, ground_items, entity_camera, self.client_tick);
 
         #[cfg_attr(feature = "debug", korangar_debug::debug_condition(self.render_options.show_entities))]
-        self.map
-            .render_entities(self.entity_instructions, entities, entity_camera, self.client_tick);
+        self.map.render_entities(
+            self.entity_instructions,
+            entities,
+            entity_camera,
+            self.client_tick,
+            self.skill_target_highlight,
+        );
 
         #[cfg_attr(feature = "debug", korangar_debug::debug_condition(self.render_options.show_entities))]
         self.map

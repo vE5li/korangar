@@ -1991,6 +1991,8 @@ impl Client {
             );
         }
 
+        self.input_system.handle_hotbar_key_releases(&mut self.input_event_buffer);
+
         for event in self.input_event_buffer.drain(..) {
             match event {
                 InputEvent::LogIn {

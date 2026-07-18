@@ -19,6 +19,18 @@ use crate::graphics::{PickerTarget, ScreenPosition, ScreenSize};
 const MOUSE_SCOLL_MULTIPLIER: f32 = 30.0;
 const KEY_COUNT: usize = variant_count::<KeyCode>();
 const DOUBLE_CLICK_TIME_MS: u32 = 250;
+const HOTBAR_KEYS: [KeyCode; 10] = [
+    KeyCode::Digit1,
+    KeyCode::Digit2,
+    KeyCode::Digit3,
+    KeyCode::Digit4,
+    KeyCode::Digit5,
+    KeyCode::Digit6,
+    KeyCode::Digit7,
+    KeyCode::Digit8,
+    KeyCode::Digit9,
+    KeyCode::Digit0,
+];
 
 #[derive(Debug, Clone, Copy)]
 struct PreviousMouseButton {
@@ -52,6 +64,7 @@ pub struct InputSystem {
     input_buffer: Vec<char>,
     picker_value: Arc<AtomicU64>,
     previous_mouse_button: Option<PreviousMouseButton>,
+    active_hotbar_keys: [bool; 10],
 }
 
 impl InputSystem {
@@ -70,6 +83,7 @@ impl InputSystem {
 
         let input_buffer = Vec::new();
         let previous_mouse_button = None;
+        let active_hotbar_keys = [false; 10];
 
         Self {
             previous_mouse_position,
@@ -84,6 +98,7 @@ impl InputSystem {
             input_buffer,
             picker_value,
             previous_mouse_button,
+            active_hotbar_keys,
         }
     }
 
@@ -203,7 +218,7 @@ impl InputSystem {
         #[cfg(feature = "debug")] process_mouse: bool,
         #[cfg(feature = "debug")] use_debug_camera: bool,
     ) {
-        let alt_down = self.get_key(KeyCode::AltLeft).down();
+        let alt_down = self.get_key(KeyCode::AltLeft).down() || self.get_key(KeyCode::AltRight).down();
         let control_down = self.get_key(KeyCode::ControlLeft).down();
 
         if self.get_key(KeyCode::Escape).pressed() {
@@ -274,28 +289,13 @@ impl InputSystem {
             }
         }
 
-        if self.get_key(KeyCode::KeyJ).pressed() {
-            events.push(InputEvent::CastSkill { slot: HotbarSlot(0) });
-        }
-
-        if self.get_key(KeyCode::KeyJ).released() {
-            events.push(InputEvent::StopSkill { slot: HotbarSlot(0) });
-        }
-
-        if self.get_key(KeyCode::KeyL).pressed() {
-            events.push(InputEvent::CastSkill { slot: HotbarSlot(1) });
-        }
-
-        if self.get_key(KeyCode::KeyL).released() {
-            events.push(InputEvent::StopSkill { slot: HotbarSlot(1) });
-        }
-
-        if self.get_key(KeyCode::KeyU).pressed() {
-            events.push(InputEvent::CastSkill { slot: HotbarSlot(2) });
-        }
-
-        if self.get_key(KeyCode::KeyU).released() {
-            events.push(InputEvent::StopSkill { slot: HotbarSlot(2) });
+        for (slot, key_code) in HOTBAR_KEYS.into_iter().enumerate() {
+            if !alt_down && self.get_key(key_code).pressed() {
+                self.active_hotbar_keys[slot] = true;
+                events.push(InputEvent::CastSkill {
+                    slot: HotbarSlot(slot as u16),
+                });
+            }
         }
 
         #[cfg(feature = "debug")]
@@ -371,5 +371,103 @@ impl InputSystem {
         }
 
         self.input_buffer.clear();
+    }
+
+    /// Emit releases for hotbar keys that started an unmodified cast.
+    ///
+    /// This is kept separate from regular keyboard shortcuts so releases are
+    /// still handled while a text field has interface focus.
+    pub fn handle_hotbar_key_releases(&mut self, events: &mut Vec<InputEvent>) {
+        for (slot, key_code) in HOTBAR_KEYS.into_iter().enumerate() {
+            if self.get_key(key_code).released() && std::mem::take(&mut self.active_hotbar_keys[slot]) {
+                events.push(InputEvent::StopSkill {
+                    slot: HotbarSlot(slot as u16),
+                });
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn collect_keyboard_events(input_system: &mut InputSystem) -> Vec<InputEvent> {
+        let mut events = Vec::new();
+
+        #[cfg(feature = "debug")]
+        input_system.handle_keyboard_input(&mut events, false, false);
+
+        #[cfg(not(feature = "debug"))]
+        input_system.handle_keyboard_input(&mut events);
+
+        input_system.handle_hotbar_key_releases(&mut events);
+
+        events
+    }
+
+    #[test]
+    fn number_row_casts_and_stops_matching_hotbar_slot() {
+        let mut input_system = InputSystem::new(Arc::new(AtomicU64::new(0)));
+
+        input_system.update_keyboard(KeyCode::Digit0, ElementState::Pressed);
+        input_system.update_delta(ClientTick(1));
+
+        assert!(matches!(
+            collect_keyboard_events(&mut input_system).as_slice(),
+            [InputEvent::CastSkill { slot }] if *slot == HotbarSlot(9)
+        ));
+
+        input_system.update_keyboard(KeyCode::Digit0, ElementState::Released);
+        input_system.update_delta(ClientTick(2));
+
+        assert!(matches!(
+            collect_keyboard_events(&mut input_system).as_slice(),
+            [InputEvent::StopSkill { slot }] if *slot == HotbarSlot(9)
+        ));
+    }
+
+    #[test]
+    fn alt_number_row_sends_emote_without_orphaned_skill_stop() {
+        for alt_key in [KeyCode::AltLeft, KeyCode::AltRight] {
+            let mut input_system = InputSystem::new(Arc::new(AtomicU64::new(0)));
+
+            input_system.update_keyboard(alt_key, ElementState::Pressed);
+            input_system.update_keyboard(KeyCode::Digit1, ElementState::Pressed);
+            input_system.update_delta(ClientTick(1));
+
+            assert!(matches!(collect_keyboard_events(&mut input_system).as_slice(), [
+                InputEvent::SendEmotion { emotion: 0 }
+            ]));
+
+            input_system.update_keyboard(KeyCode::Digit1, ElementState::Released);
+            input_system.update_delta(ClientTick(2));
+
+            assert!(collect_keyboard_events(&mut input_system).is_empty());
+        }
+    }
+
+    #[test]
+    fn hotbar_release_is_emitted_after_modifier_or_focus_changes() {
+        let mut input_system = InputSystem::new(Arc::new(AtomicU64::new(0)));
+
+        input_system.update_keyboard(KeyCode::Digit1, ElementState::Pressed);
+        input_system.update_delta(ClientTick(1));
+        assert!(matches!(
+            collect_keyboard_events(&mut input_system).as_slice(),
+            [InputEvent::CastSkill { slot }] if *slot == HotbarSlot(0)
+        ));
+
+        input_system.update_keyboard(KeyCode::AltLeft, ElementState::Pressed);
+        input_system.update_keyboard(KeyCode::Digit1, ElementState::Released);
+        input_system.update_delta(ClientTick(2));
+
+        let mut events = Vec::new();
+        input_system.handle_hotbar_key_releases(&mut events);
+
+        assert!(matches!(
+            events.as_slice(),
+            [InputEvent::StopSkill { slot }] if *slot == HotbarSlot(0)
+        ));
     }
 }

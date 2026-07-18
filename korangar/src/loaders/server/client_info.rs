@@ -300,6 +300,7 @@ impl ServerType {
 #[derive(Debug, Clone, Copy, Deserialize, StateElement)]
 pub enum PacketVersion {
     _20220406,
+    _20250416,
     Unsupported(u64),
 }
 
@@ -311,6 +312,7 @@ where
 
     match version {
         20220406 => Ok(Some(PacketVersion::_20220406)),
+        20250416 => Ok(Some(PacketVersion::_20250416)),
         _ => Ok(Some(PacketVersion::Unsupported(version))),
     }
 }
@@ -337,5 +339,36 @@ where
     match value.as_ref() {
         "" => Ok(true),
         _ => panic!("boolean tags may not have any data inside"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use quick_xml::de::from_str;
+
+    use super::{ClientInfo, PacketVersion};
+
+    #[test]
+    fn selects_packet_version_20250416_from_client_info() {
+        let client_info: ClientInfo = from_str(
+            r#"
+                <clientinfo>
+                    <servicetype>korea</servicetype>
+                    <servertype>sakray</servertype>
+                    <connection>
+                        <address>127.0.0.1</address>
+                        <port>6900</port>
+                        <version>20</version>
+                        <packet_version>20250416</packet_version>
+                    </connection>
+                </clientinfo>
+            "#,
+        )
+        .unwrap();
+
+        assert!(matches!(
+            client_info.services.as_slice(),
+            [service] if matches!(service.packet_version, Some(PacketVersion::_20250416))
+        ));
     }
 }

@@ -181,6 +181,12 @@ pub enum NetworkEvent {
         choices: Vec<String>,
         npc_id: EntityId,
     },
+    OpenNumberInput {
+        npc_id: EntityId,
+    },
+    OpenTextInput {
+        npc_id: EntityId,
+    },
     AddQuestEffect {
         quest_effect: QuestEffectPacket,
     },

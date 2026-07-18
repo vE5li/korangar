@@ -168,6 +168,8 @@ pub struct Localization {
     dialog_window_title: String,
     next_button_text: String,
     close_button_text: String,
+    okay_button_text: String,
+    dialog_text_box_message: String,
     error_window_title: String,
     friend_list_window_title: String,
     friend_list_text_box_message: String,

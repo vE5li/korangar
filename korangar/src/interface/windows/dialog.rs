@@ -1,5 +1,6 @@
 use std::cell::UnsafeCell;
 
+use korangar_interface::components::text_box::DefaultHandler;
 use korangar_interface::element::store::ElementStoreMut;
 use korangar_interface::element::{Element, ElementBox, ErasedElement, StateElement};
 use korangar_interface::layout::{Resolvers, with_single_resolver};
@@ -12,6 +13,14 @@ use crate::input::InputEvent;
 use crate::state::localization::LocalizationPathExt;
 use crate::state::theme::InterfaceThemeType;
 use crate::state::{ClientState, ClientStatePathExt, client_state};
+
+/// Maximum number of characters for a dialog input. The server caps text
+/// inputs at rAthena's `CHATBOX_SIZE` (70).
+const MAXIMUM_INPUT_LENGTH: usize = 70;
+
+fn parse_dialog_number(text: &str) -> Option<i32> {
+    text.trim().parse().ok()
+}
 
 /// A small wrapper struct that serves two purposes:
 /// - Making the elements nicer to construct by putting the [`UnsafeCell::new`]
@@ -26,6 +35,9 @@ pub struct DialogElement {
     #[hidden_element]
     element: UnsafeCell<ElementBox<ClientState>>,
     is_next_button: bool,
+    /// Marks the elements of an input row so they can be removed once the
+    /// input is submitted.
+    is_input: bool,
 }
 
 impl DialogElement {
@@ -38,6 +50,20 @@ impl DialogElement {
         Self {
             element: UnsafeCell::new(ErasedElement::new(element)),
             is_next_button,
+            is_input: false,
+        }
+    }
+
+    /// Creates a new dialog element that is part of an input row.
+    #[inline(always)]
+    fn new_input<E>(element: E) -> Self
+    where
+        E: Element<ClientState> + 'static,
+    {
+        Self {
+            element: UnsafeCell::new(ErasedElement::new(element)),
+            is_next_button: false,
+            is_input: true,
         }
     }
 }
@@ -52,6 +78,8 @@ pub struct DialogWindowState {
     /// Whether or not the elements should be cleared the next time
     /// [`start`](Self::start) is called.
     clear_next: bool,
+    /// Backing store for the text box of an input row.
+    input_buffer: String,
 }
 
 impl DialogWindowState {
@@ -109,7 +137,7 @@ impl DialogWindowState {
     pub fn add_close_button(&mut self) {
         use korangar_interface::prelude::*;
 
-        self.elements.retain(|element| !element.is_next_button);
+        self.elements.retain(|element| !element.is_next_button && !element.is_input);
 
         let npc_id = self.npc_id;
 
@@ -132,7 +160,7 @@ impl DialogWindowState {
     pub fn add_choice_buttons(&mut self, choices: Vec<String>) {
         use korangar_interface::prelude::*;
 
-        self.elements.retain(|element| !element.is_next_button);
+        self.elements.retain(|element| !element.is_next_button && !element.is_input);
 
         let npc_id = self.npc_id;
 
@@ -147,6 +175,70 @@ impl DialogWindowState {
                 false,
             ))
         });
+    }
+
+    /// Add a number input row to the dialog.
+    pub fn add_number_input(&mut self) {
+        self.add_input(true);
+    }
+
+    /// Add a text input row to the dialog.
+    pub fn add_text_input(&mut self) {
+        self.add_input(false);
+    }
+
+    /// Add an input row (text box and an "OK"-button) to the dialog.
+    fn add_input(&mut self, numbers_only: bool) {
+        use korangar_interface::prelude::*;
+
+        if self.clear_next {
+            // An input request may be the first packet after advancing a dialog page.
+            // In that case, clear the previous page just like add_text() does.
+            self.elements.clear();
+            self.clear_next = false;
+        } else {
+            // The server should only ever request one input at a time. Also remove
+            // any stale Next button: the server is now waiting for an input packet.
+            self.elements.retain(|element| !element.is_input && !element.is_next_button);
+        }
+        self.input_buffer.clear();
+
+        let npc_id = self.npc_id;
+        let input_path = client_state().dialog_window().input_buffer();
+
+        struct DialogInputTextBox;
+
+        let submit_action = move |state: &State<ClientState>, queue: &mut EventQueue<ClientState>| {
+            let text = state.get(&input_path).clone();
+
+            match numbers_only {
+                true => {
+                    let Some(value) = parse_dialog_number(&text) else {
+                        return;
+                    };
+                    queue.queue(InputEvent::SubmitDialogNumberInput { npc_id, value });
+                }
+                false => queue.queue(InputEvent::SubmitDialogTextInput { npc_id, text }),
+            }
+        };
+
+        self.elements.push(DialogElement::new_input(text_box! {
+            ghost_text: client_state().localization().dialog_text_box_message(),
+            state: input_path,
+            input_handler: DefaultHandler::<_, _, MAXIMUM_INPUT_LENGTH>::new(input_path, submit_action),
+            focus_id: DialogInputTextBox,
+        }));
+
+        self.elements.push(DialogElement::new_input(button! {
+            text: client_state().localization().okay_button_text(),
+            event: submit_action,
+        }));
+    }
+
+    /// Remove the input row after the input has been submitted.
+    pub fn input_submitted(&mut self) {
+        self.elements.retain(|element| !element.is_input);
+        self.input_buffer.clear();
     }
 
     /// End the dialog.
@@ -165,6 +257,7 @@ impl Default for DialogWindowState {
             // Arguably not very clean but avoids using an Option.
             npc_id: EntityId(0),
             clear_next: false,
+            input_buffer: Default::default(),
         }
     }
 }
@@ -254,5 +347,32 @@ where
                 },
             ),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{DialogWindowState, parse_dialog_number};
+
+    #[test]
+    fn dialog_numbers_require_valid_i32_input() {
+        assert_eq!(parse_dialog_number(" -42 "), Some(-42));
+        assert_eq!(parse_dialog_number(""), None);
+        assert_eq!(parse_dialog_number("-"), None);
+        assert_eq!(parse_dialog_number("12x"), None);
+        assert_eq!(parse_dialog_number("2147483648"), None);
+    }
+
+    #[test]
+    fn input_after_next_starts_a_new_dialog_page() {
+        let mut state = DialogWindowState::default();
+        state.add_next_button();
+        assert!(state.elements.iter().any(|element| element.is_next_button));
+
+        state.add_number_input();
+
+        assert!(!state.clear_next);
+        assert!(!state.elements.iter().any(|element| element.is_next_button));
+        assert!(state.elements.iter().all(|element| element.is_input));
     }
 }

@@ -711,6 +711,8 @@ where
 
         NetworkEvent::OpenDialog { text, npc_id }
     })?;
+    packet_handler.register(|packet: OpenNumberInputPacket| NetworkEvent::OpenNumberInput { npc_id: packet.npc_id })?;
+    packet_handler.register(|packet: OpenTextInputPacket| NetworkEvent::OpenTextInput { npc_id: packet.npc_id })?;
     packet_handler.register(|packet: RequestEquipItemStatusPacket| match packet.result {
         RequestEquipItemStatus::Success => Some(NetworkEvent::UpdateEquippedPosition {
             index: packet.inventory_index,

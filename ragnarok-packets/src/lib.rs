@@ -2024,6 +2024,24 @@ pub struct DialogMenuPacket {
     pub message: String,
 }
 
+/// Sent by the map server to request a number input from the player during an
+/// NPC dialog (`ZC_OPEN_EDITDLG`).
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0142)]
+pub struct OpenNumberInputPacket {
+    pub npc_id: EntityId,
+}
+
+/// Sent by the map server to request a text input from the player during an
+/// NPC dialog (`ZC_OPEN_EDITDLGSTR`).
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x01D4)]
+pub struct OpenTextInputPacket {
+    pub npc_id: EntityId,
+}
+
 #[derive(Debug, Clone, Copy, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[numeric_type(u32)]
@@ -3641,6 +3659,28 @@ pub struct CloseDialogPacket {
 pub struct ChooseDialogOptionPacket {
     pub npc_id: EntityId,
     pub option: i8,
+}
+
+/// Sent by the client as a response to a [`OpenNumberInputPacket`]
+/// (`CZ_INPUT_EDITDLG`).
+#[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0143)]
+pub struct NumberInputPacket {
+    pub npc_id: EntityId,
+    pub value: i32,
+}
+
+/// Sent by the client as a response to a [`OpenTextInputPacket`]
+/// (`CZ_INPUT_EDITDLGSTR`).
+#[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x01D5)]
+#[variable_length]
+pub struct TextInputPacket {
+    pub npc_id: EntityId,
+    #[length_remaining]
+    pub text: String,
 }
 
 bitflags::bitflags! {

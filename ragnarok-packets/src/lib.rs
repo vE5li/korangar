@@ -1128,6 +1128,14 @@ pub struct DisplayEmotionPacket {
     pub emotion: u8,
 }
 
+/// Sent by the client to show an emotion (`CZ_REQ_EMOTION`).
+#[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x00BF)]
+pub struct RequestEmotionPacket {
+    pub emotion: u8,
+}
+
 /// Every value that can be set from the server through [UpdateStatPacket],
 /// [UpdateStatPacket1], [UpdateStatPacket2], and [UpdateStatPacket3].
 /// All UpdateStatPackets do the same, they just have different sizes

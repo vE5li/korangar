@@ -204,7 +204,10 @@ where
             color,
         }
     })?;
-    packet_handler.register_noop::<DisplayEmotionPacket>()?;
+    packet_handler.register(|packet: DisplayEmotionPacket| NetworkEvent::DisplayEmotion {
+        entity_id: packet.entity_id,
+        emotion: packet.emotion,
+    })?;
     packet_handler.register(|packet: EntityMovePacket| {
         let EntityMovePacket {
             entity_id,

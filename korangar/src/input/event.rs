@@ -155,6 +155,11 @@ pub enum InputEvent {
         /// Item to move.
         item: InventoryItem<ResourceMetadata>,
     },
+    /// Show an emotion.
+    SendEmotion {
+        /// Id of the emotion.
+        emotion: u8,
+    },
     /// Move a skill in the user interface.
     MoveSkill {
         /// Source of the move.

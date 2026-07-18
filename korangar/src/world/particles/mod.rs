@@ -9,9 +9,9 @@ use ragnarok_packets::{EntityId, QuestColor, QuestEffectPacket};
 use rand_aes::tls::rand_f32;
 
 use crate::graphics::{Color, ScreenClip, ScreenPosition, ScreenSize, Texture};
-use crate::loaders::{FontSize, ImageType, Scaling, TextureLoader};
+use crate::loaders::{FontSize, ImageType, Scaling, Sprite, TextureLoader};
 use crate::renderer::{GameInterfaceRenderer, SpriteRenderer};
-use crate::world::Camera;
+use crate::world::{Actions, Camera};
 use crate::{Entity, Map};
 
 pub trait Particle {
@@ -146,6 +146,72 @@ impl Particle for HealNumber {
         };
 
         renderer.render_damage_text(&self.heal_amount, final_position, Color::rgb_u8(30, 255, 30), FontSize(16.0));
+    }
+}
+
+/// An emotion played above an entity, rendered from the animation frames of
+/// `emotion.act`. Despawns after playing through the animation once.
+pub struct Emote {
+    position: Point3<f32>,
+    sprite: Arc<Sprite>,
+    actions: Arc<Actions>,
+    emotion_id: usize,
+    timer: f32,
+}
+
+impl Emote {
+    /// Offset above the entity position so the emote hovers over the head.
+    const POSITION_OFFSET: Vector3<f32> = Vector3::new(0.0, 30.0, 0.0);
+
+    pub fn new(entity_position: Point3<f32>, sprite: Arc<Sprite>, actions: Arc<Actions>, emotion_id: usize) -> Self {
+        Self {
+            position: entity_position + Self::POSITION_OFFSET,
+            sprite,
+            actions,
+            emotion_id,
+            timer: 0.0,
+        }
+    }
+
+    /// Milliseconds each animation frame is displayed for, scaled by the
+    /// per-action delay of the loaded actions.
+    fn frame_time(&self) -> f32 {
+        let delay = self.actions.delays[self.emotion_id % self.actions.delays.len()];
+        delay * 50.0
+    }
+
+    fn frame_count(&self) -> usize {
+        let action = &self.actions.actions[self.emotion_id % self.actions.actions.len()];
+        action.motions.len()
+    }
+}
+
+impl Particle for Emote {
+    fn update(&mut self, delta_time: f32) -> bool {
+        self.timer += delta_time * 1000.0;
+        self.timer < self.frame_count() as f32 * self.frame_time()
+    }
+
+    fn render(&self, renderer: &GameInterfaceRenderer, camera: &dyn Camera, window_size: ScreenSize) {
+        let clip_space_position = camera.view_projection_matrix() * self.position.to_homogeneous();
+        let screen_position = camera.clip_to_screen_space(clip_space_position);
+        let final_position = ScreenPosition {
+            left: screen_position.x * window_size.width,
+            top: screen_position.y * window_size.height,
+        };
+
+        let frame = (self.timer / self.frame_time()) as usize;
+
+        self.actions.render_sprite_frame(
+            renderer,
+            &self.sprite,
+            self.emotion_id,
+            frame,
+            final_position,
+            ScreenClip::unbound(),
+            Color::WHITE,
+            1.0,
+        );
     }
 }
 

@@ -708,6 +708,14 @@ where
 
         NetworkEvent::OpenDialog { text, npc_id }
     })?;
+    packet_handler.register(|packet: UseItemAckPacket| match packet.result {
+        0 => None,
+        _ => Some(NetworkEvent::ItemUsed {
+            account_id: packet.account_id,
+            index: packet.inventory_index,
+            remaining_amount: packet.remaining_amount,
+        }),
+    })?;
     packet_handler.register(|packet: RequestEquipItemStatusPacket| match packet.result {
         RequestEquipItemStatus::Success => Some(NetworkEvent::UpdateEquippedPosition {
             index: packet.inventory_index,

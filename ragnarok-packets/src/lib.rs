@@ -1567,6 +1567,29 @@ pub struct ItemPickupRequestPacket {
     pub entity_id: EntityId,
 }
 
+/// Sent by the client to use an item from the inventory (`CZ_USE_ITEM`).
+#[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0439)]
+pub struct UseItemPacket {
+    pub inventory_index: InventoryIndex,
+    pub account_id: AccountId,
+}
+
+/// Sent by the map server as a response to a [`UseItemPacket`]
+/// (`ZC_USE_ITEM_ACK`). If `result` is non-zero the item was used and
+/// `remaining_amount` holds the amount left in the inventory.
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x01C8)]
+pub struct UseItemAckPacket {
+    pub inventory_index: InventoryIndex,
+    pub item_id: ItemId,
+    pub account_id: AccountId,
+    pub remaining_amount: u16,
+    pub result: u8,
+}
+
 #[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x00F3)]

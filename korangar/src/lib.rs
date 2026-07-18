@@ -1595,6 +1595,21 @@ impl Client {
                         .follow_mut(client_state().inventory())
                         .fill(&self.async_loader, items);
                 }
+                NetworkEvent::ItemUsed {
+                    account_id,
+                    index,
+                    remaining_amount,
+                } => {
+                    if self
+                        .saved_login_data
+                        .as_ref()
+                        .is_some_and(|login_data| login_data.account_id == account_id)
+                    {
+                        self.client_state
+                            .follow_mut(client_state().inventory())
+                            .set_item_amount(index, remaining_amount);
+                    }
+                }
                 NetworkEvent::IventoryItemAdded { item } => {
                     self.client_state
                         .follow_mut(client_state().inventory())
@@ -2282,6 +2297,11 @@ impl Client {
                     }
                     _ => {}
                 },
+                InputEvent::UseItem { index } => {
+                    if let Some(login_data) = &self.saved_login_data {
+                        let _ = self.networking_system.use_item(login_data.account_id, index);
+                    }
+                }
                 InputEvent::MoveSkill {
                     source,
                     destination,

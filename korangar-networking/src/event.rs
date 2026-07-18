@@ -188,6 +188,11 @@ pub enum NetworkEvent {
     IventoryItemAdded {
         item: InventoryItem<NoMetadata>,
     },
+    ItemUsed {
+        account_id: AccountId,
+        index: InventoryIndex,
+        remaining_amount: u16,
+    },
     ItemObtained {
         item_id: ItemId,
         quantity: u16,

@@ -5,8 +5,8 @@ use korangar_debug::profiling::FrameMeasurement;
 use korangar_interface::event::{ClickHandler, Event, EventQueue};
 use korangar_networking::{InventoryItem, ShopItem};
 use ragnarok_packets::{
-    AccountId, BuyOrSellOption, CharacterId, CharacterServerInformation, EntityId, HotbarSlot, ShopId, SkillId, SoldItemInformation,
-    StatUpType, TilePosition,
+    AccountId, BuyOrSellOption, CharacterId, CharacterServerInformation, EntityId, HotbarSlot, ShopId, SkillId, SkillLevel,
+    SoldItemInformation, StatUpType, TilePosition,
 };
 use rust_state::State;
 
@@ -17,6 +17,22 @@ use crate::state::skills::LearnableSkill;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 use crate::world::ResourceMetadata;
+
+/// How a skill activation is owned by its input source.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SkillActivation {
+    /// A keyboard press owns the activation until its matching release.
+    Hold,
+    /// A user-interface activation remains active until toggled again.
+    Toggle,
+}
+
+/// A fully resolved destination for a skill cast.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SkillCastTarget {
+    Entity(EntityId),
+    Ground(TilePosition),
+}
 
 /// An event triggered by the user through mouse or keyboard input.
 #[derive(Clone, Debug)]
@@ -173,6 +189,17 @@ pub enum InputEvent {
     CastSkill {
         /// Slot of the hotbar that the skill is bound to.
         slot: HotbarSlot,
+        /// Ownership semantics for continuous skills.
+        activation: SkillActivation,
+    },
+    /// Cast a targeted skill after its destination has been validated.
+    CastSkillAt {
+        /// Id of the skill to cast.
+        skill_id: SkillId,
+        /// Level at which to cast the skill.
+        skill_level: SkillLevel,
+        /// Validated entity or ground destination.
+        target: SkillCastTarget,
     },
     /// Stop a skill.
     StopSkill {

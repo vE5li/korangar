@@ -11,7 +11,7 @@ use winit::dpi::PhysicalPosition;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta};
 use winit::keyboard::KeyCode;
 
-pub use self::event::InputEvent;
+pub use self::event::{InputEvent, SkillActivation, SkillCastTarget};
 pub use self::key::Key;
 pub use self::mode::{Grabbed, MouseInputMode, MouseModeExt};
 use crate::graphics::{PickerTarget, ScreenPosition, ScreenSize};
@@ -211,6 +211,10 @@ impl InputSystem {
         &self.keys[key_code as usize]
     }
 
+    pub fn escape_pressed(&self) -> bool {
+        self.get_key(KeyCode::Escape).pressed()
+    }
+
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn handle_keyboard_input(
         &mut self,
@@ -294,6 +298,7 @@ impl InputSystem {
                 self.active_hotbar_keys[slot] = true;
                 events.push(InputEvent::CastSkill {
                     slot: HotbarSlot(slot as u16),
+                    activation: SkillActivation::Hold,
                 });
             }
         }
@@ -386,6 +391,10 @@ impl InputSystem {
             }
         }
     }
+
+    pub fn clear_hotbar_key_ownership(&mut self) {
+        self.active_hotbar_keys.fill(false);
+    }
 }
 
 #[cfg(test)]
@@ -415,7 +424,10 @@ mod tests {
 
         assert!(matches!(
             collect_keyboard_events(&mut input_system).as_slice(),
-            [InputEvent::CastSkill { slot }] if *slot == HotbarSlot(9)
+            [InputEvent::CastSkill {
+                slot,
+                activation: SkillActivation::Hold,
+            }] if *slot == HotbarSlot(9)
         ));
 
         input_system.update_keyboard(KeyCode::Digit0, ElementState::Released);
@@ -455,7 +467,10 @@ mod tests {
         input_system.update_delta(ClientTick(1));
         assert!(matches!(
             collect_keyboard_events(&mut input_system).as_slice(),
-            [InputEvent::CastSkill { slot }] if *slot == HotbarSlot(0)
+            [InputEvent::CastSkill {
+                slot,
+                activation: SkillActivation::Hold,
+            }] if *slot == HotbarSlot(0)
         ));
 
         input_system.update_keyboard(KeyCode::AltLeft, ElementState::Pressed);
@@ -469,5 +484,42 @@ mod tests {
             events.as_slice(),
             [InputEvent::StopSkill { slot }] if *slot == HotbarSlot(0)
         ));
+    }
+
+    #[test]
+    fn same_frame_press_and_release_remain_paired() {
+        let mut input_system = InputSystem::new(Arc::new(AtomicU64::new(0)));
+
+        input_system.update_keyboard(KeyCode::Digit1, ElementState::Pressed);
+        input_system.update_keyboard(KeyCode::Digit1, ElementState::Released);
+        input_system.update_delta(ClientTick(1));
+
+        assert!(matches!(
+            collect_keyboard_events(&mut input_system).as_slice(),
+            [
+                InputEvent::CastSkill {
+                    slot: cast_slot,
+                    activation: SkillActivation::Hold,
+                },
+                InputEvent::StopSkill { slot: stop_slot },
+            ] if *cast_slot == HotbarSlot(0) && *stop_slot == HotbarSlot(0)
+        ));
+    }
+
+    #[test]
+    fn lifecycle_cleanup_suppresses_a_late_release() {
+        let mut input_system = InputSystem::new(Arc::new(AtomicU64::new(0)));
+
+        input_system.update_keyboard(KeyCode::Digit1, ElementState::Pressed);
+        input_system.update_delta(ClientTick(1));
+        collect_keyboard_events(&mut input_system);
+
+        input_system.clear_hotbar_key_ownership();
+        input_system.update_keyboard(KeyCode::Digit1, ElementState::Released);
+        input_system.update_delta(ClientTick(2));
+
+        let mut events = Vec::new();
+        input_system.handle_hotbar_key_releases(&mut events);
+        assert!(events.is_empty());
     }
 }

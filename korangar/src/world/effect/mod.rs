@@ -75,7 +75,7 @@ impl Effect {
                 continue;
             };
 
-            if frame.texture_index > layer.textures.len() {
+            if frame.texture_index >= layer.textures.len() {
                 continue;
             }
 
@@ -343,6 +343,28 @@ impl EffectWithLight {
             gets_deleted: false,
         }
     }
+
+    pub fn without_light(
+        effect: Arc<Effect>,
+        frame_timer: FrameTimer,
+        center: EffectCenter,
+        effect_offset: Vector3<f32>,
+        repeating: bool,
+    ) -> Self {
+        Self {
+            effect,
+            frame_timer,
+            center,
+            effect_offset,
+            point_light_id: PointLightId::new(0),
+            light_offset: Vector3::new(0.0, 0.0, 0.0),
+            light_color: Color::TRANSPARENT,
+            light_intensity: 0.0,
+            repeating,
+            current_light_intensity: 0.0,
+            gets_deleted: false,
+        }
+    }
 }
 
 impl EffectBase for EffectWithLight {
@@ -368,7 +390,7 @@ impl EffectBase for EffectWithLight {
         self.current_light_intensity += (target - self.current_light_intensity) * FADE_SPEED * delta_time;
         self.current_light_intensity = clamping_function(self.current_light_intensity, target);
 
-        !self.gets_deleted || self.current_light_intensity > 0.1
+        !self.gets_deleted || (self.light_intensity > 0.0 && self.current_light_intensity > 0.1)
     }
 
     fn mark_for_deletion(&mut self) {
@@ -376,6 +398,10 @@ impl EffectBase for EffectWithLight {
     }
 
     fn register_point_lights(&self, point_light_manager: &mut PointLightManager, camera: &dyn Camera) {
+        if self.light_intensity <= 0.0 {
+            return;
+        }
+
         let frustum = Frustum::new(camera.view_projection_matrix(), true);
 
         let light_position = self.center.to_position() + self.light_offset;
@@ -414,6 +440,8 @@ impl EffectHolder {
     }
 
     pub fn add_unit(&mut self, effect: Box<dyn EffectBase + Send + Sync>, entity_id: EntityId) {
+        self.effects
+            .retain(|(_, existing_entity_id)| *existing_entity_id != Some(entity_id));
         self.effects.push((effect, Some(entity_id)));
     }
 

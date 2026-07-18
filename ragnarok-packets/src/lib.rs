@@ -3856,6 +3856,14 @@ pub struct EndUseSkillPacket {
     pub skill_id: SkillId,
 }
 
+/// `ZC_DISPEL`, sent when an entity's skill cast is cancelled.
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x01B9)]
+pub struct CancelSkillCastPacket {
+    pub entity_id: EntityId,
+}
+
 /// Modern `ZC_USESKILL_ACK` sent when an entity starts casting a skill.
 ///
 /// This is the `PACKETVER >= 20181212` layout used by packet version
@@ -3929,6 +3937,22 @@ mod skill_cast_packet_tests {
         assert_eq!(decoded.delay_time, packet.delay_time);
         assert_eq!(decoded.disposable, packet.disposable);
         assert_eq!(decoded.attack_motion, packet.attack_motion);
+    }
+
+    #[test]
+    fn cancelled_skill_cast_has_exact_wire_layout() {
+        let packet = CancelSkillCastPacket {
+            entity_id: EntityId(0x0102_0304),
+        };
+        let expected = [0xB9, 0x01, 0x04, 0x03, 0x02, 0x01];
+
+        let mut writer = ByteWriter::new();
+        assert_eq!(packet.packet_to_bytes(&mut writer).unwrap(), expected.len());
+        assert_eq!(writer.as_slice(), expected);
+
+        let mut reader = ByteReader::without_metadata(&expected);
+        let decoded = CancelSkillCastPacket::packet_from_bytes(&mut reader).unwrap();
+        assert_eq!(decoded.entity_id, packet.entity_id);
     }
 }
 

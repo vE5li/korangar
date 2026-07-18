@@ -156,6 +156,16 @@ pub enum NetworkEvent {
         attack_duration: u32,
         is_critical: bool,
     },
+    /// An entity started casting a skill.
+    EntityStartCasting {
+        entity_id: EntityId,
+        /// Cast duration in milliseconds.
+        cast_time: u32,
+    },
+    /// The server cancelled an entity's active skill cast.
+    EntityCancelCasting {
+        entity_id: EntityId,
+    },
     EntityPickUpItem {
         entity_id: EntityId,
         item_entity_id: EntityId,

@@ -746,7 +746,13 @@ where
             color: MessageColor::Error,
         },
     })?;
-    packet_handler.register_noop::<UseSkillSuccessPacket>()?;
+    packet_handler.register(|packet: UseSkillSuccessPacket| NetworkEvent::EntityStartCasting {
+        entity_id: packet.source_entity,
+        cast_time: packet.delay_time,
+    })?;
+    packet_handler.register(|packet: CancelSkillCastPacket| NetworkEvent::EntityCancelCasting {
+        entity_id: packet.entity_id,
+    })?;
     packet_handler.register_noop::<ToUseSkillSuccessPacket>()?;
     packet_handler.register(|packet: NotifySkillUnitPacket| {
         let NotifySkillUnitPacket {
@@ -849,4 +855,53 @@ where
     packet_handler.register(|packet: RemoveSkillPacket| NetworkEvent::RemoveSkill { skill_id: packet.skill_id })?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod skill_cast_tests {
+    use ragnarok_bytes::ByteReader;
+    use ragnarok_packets::EntityId;
+    use ragnarok_packets::handler::{HandlerResult, NoPacketCallback, PacketHandler};
+
+    use super::register_map_server_packets;
+    use crate::NetworkEvent;
+    use crate::event::NetworkEventList;
+
+    #[test]
+    fn maps_cast_start_and_cancel_packets_to_lifecycle_events() {
+        let mut handler = PacketHandler::<NetworkEventList, NoPacketCallback>::default();
+        register_map_server_packets(&mut handler).unwrap();
+
+        let packets = [
+            0x1A, 0x0B, // ZC_USESKILL_ACK
+            0x04, 0x03, 0x02, 0x01, // source entity
+            0x08, 0x07, 0x06, 0x05, // destination entity
+            0x12, 0x11, // x
+            0x14, 0x13, // y
+            0x16, 0x15, // skill id
+            0x1A, 0x19, 0x18, 0x17, // element
+            0xE8, 0x03, 0x00, 0x00, // 1000 ms cast time
+            0x1F, // disposable
+            0x23, 0x22, 0x21, 0x20, // attack motion
+            0xB9, 0x01, // ZC_DISPEL
+            0x04, 0x03, 0x02, 0x01, // entity
+        ];
+        let mut reader = ByteReader::without_metadata(&packets);
+
+        let HandlerResult::Ok(NetworkEventList(start_events)) = handler.process_one(&mut reader) else {
+            panic!("cast start packet was not handled");
+        };
+        assert!(matches!(start_events.as_slice(), [NetworkEvent::EntityStartCasting {
+            entity_id: EntityId(0x0102_0304),
+            cast_time: 1000
+        }]));
+
+        let HandlerResult::Ok(NetworkEventList(cancel_events)) = handler.process_one(&mut reader) else {
+            panic!("cast cancellation packet was not handled");
+        };
+        assert!(matches!(cancel_events.as_slice(), [NetworkEvent::EntityCancelCasting {
+            entity_id: EntityId(0x0102_0304)
+        }]));
+        assert_eq!(reader.remaining_bytes(), []);
+    }
 }

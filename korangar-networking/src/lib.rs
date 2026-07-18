@@ -297,6 +297,11 @@ where
     {
         let mut stream = TcpStream::connect(address).await.map_err(|_| NetworkTaskError::FailedToConnect)?;
         let mut interval = tokio::time::interval(ping_frequency);
+        // A tokio interval fires immediately on the first tick, which would race the
+        // ping against the login packet. rAthena's map server requires the first read
+        // of a session to contain exactly the login packet, so delay the first ping
+        // by one full period.
+        interval.reset();
         let mut buffer = [0u8; 8192];
         let mut cut_off_buffer_base = 0;
         let mut events = Vec::new();

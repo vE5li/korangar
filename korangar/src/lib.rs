@@ -1133,9 +1133,11 @@ impl Client {
                     self.networking_system.disconnect_from_character_server();
                     self.networking_system
                         .connect_to_map_server(self.saved_packet_version, saved_login_data, login_data);
-                    // Ask for the client tick right away, so that the player isn't de-synced when
-                    // they spawn on the map.
-                    let _ = self.networking_system.request_client_tick();
+                    // NOTE: Nothing else must be sent to the map server until it responds:
+                    // rAthena requires the first read of a session to contain exactly the
+                    // login packet and disconnects otherwise. The client tick is part of
+                    // the map server login success packet, so there is no need to request
+                    // it here.
 
                     let character_information = self
                         .client_state

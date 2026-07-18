@@ -46,6 +46,8 @@ pub trait MouseModeExt {
     fn is_grabbing(&self) -> bool;
 
     fn grabbed(&self) -> Option<Grabbed>;
+
+    fn moved_inventory_item(&self) -> Option<InventoryItem<ResourceMetadata>>;
 }
 
 impl MouseModeExt for MouseMode<ClientState> {
@@ -87,6 +89,19 @@ impl MouseModeExt for MouseMode<ClientState> {
                 skill.actions.clone()?,
                 skill.animation_state.clone(),
             )),
+            _ => None,
+        }
+    }
+
+    fn moved_inventory_item(&self) -> Option<InventoryItem<ResourceMetadata>> {
+        match self {
+            MouseMode::Custom {
+                mode:
+                    MouseInputMode::MoveItem {
+                        source: ItemSource::Inventory,
+                        item,
+                    },
+            } => Some(item.clone()),
             _ => None,
         }
     }

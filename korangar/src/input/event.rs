@@ -5,8 +5,8 @@ use korangar_debug::profiling::FrameMeasurement;
 use korangar_interface::event::{ClickHandler, Event, EventQueue};
 use korangar_networking::{InventoryItem, ShopItem};
 use ragnarok_packets::{
-    AccountId, BuyOrSellOption, CharacterId, CharacterServerInformation, EntityId, HotbarSlot, ShopId, SkillId, SoldItemInformation,
-    StatUpType, TilePosition,
+    AccountId, BuyOrSellOption, CharacterId, CharacterServerInformation, EntityId, HotbarSlot, InventoryIndex, ShopId, SkillId,
+    SoldItemInformation, StatUpType, TilePosition,
 };
 use rust_state::State;
 
@@ -154,6 +154,13 @@ pub enum InputEvent {
         destination: ItemSource,
         /// Item to move.
         item: InventoryItem<ResourceMetadata>,
+    },
+    /// Throw an item from the inventory on the ground.
+    DropItem {
+        /// Inventory index of the item to drop.
+        index: InventoryIndex,
+        /// Amount of items to drop.
+        amount: u16,
     },
     /// Move a skill in the user interface.
     MoveSkill {

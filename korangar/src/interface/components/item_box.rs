@@ -77,9 +77,67 @@ where
     }
 }
 
+/// Handler for double clicking an item, mirroring the behavior of the official
+/// client: regular items are used, equippable items are equipped or unequipped.
+struct ItemBoxUseHandler<P> {
+    item_path: P,
+    source: ItemSource,
+}
+
+impl<P> ItemBoxUseHandler<P> {
+    fn new(item_path: P, source: ItemSource) -> Self {
+        Self { item_path, source }
+    }
+}
+
+impl<P> ClickHandler<ClientState> for ItemBoxUseHandler<P>
+where
+    P: Path<ClientState, InventoryItem<ResourceMetadata>, false>,
+{
+    fn handle_click(&self, state: &State<ClientState>, queue: &mut EventQueue<ClientState>) {
+        // Unwrapping here is fine since we only register the handler if the slot has a
+        // item.
+        let item = state.try_get(&self.item_path).unwrap().clone();
+
+        match (self.source, &item.details) {
+            (ItemSource::Inventory, InventoryItemDetails::Regular { .. }) => {
+                queue.queue(InputEvent::UseItem { index: item.index });
+            }
+            (
+                ItemSource::Inventory,
+                InventoryItemDetails::Equippable {
+                    equip_position,
+                    equipped_position,
+                    ..
+                },
+            ) => {
+                let (source, destination) = match equipped_position.is_empty() {
+                    true => (ItemSource::Inventory, ItemSource::Equipment { position: *equip_position }),
+                    false => (
+                        ItemSource::Equipment {
+                            position: *equipped_position,
+                        },
+                        ItemSource::Inventory,
+                    ),
+                };
+
+                queue.queue(InputEvent::MoveItem { source, destination, item });
+            }
+            (ItemSource::Equipment { position }, _) => {
+                queue.queue(InputEvent::MoveItem {
+                    source: ItemSource::Equipment { position },
+                    destination: ItemSource::Inventory,
+                    item,
+                });
+            }
+        }
+    }
+}
+
 pub struct ItemBox<A> {
     item_path: A,
     handler: ItemBoxHandler<A>,
+    use_handler: ItemBoxUseHandler<A>,
     amount_display: AmountDisplay,
 }
 
@@ -94,6 +152,7 @@ where
         Self {
             item_path,
             handler: ItemBoxHandler::new(item_path, source),
+            use_handler: ItemBoxUseHandler::new(item_path, source),
             amount_display: AmountDisplay::default(),
         }
     }
@@ -178,6 +237,7 @@ where
 
             if is_hovered {
                 layout.register_click_handler(MouseButton::Left, &self.handler);
+                layout.register_click_handler(MouseButton::DoubleLeft, &self.use_handler);
             }
 
             if matches!(item.details, InventoryItemDetails::Regular { .. }) {

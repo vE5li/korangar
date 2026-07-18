@@ -3856,9 +3856,13 @@ pub struct EndUseSkillPacket {
     pub skill_id: SkillId,
 }
 
+/// Modern `ZC_USESKILL_ACK` sent when an entity starts casting a skill.
+///
+/// This is the `PACKETVER >= 20181212` layout used by packet version
+/// 20220406. `delay_time` is the cast time in milliseconds.
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
-#[header(0x07FB)]
+#[header(0x0B1A)]
 pub struct UseSkillSuccessPacket {
     pub source_entity: EntityId,
     pub destination_entity: EntityId,
@@ -3867,6 +3871,7 @@ pub struct UseSkillSuccessPacket {
     pub element: u32,
     pub delay_time: u32,
     pub disposable: u8,
+    pub attack_motion: u32,
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
@@ -3878,6 +3883,53 @@ pub struct ToUseSkillSuccessPacket {
     pub item_id: ItemId,
     pub flag: u8,
     pub cause: u8,
+}
+
+#[cfg(test)]
+mod skill_cast_packet_tests {
+    use super::*;
+
+    #[test]
+    fn modern_skill_cast_acknowledgement_has_exact_wire_layout() {
+        let packet = UseSkillSuccessPacket {
+            source_entity: EntityId(0x0102_0304),
+            destination_entity: EntityId(0x0506_0708),
+            position: TilePosition { x: 0x1112, y: 0x1314 },
+            skill_id: SkillId(0x1516),
+            element: 0x1718_191A,
+            delay_time: 0x1B1C_1D1E,
+            disposable: 0x1F,
+            attack_motion: 0x2021_2223,
+        };
+
+        let expected = [
+            0x1A, 0x0B, // header
+            0x04, 0x03, 0x02, 0x01, // source entity
+            0x08, 0x07, 0x06, 0x05, // destination entity
+            0x12, 0x11, // x
+            0x14, 0x13, // y
+            0x16, 0x15, // skill id
+            0x1A, 0x19, 0x18, 0x17, // element
+            0x1E, 0x1D, 0x1C, 0x1B, // cast delay
+            0x1F, // disposable
+            0x23, 0x22, 0x21, 0x20, // attack motion
+        ];
+
+        let mut writer = ByteWriter::new();
+        assert_eq!(packet.packet_to_bytes(&mut writer).unwrap(), expected.len());
+        assert_eq!(writer.as_slice(), expected);
+
+        let mut reader = ByteReader::without_metadata(&expected);
+        let decoded = UseSkillSuccessPacket::packet_from_bytes(&mut reader).unwrap();
+        assert_eq!(decoded.source_entity, packet.source_entity);
+        assert_eq!(decoded.destination_entity, packet.destination_entity);
+        assert_eq!(decoded.position, packet.position);
+        assert_eq!(decoded.skill_id, packet.skill_id);
+        assert_eq!(decoded.element, packet.element);
+        assert_eq!(decoded.delay_time, packet.delay_time);
+        assert_eq!(decoded.disposable, packet.disposable);
+        assert_eq!(decoded.attack_motion, packet.attack_motion);
+    }
 }
 
 #[derive(Debug, Clone, ByteConvertable)]

@@ -135,6 +135,13 @@ pub enum NetworkEvent {
         text: String,
         color: MessageColor,
     },
+    /// A skill use was rejected by the map server.
+    SkillUseRejected {
+        skill_id: SkillId,
+        detail: i32,
+        item_id: ItemId,
+        cause: SkillUseFailureCode,
+    },
     CharacterSlotSwitched,
     CharacterSlotSwitchFailed,
     /// Update entity details. Mostly received when the client sends

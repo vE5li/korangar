@@ -71,7 +71,7 @@ use networking::{PacketHistory, PacketHistoryCallback};
 use ragnarok_packets::handler::NoPacketCallback;
 use ragnarok_packets::{
     AttackRange, BuyShopItemsResult, CharacterServerInformation, ClientTick, Direction, DisappearanceReason, EntityId, HotbarSlot,
-    SellItemsResult, SkillId, SkillLevel, SkillType, TilePosition, UnitId, WorldPosition,
+    SellItemsResult, SkillId, SkillLevel, SkillType, SkillUseFailureCode, TilePosition, UnitId, WorldPosition,
 };
 use renderer::InterfaceRenderer;
 use rust_state::{ManuallyAssertExt, State};
@@ -1555,6 +1555,34 @@ impl Client {
                     self.client_state
                         .follow_mut(client_state().chat_messages())
                         .push(ChatMessage::new(text, color));
+                }
+                NetworkEvent::SkillUseRejected {
+                    skill_id,
+                    detail,
+                    item_id,
+                    cause,
+                } => {
+                    let item_name = (item_id.0 != 0
+                        && matches!(cause, SkillUseFailureCode::NEED_ITEM | SkillUseFailureCode::NEED_EQUIPMENT))
+                    .then(|| {
+                        self.library
+                            .get::<ItemName>(ItemNameKey {
+                                item_id,
+                                is_identified: true,
+                            })
+                            .to_string()
+                    })
+                    .filter(|name| name != "NOTFOUND");
+                    let message = self.client_state.follow(client_state().localization()).skill_use_failure_message(
+                        skill_id,
+                        detail,
+                        item_id,
+                        item_name.as_deref(),
+                        cause,
+                    );
+                    self.client_state
+                        .follow_mut(client_state().chat_messages())
+                        .push(ChatMessage::new(message, MessageColor::Error));
                 }
                 NetworkEvent::UpdateEntityDetails { entity_id, name } => {
                     let entity = self

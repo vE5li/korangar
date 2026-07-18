@@ -753,7 +753,14 @@ where
     packet_handler.register(|packet: CancelSkillCastPacket| NetworkEvent::EntityCancelCasting {
         entity_id: packet.entity_id,
     })?;
-    packet_handler.register_noop::<ToUseSkillSuccessPacket>()?;
+    packet_handler.register(|packet: ToUseSkillSuccessPacket| {
+        (packet.flag == 0).then_some(NetworkEvent::SkillUseRejected {
+            skill_id: packet.skill_id,
+            detail: packet.detail,
+            item_id: packet.item_id,
+            cause: packet.cause,
+        })
+    })?;
     packet_handler.register(|packet: NotifySkillUnitPacket| {
         let NotifySkillUnitPacket {
             entity_id,
@@ -858,10 +865,10 @@ where
 }
 
 #[cfg(test)]
-mod skill_cast_tests {
+mod skill_packet_tests {
     use ragnarok_bytes::ByteReader;
-    use ragnarok_packets::EntityId;
     use ragnarok_packets::handler::{HandlerResult, NoPacketCallback, PacketHandler};
+    use ragnarok_packets::{EntityId, ItemId, SkillId, SkillUseFailureCode};
 
     use super::register_map_server_packets;
     use crate::NetworkEvent;
@@ -902,6 +909,44 @@ mod skill_cast_tests {
         assert!(matches!(cancel_events.as_slice(), [NetworkEvent::EntityCancelCasting {
             entity_id: EntityId(0x0102_0304)
         }]));
+        assert_eq!(reader.remaining_bytes(), []);
+    }
+
+    #[test]
+    fn preserves_rejection_context_and_ignores_success_acknowledgements() {
+        let mut handler = PacketHandler::<NetworkEventList, NoPacketCallback>::default();
+        register_map_server_packets(&mut handler).unwrap();
+
+        let packets = [
+            0x10, 0x01, // ZC_ACK_TOUSESKILL
+            0x34, 0x12, // skill id
+            0xFE, 0xFF, 0xFF, 0xFF, // signed detail: -2
+            0xEF, 0xCD, 0xAB, 0x89, // item id
+            0x00, // rejected
+            0x47, // required item
+            0x10, 0x01, // ZC_ACK_TOUSESKILL
+            0x78, 0x56, // skill id
+            0x00, 0x00, 0x00, 0x00, // detail
+            0x00, 0x00, 0x00, 0x00, // item id
+            0x01, // accepted
+            0x00, // generic cause
+        ];
+        let mut reader = ByteReader::without_metadata(&packets);
+
+        let HandlerResult::Ok(NetworkEventList(rejection_events)) = handler.process_one(&mut reader) else {
+            panic!("skill rejection packet was not handled");
+        };
+        assert!(matches!(rejection_events.as_slice(), [NetworkEvent::SkillUseRejected {
+            skill_id: SkillId(0x1234),
+            detail: -2,
+            item_id: ItemId(0x89AB_CDEF),
+            cause: SkillUseFailureCode::NEED_ITEM,
+        }]));
+
+        let HandlerResult::Ok(NetworkEventList(success_events)) = handler.process_one(&mut reader) else {
+            panic!("skill success acknowledgement was not handled");
+        };
+        assert!(success_events.is_empty());
         assert_eq!(reader.remaining_bytes(), []);
     }
 }

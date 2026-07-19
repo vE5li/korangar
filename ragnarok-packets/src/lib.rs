@@ -4122,7 +4122,7 @@ impl UnitId {
     pub const Clusterbomb: Self = Self(217);
     pub const Cobalttrap: Self = Self(211);
     pub const Conflagration: Self = Self(284);
-    pub const Creatingstar: Self = Self(264);
+    pub const Creatingstar: Self = Self(265);
     pub const CrossRain: Self = Self(275);
     pub const DarkRunner: Self = Self(200);
     pub const DarkTransfer: Self = Self(201);
@@ -4135,7 +4135,6 @@ impl UnitId {
     pub const Dissonance: Self = Self(166);
     pub const Dontforgetme: Self = Self(173);
     pub const Drumbattlefield: Self = Self(161);
-    pub const Dummy0: Self = Self(265);
     pub const Dummyskill: Self = Self(134);
     pub const EarthInsignia: Self = Self(244);
     pub const Earthquake: Self = Self(198);
@@ -4176,6 +4175,7 @@ impl UnitId {
     pub const GroundGravitation: Self = Self(296);
     pub const GrounddriftDark: Self = Self(191);
     pub const GrounddriftFire: Self = Self(194);
+    pub const GrounddriftNeutral: Self = Self(264);
     pub const GrounddriftPoison: Self = Self(192);
     pub const GrounddriftWater: Self = Self(193);
     pub const GrounddriftWind: Self = Self(190);
@@ -4230,6 +4230,7 @@ impl UnitId {
     pub const Safetywall: Self = Self(126);
     pub const Sanctuary: Self = Self(131);
     pub const Sandman: Self = Self(149);
+    pub const SeedTrap: Self = Self(268);
     pub const Serviceforyou: Self = Self(175);
     pub const SevereRainstorm: Self = Self(219);
     pub const Shinkirou: Self = Self(294);

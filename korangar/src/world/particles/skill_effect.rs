@@ -1,14 +1,15 @@
 use std::f32::consts::PI;
 use std::sync::Arc;
 
-use cgmath::{Point3, Vector3};
+use cgmath::{Point3, Rad, Vector2, Vector3};
 use korangar_interface::application::Clip;
 use ragnarok_packets::EntityId;
+use wgpu::BlendFactor;
 
 use crate::Entity;
 use crate::graphics::{Color, ScreenClip, ScreenPosition, ScreenSize, Texture};
-use crate::renderer::{GameInterfaceRenderer, SpriteRenderer};
-use crate::world::Camera;
+use crate::renderer::{EFFECT_ORIGIN, EffectRenderer, GameInterfaceRenderer, SpriteRenderer};
+use crate::world::{Camera, EffectBase, PointLightManager};
 
 /// The classic 128x128 Cold Bolt shard stored in `data.grf`.
 ///
@@ -46,9 +47,10 @@ const FIRE_BOLT_DESCENT_HEIGHT: f32 = 38.0;
 /// the impact animation's own offset.
 const FIRE_BOLT_TARGET_HEIGHT: f32 = 5.0;
 
-/// Rendered size of one projectile frame. The source textures are 128x64, so
+/// Half extents of one projectile frame. The source textures are 128x64, so
 /// the quad keeps their 2:1 aspect.
-const FIRE_BOLT_PARTICLE_SIZE: ScreenSize = ScreenSize { width: 32.0, height: 16.0 };
+const FIRE_BOLT_HALF_WIDTH: f32 = 16.0;
+const FIRE_BOLT_HALF_HEIGHT: f32 = 8.0;
 
 pub const COLD_BOLT_PARTICLE_DURATION: f32 = 0.44;
 pub const FROST_DIVER_TRAVEL_DURATION: f32 = 0.64;
@@ -175,20 +177,53 @@ fn fire_bolt_offset(bolt_index: usize) -> Vector3<f32> {
     Vector3::new(APPROACH_X + jitter_x, 0.0, APPROACH_Z + jitter_z)
 }
 
+/// Screen-space angle that rotates the projectile's local +X axis onto the
+/// direction it is travelling.
+///
+/// The source textures are horizontal streaks whose dense head sits at +X, so
+/// an unrotated quad always reads as flying sideways. Screen space is y-down
+/// and so is the effect renderer's corner space, which lets the angle be taken
+/// directly. Both endpoints are scaled to pixels first so the result is not
+/// skewed by the window's aspect ratio.
+fn screen_direction_angle(from: Vector2<f32>, to: Vector2<f32>, window_size: ScreenSize) -> Rad<f32> {
+    let delta_x = (to.x - from.x) * window_size.width;
+    let delta_y = (to.y - from.y) * window_size.height;
+
+    // A degenerate path would make atan2 jitter; leaving it unrotated is the
+    // stable choice because the quad is then still centred on the target.
+    if delta_x.abs() < f32::EPSILON && delta_y.abs() < f32::EPSILON {
+        return Rad(0.0);
+    }
+
+    Rad(delta_y.atan2(delta_x))
+}
+
+fn projectile_screen_angle(camera: &dyn Camera, window_size: ScreenSize, from: Point3<f32>, to: Point3<f32>) -> Rad<f32> {
+    let project = |point: Point3<f32>| {
+        let clip_space_position = camera.view_projection_matrix() * point.to_homogeneous();
+        camera.clip_to_screen_space(clip_space_position)
+    };
+
+    screen_direction_angle(project(from), project(to), window_size)
+}
+
 /// One descending Fire Bolt projectile.
 ///
-/// The particle is descent-only and its lifetime is the projectile's flight
-/// time, so the separately scheduled impact animation always takes over at
-/// the exact moment the projectile reaches the target.
-pub struct FireBoltParticle {
+/// Rendered through the effect pipeline rather than as an interface sprite,
+/// because it needs to be rotated onto its flight direction and blended
+/// additively. Its lifetime is the projectile's flight time, so the
+/// separately scheduled impact animation takes over at the exact moment the
+/// projectile reaches the target.
+pub struct FireBoltProjectile {
     target_entity_id: EntityId,
     target_position: Point3<f32>,
     textures: Vec<Arc<Texture>>,
     offset: Vector3<f32>,
     timeline: Timeline,
+    deleted: bool,
 }
 
-impl FireBoltParticle {
+impl FireBoltProjectile {
     pub fn new(
         target_entity_id: EntityId,
         target_position: Point3<f32>,
@@ -202,6 +237,7 @@ impl FireBoltParticle {
             textures,
             offset: fire_bolt_offset(bolt_index),
             timeline: Timeline::new(flight_duration),
+            deleted: false,
         }
     }
 
@@ -213,10 +249,25 @@ impl FireBoltParticle {
         let frame = self.timeline.elapsed.max(0.0) / FIRE_ARROW_FRAME_DURATION;
         (frame as usize) % self.textures.len()
     }
+
+    /// Where the bolt enters, above and beside the target.
+    fn launch_position(&self) -> Point3<f32> {
+        self.landing_position() + self.offset + Vector3::new(0.0, FIRE_BOLT_DESCENT_HEIGHT, 0.0)
+    }
+
+    /// Where the bolt lands. The impact animation plays here, so the
+    /// projectile converges completely rather than keeping a residual offset.
+    fn landing_position(&self) -> Point3<f32> {
+        self.target_position + Vector3::new(0.0, FIRE_BOLT_TARGET_HEIGHT, 0.0)
+    }
 }
 
-impl EntityParticle for FireBoltParticle {
+impl EffectBase for FireBoltProjectile {
     fn update(&mut self, entities: &[Entity], local_entity: Option<(EntityId, Point3<f32>)>, delta_time: f32) -> bool {
+        if self.deleted {
+            return false;
+        }
+
         if let Some(position) = resolve_entity_position(self.target_entity_id, entities, local_entity) {
             self.target_position = position;
         }
@@ -224,27 +275,54 @@ impl EntityParticle for FireBoltParticle {
         self.timeline.advance(delta_time)
     }
 
-    fn render(&self, renderer: &GameInterfaceRenderer, camera: &dyn Camera, window_size: ScreenSize) {
+    fn mark_for_deletion(&mut self) {
+        self.deleted = true;
+    }
+
+    fn register_point_lights(&self, _point_light_manager: &mut PointLightManager, _camera: &dyn Camera) {}
+
+    fn render(&self, renderer: &mut EffectRenderer, camera: &dyn Camera) {
         let Some(texture) = self.textures.get(self.frame_index()) else {
             return;
         };
 
-        // The projectile converges completely so it lands on the target
-        // rather than beside it, matching the reference clients' zero end
-        // offset.
-        let descent = smoothstep(self.timeline.progress());
-        let position = self.target_position
-            + self.offset * (1.0 - descent)
-            + Vector3::new(0.0, FIRE_BOLT_DESCENT_HEIGHT * (1.0 - descent) + FIRE_BOLT_TARGET_HEIGHT, 0.0);
+        let launch = self.launch_position();
+        let landing = self.landing_position();
+        let position = launch + (landing - launch) * smoothstep(self.timeline.progress());
+        let angle = projectile_screen_angle(camera, renderer.window_size(), launch, landing);
 
-        render_centered(
-            renderer,
-            texture.clone(),
-            position,
+        // Corner order the effect renderer expects: top left, top right,
+        // bottom left, bottom right.
+        let corners = [
+            Vector2::new(-FIRE_BOLT_HALF_WIDTH, -FIRE_BOLT_HALF_HEIGHT),
+            Vector2::new(FIRE_BOLT_HALF_WIDTH, -FIRE_BOLT_HALF_HEIGHT),
+            Vector2::new(-FIRE_BOLT_HALF_WIDTH, FIRE_BOLT_HALF_HEIGHT),
+            Vector2::new(FIRE_BOLT_HALF_WIDTH, FIRE_BOLT_HALF_HEIGHT),
+        ];
+
+        // The renderer maps these as [2] top left, [1] top right,
+        // [3] bottom left, [0] bottom right.
+        let texture_coordinates = [
+            Vector2::new(1.0, 1.0),
+            Vector2::new(1.0, 0.0),
+            Vector2::new(0.0, 0.0),
+            Vector2::new(0.0, 1.0),
+        ];
+
+        renderer.render_effect(
             camera,
-            window_size,
-            FIRE_BOLT_PARTICLE_SIZE,
+            position,
+            texture.clone(),
+            corners,
+            texture_coordinates,
+            // Cancels the renderer's own origin shift so the quad ends up
+            // centred on the projectile and rotates about its own centre.
+            EFFECT_ORIGIN,
+            angle,
             Color::rgb(1.0, 1.0, 1.0),
+            // Additive, matching the reference client's blend mode for fire.
+            BlendFactor::SrcAlpha,
+            BlendFactor::One,
         );
     }
 }
@@ -577,45 +655,110 @@ mod tests {
     fn fire_bolt_descends_onto_the_target_and_expires_with_its_flight() {
         const FLIGHT: f32 = 0.42;
         let target = Point3::new(100.0, 20.0, 300.0);
-        let mut particle = FireBoltParticle::new(EntityId(7), target, Vec::new(), 0, FLIGHT);
+        let mut projectile = FireBoltProjectile::new(EntityId(7), target, Vec::new(), 0, FLIGHT);
 
-        // Starts above and beside the target.
-        assert_eq!(particle.timeline.progress(), 0.0);
-        let start_offset = particle.offset;
-        assert!(start_offset.x > 0.0);
+        // Enters above and beside the target.
+        let launch = projectile.launch_position();
+        let landing = projectile.landing_position();
+        assert!(launch.y > landing.y, "must enter from above");
+        assert!(launch.x > landing.x, "must enter from the side");
 
         // Lives exactly as long as the flight it was given, so the separately
         // scheduled impact takes over the moment it lands.
-        assert!(particle.update(&[], None, FLIGHT * 0.5));
-        assert!((particle.timeline.progress() - 0.5).abs() < 1.0e-6);
-        assert!(!particle.update(&[], None, FLIGHT * 0.5));
-        assert_eq!(particle.timeline.progress(), 1.0);
+        assert_eq!(projectile.timeline.progress(), 0.0);
+        assert!(projectile.update(&[], None, FLIGHT * 0.5));
+        assert!((projectile.timeline.progress() - 0.5).abs() < 1.0e-6);
+        assert!(!projectile.update(&[], None, FLIGHT * 0.5));
+        assert_eq!(projectile.timeline.progress(), 1.0);
     }
 
     #[test]
     fn fire_bolt_converges_completely_onto_the_target() {
         // Unlike Cold Bolt, which keeps a residual offset, the fire bolt must
         // land on the target: the impact animation plays there.
-        let full_descent = smoothstep(1.0);
-        assert_eq!(full_descent, 1.0);
+        let target = Point3::new(10.0, 0.0, 20.0);
+        let projectile = FireBoltProjectile::new(EntityId(1), target, Vec::new(), 3, 0.42);
 
-        let offset = fire_bolt_offset(3);
-        let residual = offset * (1.0 - full_descent);
-        assert_eq!(residual.x, 0.0);
-        assert_eq!(residual.z, 0.0);
+        let launch = projectile.launch_position();
+        let landing = projectile.landing_position();
+        let arrived = launch + (landing - launch) * smoothstep(1.0);
 
-        let height = FIRE_BOLT_DESCENT_HEIGHT * (1.0 - full_descent) + FIRE_BOLT_TARGET_HEIGHT;
-        assert_eq!(height, FIRE_BOLT_TARGET_HEIGHT);
+        assert!((arrived.x - landing.x).abs() < 1.0e-6);
+        assert!((arrived.y - landing.y).abs() < 1.0e-6);
+        assert!((arrived.z - landing.z).abs() < 1.0e-6);
+        assert_eq!(landing.y, target.y + FIRE_BOLT_TARGET_HEIGHT);
     }
 
     #[test]
-    fn fire_bolt_particle_survives_a_missing_texture_list() {
-        // load_skill_particle_texture can fail; the particle must not panic
-        // on an empty list.
-        let mut particle = FireBoltParticle::new(EntityId(1), Point3::new(0.0, 0.0, 0.0), Vec::new(), 0, 0.42);
+    fn projectile_rotation_points_the_texture_along_its_travel_direction() {
+        // The source textures are horizontal streaks whose head is at +X, and
+        // screen space is y-down, so these are the angles that aim the head
+        // at the target. An unrotated quad always reads as flying sideways.
+        const SQUARE: ScreenSize = ScreenSize {
+            width: 100.0,
+            height: 100.0,
+        };
+        let origin = Vector2::new(0.5, 0.5);
+        let angle_to = |x: f32, y: f32| screen_direction_angle(origin, Vector2::new(x, y), SQUARE).0;
 
-        assert_eq!(particle.frame_index(), 0);
-        assert!(particle.update(&[], None, 0.1));
+        // Straight right along +X: the texture already points this way.
+        assert!((angle_to(0.6, 0.5) - 0.0).abs() < 1.0e-5);
+        // Straight down the screen is a quarter turn, positive because y is down.
+        assert!((angle_to(0.5, 0.6) - std::f32::consts::FRAC_PI_2).abs() < 1.0e-5);
+        // Straight up is the opposite quarter turn.
+        assert!((angle_to(0.5, 0.4) + std::f32::consts::FRAC_PI_2).abs() < 1.0e-5);
+        // Straight left is a half turn.
+        assert!((angle_to(0.4, 0.5).abs() - std::f32::consts::PI).abs() < 1.0e-5);
+
+        // The real case: a bolt entering from the upper right and falling to
+        // the lower left points down and to the left, between 90 and 180.
+        let falling = angle_to(0.4, 0.6);
+        assert!(
+            falling > std::f32::consts::FRAC_PI_2 && falling < std::f32::consts::PI,
+            "expected a down-left heading, got {falling}"
+        );
+
+        // Degenerate paths must not make the sprite spin.
+        assert_eq!(screen_direction_angle(origin, origin, SQUARE).0, 0.0);
+    }
+
+    #[test]
+    fn projectile_rotation_is_corrected_for_window_aspect() {
+        // Equal normalized deltas are not equal on screen unless the window is
+        // square, so the angle has to be taken in pixels.
+        let from = Vector2::new(0.5, 0.5);
+        let to = Vector2::new(0.6, 0.6);
+
+        let square = screen_direction_angle(from, to, ScreenSize {
+            width: 100.0,
+            height: 100.0,
+        });
+        let wide = screen_direction_angle(from, to, ScreenSize {
+            width: 200.0,
+            height: 100.0,
+        });
+
+        assert!((square.0 - std::f32::consts::FRAC_PI_4).abs() < 1.0e-5);
+        assert!(wide.0 < square.0, "a wider window must flatten the heading");
+    }
+
+    #[test]
+    fn fire_bolt_follows_a_moving_target_and_can_be_cancelled() {
+        let mut projectile = FireBoltProjectile::new(EntityId(1), Point3::new(0.0, 0.0, 0.0), Vec::new(), 0, 0.42);
+
+        // Effects are torn down on world transitions.
+        projectile.mark_for_deletion();
+        assert!(!projectile.update(&[], None, 0.01));
+    }
+
+    #[test]
+    fn fire_bolt_projectile_survives_a_missing_texture_list() {
+        // load_skill_particle_texture can fail; the projectile must not panic
+        // on an empty list.
+        let mut projectile = FireBoltProjectile::new(EntityId(1), Point3::new(0.0, 0.0, 0.0), Vec::new(), 0, 0.42);
+
+        assert_eq!(projectile.frame_index(), 0);
+        assert!(projectile.update(&[], None, 0.1));
     }
 
     #[test]

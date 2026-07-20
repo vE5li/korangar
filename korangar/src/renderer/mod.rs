@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 #[cfg(feature = "debug")]
 use cgmath::Point3;
-pub use effect::EffectRenderer;
+pub use effect::{EFFECT_ORIGIN, EffectRenderer};
 #[cfg(feature = "debug")]
 pub use game_interface::AlignHorizontal;
 pub use game_interface::GameInterfaceRenderer;

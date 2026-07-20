@@ -7,6 +7,13 @@ use wgpu::BlendFactor;
 use crate::graphics::{Color, EffectInstruction, ScreenPosition, ScreenSize, Texture};
 use crate::world::Camera;
 
+/// Origin the classic client's effect coordinates are expressed around.
+///
+/// Callers that build their own quads instead of replaying STR frame data can
+/// pass this as the effect offset to cancel the shift out and get a quad
+/// centred on the world position.
+pub const EFFECT_ORIGIN: Vector2<f32> = Vector2::new(319.0, 291.0);
+
 pub struct EffectRenderer {
     instructions: Vec<EffectInstruction>,
     window_size: ScreenSize,
@@ -32,6 +39,10 @@ impl EffectRenderer {
         self.window_size = window_size;
     }
 
+    pub fn window_size(&self) -> ScreenSize {
+        self.window_size
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn render_effect(
         &mut self,
@@ -46,8 +57,6 @@ impl EffectRenderer {
         source_blend_factor: BlendFactor,
         destination_blend_factor: BlendFactor,
     ) {
-        const EFFECT_ORIGIN: Vector2<f32> = Vector2::new(319.0, 291.0);
-
         let clip_space_position = camera.view_projection_matrix() * position.to_homogeneous();
         let screen_space_position = camera.clip_to_screen_space(clip_space_position);
 

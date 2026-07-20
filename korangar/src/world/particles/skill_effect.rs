@@ -47,10 +47,19 @@ const FIRE_BOLT_DESCENT_HEIGHT: f32 = 38.0;
 /// the impact animation's own offset.
 const FIRE_BOLT_TARGET_HEIGHT: f32 = 5.0;
 
-/// Half extents of one projectile frame. The source textures are 128x64, so
-/// the quad keeps their 2:1 aspect.
-const FIRE_BOLT_HALF_WIDTH: f32 = 16.0;
-const FIRE_BOLT_HALF_HEIGHT: f32 = 8.0;
+/// Rendered size of one projectile frame, in the effect renderer's pixel
+/// space.
+///
+/// This matches the source textures' native 128x64, which keeps texel mapping
+/// 1:1 and puts the projectile in the same scale band as the impact it
+/// precedes: `firehit2.str` renders quads of median 81x137 in this same
+/// space. Adjust these two values together to resize the bolt; the aspect
+/// must stay 2:1 or the streak distorts.
+const FIRE_BOLT_WIDTH: f32 = 128.0;
+const FIRE_BOLT_HEIGHT: f32 = 64.0;
+
+const FIRE_BOLT_HALF_WIDTH: f32 = FIRE_BOLT_WIDTH * 0.5;
+const FIRE_BOLT_HALF_HEIGHT: f32 = FIRE_BOLT_HEIGHT * 0.5;
 
 pub const COLD_BOLT_PARTICLE_DURATION: f32 = 0.44;
 pub const FROST_DIVER_TRAVEL_DURATION: f32 = 0.64;
@@ -720,6 +729,19 @@ mod tests {
 
         // Degenerate paths must not make the sprite spin.
         assert_eq!(screen_direction_angle(origin, origin, SQUARE).0, 0.0);
+    }
+
+    #[test]
+    fn fire_bolt_quad_matches_the_source_texture_aspect() {
+        // The frames are 128x64 streaks. A quad that is not 2:1 stretches
+        // them, which is most visible once the bolt is rotated.
+        assert_eq!(FIRE_BOLT_WIDTH / FIRE_BOLT_HEIGHT, 2.0);
+        assert_eq!(FIRE_BOLT_HALF_WIDTH * 2.0, FIRE_BOLT_WIDTH);
+        assert_eq!(FIRE_BOLT_HALF_HEIGHT * 2.0, FIRE_BOLT_HEIGHT);
+
+        // Sized to sit alongside the impact it precedes rather than beneath
+        // it: firehit2.str renders quads of median 81x137 in this same space.
+        assert!(FIRE_BOLT_WIDTH >= 81.0, "projectile must not be dwarfed by its own impact");
     }
 
     #[test]

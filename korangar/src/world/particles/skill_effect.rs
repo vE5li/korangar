@@ -23,6 +23,33 @@ pub const FROST_DIVER_TEXTURE_PATH: &str = "effect\\ice.tga";
 /// A 64x64 ice fragment used for classic water-skill impacts.
 pub const ICE_IMPACT_TEXTURE_PATH: &str = "effect\\iceparticle.bmp";
 
+/// The six 128x64 "fire arrow" frames the reference clients cycle for the
+/// Fire Bolt projectile. `data.grf` also ships frames 7 and 8, which both
+/// reference implementations exclude as unused by the official client.
+pub const FIRE_ARROW_TEXTURE_PATHS: [&str; 6] = [
+    "effect\\불화살1.tga",
+    "effect\\불화살2.tga",
+    "effect\\불화살3.tga",
+    "effect\\불화살4.tga",
+    "effect\\불화살5.tga",
+    "effect\\불화살6.tga",
+];
+
+/// Cadence of the projectile texture cycle.
+pub const FIRE_ARROW_FRAME_DURATION: f32 = 0.03;
+
+/// Height above the target that a Fire Bolt starts its descent from. Matches
+/// the Cold Bolt descent so both bolt skills share one visual scale.
+const FIRE_BOLT_DESCENT_HEIGHT: f32 = 38.0;
+
+/// Ground clearance of the projectile when it reaches the target, matching
+/// the impact animation's own offset.
+const FIRE_BOLT_TARGET_HEIGHT: f32 = 5.0;
+
+/// Rendered size of one projectile frame. The source textures are 128x64, so
+/// the quad keeps their 2:1 aspect.
+const FIRE_BOLT_PARTICLE_SIZE: ScreenSize = ScreenSize { width: 32.0, height: 16.0 };
+
 pub const COLD_BOLT_PARTICLE_DURATION: f32 = 0.44;
 pub const FROST_DIVER_TRAVEL_DURATION: f32 = 0.64;
 pub const FROST_DIVER_IMPACT_DURATION: f32 = 0.46;
@@ -134,6 +161,92 @@ fn cold_bolt_offset(bolt_index: usize) -> Vector3<f32> {
     let (x, z) = OFFSETS[bolt_index % OFFSETS.len()];
     let ring = 1.0 + (bolt_index / OFFSETS.len()) as f32 * 0.35;
     Vector3::new(x * ring, 0.0, z * ring)
+}
+
+fn fire_bolt_offset(bolt_index: usize) -> Vector3<f32> {
+    // Every bolt of a volley approaches from the same upper corner and only
+    // the jitter varies. The reference clients both do this, and it is what
+    // makes a multi-hit cast read as one stream rather than a ring.
+    const APPROACH_X: f32 = 10.0;
+    const APPROACH_Z: f32 = 4.0;
+    const JITTER: [(f32, f32); 6] = [(0.0, 0.0), (2.0, -1.5), (-2.0, 1.5), (1.0, 2.0), (-1.5, -2.0), (2.5, 0.5)];
+
+    let (jitter_x, jitter_z) = JITTER[bolt_index % JITTER.len()];
+    Vector3::new(APPROACH_X + jitter_x, 0.0, APPROACH_Z + jitter_z)
+}
+
+/// One descending Fire Bolt projectile.
+///
+/// The particle is descent-only and its lifetime is the projectile's flight
+/// time, so the separately scheduled impact animation always takes over at
+/// the exact moment the projectile reaches the target.
+pub struct FireBoltParticle {
+    target_entity_id: EntityId,
+    target_position: Point3<f32>,
+    textures: Vec<Arc<Texture>>,
+    offset: Vector3<f32>,
+    timeline: Timeline,
+}
+
+impl FireBoltParticle {
+    pub fn new(
+        target_entity_id: EntityId,
+        target_position: Point3<f32>,
+        textures: Vec<Arc<Texture>>,
+        bolt_index: usize,
+        flight_duration: f32,
+    ) -> Self {
+        Self {
+            target_entity_id,
+            target_position,
+            textures,
+            offset: fire_bolt_offset(bolt_index),
+            timeline: Timeline::new(flight_duration),
+        }
+    }
+
+    fn frame_index(&self) -> usize {
+        if self.textures.is_empty() {
+            return 0;
+        }
+
+        let frame = self.timeline.elapsed.max(0.0) / FIRE_ARROW_FRAME_DURATION;
+        (frame as usize) % self.textures.len()
+    }
+}
+
+impl EntityParticle for FireBoltParticle {
+    fn update(&mut self, entities: &[Entity], local_entity: Option<(EntityId, Point3<f32>)>, delta_time: f32) -> bool {
+        if let Some(position) = resolve_entity_position(self.target_entity_id, entities, local_entity) {
+            self.target_position = position;
+        }
+
+        self.timeline.advance(delta_time)
+    }
+
+    fn render(&self, renderer: &GameInterfaceRenderer, camera: &dyn Camera, window_size: ScreenSize) {
+        let Some(texture) = self.textures.get(self.frame_index()) else {
+            return;
+        };
+
+        // The projectile converges completely so it lands on the target
+        // rather than beside it, matching the reference clients' zero end
+        // offset.
+        let descent = smoothstep(self.timeline.progress());
+        let position = self.target_position
+            + self.offset * (1.0 - descent)
+            + Vector3::new(0.0, FIRE_BOLT_DESCENT_HEIGHT * (1.0 - descent) + FIRE_BOLT_TARGET_HEIGHT, 0.0);
+
+        render_centered(
+            renderer,
+            texture.clone(),
+            position,
+            camera,
+            window_size,
+            FIRE_BOLT_PARTICLE_SIZE,
+            Color::rgb(1.0, 1.0, 1.0),
+        );
+    }
 }
 
 /// One descending Cold Bolt shard followed by an ice impact.
@@ -419,6 +532,90 @@ mod tests {
         assert_eq!(cold_bolt_offset(8), Vector3::new(0.0, 0.0, 0.0));
         assert!(cold_bolt_offset(31).x.abs() <= 14.5);
         assert!(cold_bolt_offset(31).z.abs() <= 14.5);
+    }
+
+    #[test]
+    fn fire_bolt_frames_cycle_and_stay_in_bounds() {
+        let frame_count = FIRE_ARROW_TEXTURE_PATHS.len();
+        assert_eq!(frame_count, 6);
+
+        // Frame selection is derived from elapsed time, so it must wrap rather
+        // than run off the end of the texture list.
+        for step in 0..200 {
+            let elapsed = step as f32 * FIRE_ARROW_FRAME_DURATION * 0.5;
+            let index = ((elapsed.max(0.0) / FIRE_ARROW_FRAME_DURATION) as usize) % frame_count;
+            assert!(index < frame_count);
+        }
+
+        let index_at = |elapsed: f32| ((elapsed.max(0.0) / FIRE_ARROW_FRAME_DURATION) as usize) % frame_count;
+        assert_eq!(index_at(0.0), 0);
+        assert_eq!(index_at(FIRE_ARROW_FRAME_DURATION * 1.5), 1);
+        assert_eq!(index_at(FIRE_ARROW_FRAME_DURATION * frame_count as f32), 0);
+        assert_eq!(index_at(-1.0), 0);
+    }
+
+    #[test]
+    fn fire_bolt_approaches_from_one_corner_and_is_bounded() {
+        // Every bolt shares an approach direction so a volley reads as one
+        // stream; only the jitter varies.
+        for bolt_index in 0..32 {
+            let offset = fire_bolt_offset(bolt_index);
+
+            assert!(offset.x > 0.0, "bolt {bolt_index} must approach from the same side");
+            assert!(offset.z > 0.0, "bolt {bolt_index} must approach from the same side");
+            assert!(offset.x <= 14.0);
+            assert!(offset.z <= 8.0);
+            assert_eq!(offset.y, 0.0, "descent height is applied separately");
+        }
+
+        // Deterministic, so a replayed volley looks identical.
+        assert_eq!(fire_bolt_offset(0), fire_bolt_offset(6));
+        assert_ne!(fire_bolt_offset(0), fire_bolt_offset(1));
+    }
+
+    #[test]
+    fn fire_bolt_descends_onto_the_target_and_expires_with_its_flight() {
+        const FLIGHT: f32 = 0.42;
+        let target = Point3::new(100.0, 20.0, 300.0);
+        let mut particle = FireBoltParticle::new(EntityId(7), target, Vec::new(), 0, FLIGHT);
+
+        // Starts above and beside the target.
+        assert_eq!(particle.timeline.progress(), 0.0);
+        let start_offset = particle.offset;
+        assert!(start_offset.x > 0.0);
+
+        // Lives exactly as long as the flight it was given, so the separately
+        // scheduled impact takes over the moment it lands.
+        assert!(particle.update(&[], None, FLIGHT * 0.5));
+        assert!((particle.timeline.progress() - 0.5).abs() < 1.0e-6);
+        assert!(!particle.update(&[], None, FLIGHT * 0.5));
+        assert_eq!(particle.timeline.progress(), 1.0);
+    }
+
+    #[test]
+    fn fire_bolt_converges_completely_onto_the_target() {
+        // Unlike Cold Bolt, which keeps a residual offset, the fire bolt must
+        // land on the target: the impact animation plays there.
+        let full_descent = smoothstep(1.0);
+        assert_eq!(full_descent, 1.0);
+
+        let offset = fire_bolt_offset(3);
+        let residual = offset * (1.0 - full_descent);
+        assert_eq!(residual.x, 0.0);
+        assert_eq!(residual.z, 0.0);
+
+        let height = FIRE_BOLT_DESCENT_HEIGHT * (1.0 - full_descent) + FIRE_BOLT_TARGET_HEIGHT;
+        assert_eq!(height, FIRE_BOLT_TARGET_HEIGHT);
+    }
+
+    #[test]
+    fn fire_bolt_particle_survives_a_missing_texture_list() {
+        // load_skill_particle_texture can fail; the particle must not panic
+        // on an empty list.
+        let mut particle = FireBoltParticle::new(EntityId(1), Point3::new(0.0, 0.0, 0.0), Vec::new(), 0, 0.42);
+
+        assert_eq!(particle.frame_index(), 0);
+        assert!(particle.update(&[], None, 0.1));
     }
 
     #[test]

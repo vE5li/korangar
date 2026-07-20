@@ -242,6 +242,7 @@ struct PendingProceduralSkillVisual {
     source_entity_id: EntityId,
     destination_entity_id: EntityId,
     sequence_index: usize,
+    flight_time: f32,
 }
 
 fn is_skill_target_confirmation(mouse_button: MouseButton) -> bool {
@@ -1468,8 +1469,37 @@ impl Client {
         destination_entity_id: EntityId,
         sequence_index: usize,
         initial_elapsed: f32,
+        flight_time: f32,
     ) {
         let mut particle: Box<dyn EntityParticle + Send + Sync> = match recipe.kind {
+            SkillProceduralVisualKind::FireBoltProjectile => {
+                let Some(position) = self.entity_position(destination_entity_id) else {
+                    return;
+                };
+
+                let mut textures = Vec::with_capacity(FIRE_ARROW_TEXTURE_PATHS.len());
+                for texture_path in FIRE_ARROW_TEXTURE_PATHS {
+                    let Some(texture) = self.load_skill_particle_texture(texture_path) else {
+                        return;
+                    };
+                    textures.push(texture);
+                }
+
+                // The official client randomizes the launch sound per bolt.
+                let sound_index = (rand_aes::tls::rand_f32() * FIRE_ARROW_LAUNCH_SOUND_PATHS.len() as f32) as usize;
+                let sound_path = FIRE_ARROW_LAUNCH_SOUND_PATHS[sound_index.min(FIRE_ARROW_LAUNCH_SOUND_PATHS.len() - 1)];
+                let sound_effect = self.audio_engine.load(sound_path);
+                self.audio_engine
+                    .play_spatial_sound_effect(sound_effect, position, FIRE_ARROW_LAUNCH_SOUND_RANGE);
+
+                Box::new(FireBoltParticle::new(
+                    destination_entity_id,
+                    position,
+                    textures,
+                    sequence_index,
+                    flight_time,
+                ))
+            }
             SkillProceduralVisualKind::ColdBolt => {
                 let Some(position) = self.entity_position(destination_entity_id) else {
                     return;
@@ -1572,13 +1602,21 @@ impl Client {
         destination_entity_id: EntityId,
         hit_count: i16,
         initial_delay: f32,
+        flight_time: f32,
     ) {
         let repeat_delays = std::iter::once(0.0).chain(skill_effect_repeat_delays(recipe.hit_interval, hit_count));
 
         for (sequence_index, repeat_delay) in repeat_delays.enumerate() {
             let remaining_delay = initial_delay + repeat_delay;
             if remaining_delay <= 0.0 {
-                self.spawn_procedural_skill_visual(recipe, source_entity_id, destination_entity_id, sequence_index, 0.0);
+                self.spawn_procedural_skill_visual(
+                    recipe,
+                    source_entity_id,
+                    destination_entity_id,
+                    sequence_index,
+                    0.0,
+                    flight_time,
+                );
             } else {
                 self.pending_procedural_skill_visuals.push(PendingProceduralSkillVisual {
                     remaining_delay,
@@ -1586,6 +1624,7 @@ impl Client {
                     source_entity_id,
                     destination_entity_id,
                     sequence_index,
+                    flight_time,
                 });
             }
         }
@@ -1604,6 +1643,7 @@ impl Client {
                     pending.destination_entity_id,
                     pending.sequence_index,
                     -pending.remaining_delay,
+                    pending.flight_time,
                 );
             } else {
                 self.pending_procedural_skill_visuals.push(pending);
@@ -2363,6 +2403,7 @@ impl Client {
                     source_entity_id,
                     destination_entity_id,
                     start_time,
+                    source_motion,
                     damage,
                     hit_count,
                     action,
@@ -2381,24 +2422,40 @@ impl Client {
                         .or_else(|| procedural_recipe.and_then(|recipe| recipe.hit_interval))
                         .or_else(|| sound_recipe.and_then(|recipe| recipe.hit_interval))
                         .or_else(|| skill_damage_number_interval(skill_id));
+
+                    // A projectile launches when the packet says the skill
+                    // resolved, but its hit only lands once it arrives. The
+                    // server's attack motion is that flight time, so all hit
+                    // feedback waits for it. Skills without a projectile keep
+                    // a zero lead and are unaffected.
+                    let flight_time = skill_impact_lead_time(procedural_recipe, source_motion);
+                    let impact_delay = initial_delay + flight_time;
+
                     self.queue_skill_damage_particle(
                         destination_entity_id,
                         SkillDamageDisplay::from_packet(damage, action),
                         hit_count,
                         hit_interval,
-                        initial_delay,
+                        impact_delay,
                     );
                     if let Some(recipe) = visual_recipe {
-                        self.queue_skill_damage_visual(recipe, source_entity_id, destination_entity_id, hit_count, initial_delay);
+                        self.queue_skill_damage_visual(recipe, source_entity_id, destination_entity_id, hit_count, impact_delay);
                     }
                     if let Some(recipe) = sprite_recipe {
-                        self.queue_skill_sprite_visual(recipe, source_entity_id, destination_entity_id, true, initial_delay);
+                        self.queue_skill_sprite_visual(recipe, source_entity_id, destination_entity_id, true, impact_delay);
                     }
                     if let Some(recipe) = procedural_recipe {
-                        self.queue_procedural_skill_visual(recipe, source_entity_id, destination_entity_id, hit_count, initial_delay);
+                        self.queue_procedural_skill_visual(
+                            recipe,
+                            source_entity_id,
+                            destination_entity_id,
+                            hit_count,
+                            initial_delay,
+                            flight_time,
+                        );
                     }
                     if let Some(recipe) = sound_recipe {
-                        self.play_skill_damage_sound(recipe, source_entity_id, destination_entity_id, hit_count, initial_delay);
+                        self.play_skill_damage_sound(recipe, source_entity_id, destination_entity_id, hit_count, impact_delay);
                     }
                     if let Some((recipe, followup_delay)) = skill_damage_followup_sound(skill_id) {
                         self.play_skill_damage_sound(
@@ -2406,7 +2463,7 @@ impl Client {
                             source_entity_id,
                             destination_entity_id,
                             1,
-                            initial_delay + followup_delay,
+                            impact_delay + followup_delay,
                         );
                     }
                 }
@@ -2675,7 +2732,11 @@ impl Client {
                         self.spawn_skill_sprite_visual(recipe, entity_id, entity_id, true);
                     }
                     if let Some(recipe) = special_effect_procedural_visual(effect_id) {
-                        self.spawn_procedural_skill_visual(recipe, entity_id, entity_id, 0, 0.0);
+                        // ZC_NOTIFY_EFFECT carries no motion time. None of the
+                        // direct-effect recipes lead an impact, so the flight
+                        // time is unused; the floor keeps any future
+                        // projectile visible rather than single-frame.
+                        self.spawn_procedural_skill_visual(recipe, entity_id, entity_id, 0, 0.0, skill_projectile_flight_time(0));
                     }
                     if let Some(recipe) = special_effect_sound(effect_id) {
                         self.play_skill_sound(recipe, entity_id, entity_id, None);

@@ -14,10 +14,24 @@ const FROST_DIVER_SKILL: SkillId = SkillId(15);
 
 pub const SIGHT_ATTACHMENT_KEY: u32 = SIGHT_SKILL.0 as u32;
 pub const OPTION_SIGHT: u32 = 0x0000_0001;
+/// Launch sounds of the Fire Bolt projectile. The official client picks one
+/// at random per bolt.
+pub const FIRE_ARROW_LAUNCH_SOUND_PATHS: [&str; 3] = [
+    "effect\\ef_firearrow1.wav",
+    "effect\\ef_firearrow2.wav",
+    "effect\\ef_firearrow3.wav",
+];
+
+/// Spatial range of the projectile launch sound.
+pub const FIRE_ARROW_LAUNCH_SOUND_RANGE: f32 = 55.0;
+
 pub const SKILL_SOUND_PATHS: &[&str] = &[
     "_heal_effect.wav",
     "effect\\ef_blessing.wav",
     "effect\\ef_fireball.wav",
+    "effect\\ef_firearrow1.wav",
+    "effect\\ef_firearrow2.wav",
+    "effect\\ef_firearrow3.wav",
     "effect\\ef_firehit.wav",
     "effect\\ef_firewall.wav",
     "effect\\ef_frostdiver.wav",
@@ -81,6 +95,7 @@ pub struct SkillSoundRecipe {
 pub enum SkillProceduralVisualKind {
     ColdBolt,
     ColdImpact,
+    FireBoltProjectile,
     FrostDiver,
     FrostDiverPreview,
     FrostDiverImpact,
@@ -90,15 +105,50 @@ pub enum SkillProceduralVisualKind {
 pub struct SkillProceduralVisualRecipe {
     pub kind: SkillProceduralVisualKind,
     pub hit_interval: Option<f32>,
+    /// Whether this visual is a projectile that must land before the hit
+    /// resolves. Hit feedback for such skills is delayed by the projectile's
+    /// flight time so the impact never precedes the projectile.
+    pub leads_impact: bool,
 }
 
 pub const FROST_DIVER_FOLLOWUP_DELAY: f32 = 0.64;
+
+/// Bounds applied to the server's attack motion when it is reused as a
+/// projectile flight time.
+///
+/// `ZC_NOTIFY_SKILL` carries rAthena's `sdelay`, which is the caster's attack
+/// motion and therefore ASPD dependent. It is authoritative for when the hit
+/// resolves, but unbounded as a flight duration: zero would leave the
+/// projectile invisible and a slow caster would leave it hanging in the air.
+pub const PROJECTILE_FLIGHT_MINIMUM: f32 = 0.18;
+pub const PROJECTILE_FLIGHT_MAXIMUM: f32 = 0.60;
+
+/// Flight time of a projectile whose hit is scheduled `source_motion`
+/// milliseconds after the packet.
+pub fn skill_projectile_flight_time(source_motion: i32) -> f32 {
+    (source_motion.max(0) as f32 / 1000.0).clamp(PROJECTILE_FLIGHT_MINIMUM, PROJECTILE_FLIGHT_MAXIMUM)
+}
+
+/// Delay that hit feedback must wait so it resolves after the projectile
+/// lands. Skills without a leading projectile are unaffected.
+pub fn skill_impact_lead_time(recipe: Option<SkillProceduralVisualRecipe>, source_motion: i32) -> f32 {
+    match recipe {
+        Some(recipe) if recipe.leads_impact => skill_projectile_flight_time(source_motion),
+        _ => 0.0,
+    }
+}
 
 const FIRE_IMPACT_LIGHT: SkillEffectLight = SkillEffectLight {
     offset: [0.0, 6.0, 0.0],
     color: Color::rgb_u8(255, 72, 20),
     intensity: 45.0,
 };
+
+/// Spacing between the hits of a Fire Bolt volley.
+///
+/// This is the official client's `PLUSATTACKED_MOTIONTIME`. Both reference
+/// implementations pace multi-hit feedback at 200ms.
+const FIRE_BOLT_HIT_INTERVAL: f32 = 0.20;
 
 const FIRE_BOLT_IMPACT: SkillVisualRecipe = SkillVisualRecipe {
     effect_path: "firehit2.str",
@@ -108,7 +158,7 @@ const FIRE_BOLT_IMPACT: SkillVisualRecipe = SkillVisualRecipe {
     effect_offset: [0.0, 5.0, 0.0],
     light: Some(FIRE_IMPACT_LIGHT),
     repeating: false,
-    hit_interval: Some(0.12),
+    hit_interval: Some(FIRE_BOLT_HIT_INTERVAL),
 };
 
 const FIRE_WALL_IMPACT: SkillVisualRecipe = SkillVisualRecipe {
@@ -244,7 +294,7 @@ const FIRE_BOLT_SOUND: SkillSoundRecipe = SkillSoundRecipe {
     sound_path: "effect\\ef_firehit.wav",
     sound_range: 55.0,
     anchor: SkillVisualAnchor::DestinationEntity,
-    hit_interval: Some(0.12),
+    hit_interval: Some(FIRE_BOLT_HIT_INTERVAL),
 };
 
 const FIRE_HIT_DIRECT_SOUND: SkillSoundRecipe = SkillSoundRecipe {
@@ -275,26 +325,42 @@ const FROST_DIVER_TARGET_HIT_SOUND: SkillSoundRecipe = SkillSoundRecipe {
 const COLD_BOLT_PROCEDURAL: SkillProceduralVisualRecipe = SkillProceduralVisualRecipe {
     kind: SkillProceduralVisualKind::ColdBolt,
     hit_interval: Some(0.12),
+    leads_impact: false,
 };
 
 const COLD_IMPACT_PROCEDURAL: SkillProceduralVisualRecipe = SkillProceduralVisualRecipe {
     kind: SkillProceduralVisualKind::ColdImpact,
     hit_interval: None,
+    leads_impact: false,
+};
+
+/// Fire Bolt's projectile stage.
+///
+/// The official client models Fire Bolt as a projectile that falls onto the
+/// target followed by a separate impact animation, so the projectile leads
+/// the hit rather than sharing its schedule.
+const FIRE_BOLT_PROJECTILE_PROCEDURAL: SkillProceduralVisualRecipe = SkillProceduralVisualRecipe {
+    kind: SkillProceduralVisualKind::FireBoltProjectile,
+    hit_interval: Some(FIRE_BOLT_HIT_INTERVAL),
+    leads_impact: true,
 };
 
 const FROST_DIVER_PROCEDURAL: SkillProceduralVisualRecipe = SkillProceduralVisualRecipe {
     kind: SkillProceduralVisualKind::FrostDiver,
     hit_interval: None,
+    leads_impact: false,
 };
 
 const FROST_DIVER_PREVIEW_PROCEDURAL: SkillProceduralVisualRecipe = SkillProceduralVisualRecipe {
     kind: SkillProceduralVisualKind::FrostDiverPreview,
     hit_interval: None,
+    leads_impact: false,
 };
 
 const FROST_DIVER_IMPACT_PROCEDURAL: SkillProceduralVisualRecipe = SkillProceduralVisualRecipe {
     kind: SkillProceduralVisualKind::FrostDiverImpact,
     hit_interval: None,
+    leads_impact: false,
 };
 
 pub fn skill_damage_visual(skill_id: SkillId) -> Option<SkillVisualRecipe> {
@@ -368,6 +434,7 @@ pub fn skill_damage_sound(skill_id: SkillId) -> Option<SkillSoundRecipe> {
 pub fn skill_damage_procedural_visual(skill_id: SkillId) -> Option<SkillProceduralVisualRecipe> {
     match skill_id {
         COLD_BOLT_SKILL => Some(COLD_BOLT_PROCEDURAL),
+        FIRE_BOLT_SKILL => Some(FIRE_BOLT_PROJECTILE_PROCEDURAL),
         FROST_DIVER_SKILL => Some(FROST_DIVER_PROCEDURAL),
         _ => None,
     }
@@ -500,6 +567,100 @@ mod tests {
             skill_damage_followup_sound(FROST_DIVER_SKILL),
             Some((FROST_DIVER_TARGET_HIT_SOUND, FROST_DIVER_FOLLOWUP_DELAY))
         );
+    }
+
+    #[test]
+    fn fire_bolt_projectile_leads_its_own_impact() {
+        let projectile = skill_damage_procedural_visual(FIRE_BOLT_SKILL).unwrap();
+
+        assert_eq!(projectile.kind, SkillProceduralVisualKind::FireBoltProjectile);
+        assert!(projectile.leads_impact);
+        // Projectile and impact must fan out on the same cadence, otherwise
+        // the pairing drifts apart across a multi-hit volley.
+        assert_eq!(projectile.hit_interval, Some(FIRE_BOLT_HIT_INTERVAL));
+        assert_eq!(
+            skill_damage_visual(FIRE_BOLT_SKILL).unwrap().hit_interval,
+            Some(FIRE_BOLT_HIT_INTERVAL)
+        );
+        assert_eq!(
+            skill_damage_sound(FIRE_BOLT_SKILL).unwrap().hit_interval,
+            Some(FIRE_BOLT_HIT_INTERVAL)
+        );
+    }
+
+    #[test]
+    fn projectile_flight_time_is_clamped_to_a_visible_range() {
+        // The server's attack motion is ASPD dependent and unbounded as a
+        // flight duration.
+        assert_eq!(skill_projectile_flight_time(0), PROJECTILE_FLIGHT_MINIMUM);
+        assert_eq!(skill_projectile_flight_time(-5000), PROJECTILE_FLIGHT_MINIMUM);
+        assert_eq!(skill_projectile_flight_time(i32::MIN), PROJECTILE_FLIGHT_MINIMUM);
+        assert_eq!(skill_projectile_flight_time(10_000), PROJECTILE_FLIGHT_MAXIMUM);
+        assert_eq!(skill_projectile_flight_time(i32::MAX), PROJECTILE_FLIGHT_MAXIMUM);
+        assert_eq!(skill_projectile_flight_time(420), 0.42);
+        assert!(PROJECTILE_FLIGHT_MINIMUM > 0.0 && PROJECTILE_FLIGHT_MINIMUM < PROJECTILE_FLIGHT_MAXIMUM);
+    }
+
+    #[test]
+    fn only_projectile_skills_delay_their_hit_feedback() {
+        // Fire Bolt leads, so its hit waits for the projectile to land.
+        let fire_bolt = skill_damage_procedural_visual(FIRE_BOLT_SKILL);
+        assert_eq!(skill_impact_lead_time(fire_bolt, 420), 0.42);
+
+        // Everything else keeps a zero lead and is unaffected by this change.
+        assert_eq!(
+            skill_impact_lead_time(skill_damage_procedural_visual(COLD_BOLT_SKILL), 420),
+            0.0
+        );
+        assert_eq!(
+            skill_impact_lead_time(skill_damage_procedural_visual(FROST_DIVER_SKILL), 420),
+            0.0
+        );
+        assert_eq!(skill_impact_lead_time(None, 420), 0.0);
+        assert_eq!(
+            skill_impact_lead_time(skill_damage_procedural_visual(SkillId(u16::MAX)), 420),
+            0.0
+        );
+    }
+
+    #[test]
+    fn every_fire_bolt_hit_resolves_after_its_projectile_lands() {
+        // The property the split exists for: for every hit of the volley the
+        // impact must never precede the projectile that produced it.
+        let recipe = skill_damage_procedural_visual(FIRE_BOLT_SKILL).unwrap();
+        let initial_delay = 0.3;
+
+        for source_motion in [0, 120, 420, 900, i32::MAX] {
+            let flight_time = skill_impact_lead_time(Some(recipe), source_motion);
+            let impact_delay = initial_delay + flight_time;
+            let launches = std::iter::once(0.0).chain(skill_effect_repeat_delays(recipe.hit_interval, 10));
+            let impacts = std::iter::once(0.0).chain(skill_effect_repeat_delays(recipe.hit_interval, 10));
+
+            for (launch_offset, impact_offset) in launches.zip(impacts) {
+                let launch_at = initial_delay + launch_offset;
+                let impact_at = impact_delay + impact_offset;
+                let lands_at = launch_at + flight_time;
+
+                assert!(impact_at > launch_at, "impact must not precede its projectile launch");
+                assert!(
+                    (impact_at - lands_at).abs() < 1.0e-6,
+                    "impact must coincide with the projectile landing"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn fire_bolt_launch_sounds_are_indexable_and_present_in_the_preload_list() {
+        assert_eq!(FIRE_ARROW_LAUNCH_SOUND_PATHS.len(), 3);
+        for path in FIRE_ARROW_LAUNCH_SOUND_PATHS {
+            assert!(SKILL_SOUND_PATHS.contains(&path), "{path} must be preloaded");
+        }
+        // Guards the index derivation used at the spawn site.
+        for raw in [0.0_f32, 0.5, 0.999_999, 1.0] {
+            let index = ((raw * FIRE_ARROW_LAUNCH_SOUND_PATHS.len() as f32) as usize).min(FIRE_ARROW_LAUNCH_SOUND_PATHS.len() - 1);
+            assert!(index < FIRE_ARROW_LAUNCH_SOUND_PATHS.len());
+        }
     }
 
     #[test]

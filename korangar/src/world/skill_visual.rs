@@ -22,8 +22,9 @@ pub const FIRE_ARROW_LAUNCH_SOUND_PATHS: [&str; 3] = [
     "effect\\ef_firearrow3.wav",
 ];
 
-/// Spatial range of the projectile launch sound.
-pub const FIRE_ARROW_LAUNCH_SOUND_RANGE: f32 = 55.0;
+/// Launch sounds of the Cold Bolt projectile. The official client attaches
+/// these to the projectile rather than to the hit, and picks one per bolt.
+pub const ICE_ARROW_LAUNCH_SOUND_PATHS: [&str; 3] = ["effect\\ef_icearrow1.wav", "effect\\ef_icearrow2.wav", "effect\\ef_icearrow3.wav"];
 
 pub const SKILL_SOUND_PATHS: &[&str] = &[
     "_heal_effect.wav",
@@ -36,9 +37,13 @@ pub const SKILL_SOUND_PATHS: &[&str] = &[
     "effect\\ef_firewall.wav",
     "effect\\ef_frostdiver.wav",
     "effect\\ef_frostdiver2.wav",
-    "effect\\ef_icearrow.wav",
+    "effect\\ef_icearrow1.wav",
+    "effect\\ef_icearrow2.wav",
+    "effect\\ef_icearrow3.wav",
     "effect\\ef_lightbolt.wav",
     "effect\\ef_sight.wav",
+    "_hit_fist3.wav",
+    "_hit_fist4.wav",
 ];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -59,6 +64,10 @@ pub struct SkillEffectLight {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SkillVisualRecipe {
     pub effect_path: &'static str,
+    /// Interchangeable alternatives to `effect_path`. The official client
+    /// varies several impact animations per hit rather than replaying one.
+    /// Empty means `effect_path` is always used.
+    pub effect_path_variants: &'static [&'static str],
     pub sound_path: Option<&'static str>,
     pub sound_range: f32,
     pub anchor: SkillVisualAnchor,
@@ -86,9 +95,27 @@ pub struct SkillSpriteVisualRecipe {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SkillSoundRecipe {
     pub sound_path: &'static str,
+    /// Interchangeable alternatives to `sound_path`, picked per hit. Empty
+    /// means `sound_path` is always used.
+    pub sound_path_variants: &'static [&'static str],
     pub sound_range: f32,
     pub anchor: SkillVisualAnchor,
     pub hit_interval: Option<f32>,
+}
+
+/// Picks one of `variants` using a roll in `[0, 1)`, falling back to `single`
+/// when there are no variants.
+///
+/// The roll is a parameter rather than drawn inside so the selection is
+/// testable and so a caller can keep one roll consistent across the assets of
+/// a single hit.
+pub fn pick_variant(single: &'static str, variants: &'static [&'static str], roll: f32) -> &'static str {
+    if variants.is_empty() {
+        return single;
+    }
+
+    let index = (roll.clamp(0.0, 1.0) * variants.len() as f32) as usize;
+    variants[index.min(variants.len() - 1)]
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -148,17 +175,23 @@ const FIRE_IMPACT_LIGHT: SkillEffectLight = SkillEffectLight {
 ///
 /// This is the official client's `PLUSATTACKED_MOTIONTIME`. Both reference
 /// implementations pace multi-hit feedback at 200ms.
-const FIRE_BOLT_HIT_INTERVAL: f32 = 0.20;
+const BOLT_HIT_INTERVAL: f32 = 0.20;
+
+/// The official client varies the fire impact per hit instead of replaying
+/// one animation. Fire Wall's hit shares the same effect, so it inherits
+/// these through `FIRE_WALL_IMPACT`.
+const FIRE_HIT_VARIANTS: &[&str] = &["firehit1.str", "firehit2.str", "firehit3.str"];
 
 const FIRE_BOLT_IMPACT: SkillVisualRecipe = SkillVisualRecipe {
     effect_path: "firehit2.str",
+    effect_path_variants: FIRE_HIT_VARIANTS,
     sound_path: None,
     sound_range: 55.0,
     anchor: SkillVisualAnchor::DestinationEntity,
     effect_offset: [0.0, 5.0, 0.0],
     light: Some(FIRE_IMPACT_LIGHT),
     repeating: false,
-    hit_interval: Some(FIRE_BOLT_HIT_INTERVAL),
+    hit_interval: Some(BOLT_HIT_INTERVAL),
 };
 
 const FIRE_WALL_IMPACT: SkillVisualRecipe = SkillVisualRecipe {
@@ -169,6 +202,7 @@ const FIRE_WALL_IMPACT: SkillVisualRecipe = SkillVisualRecipe {
 
 const FIRE_WALL_GROUND: SkillVisualRecipe = SkillVisualRecipe {
     effect_path: "firewall2.str",
+    effect_path_variants: &[],
     sound_path: Some("effect\\ef_firewall.wav"),
     sound_range: 65.0,
     anchor: SkillVisualAnchor::GroundPosition,
@@ -180,6 +214,7 @@ const FIRE_WALL_GROUND: SkillVisualRecipe = SkillVisualRecipe {
 
 const FIRE_WALL_UNIT: SkillVisualRecipe = SkillVisualRecipe {
     effect_path: "firewall.str",
+    effect_path_variants: &[],
     sound_path: None,
     sound_range: 65.0,
     anchor: SkillVisualAnchor::SkillUnit,
@@ -195,6 +230,7 @@ const FIRE_WALL_UNIT: SkillVisualRecipe = SkillVisualRecipe {
 
 const PNEUMA_UNIT: SkillVisualRecipe = SkillVisualRecipe {
     effect_path: "pneuma1.str",
+    effect_path_variants: &[],
     sound_path: None,
     sound_range: 50.0,
     anchor: SkillVisualAnchor::SkillUnit,
@@ -210,6 +246,7 @@ const PNEUMA_UNIT: SkillVisualRecipe = SkillVisualRecipe {
 
 const LIGHTNING_BOLT_IMPACT: SkillVisualRecipe = SkillVisualRecipe {
     effect_path: "lightning.str",
+    effect_path_variants: &[],
     sound_path: Some("effect\\ef_lightbolt.wav"),
     sound_range: 55.0,
     anchor: SkillVisualAnchor::DestinationEntity,
@@ -225,6 +262,7 @@ const LIGHTNING_BOLT_IMPACT: SkillVisualRecipe = SkillVisualRecipe {
 
 const HEAL_TARGET: SkillVisualRecipe = SkillVisualRecipe {
     effect_path: "recovery.str",
+    effect_path_variants: &[],
     sound_path: None,
     sound_range: 55.0,
     anchor: SkillVisualAnchor::DestinationEntity,
@@ -278,23 +316,40 @@ const SIGHT_SOURCE: SkillSpriteVisualRecipe = SkillSpriteVisualRecipe {
 
 const HEAL_SOUND: SkillSoundRecipe = SkillSoundRecipe {
     sound_path: "_heal_effect.wav",
+    sound_path_variants: &[],
     sound_range: 55.0,
     anchor: SkillVisualAnchor::DestinationEntity,
     hit_interval: None,
 };
 
-const COLD_BOLT_SOUND: SkillSoundRecipe = SkillSoundRecipe {
-    sound_path: "effect\\ef_icearrow.wav",
+/// `EF_ICEARROW` fired as a direct effect is the projectile's own sound.
+const ICE_ARROW_DIRECT_SOUND: SkillSoundRecipe = SkillSoundRecipe {
+    sound_path: "effect\\ef_icearrow1.wav",
+    sound_path_variants: &ICE_ARROW_LAUNCH_SOUND_PATHS,
     sound_range: 55.0,
     anchor: SkillVisualAnchor::DestinationEntity,
-    hit_interval: Some(0.12),
+    hit_interval: None,
+};
+
+/// Cold Bolt's impact sound.
+///
+/// The ice-arrow sounds belong to the projectile, not the hit: the official
+/// client attaches them to `ef_coldbolt` and plays a generic elemental hit on
+/// arrival. Those launch sounds now live on the projectile art.
+const COLD_BOLT_IMPACT_SOUND: SkillSoundRecipe = SkillSoundRecipe {
+    sound_path: "_hit_fist3.wav",
+    sound_path_variants: &["_hit_fist3.wav", "_hit_fist4.wav"],
+    sound_range: 55.0,
+    anchor: SkillVisualAnchor::DestinationEntity,
+    hit_interval: Some(BOLT_HIT_INTERVAL),
 };
 
 const FIRE_BOLT_SOUND: SkillSoundRecipe = SkillSoundRecipe {
     sound_path: "effect\\ef_firehit.wav",
+    sound_path_variants: &[],
     sound_range: 55.0,
     anchor: SkillVisualAnchor::DestinationEntity,
-    hit_interval: Some(FIRE_BOLT_HIT_INTERVAL),
+    hit_interval: Some(BOLT_HIT_INTERVAL),
 };
 
 const FIRE_HIT_DIRECT_SOUND: SkillSoundRecipe = SkillSoundRecipe {
@@ -305,6 +360,7 @@ const FIRE_HIT_DIRECT_SOUND: SkillSoundRecipe = SkillSoundRecipe {
 
 const FROST_DIVER_SOUND: SkillSoundRecipe = SkillSoundRecipe {
     sound_path: "effect\\ef_frostdiver.wav",
+    sound_path_variants: &[],
     sound_range: 55.0,
     anchor: SkillVisualAnchor::SourceEntity,
     hit_interval: None,
@@ -312,6 +368,7 @@ const FROST_DIVER_SOUND: SkillSoundRecipe = SkillSoundRecipe {
 
 const FROST_DIVER_HIT_SOUND: SkillSoundRecipe = SkillSoundRecipe {
     sound_path: "effect\\ef_frostdiver2.wav",
+    sound_path_variants: &[],
     sound_range: 55.0,
     anchor: SkillVisualAnchor::SourceEntity,
     hit_interval: None,
@@ -322,10 +379,12 @@ const FROST_DIVER_TARGET_HIT_SOUND: SkillSoundRecipe = SkillSoundRecipe {
     ..FROST_DIVER_HIT_SOUND
 };
 
+/// Cold Bolt is the same falling-projectile shape as Fire Bolt, so it shares
+/// the cadence and the leading behaviour.
 const COLD_BOLT_PROCEDURAL: SkillProceduralVisualRecipe = SkillProceduralVisualRecipe {
     kind: SkillProceduralVisualKind::ColdBolt,
-    hit_interval: Some(0.12),
-    leads_impact: false,
+    hit_interval: Some(BOLT_HIT_INTERVAL),
+    leads_impact: true,
 };
 
 const COLD_IMPACT_PROCEDURAL: SkillProceduralVisualRecipe = SkillProceduralVisualRecipe {
@@ -341,7 +400,7 @@ const COLD_IMPACT_PROCEDURAL: SkillProceduralVisualRecipe = SkillProceduralVisua
 /// the hit rather than sharing its schedule.
 const FIRE_BOLT_PROJECTILE_PROCEDURAL: SkillProceduralVisualRecipe = SkillProceduralVisualRecipe {
     kind: SkillProceduralVisualKind::FireBoltProjectile,
-    hit_interval: Some(FIRE_BOLT_HIT_INTERVAL),
+    hit_interval: Some(BOLT_HIT_INTERVAL),
     leads_impact: true,
 };
 
@@ -424,7 +483,7 @@ pub fn skill_damage_sound(skill_id: SkillId) -> Option<SkillSoundRecipe> {
     match skill_id {
         // The classic Cold Bolt visual is procedural and has no complete
         // STR/SPR/ACT asset, but its authoritative GRF sound is available.
-        COLD_BOLT_SKILL => Some(COLD_BOLT_SOUND),
+        COLD_BOLT_SKILL => Some(COLD_BOLT_IMPACT_SOUND),
         FIRE_BOLT_SKILL => Some(FIRE_BOLT_SOUND),
         FROST_DIVER_SKILL => Some(FROST_DIVER_SOUND),
         _ => None,
@@ -517,7 +576,7 @@ pub fn special_effect_sprite_visual(effect_id: EffectId) -> Option<SkillSpriteVi
 pub fn special_effect_sound(effect_id: EffectId) -> Option<SkillSoundRecipe> {
     match effect_id {
         EffectId::Firehit => Some(FIRE_HIT_DIRECT_SOUND),
-        EffectId::Icearrow => Some(COLD_BOLT_SOUND),
+        EffectId::Icearrow => Some(ICE_ARROW_DIRECT_SOUND),
         EffectId::Frostdiver => Some(FROST_DIVER_SOUND),
         EffectId::Frostdiver2 => Some(FROST_DIVER_HIT_SOUND),
         EffectId::Heal => Some(HEAL_SOUND),
@@ -553,9 +612,12 @@ mod tests {
         assert_eq!(lightning_bolt.hit_interval, None);
         assert_eq!(skill_damage_number_interval(LIGHTNING_BOLT_SKILL), Some(0.12));
 
+        // Both bolts are the same falling-projectile shape, so they share the
+        // cadence and the leading behaviour.
         let cold_bolt = skill_damage_procedural_visual(COLD_BOLT_SKILL).unwrap();
         assert_eq!(cold_bolt.kind, SkillProceduralVisualKind::ColdBolt);
-        assert_eq!(cold_bolt.hit_interval, Some(0.12));
+        assert_eq!(cold_bolt.hit_interval, Some(BOLT_HIT_INTERVAL));
+        assert!(cold_bolt.leads_impact);
 
         let frost_diver = skill_damage_procedural_visual(FROST_DIVER_SKILL).unwrap();
         assert_eq!(frost_diver.kind, SkillProceduralVisualKind::FrostDiver);
@@ -577,15 +639,71 @@ mod tests {
         assert!(projectile.leads_impact);
         // Projectile and impact must fan out on the same cadence, otherwise
         // the pairing drifts apart across a multi-hit volley.
-        assert_eq!(projectile.hit_interval, Some(FIRE_BOLT_HIT_INTERVAL));
+        assert_eq!(projectile.hit_interval, Some(BOLT_HIT_INTERVAL));
         assert_eq!(
             skill_damage_visual(FIRE_BOLT_SKILL).unwrap().hit_interval,
-            Some(FIRE_BOLT_HIT_INTERVAL)
+            Some(BOLT_HIT_INTERVAL)
         );
         assert_eq!(
             skill_damage_sound(FIRE_BOLT_SKILL).unwrap().hit_interval,
-            Some(FIRE_BOLT_HIT_INTERVAL)
+            Some(BOLT_HIT_INTERVAL)
         );
+    }
+
+    #[test]
+    fn variant_selection_covers_every_entry_and_never_indexes_out_of_range() {
+        const VARIANTS: &[&str] = &["a", "b", "c"];
+
+        // A roll of exactly 1.0 must not run past the end.
+        assert_eq!(pick_variant("fallback", VARIANTS, 1.0), "c");
+        assert_eq!(pick_variant("fallback", VARIANTS, 0.0), "a");
+        assert_eq!(pick_variant("fallback", VARIANTS, 0.5), "b");
+        // Out-of-contract rolls are clamped rather than panicking.
+        assert_eq!(pick_variant("fallback", VARIANTS, -5.0), "a");
+        assert_eq!(pick_variant("fallback", VARIANTS, 99.0), "c");
+
+        // No variants means the single path is authoritative.
+        assert_eq!(pick_variant("fallback", &[], 0.7), "fallback");
+
+        // Every entry must be reachable, or a variant would be dead weight.
+        let mut seen = [false; 3];
+        for step in 0..300 {
+            let picked = pick_variant("fallback", VARIANTS, step as f32 / 300.0);
+            seen[VARIANTS.iter().position(|v| *v == picked).unwrap()] = true;
+        }
+        assert!(seen.iter().all(|hit| *hit));
+    }
+
+    #[test]
+    fn varied_impacts_are_declared_and_preloaded() {
+        // Fire Bolt and Fire Wall share EF_FIREHIT, so both vary per hit.
+        let fire_bolt = skill_damage_visual(FIRE_BOLT_SKILL).unwrap();
+        let fire_wall = skill_damage_visual(FIRE_WALL_SKILL).unwrap();
+        assert_eq!(fire_bolt.effect_path_variants, FIRE_HIT_VARIANTS);
+        assert_eq!(fire_wall.effect_path_variants, FIRE_HIT_VARIANTS);
+        assert_eq!(FIRE_HIT_VARIANTS.len(), 3);
+
+        // The declared default must itself be one of the variants, otherwise
+        // an empty-variant fallback would render something inconsistent.
+        assert!(FIRE_HIT_VARIANTS.contains(&fire_bolt.effect_path));
+
+        // Cold Bolt's hit sound varies; its launch sounds live on the
+        // projectile, not on the hit.
+        let cold_bolt_sound = skill_damage_sound(COLD_BOLT_SKILL).unwrap();
+        assert_eq!(cold_bolt_sound.sound_path_variants.len(), 2);
+        assert!(cold_bolt_sound.sound_path_variants.contains(&cold_bolt_sound.sound_path));
+
+        // Everything a variant list can select must be preloaded, or the
+        // first use of a rarely-picked variant would stall.
+        for path in FIRE_HIT_VARIANTS {
+            assert!(path.ends_with(".str"), "impact variants are animations, not sounds");
+        }
+        for path in cold_bolt_sound.sound_path_variants {
+            assert!(SKILL_SOUND_PATHS.contains(path), "{path} must be preloaded");
+        }
+        for path in ICE_ARROW_LAUNCH_SOUND_PATHS {
+            assert!(SKILL_SOUND_PATHS.contains(&path), "{path} must be preloaded");
+        }
     }
 
     #[test]
@@ -603,15 +721,14 @@ mod tests {
 
     #[test]
     fn only_projectile_skills_delay_their_hit_feedback() {
-        // Fire Bolt leads, so its hit waits for the projectile to land.
-        let fire_bolt = skill_damage_procedural_visual(FIRE_BOLT_SKILL);
-        assert_eq!(skill_impact_lead_time(fire_bolt, 420), 0.42);
+        // Both bolts lead, so their hits wait for the projectile to land.
+        for skill_id in [FIRE_BOLT_SKILL, COLD_BOLT_SKILL] {
+            let recipe = skill_damage_procedural_visual(skill_id);
+            assert_eq!(skill_impact_lead_time(recipe, 420), 0.42);
+        }
 
-        // Everything else keeps a zero lead and is unaffected by this change.
-        assert_eq!(
-            skill_impact_lead_time(skill_damage_procedural_visual(COLD_BOLT_SKILL), 420),
-            0.0
-        );
+        // Frost Diver travels from the caster rather than falling, and is not
+        // modelled as a leading projectile, so it keeps a zero lead.
         assert_eq!(
             skill_impact_lead_time(skill_damage_procedural_visual(FROST_DIVER_SKILL), 420),
             0.0

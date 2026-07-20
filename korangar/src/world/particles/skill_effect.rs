@@ -9,7 +9,7 @@ use wgpu::BlendFactor;
 use crate::Entity;
 use crate::graphics::{Color, ScreenClip, ScreenPosition, ScreenSize, Texture};
 use crate::renderer::{EFFECT_ORIGIN, EffectRenderer, GameInterfaceRenderer, SpriteRenderer};
-use crate::world::{Camera, EffectBase, PointLightManager};
+use crate::world::{Camera, EffectBase, FIRE_ARROW_LAUNCH_SOUND_PATHS, ICE_ARROW_LAUNCH_SOUND_PATHS, PointLightManager};
 
 /// The classic 128x128 Cold Bolt shard stored in `data.grf`.
 ///
@@ -39,27 +39,64 @@ pub const FIRE_ARROW_TEXTURE_PATHS: [&str; 6] = [
 /// Cadence of the projectile texture cycle.
 pub const FIRE_ARROW_FRAME_DURATION: f32 = 0.03;
 
-/// Height above the target that a Fire Bolt starts its descent from. Matches
-/// the Cold Bolt descent so both bolt skills share one visual scale.
-const FIRE_BOLT_DESCENT_HEIGHT: f32 = 38.0;
+/// Height above the target that a bolt starts its descent from.
+const BOLT_DESCENT_HEIGHT: f32 = 38.0;
 
-/// Ground clearance of the projectile when it reaches the target, matching
-/// the impact animation's own offset.
-const FIRE_BOLT_TARGET_HEIGHT: f32 = 5.0;
+/// Ground clearance of a bolt when it reaches the target, matching the impact
+/// animation's own offset.
+const BOLT_TARGET_HEIGHT: f32 = 5.0;
 
-/// Rendered size of one projectile frame, in the effect renderer's pixel
-/// space.
+/// Art and motion of a bolt that falls onto its target.
 ///
-/// This matches the source textures' native 128x64, which keeps texel mapping
-/// 1:1 and puts the projectile in the same scale band as the impact it
-/// precedes: `firehit2.str` renders quads of median 81x137 in this same
-/// space. Adjust these two values together to resize the bolt; the aspect
-/// must stay 2:1 or the streak distorts.
-const FIRE_BOLT_WIDTH: f32 = 128.0;
-const FIRE_BOLT_HEIGHT: f32 = 64.0;
+/// Fire Bolt and Cold Bolt are the same effect shape with different assets:
+/// the official client spawns both above the target and drops them, never
+/// involving the caster. Sizes are given in the effect renderer's pixel space
+/// and should match the source texture's native resolution, which keeps texel
+/// mapping 1:1 and puts the bolt in the same scale band as the impact it
+/// precedes (`firehit2.str` renders quads of median 81x137 in this space).
+#[derive(Clone, Copy, Debug)]
+pub struct BoltProjectileArt {
+    /// Frames cycled while falling. A single entry renders unanimated.
+    pub frames: &'static [&'static str],
+    pub frame_duration: f32,
+    /// Native texture size. The aspect must match the source or the sprite
+    /// distorts, which is most visible once the bolt is rotated.
+    pub width: f32,
+    pub height: f32,
+    pub launch_sounds: &'static [&'static str],
+    pub sound_range: f32,
+}
 
-const FIRE_BOLT_HALF_WIDTH: f32 = FIRE_BOLT_WIDTH * 0.5;
-const FIRE_BOLT_HALF_HEIGHT: f32 = FIRE_BOLT_HEIGHT * 0.5;
+impl BoltProjectileArt {
+    fn half_width(&self) -> f32 {
+        self.width * 0.5
+    }
+
+    fn half_height(&self) -> f32 {
+        self.height * 0.5
+    }
+}
+
+/// Fire Bolt: six animated 128x64 streaks.
+pub const FIRE_BOLT_ART: BoltProjectileArt = BoltProjectileArt {
+    frames: &FIRE_ARROW_TEXTURE_PATHS,
+    frame_duration: FIRE_ARROW_FRAME_DURATION,
+    width: 128.0,
+    height: 64.0,
+    launch_sounds: &FIRE_ARROW_LAUNCH_SOUND_PATHS,
+    sound_range: 55.0,
+};
+
+/// Cold Bolt: one unanimated 128x128 shard. Square, unlike Fire Bolt, which
+/// is why the quad size is per projectile rather than shared.
+pub const COLD_BOLT_ART: BoltProjectileArt = BoltProjectileArt {
+    frames: &[ICE_ARROW_TEXTURE_PATH],
+    frame_duration: FIRE_ARROW_FRAME_DURATION,
+    width: 128.0,
+    height: 128.0,
+    launch_sounds: &ICE_ARROW_LAUNCH_SOUND_PATHS,
+    sound_range: 55.0,
+};
 
 pub const COLD_BOLT_PARTICLE_DURATION: f32 = 0.44;
 pub const FROST_DIVER_TRAVEL_DURATION: f32 = 0.64;
@@ -174,7 +211,7 @@ fn cold_bolt_offset(bolt_index: usize) -> Vector3<f32> {
     Vector3::new(x * ring, 0.0, z * ring)
 }
 
-fn fire_bolt_offset(bolt_index: usize) -> Vector3<f32> {
+fn bolt_offset(bolt_index: usize) -> Vector3<f32> {
     // Every bolt of a volley approaches from the same upper corner and only
     // the jitter varies. The reference clients both do this, and it is what
     // makes a multi-hit cast read as one stream rather than a ring.
@@ -216,14 +253,15 @@ fn projectile_screen_angle(camera: &dyn Camera, window_size: ScreenSize, from: P
     screen_direction_angle(project(from), project(to), window_size)
 }
 
-/// One descending Fire Bolt projectile.
+/// One descending bolt projectile.
 ///
 /// Rendered through the effect pipeline rather than as an interface sprite,
 /// because it needs to be rotated onto its flight direction and blended
 /// additively. Its lifetime is the projectile's flight time, so the
 /// separately scheduled impact animation takes over at the exact moment the
 /// projectile reaches the target.
-pub struct FireBoltProjectile {
+pub struct BoltProjectile {
+    art: BoltProjectileArt,
     target_entity_id: EntityId,
     target_position: Point3<f32>,
     textures: Vec<Arc<Texture>>,
@@ -232,8 +270,9 @@ pub struct FireBoltProjectile {
     deleted: bool,
 }
 
-impl FireBoltProjectile {
+impl BoltProjectile {
     pub fn new(
+        art: BoltProjectileArt,
         target_entity_id: EntityId,
         target_position: Point3<f32>,
         textures: Vec<Arc<Texture>>,
@@ -241,10 +280,11 @@ impl FireBoltProjectile {
         flight_duration: f32,
     ) -> Self {
         Self {
+            art,
             target_entity_id,
             target_position,
             textures,
-            offset: fire_bolt_offset(bolt_index),
+            offset: bolt_offset(bolt_index),
             timeline: Timeline::new(flight_duration),
             deleted: false,
         }
@@ -255,23 +295,23 @@ impl FireBoltProjectile {
             return 0;
         }
 
-        let frame = self.timeline.elapsed.max(0.0) / FIRE_ARROW_FRAME_DURATION;
+        let frame = self.timeline.elapsed.max(0.0) / self.art.frame_duration.max(f32::EPSILON);
         (frame as usize) % self.textures.len()
     }
 
     /// Where the bolt enters, above and beside the target.
     fn launch_position(&self) -> Point3<f32> {
-        self.landing_position() + self.offset + Vector3::new(0.0, FIRE_BOLT_DESCENT_HEIGHT, 0.0)
+        self.landing_position() + self.offset + Vector3::new(0.0, BOLT_DESCENT_HEIGHT, 0.0)
     }
 
     /// Where the bolt lands. The impact animation plays here, so the
     /// projectile converges completely rather than keeping a residual offset.
     fn landing_position(&self) -> Point3<f32> {
-        self.target_position + Vector3::new(0.0, FIRE_BOLT_TARGET_HEIGHT, 0.0)
+        self.target_position + Vector3::new(0.0, BOLT_TARGET_HEIGHT, 0.0)
     }
 }
 
-impl EffectBase for FireBoltProjectile {
+impl EffectBase for BoltProjectile {
     fn update(&mut self, entities: &[Entity], local_entity: Option<(EntityId, Point3<f32>)>, delta_time: f32) -> bool {
         if self.deleted {
             return false;
@@ -302,11 +342,13 @@ impl EffectBase for FireBoltProjectile {
 
         // Corner order the effect renderer expects: top left, top right,
         // bottom left, bottom right.
+        let half_width = self.art.half_width();
+        let half_height = self.art.half_height();
         let corners = [
-            Vector2::new(-FIRE_BOLT_HALF_WIDTH, -FIRE_BOLT_HALF_HEIGHT),
-            Vector2::new(FIRE_BOLT_HALF_WIDTH, -FIRE_BOLT_HALF_HEIGHT),
-            Vector2::new(-FIRE_BOLT_HALF_WIDTH, FIRE_BOLT_HALF_HEIGHT),
-            Vector2::new(FIRE_BOLT_HALF_WIDTH, FIRE_BOLT_HALF_HEIGHT),
+            Vector2::new(-half_width, -half_height),
+            Vector2::new(half_width, -half_height),
+            Vector2::new(-half_width, half_height),
+            Vector2::new(half_width, half_height),
         ];
 
         // The renderer maps these as [2] top left, [1] top right,
@@ -646,7 +688,7 @@ mod tests {
         // Every bolt shares an approach direction so a volley reads as one
         // stream; only the jitter varies.
         for bolt_index in 0..32 {
-            let offset = fire_bolt_offset(bolt_index);
+            let offset = bolt_offset(bolt_index);
 
             assert!(offset.x > 0.0, "bolt {bolt_index} must approach from the same side");
             assert!(offset.z > 0.0, "bolt {bolt_index} must approach from the same side");
@@ -656,15 +698,15 @@ mod tests {
         }
 
         // Deterministic, so a replayed volley looks identical.
-        assert_eq!(fire_bolt_offset(0), fire_bolt_offset(6));
-        assert_ne!(fire_bolt_offset(0), fire_bolt_offset(1));
+        assert_eq!(bolt_offset(0), bolt_offset(6));
+        assert_ne!(bolt_offset(0), bolt_offset(1));
     }
 
     #[test]
     fn fire_bolt_descends_onto_the_target_and_expires_with_its_flight() {
         const FLIGHT: f32 = 0.42;
         let target = Point3::new(100.0, 20.0, 300.0);
-        let mut projectile = FireBoltProjectile::new(EntityId(7), target, Vec::new(), 0, FLIGHT);
+        let mut projectile = BoltProjectile::new(FIRE_BOLT_ART, EntityId(7), target, Vec::new(), 0, FLIGHT);
 
         // Enters above and beside the target.
         let launch = projectile.launch_position();
@@ -686,7 +728,7 @@ mod tests {
         // Unlike Cold Bolt, which keeps a residual offset, the fire bolt must
         // land on the target: the impact animation plays there.
         let target = Point3::new(10.0, 0.0, 20.0);
-        let projectile = FireBoltProjectile::new(EntityId(1), target, Vec::new(), 3, 0.42);
+        let projectile = BoltProjectile::new(FIRE_BOLT_ART, EntityId(1), target, Vec::new(), 3, 0.42);
 
         let launch = projectile.launch_position();
         let landing = projectile.landing_position();
@@ -695,7 +737,7 @@ mod tests {
         assert!((arrived.x - landing.x).abs() < 1.0e-6);
         assert!((arrived.y - landing.y).abs() < 1.0e-6);
         assert!((arrived.z - landing.z).abs() < 1.0e-6);
-        assert_eq!(landing.y, target.y + FIRE_BOLT_TARGET_HEIGHT);
+        assert_eq!(landing.y, target.y + BOLT_TARGET_HEIGHT);
     }
 
     #[test]
@@ -732,16 +774,33 @@ mod tests {
     }
 
     #[test]
-    fn fire_bolt_quad_matches_the_source_texture_aspect() {
-        // The frames are 128x64 streaks. A quad that is not 2:1 stretches
-        // them, which is most visible once the bolt is rotated.
-        assert_eq!(FIRE_BOLT_WIDTH / FIRE_BOLT_HEIGHT, 2.0);
-        assert_eq!(FIRE_BOLT_HALF_WIDTH * 2.0, FIRE_BOLT_WIDTH);
-        assert_eq!(FIRE_BOLT_HALF_HEIGHT * 2.0, FIRE_BOLT_HEIGHT);
+    fn bolt_quads_match_their_own_source_texture_aspect() {
+        // The two bolts do not share an aspect: the fire arrow is 128x64 and
+        // the ice shard is 128x128. Sizing them from one shared constant
+        // would stretch one of them, which is why size lives on the art.
+        assert_eq!(FIRE_BOLT_ART.width / FIRE_BOLT_ART.height, 2.0);
+        assert_eq!(COLD_BOLT_ART.width / COLD_BOLT_ART.height, 1.0);
 
-        // Sized to sit alongside the impact it precedes rather than beneath
-        // it: firehit2.str renders quads of median 81x137 in this same space.
-        assert!(FIRE_BOLT_WIDTH >= 81.0, "projectile must not be dwarfed by its own impact");
+        for art in [FIRE_BOLT_ART, COLD_BOLT_ART] {
+            assert_eq!(art.half_width() * 2.0, art.width);
+            assert_eq!(art.half_height() * 2.0, art.height);
+            // Sized to sit alongside the impact it precedes rather than
+            // beneath it: firehit2.str renders quads of median 81x137.
+            assert!(art.width >= 81.0, "projectile must not be dwarfed by its own impact");
+            assert!(!art.frames.is_empty(), "a projectile with no frames renders nothing");
+            assert!(art.frame_duration > 0.0, "a zero frame duration would divide by zero");
+            assert!(!art.launch_sounds.is_empty());
+        }
+    }
+
+    #[test]
+    fn cold_bolt_uses_the_authentic_shard_rather_than_an_approximation() {
+        // The archive ships the real projectile texture, so the earlier
+        // procedural stand-in is no longer needed.
+        assert_eq!(COLD_BOLT_ART.frames, &[ICE_ARROW_TEXTURE_PATH]);
+        // A single frame must still index safely through the cycling logic.
+        let projectile = BoltProjectile::new(COLD_BOLT_ART, EntityId(2), Point3::new(0.0, 0.0, 0.0), Vec::new(), 0, 0.42);
+        assert_eq!(projectile.frame_index(), 0);
     }
 
     #[test]
@@ -766,7 +825,7 @@ mod tests {
 
     #[test]
     fn fire_bolt_follows_a_moving_target_and_can_be_cancelled() {
-        let mut projectile = FireBoltProjectile::new(EntityId(1), Point3::new(0.0, 0.0, 0.0), Vec::new(), 0, 0.42);
+        let mut projectile = BoltProjectile::new(FIRE_BOLT_ART, EntityId(1), Point3::new(0.0, 0.0, 0.0), Vec::new(), 0, 0.42);
 
         // Effects are torn down on world transitions.
         projectile.mark_for_deletion();
@@ -777,7 +836,7 @@ mod tests {
     fn fire_bolt_projectile_survives_a_missing_texture_list() {
         // load_skill_particle_texture can fail; the projectile must not panic
         // on an empty list.
-        let mut projectile = FireBoltProjectile::new(EntityId(1), Point3::new(0.0, 0.0, 0.0), Vec::new(), 0, 0.42);
+        let mut projectile = BoltProjectile::new(FIRE_BOLT_ART, EntityId(1), Point3::new(0.0, 0.0, 0.0), Vec::new(), 0, 0.42);
 
         assert_eq!(projectile.frame_index(), 0);
         assert!(projectile.update(&[], None, 0.1));

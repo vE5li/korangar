@@ -1180,14 +1180,16 @@ impl Client {
                 .play_spatial_sound_effect(sound_effect, effect_position, recipe.sound_range);
         }
 
-        let effect = match self.effect_loader.get_or_load(recipe.effect_path, &self.texture_loader) {
+        // The official client varies several impact animations per hit.
+        let effect_path = pick_variant(recipe.effect_path, recipe.effect_path_variants, rand_aes::tls::rand_f32());
+        let effect = match self.effect_loader.get_or_load(effect_path, &self.texture_loader) {
             Ok(effect) => effect,
             Err(_error) => {
                 #[cfg(feature = "debug")]
                 print_debug!(
                     "[{}] failed to load skill effect '{}': {:?}",
                     "error".red(),
-                    recipe.effect_path,
+                    effect_path,
                     _error
                 );
                 return;
@@ -1462,8 +1464,9 @@ impl Client {
             .ok()
     }
 
-    fn spawn_fire_bolt_projectile(
+    fn spawn_bolt_projectile(
         &mut self,
+        art: BoltProjectileArt,
         destination_entity_id: EntityId,
         sequence_index: usize,
         initial_elapsed: f32,
@@ -1473,8 +1476,8 @@ impl Client {
             return;
         };
 
-        let mut textures = Vec::with_capacity(FIRE_ARROW_TEXTURE_PATHS.len());
-        for texture_path in FIRE_ARROW_TEXTURE_PATHS {
+        let mut textures = Vec::with_capacity(art.frames.len());
+        for texture_path in art.frames {
             let Some(texture) = self.load_skill_particle_texture(texture_path) else {
                 return;
             };
@@ -1482,13 +1485,14 @@ impl Client {
         }
 
         // The official client randomizes the launch sound per bolt.
-        let sound_index = (rand_aes::tls::rand_f32() * FIRE_ARROW_LAUNCH_SOUND_PATHS.len() as f32) as usize;
-        let sound_path = FIRE_ARROW_LAUNCH_SOUND_PATHS[sound_index.min(FIRE_ARROW_LAUNCH_SOUND_PATHS.len() - 1)];
-        let sound_effect = self.audio_engine.load(sound_path);
-        self.audio_engine
-            .play_spatial_sound_effect(sound_effect, position, FIRE_ARROW_LAUNCH_SOUND_RANGE);
+        if let Some(first) = art.launch_sounds.first() {
+            let sound_path = pick_variant(first, art.launch_sounds, rand_aes::tls::rand_f32());
+            let sound_effect = self.audio_engine.load(sound_path);
+            self.audio_engine.play_spatial_sound_effect(sound_effect, position, art.sound_range);
+        }
 
-        let mut effect: Box<dyn EffectBase + Send + Sync> = Box::new(FireBoltProjectile::new(
+        let mut effect: Box<dyn EffectBase + Send + Sync> = Box::new(BoltProjectile::new(
+            art,
             destination_entity_id,
             position,
             textures,
@@ -1513,31 +1517,28 @@ impl Client {
         flight_time: f32,
     ) {
         let mut particle: Box<dyn EntityParticle + Send + Sync> = match recipe.kind {
+            // Both bolts render through the effect pipeline so they can be
+            // rotated onto their flight direction, so they do not join the
+            // interface-sprite particles below.
             SkillProceduralVisualKind::FireBoltProjectile => {
-                // Rendered through the effect pipeline so it can be rotated
-                // onto its flight direction, so it does not join the
-                // interface-sprite particles below.
-                self.spawn_fire_bolt_projectile(destination_entity_id, sequence_index, initial_elapsed, flight_time);
+                self.spawn_bolt_projectile(
+                    FIRE_BOLT_ART,
+                    destination_entity_id,
+                    sequence_index,
+                    initial_elapsed,
+                    flight_time,
+                );
                 return;
             }
             SkillProceduralVisualKind::ColdBolt => {
-                let Some(position) = self.entity_position(destination_entity_id) else {
-                    return;
-                };
-                let Some(arrow_texture) = self.load_skill_particle_texture(ICE_ARROW_TEXTURE_PATH) else {
-                    return;
-                };
-                let Some(impact_texture) = self.load_skill_particle_texture(ICE_IMPACT_TEXTURE_PATH) else {
-                    return;
-                };
-
-                Box::new(ColdBoltParticle::new(
+                self.spawn_bolt_projectile(
+                    COLD_BOLT_ART,
                     destination_entity_id,
-                    position,
-                    arrow_texture,
-                    impact_texture,
                     sequence_index,
-                ))
+                    initial_elapsed,
+                    flight_time,
+                );
+                return;
             }
             SkillProceduralVisualKind::ColdImpact => {
                 let Some(position) = self.entity_position(destination_entity_id) else {
@@ -1690,7 +1691,8 @@ impl Client {
             return;
         };
 
-        let sound_effect = self.audio_engine.load(recipe.sound_path);
+        let sound_path = pick_variant(recipe.sound_path, recipe.sound_path_variants, rand_aes::tls::rand_f32());
+        let sound_effect = self.audio_engine.load(sound_path);
         self.audio_engine
             .play_spatial_sound_effect(sound_effect, position, recipe.sound_range);
     }
@@ -1704,7 +1706,8 @@ impl Client {
         initial_delay: f32,
     ) {
         let hits_remaining = 1 + skill_effect_repeat_delays(recipe.hit_interval, hit_count).len();
-        let sound_effect_key = self.audio_engine.load(recipe.sound_path);
+        let sound_path = pick_variant(recipe.sound_path, recipe.sound_path_variants, rand_aes::tls::rand_f32());
+        let sound_effect_key = self.audio_engine.load(sound_path);
         let mut pending = PendingSkillSound {
             timing: SkillSoundSequenceTiming::new(initial_delay, recipe.hit_interval.unwrap_or_default(), hits_remaining),
             recipe,

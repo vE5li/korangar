@@ -11,6 +11,16 @@ use crate::world::{Actions, SpriteAnimationState};
 
 const PICKUP_DURATION_MS: u32 = 150;
 
+/// Number of actions in the classic cursor act.
+const CURSOR_ACTION_COUNT: usize = 14;
+
+/// The direction that makes `base * 8 + direction` reduce to `base` modulo
+/// the cursor act's action count, so each cursor state reaches its own
+/// action. See the comment at the call site for the arithmetic.
+fn cursor_direction(action_base_offset: usize) -> usize {
+    7 * (action_base_offset % 2)
+}
+
 #[allow(dead_code)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum MouseCursorState {
@@ -158,11 +168,15 @@ impl MouseCursor {
             }
         }
 
-        // TODO: Figure out how this is actually supposed to work
-        let direction = match self.cursor_state {
-            MouseCursorState::Default | MouseCursorState::Click | MouseCursorState::RotateCamera => 0,
-            _ => 7,
-        };
+        // The cursor act is not directional: it has 14 actions, one per
+        // cursor type, while the action index is computed as base * 8 +
+        // direction and reduced modulo the action count. Reaching action N
+        // therefore needs 8N + d = N (mod 14), i.e. d = 7N (mod 14): zero
+        // for even actions and seven for odd ones. The previous hardcoded
+        // state list satisfied this by accident for the states it used and
+        // silently showed the wrong cursor for the even-numbered Target,
+        // NoAction and WarpFast.
+        let direction = cursor_direction(self.animation_state.action_base_offset);
 
         // TODO: Is there some deeper logic here?
         const HOVER_ITEM_FRAME: usize = 0;
@@ -225,5 +239,30 @@ impl MouseCursor {
             );
             renderer.render_text(&text, text_position, Color::WHITE, font_size, AlignHorizontal::Left);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_cursor_state_reaches_its_own_action() {
+        // The action index is base * 8 + direction, reduced modulo the act's
+        // action count by the renderer. Every state must land on its own
+        // action, including the even-numbered ones the old hardcoded
+        // direction list routed to the wrong cursor.
+        for base in 0..CURSOR_ACTION_COUNT {
+            let direction = cursor_direction(base);
+            assert_eq!(
+                (base * 8 + direction) % CURSOR_ACTION_COUNT,
+                base,
+                "cursor action {base} must render as itself"
+            );
+        }
+
+        // The armed-skill aim circle in particular: action 10.
+        let target = usize::from(MouseCursorState::Target);
+        assert_eq!((target * 8 + cursor_direction(target)) % CURSOR_ACTION_COUNT, 10);
     }
 }

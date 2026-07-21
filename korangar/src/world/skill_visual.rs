@@ -88,6 +88,10 @@ pub struct SkillVisualRecipe {
     pub light: Option<SkillEffectLight>,
     pub repeating: bool,
     pub hit_interval: Option<f32>,
+    /// Whether this visual is a wind-up whose landing the hit must wait for,
+    /// like a projectile's flight. The lightning strike works this way: the
+    /// bolt falls first, the damage lands when it connects.
+    pub leads_impact: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -182,12 +186,20 @@ pub fn skill_projectile_flight_time(source_motion: i32) -> f32 {
     (source_motion.max(0) as f32 / 1000.0).clamp(PROJECTILE_FLIGHT_MINIMUM, PROJECTILE_FLIGHT_MAXIMUM)
 }
 
-/// Delay that hit feedback must wait so it resolves after the projectile
-/// lands. Skills without a leading projectile are unaffected.
-pub fn skill_impact_lead_time(recipe: Option<SkillProceduralVisualRecipe>, source_motion: i32) -> f32 {
-    match recipe {
-        Some(recipe) if recipe.leads_impact => skill_projectile_flight_time(source_motion),
-        _ => 0.0,
+/// Delay that hit feedback must wait so it resolves after the projectile or
+/// leading cast visual lands. Skills with neither are unaffected.
+pub fn skill_impact_lead_time(
+    procedural: Option<SkillProceduralVisualRecipe>,
+    cast_visual: Option<SkillVisualRecipe>,
+    source_motion: i32,
+) -> f32 {
+    let projectile_leads = procedural.is_some_and(|recipe| recipe.leads_impact);
+    let cast_visual_leads = cast_visual.is_some_and(|recipe| recipe.leads_impact);
+
+    if projectile_leads || cast_visual_leads {
+        skill_projectile_flight_time(source_motion)
+    } else {
+        0.0
     }
 }
 
@@ -218,6 +230,7 @@ const FIRE_BOLT_IMPACT: SkillVisualRecipe = SkillVisualRecipe {
     light: Some(FIRE_IMPACT_LIGHT),
     repeating: false,
     hit_interval: Some(BOLT_HIT_INTERVAL),
+    leads_impact: false,
 };
 
 const FIRE_WALL_IMPACT: SkillVisualRecipe = SkillVisualRecipe {
@@ -236,6 +249,7 @@ const FIRE_WALL_GROUND: SkillVisualRecipe = SkillVisualRecipe {
     light: Some(FIRE_IMPACT_LIGHT),
     repeating: false,
     hit_interval: None,
+    leads_impact: false,
 };
 
 const FIRE_WALL_UNIT: SkillVisualRecipe = SkillVisualRecipe {
@@ -252,6 +266,7 @@ const FIRE_WALL_UNIT: SkillVisualRecipe = SkillVisualRecipe {
     }),
     repeating: true,
     hit_interval: None,
+    leads_impact: false,
 };
 
 const PNEUMA_UNIT: SkillVisualRecipe = SkillVisualRecipe {
@@ -268,6 +283,7 @@ const PNEUMA_UNIT: SkillVisualRecipe = SkillVisualRecipe {
     }),
     repeating: false,
     hit_interval: None,
+    leads_impact: false,
 };
 
 /// The big strike that resolves the cast. The official client plays this
@@ -286,6 +302,7 @@ const LIGHTNING_BOLT_STRIKE: SkillVisualRecipe = SkillVisualRecipe {
     }),
     repeating: false,
     hit_interval: None,
+    leads_impact: true,
 };
 
 /// The official client varies the wind elemental hit per hit (EF_WINDHIT).
@@ -303,6 +320,7 @@ const LIGHTNING_BOLT_HIT: SkillVisualRecipe = SkillVisualRecipe {
     light: None,
     repeating: false,
     hit_interval: Some(BOLT_HIT_INTERVAL),
+    leads_impact: false,
 };
 
 /// The wind hit's own sound, a generic elemental fist impact.
@@ -324,6 +342,7 @@ const HEAL_TARGET: SkillVisualRecipe = SkillVisualRecipe {
     light: None,
     repeating: false,
     hit_interval: None,
+    leads_impact: false,
 };
 
 /// Kept for the direct-effect debug path only: ZC_NOTIFY_EFFECT carries a
@@ -770,8 +789,16 @@ mod tests {
             assert!(SKILL_SOUND_PATHS.contains(path), "{path} must be preloaded");
         }
 
-        // No skill both leads with a projectile and has a cast visual yet;
-        // the pacing chain must therefore come from the per-hit visual.
+        // The strike is a wind-up: the bolt falls first and the damage lands
+        // when it connects, so every hit waits for the strike's lead while
+        // the strike itself starts immediately.
+        assert!(strike.leads_impact);
+        assert_eq!(skill_impact_lead_time(None, Some(strike), 420), 0.42);
+        assert_eq!(
+            skill_impact_lead_time(None, Some(hit), 420),
+            0.0,
+            "the per-hit wind puff must not compound the lead"
+        );
         assert_eq!(skill_damage_number_interval(LIGHTNING_BOLT_SKILL), None);
 
         // Skills without a cast visual are unaffected.
@@ -853,18 +880,18 @@ mod tests {
         // Both bolts lead, so their hits wait for the projectile to land.
         for skill_id in [FIRE_BOLT_SKILL, COLD_BOLT_SKILL] {
             let recipe = skill_damage_procedural_visual(skill_id);
-            assert_eq!(skill_impact_lead_time(recipe, 420), 0.42);
+            assert_eq!(skill_impact_lead_time(recipe, None, 420), 0.42);
         }
 
         // Frost Diver travels from the caster rather than falling, and is not
         // modelled as a leading projectile, so it keeps a zero lead.
         assert_eq!(
-            skill_impact_lead_time(skill_damage_procedural_visual(FROST_DIVER_SKILL), 420),
+            skill_impact_lead_time(skill_damage_procedural_visual(FROST_DIVER_SKILL), None, 420),
             0.0
         );
-        assert_eq!(skill_impact_lead_time(None, 420), 0.0);
+        assert_eq!(skill_impact_lead_time(None, None, 420), 0.0);
         assert_eq!(
-            skill_impact_lead_time(skill_damage_procedural_visual(SkillId(u16::MAX)), 420),
+            skill_impact_lead_time(skill_damage_procedural_visual(SkillId(u16::MAX)), None, 420),
             0.0
         );
     }
@@ -877,7 +904,7 @@ mod tests {
         let initial_delay = 0.3;
 
         for source_motion in [0, 120, 420, 900, i32::MAX] {
-            let flight_time = skill_impact_lead_time(Some(recipe), source_motion);
+            let flight_time = skill_impact_lead_time(Some(recipe), None, source_motion);
             let impact_delay = initial_delay + flight_time;
             let launches = std::iter::once(0.0).chain(skill_effect_repeat_delays(recipe.hit_interval, 10));
             let impacts = std::iter::once(0.0).chain(skill_effect_repeat_delays(recipe.hit_interval, 10));
@@ -959,7 +986,7 @@ mod tests {
         // waits for the sphere's flight like every leading projectile.
         let impact = skill_damage_visual(FIRE_BALL_SKILL).unwrap();
         assert_eq!(impact.effect_path_variants, FIRE_HIT_VARIANTS);
-        assert_eq!(skill_impact_lead_time(Some(projectile), 420), 0.42);
+        assert_eq!(skill_impact_lead_time(Some(projectile), None, 420), 0.42);
 
         // The stationary sphere no longer plays on the victim.
         assert_eq!(skill_damage_sprite_visual(FIRE_BALL_SKILL, 6), None);

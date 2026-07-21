@@ -2514,6 +2514,7 @@ impl Client {
                     // actions, which must not be triggered by this packet.
                     let initial_delay = skill_effect_initial_delay(start_time, client_tick);
                     let visual_recipe = skill_damage_visual(skill_id);
+                    let cast_visual_recipe = skill_damage_cast_visual(skill_id);
                     let sprite_recipe = skill_damage_sprite_visual(skill_id, action);
                     let procedural_recipe = skill_damage_procedural_visual(skill_id);
                     let sound_recipe = skill_damage_sound(skill_id);
@@ -2523,12 +2524,12 @@ impl Client {
                         .or_else(|| sound_recipe.and_then(|recipe| recipe.hit_interval))
                         .or_else(|| skill_damage_number_interval(skill_id));
 
-                    // A projectile launches when the packet says the skill
-                    // resolved, but its hit only lands once it arrives. The
-                    // server's attack motion is that flight time, so all hit
-                    // feedback waits for it. Skills without a projectile keep
-                    // a zero lead and are unaffected.
-                    let flight_time = skill_impact_lead_time(procedural_recipe, source_motion);
+                    // A projectile or leading cast visual launches when the
+                    // packet says the skill resolved, but its hit only lands
+                    // once it arrives. The server's attack motion is that
+                    // flight time, so all hit feedback waits for it. Skills
+                    // with neither keep a zero lead and are unaffected.
+                    let flight_time = skill_impact_lead_time(procedural_recipe, cast_visual_recipe, source_motion);
                     let impact_delay = initial_delay + flight_time;
 
                     self.queue_skill_damage_particle(
@@ -2541,8 +2542,8 @@ impl Client {
                     // The once-per-resolution component, independent of the
                     // hit count. Mirrors the official client's split between
                     // a skill's effect and its per-hit effect.
-                    if let Some(recipe) = skill_damage_cast_visual(skill_id) {
-                        self.queue_skill_damage_visual(recipe, source_entity_id, destination_entity_id, 1, impact_delay);
+                    if let Some(recipe) = cast_visual_recipe {
+                        self.queue_skill_damage_visual(recipe, source_entity_id, destination_entity_id, 1, initial_delay);
                     }
                     if let Some(recipe) = visual_recipe {
                         self.queue_skill_damage_visual(recipe, source_entity_id, destination_entity_id, hit_count, impact_delay);

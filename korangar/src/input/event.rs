@@ -155,6 +155,8 @@ pub enum InputEvent {
         /// Item to move.
         item: InventoryItem<ResourceMetadata>,
     },
+    /// Sit down or stand up, depending on the current state of the player.
+    ToggleSit,
     /// Show an emotion.
     SendEmotion {
         /// Id of the emotion.

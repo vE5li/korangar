@@ -78,6 +78,10 @@ pub enum NetworkEvent {
     PlayerStandUp {
         entity_id: EntityId,
     },
+    /// Make a player sit down.
+    PlayerSitDown {
+        entity_id: EntityId,
+    },
     /// Show an emotion above an entity.
     DisplayEmotion {
         entity_id: EntityId,

@@ -731,6 +731,24 @@ where
         }
     }
 
+    pub fn sit_down(&mut self) -> Result<(), NotConnectedError> {
+        match self.map_server_packet_version()? {
+            SupportedPacketVersion::_20220406 => {
+                // The entity id is ignored by the server for this action.
+                self.send_map_server_packet(RequestActionPacket::new(EntityId(0), Action::SitDown))
+            }
+        }
+    }
+
+    pub fn stand_up(&mut self) -> Result<(), NotConnectedError> {
+        match self.map_server_packet_version()? {
+            SupportedPacketVersion::_20220406 => {
+                // The entity id is ignored by the server for this action.
+                self.send_map_server_packet(RequestActionPacket::new(EntityId(0), Action::StandUp))
+            }
+        }
+    }
+
     pub fn send_emotion(&mut self, emotion: u8) -> Result<(), NotConnectedError> {
         match self.map_server_packet_version()? {
             SupportedPacketVersion::_20220406 => self.send_map_server_packet(RequestEmotionPacket::new(emotion)),
@@ -910,7 +928,10 @@ where
 mod packet_handlers {
     use ragnarok_bytes::{ByteReader, ByteWriter};
     use ragnarok_packets::handler::{HandlerResult, NoPacketCallback};
-    use ragnarok_packets::{DisplayEmotionPacket, EntityId, PacketExt, RequestEmotionPacket};
+    use ragnarok_packets::{
+        Action, ClientTick, DamagePacket1, DamagePacket3, DamageType, DisplayEmotionPacket, EntityId, PacketExt, RequestActionPacket,
+        RequestEmotionPacket,
+    };
 
     use crate::{NetworkEvent, NetworkingSystem, SupportedPacketVersion};
 
@@ -959,5 +980,83 @@ mod packet_handlers {
             entity_id: EntityId(0x1234_5678),
             emotion: 3,
         }]));
+    }
+
+    #[test]
+    fn sit_and_stand_requests_use_the_action_packet_layout() {
+        let mut writer = ByteWriter::new();
+        RequestActionPacket {
+            npc_id: EntityId(0),
+            action: Action::SitDown,
+        }
+        .packet_to_bytes(&mut writer)
+        .unwrap();
+        assert_eq!(writer.as_slice(), &[0x37, 0x04, 0, 0, 0, 0, 2]);
+
+        writer.clear();
+        RequestActionPacket {
+            npc_id: EntityId(0),
+            action: Action::StandUp,
+        }
+        .packet_to_bytes(&mut writer)
+        .unwrap();
+        assert_eq!(writer.as_slice(), &[0x37, 0x04, 0, 0, 0, 0, 3]);
+    }
+
+    #[test]
+    fn sit_and_stand_notifications_use_the_source_entity() {
+        let mut handler = NetworkingSystem::create_map_server_packet_handler(NoPacketCallback, SupportedPacketVersion::_20220406).unwrap();
+        let mut writer = ByteWriter::new();
+
+        DamagePacket1 {
+            source_entity_id: EntityId(0x1122_3344),
+            destination_entity_id: EntityId(0),
+            client_tick: ClientTick(0),
+            attack_duration: 0,
+            damage_delay: 0,
+            damage_amount: 0,
+            number_of_hits: 0,
+            damage_type: DamageType::SitDown,
+            damage_amount_2: 0,
+        }
+        .packet_to_bytes(&mut writer)
+        .unwrap();
+        DamagePacket3 {
+            source_entity_id: EntityId(0x5566_7788),
+            destination_entity_id: EntityId(0),
+            client_tick: ClientTick(0),
+            attack_duration: 0,
+            damage_delay: 0,
+            damage_amount: 0,
+            is_special_damage: 0,
+            number_of_hits: 0,
+            damage_type: DamageType::StandUp,
+            damage_amount_2: 0,
+        }
+        .packet_to_bytes(&mut writer)
+        .unwrap();
+
+        let mut reader = ByteReader::without_metadata(writer.as_slice());
+        assert!(matches!(
+            handler.process_one(&mut reader),
+            HandlerResult::Ok(events)
+                if matches!(
+                    events.0.as_slice(),
+                    [NetworkEvent::PlayerSitDown {
+                        entity_id: EntityId(0x1122_3344),
+                    }]
+                )
+        ));
+        assert!(matches!(
+            handler.process_one(&mut reader),
+            HandlerResult::Ok(events)
+                if matches!(
+                    events.0.as_slice(),
+                    [NetworkEvent::PlayerStandUp {
+                        entity_id: EntityId(0x5566_7788),
+                    }]
+                )
+        ));
+        assert!(reader.is_empty());
     }
 }

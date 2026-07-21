@@ -1595,6 +1595,24 @@ impl Client {
 
                     self.interface.open_window(DialogWindow::new(client_state().dialog_window()));
                 }
+                NetworkEvent::OpenNumberInput { npc_id } => {
+                    self.client_state
+                        .follow_mut(client_state().dialog_window())
+                        // Some NPCs start the dialog with this packet so we need to make sure it's initialized.
+                        .initialize(npc_id)
+                        .add_number_input();
+
+                    self.interface.open_window(DialogWindow::new(client_state().dialog_window()));
+                }
+                NetworkEvent::OpenTextInput { npc_id } => {
+                    self.client_state
+                        .follow_mut(client_state().dialog_window())
+                        // Some NPCs start the dialog with this packet so we need to make sure it's initialized.
+                        .initialize(npc_id)
+                        .add_text_input();
+
+                    self.interface.open_window(DialogWindow::new(client_state().dialog_window()));
+                }
                 NetworkEvent::AddQuestEffect { quest_effect } => {
                     if let Some(map) = &self.map {
                         self.particle_holder.add_quest_icon(&self.texture_loader, map, quest_effect)
@@ -2283,6 +2301,14 @@ impl Client {
                     if option == -1 {
                         self.interface.close_window_with_class(WindowClass::Dialog);
                     }
+                }
+                InputEvent::SubmitDialogNumberInput { npc_id, value } => {
+                    let _ = self.networking_system.submit_dialog_number_input(npc_id, value);
+                    self.client_state.follow_mut(client_state().dialog_window()).input_submitted();
+                }
+                InputEvent::SubmitDialogTextInput { npc_id, text } => {
+                    let _ = self.networking_system.submit_dialog_text_input(npc_id, text);
+                    self.client_state.follow_mut(client_state().dialog_window()).input_submitted();
                 }
                 InputEvent::MoveItem { source, destination, item } => match (source, destination) {
                     (ItemSource::Inventory, ItemSource::Equipment { position }) => {

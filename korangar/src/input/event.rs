@@ -146,6 +146,20 @@ pub enum InputEvent {
         /// Id of the option.
         option: i8,
     },
+    /// Submit the number typed into a dialog input.
+    SubmitDialogNumberInput {
+        /// Id of the NPC the player is in a dialog with.
+        npc_id: EntityId,
+        /// The number the player entered.
+        value: i32,
+    },
+    /// Submit the text typed into a dialog input.
+    SubmitDialogTextInput {
+        /// Id of the NPC the player is in a dialog with.
+        npc_id: EntityId,
+        /// The text the player entered.
+        text: String,
+    },
     /// Move an item in the user interface.
     MoveItem {
         /// Source of the move.

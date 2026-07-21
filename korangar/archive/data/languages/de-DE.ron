@@ -36,6 +36,8 @@
     dialog_window_title: "Dialog",
     next_button_text: "Weiter",
     close_button_text: "Schließen",
+    okay_button_text: "OK",
+    dialog_text_box_message: "Wert eingeben",
     error_window_title: "Fehler",
     friend_list_window_title: "Freundesliste",
     friend_list_text_box_message: "Freund durch Name hinzufügen",

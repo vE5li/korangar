@@ -775,6 +775,18 @@ where
         }
     }
 
+    pub fn submit_dialog_number_input(&mut self, npc_id: EntityId, value: i32) -> Result<(), NotConnectedError> {
+        match self.map_server_packet_version()? {
+            SupportedPacketVersion::_20220406 => self.send_map_server_packet(NumberInputPacket::new(npc_id, value)),
+        }
+    }
+
+    pub fn submit_dialog_text_input(&mut self, npc_id: EntityId, text: String) -> Result<(), NotConnectedError> {
+        match self.map_server_packet_version()? {
+            SupportedPacketVersion::_20220406 => self.send_map_server_packet(TextInputPacket::new(npc_id, text)),
+        }
+    }
+
     pub fn request_item_equip(&mut self, item_index: InventoryIndex, equip_position: EquipPosition) -> Result<(), NotConnectedError> {
         match self.map_server_packet_version()? {
             SupportedPacketVersion::_20220406 => self.send_map_server_packet(RequestEquipItemPacket::new(item_index, equip_position)),
@@ -910,7 +922,10 @@ where
 mod packet_handlers {
     use ragnarok_bytes::{ByteReader, ByteWriter};
     use ragnarok_packets::handler::{HandlerResult, NoPacketCallback};
-    use ragnarok_packets::{DisplayEmotionPacket, EntityId, PacketExt, RequestEmotionPacket};
+    use ragnarok_packets::{
+        DisplayEmotionPacket, EntityId, NumberInputPacket, OpenNumberInputPacket, OpenTextInputPacket, PacketExt, RequestEmotionPacket,
+        TextInputPacket,
+    };
 
     use crate::{NetworkEvent, NetworkingSystem, SupportedPacketVersion};
 
@@ -959,5 +974,66 @@ mod packet_handlers {
             entity_id: EntityId(0x1234_5678),
             emotion: 3,
         }]));
+    }
+
+    #[test]
+    fn dialog_input_requests_map_to_network_events() {
+        let mut handler = NetworkingSystem::create_map_server_packet_handler(NoPacketCallback, SupportedPacketVersion::_20220406).unwrap();
+        let mut writer = ByteWriter::new();
+        OpenNumberInputPacket {
+            npc_id: EntityId(0x1234_5678),
+        }
+        .packet_to_bytes(&mut writer)
+        .unwrap();
+        OpenTextInputPacket {
+            npc_id: EntityId(0x8765_4321),
+        }
+        .packet_to_bytes(&mut writer)
+        .unwrap();
+        let mut reader = ByteReader::without_metadata(writer.as_slice());
+
+        assert!(matches!(
+            handler.process_one(&mut reader),
+            HandlerResult::Ok(events)
+                if matches!(
+                    events.0.as_slice(),
+                    [NetworkEvent::OpenNumberInput {
+                        npc_id: EntityId(0x1234_5678),
+                    }]
+                )
+        ));
+        assert!(matches!(
+            handler.process_one(&mut reader),
+            HandlerResult::Ok(events)
+                if matches!(
+                    events.0.as_slice(),
+                    [NetworkEvent::OpenTextInput {
+                        npc_id: EntityId(0x8765_4321),
+                    }]
+                )
+        ));
+    }
+
+    #[test]
+    fn dialog_input_responses_use_expected_wire_layouts() {
+        let mut writer = ByteWriter::new();
+        NumberInputPacket {
+            npc_id: EntityId(0x1234_5678),
+            value: -42,
+        }
+        .packet_to_bytes(&mut writer)
+        .unwrap();
+        assert_eq!(writer.as_slice(), &[0x43, 0x01, 0x78, 0x56, 0x34, 0x12, 0xD6, 0xFF, 0xFF, 0xFF]);
+
+        writer.clear();
+        TextInputPacket {
+            npc_id: EntityId(0x1234_5678),
+            text: "abc".to_string(),
+        }
+        .packet_to_bytes(&mut writer)
+        .unwrap();
+        assert_eq!(writer.as_slice(), &[
+            0xD5, 0x01, 0x0C, 0x00, 0x78, 0x56, 0x34, 0x12, b'a', b'b', b'c', 0x00
+        ]);
     }
 }

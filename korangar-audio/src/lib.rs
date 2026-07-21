@@ -65,7 +65,7 @@ struct BackgroundMusicTrack {
 
 enum QueuedSoundEffectType {
     Sound,
-    SpatialSound { position: Point3<f32>, range: f32 },
+    SpatialSound { position: Point3<f32>, range: f32, volume: f32 },
     AmbientSound { ambient_key: AmbientKey },
 }
 
@@ -310,10 +310,17 @@ impl<F: FileLoader> AudioEngine<F> {
     /// Plays a spatial sound effect, which will get removed automatically once
     /// it finishes playing.
     pub fn play_spatial_sound_effect(&self, sound_effect_key: SoundEffectKey, position: Point3<f32>, range: f32) {
+        self.play_spatial_sound_effect_with_volume(sound_effect_key, position, range, 1.0);
+    }
+
+    /// Like [`play_spatial_sound_effect`](Self::play_spatial_sound_effect)
+    /// with a linear volume factor applied on top of the distance
+    /// attenuation, for sounds that should sit under the mix even up close.
+    pub fn play_spatial_sound_effect_with_volume(&self, sound_effect_key: SoundEffectKey, position: Point3<f32>, range: f32, volume: f32) {
         self.engine_context
             .lock()
             .unwrap()
-            .play_spatial_sound_effect(sound_effect_key, position, range);
+            .play_spatial_sound_effect(sound_effect_key, position, range, volume);
     }
 
     /// Attempts to play a spatial sound without queueing it on a cache miss.
@@ -456,8 +463,8 @@ impl<F: FileLoader> EngineContext<F> {
         }
     }
 
-    fn play_spatial_sound_effect(&mut self, sound_effect_key: SoundEffectKey, position: Point3<f32>, range: f32) {
-        if self.try_play_spatial_sound_effect(sound_effect_key, position, range) {
+    fn play_spatial_sound_effect(&mut self, sound_effect_key: SoundEffectKey, position: Point3<f32>, range: f32, volume: f32) {
+        if self.try_play_spatial_sound_effect_with_volume(sound_effect_key, position, range, volume) {
             return;
         }
 
@@ -468,11 +475,21 @@ impl<F: FileLoader> EngineContext<F> {
             &mut self.queued_sound_effect,
             &mut self.loading_sound_effect,
             sound_effect_key,
-            QueuedSoundEffectType::SpatialSound { position, range },
+            QueuedSoundEffectType::SpatialSound { position, range, volume },
         );
     }
 
     fn try_play_spatial_sound_effect(&mut self, sound_effect_key: SoundEffectKey, position: Point3<f32>, range: f32) -> bool {
+        self.try_play_spatial_sound_effect_with_volume(sound_effect_key, position, range, 1.0)
+    }
+
+    fn try_play_spatial_sound_effect_with_volume(
+        &mut self,
+        sound_effect_key: SoundEffectKey,
+        position: Point3<f32>,
+        range: f32,
+        volume: f32,
+    ) -> bool {
         let Some(data) = self
             .cache
             .get(&sound_effect_key)
@@ -487,7 +504,8 @@ impl<F: FileLoader> EngineContext<F> {
                 min_distance: 5.0,
                 max_distance: range,
             })
-            .use_linear_attenuation_function(true);
+            .use_linear_attenuation_function(true)
+            .volume(Decibels::from_amplitude(volume));
 
         match self.spatial_sound_effect_track.add_spatial_sub_track(position, spatial_track) {
             Ok(mut spatial_track_handle) => {
@@ -738,14 +756,15 @@ impl<F: FileLoader> EngineContext<F> {
                         print_debug!("[{}] can't play sound effect: {:?}", "error".red(), _error);
                     }
                 }
-                QueuedSoundEffectType::SpatialSound { position, range } => {
+                QueuedSoundEffectType::SpatialSound { position, range, volume } => {
                     let spatial_track = SpatialTrackBuilder::new()
                         .persist_until_sounds_finish(true)
                         .distances(SpatialTrackDistances {
                             min_distance: 5.0,
                             max_distance: range,
                         })
-                        .use_linear_attenuation_function(true);
+                        .use_linear_attenuation_function(true)
+                        .volume(Decibels::from_amplitude(volume));
 
                     match self.spatial_sound_effect_track.add_spatial_sub_track(position, spatial_track) {
                         Ok(mut spatial_track_handle) => {

@@ -2058,8 +2058,13 @@ impl Client {
                         && let Some(texture) = self.load_skill_particle_texture(cast_aura_texture(element))
                     {
                         let duration = cast_time.get() as f32 / 1000.0;
+                        // At half volume: the hum underlines the cast and
+                        // must not drown it out for the caster standing at
+                        // distance zero, matching the reference client's own
+                        // half-volume cast hum.
                         let sound_effect = self.audio_engine.load(CAST_AURA_SOUND_PATH);
-                        self.audio_engine.play_spatial_sound_effect(sound_effect, position, 55.0);
+                        self.audio_engine
+                            .play_spatial_sound_effect_with_volume(sound_effect, position, 55.0, 0.5);
 
                         if let Some(ground_texture) = self.load_skill_particle_texture(CAST_GROUND_CIRCLE_TEXTURE_PATH) {
                             self.particle_holder.spawn_cast_ring(CastRing::new(

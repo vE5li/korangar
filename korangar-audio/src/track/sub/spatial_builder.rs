@@ -20,6 +20,8 @@ pub(crate) struct SpatialTrackBuilder {
     ///
     /// If false, the track will output at a constant volume.
     pub(crate) use_linear_attenuation_function: bool,
+    /// The track's base volume, applied on top of distance attenuation.
+    pub(crate) volume: Decibels,
 }
 
 impl SpatialTrackBuilder {
@@ -30,7 +32,14 @@ impl SpatialTrackBuilder {
             persist_until_sounds_finish: false,
             distances: SpatialTrackDistances::default(),
             use_linear_attenuation_function: true,
+            volume: Decibels::IDENTITY,
         }
+    }
+
+    /// Sets the track's base volume, applied on top of distance attenuation.
+    #[must_use]
+    pub(crate) fn volume(self, volume: Decibels) -> Self {
+        Self { volume, ..self }
     }
 
     /// Sets whether the track should stay alive while sounds are playing on it.
@@ -81,7 +90,7 @@ impl SpatialTrackBuilder {
         let track = Track {
             shared: shared.clone(),
             command_readers,
-            volume: Parameter::new(Decibels::IDENTITY),
+            volume: Parameter::new(self.volume),
             sounds,
             sub_tracks,
             persist_until_sounds_finish: self.persist_until_sounds_finish,

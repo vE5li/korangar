@@ -15,6 +15,8 @@ struct GroundMarkerVertexOutput {
 struct GroundMarker {
     float4 corners[4];
     float4 color;
+    // uv_scale.xy, uv_offset.zw
+    float4 uv_transform;
 };
 
 [[vk::binding(0, 0)]] var global_uniforms: ConstantBuffer<GlobalUniforms>;
@@ -29,7 +31,7 @@ func vs_main(uint vertex_index: SV_VulkanVertexID, uint instance_index: SV_Vulka
 
     var output: GroundMarkerVertexOutput;
     output.position = mul(global_uniforms.view_projection, world_position);
-    output.texture_coordinates = uv_data(vertex_index);
+    output.texture_coordinates = uv_data(vertex_index) * marker.uv_transform.xy + marker.uv_transform.zw;
     output.color = marker.color;
     return output;
 }

@@ -569,16 +569,13 @@ impl ParticleHolder {
         self.cast_rings.retain_mut(|ring| ring.update(entities, local_entity, delta_time));
     }
 
-    /// Cast rings render through the effect pipeline, which can rotate and
-    /// blend additively, unlike the interface sprite path the other
-    /// particles use.
-    pub fn render_cast_rings(&self, renderer: &mut crate::renderer::EffectRenderer, camera: &dyn Camera) {
-        self.cast_rings.iter().for_each(|ring| ring.render(renderer, camera));
-    }
-
-    /// The depth-tested ground quads of the active cast rings.
-    pub fn collect_ground_markers(&self, markers: &mut Vec<crate::graphics::GroundMarkerInstruction>) {
-        markers.extend(self.cast_rings.iter().map(|ring| ring.ground_marker()));
+    /// The depth-tested world quads of the active cast rings: the ground
+    /// circles and the camera-facing cone layers above them.
+    pub fn collect_ground_markers(&self, markers: &mut Vec<crate::graphics::GroundMarkerInstruction>, camera_right: cgmath::Vector3<f32>) {
+        for ring in &self.cast_rings {
+            markers.push(ring.ground_marker());
+            ring.cone_markers(camera_right, markers);
+        }
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile("render particles"))]

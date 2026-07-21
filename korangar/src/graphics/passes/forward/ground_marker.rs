@@ -25,6 +25,8 @@ const INITIAL_INSTRUCTION_SIZE: usize = 8;
 struct GpuGroundMarker {
     corners: [[f32; 4]; 4],
     color: [f32; 4],
+    // uv_scale.xy, uv_offset.xy
+    uv_transform: [f32; 4],
 }
 
 /// Emissive, depth-tested ground quads drawn at the end of the forward pass:
@@ -203,6 +205,7 @@ impl Prepare for ForwardGroundMarkerDrawer {
                     corner(marker.lower_right),
                 ],
                 color: marker.color.components_linear(),
+                uv_transform: [marker.uv_scale.x, marker.uv_scale.y, marker.uv_offset.x, marker.uv_offset.y],
             });
             self.textures.push(marker.texture.clone());
         }

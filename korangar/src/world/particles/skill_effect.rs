@@ -377,7 +377,51 @@ impl CastRing {
             lower_left: center + rotate(-half_size, half_size),
             lower_right: center + rotate(half_size, half_size),
             color,
+            uv_offset: Vector2::new(0.0, 0.0),
+            uv_scale: Vector2::new(1.0, 1.0),
             texture: self.ground_texture.clone(),
+        }
+    }
+
+    /// The swirling cone above the ground circle, as camera-facing vertical
+    /// trapezoids in world space so it is depth-tested like the circle: the
+    /// caster's sprite covers the part of the cone behind them. The swirl is
+    /// the band texture's U coordinate scrolling under the repeat sampler.
+    /// Only the aura carries a cone.
+    pub fn cone_markers(&self, camera_right: Vector3<f32>, markers: &mut Vec<GroundMarkerInstruction>) {
+        let Some(cone_texture) = &self.cone_texture else {
+            return;
+        };
+
+        let alpha = (self.elapsed / 0.15).min((self.duration - self.elapsed) / 0.15).clamp(0.0, 0.85);
+        let base = self.position + Vector3::new(0.0, 0.3, 0.0);
+
+        // Two layers at the reference's differing swirl speeds read as the
+        // classic vortex. Sizes are in world units, proportioned like the
+        // reference cone: bottom narrow, top wide.
+        for (scroll_speed, scale, layer_alpha) in [(0.5, 1.0, 0.55), (0.75, 1.25, 0.35)] {
+            let bottom_half_width = 3.0 * scale;
+            let top_half_width = 6.8 * scale;
+            let height = 8.4 * scale;
+            let scroll = self.elapsed * scroll_speed;
+
+            let color = Color::rgba(
+                self.tint.red,
+                self.tint.green,
+                self.tint.blue,
+                self.tint.alpha * alpha * layer_alpha,
+            );
+
+            markers.push(GroundMarkerInstruction {
+                upper_left: base + camera_right * -top_half_width + Vector3::new(0.0, height, 0.0),
+                upper_right: base + camera_right * top_half_width + Vector3::new(0.0, height, 0.0),
+                lower_left: base + camera_right * -bottom_half_width,
+                lower_right: base + camera_right * bottom_half_width,
+                color,
+                uv_offset: Vector2::new(scroll, 0.0),
+                uv_scale: Vector2::new(1.0, 1.0),
+                texture: cone_texture.clone(),
+            });
         }
     }
 
@@ -396,65 +440,6 @@ impl CastRing {
 
         self.elapsed += delta_time.max(0.0);
         self.elapsed < self.duration
-    }
-
-    /// The swirling cone band above the ground circle, drawn through the
-    /// effect pass. Only the aura carries one; it composites additively over
-    /// the scene as glow.
-    pub fn render(&self, renderer: &mut EffectRenderer, camera: &dyn Camera) {
-        let Some(cone_texture) = &self.cone_texture else {
-            return;
-        };
-
-        // Fade in quickly at the start and out at the natural end.
-        let alpha = (self.elapsed / 0.15).min((self.duration - self.elapsed) / 0.15).clamp(0.0, 0.85);
-        let anchor = self.position + Vector3::new(0.0, 1.0, 0.0);
-
-        // The ring textures are cylinder wall bands, opaque to their edges
-        // and horizontally tileable, not top-down ring images: the reference
-        // clients wrap them around a rising cone and swirl it. The cone's
-        // silhouette is a trapezoid, and the swirl is a scroll of the band's
-        // U coordinate, which the repeat sampler is exactly suited to. Two
-        // layers at the reference's differing speeds read as the classic
-        // vortex.
-        for (scroll_speed, width_scale, layer_alpha) in [(0.5, 1.0, 0.55), (0.75, 1.25, 0.35)] {
-            let scroll = self.elapsed * scroll_speed;
-            let bottom_half_width = 22.0 * width_scale;
-            let top_half_width = 52.0 * width_scale;
-            let height = 64.0 * width_scale;
-
-            // Corner order the effect renderer expects: top left, top right,
-            // bottom left, bottom right.
-            let corners = [
-                Vector2::new(-top_half_width, -height),
-                Vector2::new(top_half_width, -height),
-                Vector2::new(-bottom_half_width, 0.0),
-                Vector2::new(bottom_half_width, 0.0),
-            ];
-            // The renderer maps these as [2] top left, [1] top right,
-            // [3] bottom left, [0] bottom right. One full U span per quad,
-            // offset by the scroll.
-            let texture_coordinates = [
-                Vector2::new(scroll + 1.0, 1.0),
-                Vector2::new(scroll + 1.0, 0.0),
-                Vector2::new(scroll, 0.0),
-                Vector2::new(scroll, 1.0),
-            ];
-
-            renderer.render_effect(
-                camera,
-                anchor,
-                cone_texture.clone(),
-                corners,
-                texture_coordinates,
-                EFFECT_ORIGIN,
-                Rad(0.0),
-                Color::rgba(1.0, 1.0, 1.0, alpha * layer_alpha),
-                // Additive, as the references render these bands.
-                BlendFactor::SrcAlpha,
-                BlendFactor::One,
-            );
-        }
     }
 }
 

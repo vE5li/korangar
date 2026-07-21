@@ -4460,6 +4460,13 @@ impl Client {
 
         let (view_matrix, projection_matrix) = current_camera.view_projection_matrices();
         let camera_position = current_camera.camera_position().to_homogeneous();
+        // The cast cone layers billboard around the vertical axis, so they
+        // need the camera's horizontal right vector. Computed here while the
+        // camera borrow is active and carried as a plain value.
+        let camera_right = {
+            let view_direction = current_camera.view_direction();
+            cgmath::InnerSpace::normalize(Vector3::new(-view_direction.z, 0.0, view_direction.x))
+        };
 
         #[cfg(feature = "debug")]
         let update_shadow_camera_measurement = Profiler::start_measurement("update directional shadow camera");
@@ -4810,7 +4817,8 @@ impl Client {
         };
 
         self.ground_marker_instructions.clear();
-        self.particle_holder.collect_ground_markers(&mut self.ground_marker_instructions);
+        self.particle_holder
+            .collect_ground_markers(&mut self.ground_marker_instructions, camera_right);
 
         let render_instruction = RenderInstruction {
             show_interface: self.show_interface,
@@ -5315,7 +5323,6 @@ impl<'a, 'm: 'a> MapRenderContext<'a, 'm> {
         );
 
         self.effect_holder.render(self.effect_renderer, self.current_camera);
-        self.particle_holder.render_cast_rings(self.effect_renderer, self.current_camera);
 
         let world_theme = self.client_state.follow(client_state().world_theme());
         for entity in self.client_state.follow(client_state().entities()).iter() {

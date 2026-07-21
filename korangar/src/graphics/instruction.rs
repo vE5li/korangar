@@ -257,6 +257,13 @@ pub struct GroundMarkerInstruction {
     pub lower_left: Point3<f32>,
     pub lower_right: Point3<f32>,
     pub color: Color,
+    /// Offset added to the quad's unit texture coordinates. A non-zero U
+    /// with a repeat-sampled band texture scrolls it, which is how the cast
+    /// cone swirls.
+    pub uv_offset: Vector2<f32>,
+    /// Scale applied to the quad's unit texture coordinates before the
+    /// offset.
+    pub uv_scale: Vector2<f32>,
     pub texture: Arc<Texture>,
 }
 

@@ -8,7 +8,8 @@ use wgpu::BlendFactor;
 
 use crate::Entity;
 use crate::graphics::{Color, ScreenClip, ScreenPosition, ScreenSize, Texture};
-use crate::renderer::{EFFECT_ORIGIN, EffectRenderer, GameInterfaceRenderer, SpriteRenderer};
+use crate::loaders::FontSize;
+use crate::renderer::{AlignHorizontal, EFFECT_ORIGIN, EffectRenderer, GameInterfaceRenderer, SpriteRenderer};
 use crate::world::{Camera, EffectBase, FIRE_ARROW_LAUNCH_SOUND_PATHS, ICE_ARROW_LAUNCH_SOUND_PATHS, PointLightManager};
 
 /// The classic 128x128 Cold Bolt shard stored in `data.grf`.
@@ -221,6 +222,68 @@ pub const ARROW_ART: BoltProjectileArt = BoltProjectileArt {
     sound_range: 55.0,
     flight_override: Some(0.14),
 };
+
+/// How long a skill's name floats over its caster.
+pub const SKILL_NAME_BUBBLE_DURATION: f32 = 1.4;
+
+/// The skill's name floating over the caster once the cast fires, in the
+/// classic green over a dark offset copy.
+pub struct SkillNameBubble {
+    entity_id: EntityId,
+    position: Point3<f32>,
+    text: String,
+    elapsed: f32,
+}
+
+impl SkillNameBubble {
+    pub fn new(entity_id: EntityId, position: Point3<f32>, text: String) -> Self {
+        Self {
+            entity_id,
+            position,
+            text,
+            elapsed: 0.0,
+        }
+    }
+}
+
+impl EntityParticle for SkillNameBubble {
+    fn update(&mut self, entities: &[Entity], local_entity: Option<(EntityId, Point3<f32>)>, delta_time: f32) -> bool {
+        if let Some(position) = resolve_entity_position(self.entity_id, entities, local_entity) {
+            self.position = position;
+        }
+
+        self.elapsed += delta_time.max(0.0);
+        self.elapsed < SKILL_NAME_BUBBLE_DURATION
+    }
+
+    fn render(&self, renderer: &GameInterfaceRenderer, camera: &dyn Camera, window_size: ScreenSize) {
+        // Fade out over the final quarter.
+        let remaining = SKILL_NAME_BUBBLE_DURATION - self.elapsed;
+        let alpha = (remaining / (SKILL_NAME_BUBBLE_DURATION * 0.25)).clamp(0.0, 1.0);
+
+        let position = to_screen_position(self.position + Vector3::new(0.0, 34.0, 0.0), camera, window_size);
+        let shadow_position = ScreenPosition {
+            left: position.left + 1.0,
+            top: position.top + 1.0,
+        };
+        let font_size = FontSize(14.0);
+
+        renderer.render_text(
+            &self.text,
+            shadow_position,
+            Color::rgba(0.1, 0.1, 0.1, 0.8 * alpha),
+            font_size,
+            AlignHorizontal::Center,
+        );
+        renderer.render_text(
+            &self.text,
+            position,
+            Color::rgba(0.0, 1.0, 0.0, alpha),
+            font_size,
+            AlignHorizontal::Center,
+        );
+    }
+}
 
 /// The magic circle swirling around a caster for the length of a cast.
 ///

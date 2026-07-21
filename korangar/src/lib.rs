@@ -1464,6 +1464,23 @@ impl Client {
             .ok()
     }
 
+    /// Floats the skill's name over its caster, as the classic client does
+    /// when a cast fires. Names come from the archive's own skill table, so
+    /// any caster's skills are covered, not only the local player's.
+    fn spawn_skill_name_bubble(&mut self, source_entity_id: EntityId, skill_id: SkillId) {
+        let name = &self.library.get::<SkillListInformation>(skill_id).name;
+        if name.is_empty() {
+            return;
+        }
+        let Some(position) = self.entity_position(source_entity_id) else {
+            return;
+        };
+
+        let text = format!("{name} !!");
+        self.particle_holder
+            .spawn_entity_particle(Box::new(SkillNameBubble::new(source_entity_id, position, text)));
+    }
+
     fn spawn_bolt_projectile(
         &mut self,
         art: BoltProjectileArt,
@@ -2558,6 +2575,12 @@ impl Client {
                     let flight_time = skill_impact_lead_time(procedural_recipe, cast_visual_recipe, source_motion);
                     let impact_delay = initial_delay + flight_time;
 
+                    // One name per cast: splash victims carry their own
+                    // packets and must not each raise a bubble.
+                    if !matches!(action, 5 | 14) {
+                        self.spawn_skill_name_bubble(source_entity_id, skill_id);
+                    }
+
                     self.queue_skill_damage_particle(
                         destination_entity_id,
                         SkillDamageDisplay::from_packet(damage, action),
@@ -2649,6 +2672,8 @@ impl Client {
                     }
 
                     if result != 0 {
+                        self.spawn_skill_name_bubble(source_entity_id, skill_id);
+
                         if let Some(recipe) = no_damage_skill_visual(skill_id) {
                             self.spawn_skill_visual(recipe, source_entity_id, destination_entity_id, None, None);
                         }

@@ -1524,6 +1524,12 @@ impl Client {
             self.audio_engine.play_spatial_sound_effect(sound_effect, position, art.sound_range);
         }
 
+        // A fixed reference flight time takes precedence over the attack-
+        // motion derivation; the hit keeps the server's own timing either
+        // way, so a faster projectile lands earlier than the impact rather
+        // than desynchronizing it.
+        let flight_time = art.flight_override.unwrap_or(flight_time);
+
         // A travelling projectile launches from wherever the caster stood at
         // spawn time. The fallback mirrors the Frost Diver convention for a
         // caster that despawned before its projectile resolved.

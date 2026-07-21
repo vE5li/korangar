@@ -106,6 +106,12 @@ pub struct BoltProjectileArt {
     pub base_angle: f32,
     pub launch_sounds: &'static [&'static str],
     pub sound_range: f32,
+    /// Fixed flight duration overriding the attack-motion derivation. The
+    /// reference client flies arrows in 140ms and the fireball in 250ms
+    /// regardless of the caster; the hit still waits for the server's own
+    /// timing, so a faster projectile simply lands earlier than the impact
+    /// rather than desynchronizing it.
+    pub flight_override: Option<f32>,
 }
 
 /// Alpha envelope of a projectile at `progress` through its flight.
@@ -140,6 +146,7 @@ pub const FIRE_BOLT_ART: BoltProjectileArt = BoltProjectileArt {
     base_angle: 0.0,
     launch_sounds: &FIRE_ARROW_LAUNCH_SOUND_PATHS,
     sound_range: 55.0,
+    flight_override: None,
 };
 
 /// Cold Bolt: one unanimated shard, square where Fire Bolt is a streak.
@@ -161,6 +168,7 @@ pub const COLD_BOLT_ART: BoltProjectileArt = BoltProjectileArt {
     base_angle: 0.0,
     launch_sounds: &ICE_ARROW_LAUNCH_SOUND_PATHS,
     sound_range: 55.0,
+    flight_override: None,
 };
 
 /// Fire Ball: the thrown sphere, animated from its own SPR/ACT pair.
@@ -184,6 +192,7 @@ pub const FIRE_BALL_ART: BoltProjectileArt = BoltProjectileArt {
     base_angle: std::f32::consts::FRAC_PI_2,
     launch_sounds: &["effect\\ef_fireball.wav"],
     sound_range: 60.0,
+    flight_override: Some(0.25),
 };
 
 /// The arrow every bow skill shares, straight from the skeleton archer's
@@ -197,16 +206,20 @@ pub const ARROW_ART: BoltProjectileArt = BoltProjectileArt {
         sprite_path: "npc\\skel_archer_arrow.spr",
         action_path: "npc\\skel_archer_arrow.act",
     },
-    size: BoltQuadSize::Native { scale: 1.0 },
+    // Declared, not native: the 8x61 frame at native size read far too
+    // large in motion. Length under half the fire streak's 100, thickness
+    // keeping the sprite's own slender aspect.
+    size: BoltQuadSize::Fixed { width: 5.0, height: 40.0 },
     motion: BoltMotion::TravelFromSource,
     fade: true,
-    // The ammunition sprite is 8x61: drawn vertically, so a quarter turn is
-    // certain. Its alpha mass is symmetric, so which end is the head could
-    // not be measured; the head is assumed at the image top, and if arrows
-    // fly tail-first the sign of this constant is the one thing to flip.
+    // The ammunition sprite is drawn vertically. Its row profile shows the
+    // anatomy: a short head blob at the image top, a constant shaft, then
+    // longer fletching tapering to a one-pixel nock at the bottom, so the
+    // head is at the top and a quarter turn aligns it with the flight.
     base_angle: std::f32::consts::FRAC_PI_2,
     launch_sounds: &[],
     sound_range: 55.0,
+    flight_override: Some(0.14),
 };
 
 pub const COLD_BOLT_PARTICLE_DURATION: f32 = 0.44;

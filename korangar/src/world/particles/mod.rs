@@ -576,6 +576,11 @@ impl ParticleHolder {
         self.cast_rings.iter().for_each(|ring| ring.render(renderer, camera));
     }
 
+    /// The depth-tested ground quads of the active cast rings.
+    pub fn collect_ground_markers(&self, markers: &mut Vec<crate::graphics::GroundMarkerInstruction>) {
+        markers.extend(self.cast_rings.iter().map(|ring| ring.ground_marker()));
+    }
+
     #[cfg_attr(feature = "debug", korangar_debug::profile("render particles"))]
     pub fn render(
         &self,

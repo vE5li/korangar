@@ -175,6 +175,20 @@ pub fn procedural_spawns_for_action(recipe: SkillProceduralVisualRecipe, action:
 /// clients from this same texture.
 pub const CAST_LOCK_ON_TEXTURE_PATH: &str = "effect\\lockon128.tga";
 
+/// The top-down magic circle under a caster, genuinely circular unlike the
+/// cylinder band textures, and therefore usable as a ground quad.
+pub const CAST_GROUND_CIRCLE_TEXTURE_PATH: &str = "effect\\magic_target.tga";
+
+/// The tint the ground circle takes for a cast's element, mirroring the ring
+/// band colours.
+pub fn cast_aura_tint(element: u32) -> Color {
+    match element {
+        1 => Color::rgb_u8(140, 170, 255),
+        3 => Color::rgb_u8(255, 120, 90),
+        _ => Color::rgb_u8(255, 220, 120),
+    }
+}
+
 /// The cast aura's hum, played once when a cast begins.
 pub const CAST_AURA_SOUND_PATH: &str = "effect\\ef_beginspell.wav";
 

@@ -1,4 +1,5 @@
 #![allow(incomplete_features)]
+#![recursion_limit = "256"]
 #![feature(adt_const_params)]
 #![feature(allocator_api)]
 #![feature(generic_const_exprs)]
@@ -404,6 +405,7 @@ pub struct Client {
     point_shadow_entity_instructions: Vec<EntityInstruction>,
     point_light_with_shadow_instructions: Vec<PointLightWithShadowInstruction>,
     point_light_instructions: Vec<PointLightInstruction>,
+    ground_marker_instructions: Vec<GroundMarkerInstruction>,
 
     input_system: InputSystem,
 
@@ -708,6 +710,7 @@ impl Client {
             let point_shadow_entity_instructions = Vec::default();
             let point_light_with_shadow_instructions = Vec::default();
             let point_light_instructions = Vec::default();
+            let ground_marker_instructions = Vec::default();
         });
 
         time_phase!("create graphics engine", {
@@ -879,6 +882,7 @@ impl Client {
             point_shadow_entity_instructions,
             point_light_with_shadow_instructions,
             point_light_instructions,
+            ground_marker_instructions,
             input_system,
             interface,
             mouse_cursor,
@@ -2056,16 +2060,21 @@ impl Client {
                         let duration = cast_time.get() as f32 / 1000.0;
                         let sound_effect = self.audio_engine.load(CAST_AURA_SOUND_PATH);
                         self.audio_engine.play_spatial_sound_effect(sound_effect, position, 55.0);
-                        self.particle_holder.spawn_cast_ring(CastRing::new(
-                            CastRingKind::Aura,
-                            source_entity_id,
-                            source_entity_id,
-                            position,
-                            texture,
-                            duration,
-                        ));
 
-                        // The lock-on circle shrinking onto whoever the cast
+                        if let Some(ground_texture) = self.load_skill_particle_texture(CAST_GROUND_CIRCLE_TEXTURE_PATH) {
+                            self.particle_holder.spawn_cast_ring(CastRing::new(
+                                CastRingKind::Aura,
+                                source_entity_id,
+                                source_entity_id,
+                                position,
+                                Some(texture),
+                                ground_texture,
+                                cast_aura_tint(element),
+                                duration,
+                            ));
+                        }
+
+                        // The lock-on reticle shrinking onto whoever the cast
                         // will land on. Ground casts and self-casts carry no
                         // separate victim to mark.
                         if destination_entity_id != source_entity_id
@@ -2078,7 +2087,9 @@ impl Client {
                                 source_entity_id,
                                 destination_entity_id,
                                 target_position,
+                                None,
                                 lock_on_texture,
+                                Color::rgb_u8(250, 160, 160),
                                 duration,
                             ));
                         }
@@ -4798,11 +4809,15 @@ impl Client {
             color: directional_light_color,
         };
 
+        self.ground_marker_instructions.clear();
+        self.particle_holder.collect_ground_markers(&mut self.ground_marker_instructions);
+
         let render_instruction = RenderInstruction {
             show_interface: self.show_interface,
             picker_position,
             uniforms,
             indicator: indicator_instruction,
+            ground_markers: &self.ground_marker_instructions,
             interface: interface_instructions.as_slice(),
             bottom_layer_rectangles: bottom_layer_instructions.as_slice(),
             middle_layer_rectangles: middle_layer_instructions.as_slice(),

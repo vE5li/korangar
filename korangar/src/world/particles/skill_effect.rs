@@ -7,7 +7,7 @@ use ragnarok_packets::EntityId;
 use wgpu::BlendFactor;
 
 use crate::Entity;
-use crate::graphics::{Color, ScreenClip, ScreenPosition, ScreenSize, Texture};
+use crate::graphics::{Color, GroundMarkerInstruction, ScreenClip, ScreenPosition, ScreenSize, Texture};
 use crate::loaders::FontSize;
 use crate::renderer::{AlignHorizontal, EFFECT_ORIGIN, EffectRenderer, GameInterfaceRenderer, SpriteRenderer};
 use crate::world::{Camera, EffectBase, FIRE_ARROW_LAUNCH_SOUND_PATHS, ICE_ARROW_LAUNCH_SOUND_PATHS, PointLightManager};
@@ -309,18 +309,27 @@ pub struct CastRing {
     caster_entity_id: EntityId,
     follow_entity_id: EntityId,
     position: Point3<f32>,
-    texture: Arc<Texture>,
+    /// The swirling cone band, drawn through the effect pass. Only the aura
+    /// has one; the lock-on is entirely a ground marker.
+    cone_texture: Option<Arc<Texture>>,
+    /// The depth-tested ground quad: the magic circle under the caster or
+    /// the reticle under the target.
+    ground_texture: Arc<Texture>,
+    tint: Color,
     duration: f32,
     elapsed: f32,
 }
 
 impl CastRing {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         kind: CastRingKind,
         caster_entity_id: EntityId,
         follow_entity_id: EntityId,
         position: Point3<f32>,
-        texture: Arc<Texture>,
+        cone_texture: Option<Arc<Texture>>,
+        ground_texture: Arc<Texture>,
+        tint: Color,
         duration: f32,
     ) -> Self {
         Self {
@@ -328,9 +337,47 @@ impl CastRing {
             caster_entity_id,
             follow_entity_id,
             position,
-            texture,
+            cone_texture,
+            ground_texture,
+            tint,
             duration: duration.max(f32::EPSILON),
             elapsed: 0.0,
+        }
+    }
+
+    /// The depth-tested ground quad of this ring: the spinning magic circle
+    /// or reticle. World-space corners, so entities standing in front of it
+    /// occlude it correctly.
+    pub fn ground_marker(&self) -> GroundMarkerInstruction {
+        let alpha = (self.elapsed / 0.15).min((self.duration - self.elapsed) / 0.15).clamp(0.0, 0.85);
+
+        let (half_size, spin_speed) = match self.kind {
+            // A gentle swirl under the caster, spanning about two tiles.
+            CastRingKind::Aura => (5.0, 45.0_f32.to_radians()),
+            // The reticle shrinks onto the target while spinning at the
+            // reference client's 270 degrees per second.
+            CastRingKind::LockOn => {
+                let shrink = 1.0 - 0.45 * (self.elapsed / 0.6).clamp(0.0, 1.0);
+                (6.0 * shrink, 270.0_f32.to_radians())
+            }
+        };
+
+        let angle = self.elapsed * spin_speed;
+        let (sin, cos) = angle.sin_cos();
+        let rotate = |x: f32, z: f32| Vector3::new(x * cos - z * sin, 0.0, x * sin + z * cos);
+
+        // Slightly lifted so the quad wins the depth test against the ground
+        // it sits on.
+        let center = self.position + Vector3::new(0.0, 0.5, 0.0);
+        let color = Color::rgba(self.tint.red, self.tint.green, self.tint.blue, self.tint.alpha * alpha);
+
+        GroundMarkerInstruction {
+            upper_left: center + rotate(-half_size, -half_size),
+            upper_right: center + rotate(half_size, -half_size),
+            lower_left: center + rotate(-half_size, half_size),
+            lower_right: center + rotate(half_size, half_size),
+            color,
+            texture: self.ground_texture.clone(),
         }
     }
 
@@ -351,96 +398,62 @@ impl CastRing {
         self.elapsed < self.duration
     }
 
+    /// The swirling cone band above the ground circle, drawn through the
+    /// effect pass. Only the aura carries one; it composites additively over
+    /// the scene as glow.
     pub fn render(&self, renderer: &mut EffectRenderer, camera: &dyn Camera) {
+        let Some(cone_texture) = &self.cone_texture else {
+            return;
+        };
+
         // Fade in quickly at the start and out at the natural end.
         let alpha = (self.elapsed / 0.15).min((self.duration - self.elapsed) / 0.15).clamp(0.0, 0.85);
         let anchor = self.position + Vector3::new(0.0, 1.0, 0.0);
 
-        match self.kind {
-            CastRingKind::Aura => {
-                // The ring textures are cylinder wall bands, opaque to their
-                // edges and horizontally tileable, not top-down ring images:
-                // the reference clients wrap them around a rising cone and
-                // swirl it. The cone's silhouette is a trapezoid, and the
-                // swirl is a scroll of the band's U coordinate, which the
-                // repeat sampler is exactly suited to. Two layers at the
-                // reference's differing speeds read as the classic vortex.
-                for (scroll_speed, width_scale, layer_alpha) in [(0.5, 1.0, 0.55), (0.75, 1.25, 0.35)] {
-                    let scroll = self.elapsed * scroll_speed;
-                    let bottom_half_width = 22.0 * width_scale;
-                    let top_half_width = 52.0 * width_scale;
-                    let height = 64.0 * width_scale;
+        // The ring textures are cylinder wall bands, opaque to their edges
+        // and horizontally tileable, not top-down ring images: the reference
+        // clients wrap them around a rising cone and swirl it. The cone's
+        // silhouette is a trapezoid, and the swirl is a scroll of the band's
+        // U coordinate, which the repeat sampler is exactly suited to. Two
+        // layers at the reference's differing speeds read as the classic
+        // vortex.
+        for (scroll_speed, width_scale, layer_alpha) in [(0.5, 1.0, 0.55), (0.75, 1.25, 0.35)] {
+            let scroll = self.elapsed * scroll_speed;
+            let bottom_half_width = 22.0 * width_scale;
+            let top_half_width = 52.0 * width_scale;
+            let height = 64.0 * width_scale;
 
-                    // Corner order the effect renderer expects: top left,
-                    // top right, bottom left, bottom right.
-                    let corners = [
-                        Vector2::new(-top_half_width, -height),
-                        Vector2::new(top_half_width, -height),
-                        Vector2::new(-bottom_half_width, 0.0),
-                        Vector2::new(bottom_half_width, 0.0),
-                    ];
-                    // The renderer maps these as [2] top left, [1] top right,
-                    // [3] bottom left, [0] bottom right. One full U span per
-                    // quad, offset by the scroll.
-                    let texture_coordinates = [
-                        Vector2::new(scroll + 1.0, 1.0),
-                        Vector2::new(scroll + 1.0, 0.0),
-                        Vector2::new(scroll, 0.0),
-                        Vector2::new(scroll, 1.0),
-                    ];
+            // Corner order the effect renderer expects: top left, top right,
+            // bottom left, bottom right.
+            let corners = [
+                Vector2::new(-top_half_width, -height),
+                Vector2::new(top_half_width, -height),
+                Vector2::new(-bottom_half_width, 0.0),
+                Vector2::new(bottom_half_width, 0.0),
+            ];
+            // The renderer maps these as [2] top left, [1] top right,
+            // [3] bottom left, [0] bottom right. One full U span per quad,
+            // offset by the scroll.
+            let texture_coordinates = [
+                Vector2::new(scroll + 1.0, 1.0),
+                Vector2::new(scroll + 1.0, 0.0),
+                Vector2::new(scroll, 0.0),
+                Vector2::new(scroll, 1.0),
+            ];
 
-                    renderer.render_effect(
-                        camera,
-                        anchor,
-                        self.texture.clone(),
-                        corners,
-                        texture_coordinates,
-                        EFFECT_ORIGIN,
-                        Rad(0.0),
-                        Color::rgba(1.0, 1.0, 1.0, alpha * layer_alpha),
-                        // Additive, as the references render these bands.
-                        BlendFactor::SrcAlpha,
-                        BlendFactor::One,
-                    );
-                }
-            }
-            CastRingKind::LockOn => {
-                // A reticle whose corner brackets are part of the art. It
-                // spins as a whole quad at the reference's 270 degrees per
-                // second; flattening after the rotation is the correct
-                // foreshortening of a ground spinner viewed obliquely.
-                let angle = self.elapsed * 270.0_f32.to_radians();
-                let (sin, cos) = angle.sin_cos();
-                let shrink = 1.0 - 0.45 * (self.elapsed / 0.6).clamp(0.0, 1.0);
-                let half = 60.0 * shrink;
-
-                let rotate_flatten = |x: f32, y: f32| Vector2::new(x * cos - y * sin, (x * sin + y * cos) * 0.5);
-                let corners = [
-                    rotate_flatten(-half, -half),
-                    rotate_flatten(half, -half),
-                    rotate_flatten(-half, half),
-                    rotate_flatten(half, half),
-                ];
-                let texture_coordinates = [
-                    Vector2::new(1.0, 1.0),
-                    Vector2::new(1.0, 0.0),
-                    Vector2::new(0.0, 0.0),
-                    Vector2::new(0.0, 1.0),
-                ];
-
-                renderer.render_effect(
-                    camera,
-                    anchor,
-                    self.texture.clone(),
-                    corners,
-                    texture_coordinates,
-                    EFFECT_ORIGIN,
-                    Rad(0.0),
-                    Color::rgba(0.98, 0.62, 0.62, alpha),
-                    BlendFactor::SrcAlpha,
-                    BlendFactor::One,
-                );
-            }
+            renderer.render_effect(
+                camera,
+                anchor,
+                cone_texture.clone(),
+                corners,
+                texture_coordinates,
+                EFFECT_ORIGIN,
+                Rad(0.0),
+                Color::rgba(1.0, 1.0, 1.0, alpha * layer_alpha),
+                // Additive, as the references render these bands.
+                BlendFactor::SrcAlpha,
+                BlendFactor::One,
+            );
         }
     }
 }

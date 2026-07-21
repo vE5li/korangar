@@ -490,6 +490,7 @@ pub struct ParticleHolder {
     particles: Vec<Box<dyn Particle + Send + Sync>>,
     entity_particles: Vec<Box<dyn EntityParticle + Send + Sync>>,
     attached_sprites: Vec<EntityAttachedSprite>,
+    cast_auras: Vec<CastAura>,
     quest_icons: HashMap<EntityId, QuestIcon>,
 }
 
@@ -500,6 +501,16 @@ impl ParticleHolder {
 
     pub fn spawn_entity_particle(&mut self, particle: Box<dyn EntityParticle + Send + Sync>) {
         self.entity_particles.push(particle);
+    }
+
+    pub fn spawn_cast_aura(&mut self, aura: CastAura) {
+        // A new cast replaces any aura the entity still has.
+        self.remove_cast_aura(aura.entity_id());
+        self.cast_auras.push(aura);
+    }
+
+    pub fn remove_cast_aura(&mut self, entity_id: EntityId) {
+        self.cast_auras.retain(|aura| aura.entity_id() != entity_id);
     }
 
     pub fn spawn_attached_sprite(&mut self, sprite: EntityAttachedSprite) {
@@ -536,6 +547,7 @@ impl ParticleHolder {
         self.particles.clear();
         self.entity_particles.clear();
         self.attached_sprites.clear();
+        self.cast_auras.clear();
         self.quest_icons.clear();
     }
 
@@ -551,6 +563,7 @@ impl ParticleHolder {
             .retain_mut(|particle| particle.update(entities, local_entity, delta_time));
         self.attached_sprites
             .retain_mut(|sprite| sprite.update(entities, local_entity, delta_time));
+        self.cast_auras.retain_mut(|aura| aura.update(entities, local_entity, delta_time));
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile("render particles"))]
@@ -571,6 +584,7 @@ impl ParticleHolder {
         self.attached_sprites
             .iter()
             .for_each(|sprite| sprite.render(renderer, camera, window_size));
+        self.cast_auras.iter().for_each(|aura| aura.render(renderer, camera, window_size));
 
         entities
             .iter()

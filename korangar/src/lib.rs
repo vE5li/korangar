@@ -2016,6 +2016,7 @@ impl Client {
                 NetworkEvent::EntityStartCasting {
                     source_entity_id,
                     cast_time,
+                    element,
                     ..
                 } => {
                     if let Some(cast_time) = NonZeroU32::new(cast_time)
@@ -2027,6 +2028,22 @@ impl Client {
                     {
                         entity.set_casting(cast_time, client_tick);
                     }
+
+                    // The magic circle swirling for the length of the cast,
+                    // in the element the acknowledgement declares.
+                    if let Some(cast_time) = NonZeroU32::new(cast_time)
+                        && let Some(position) = self.entity_position(source_entity_id)
+                        && let Some(texture) = self.load_skill_particle_texture(cast_aura_texture(element))
+                    {
+                        let sound_effect = self.audio_engine.load(CAST_AURA_SOUND_PATH);
+                        self.audio_engine.play_spatial_sound_effect(sound_effect, position, 55.0);
+                        self.particle_holder.spawn_cast_aura(CastAura::new(
+                            source_entity_id,
+                            position,
+                            texture,
+                            cast_time.get() as f32 / 1000.0,
+                        ));
+                    }
                 }
                 NetworkEvent::EntityCancelCasting { entity_id } => {
                     if let Some(entity) = self
@@ -2037,6 +2054,9 @@ impl Client {
                     {
                         entity.cancel_casting(client_tick);
                     }
+
+                    // An interrupted cast tears its aura down with it.
+                    self.particle_holder.remove_cast_aura(entity_id);
                 }
                 NetworkEvent::DisplayEmotion { entity_id, emotion } => {
                     if let Some(entity) = self

@@ -39,6 +39,7 @@ pub const ICE_ARROW_LAUNCH_SOUND_PATHS: [&str; 3] = ["effect\\ef_icearrow1.wav",
 
 pub const SKILL_SOUND_PATHS: &[&str] = &[
     "_heal_effect.wav",
+    "effect\\ef_beginspell.wav",
     "effect\\ef_blessing.wav",
     "effect\\ef_fireball.wav",
     "effect\\ef_firearrow1.wav",
@@ -168,6 +169,21 @@ pub struct SkillProceduralVisualRecipe {
 /// targets, while the primary target uses the normal single-hit types.
 pub fn procedural_spawns_for_action(recipe: SkillProceduralVisualRecipe, action: i8) -> bool {
     !recipe.primary_hit_only || !matches!(action, 5 | 14)
+}
+
+/// The cast aura's hum, played once when a cast begins.
+pub const CAST_AURA_SOUND_PATH: &str = "effect\\ef_beginspell.wav";
+
+/// The cast aura ring for a cast's element, as carried by the skill-use
+/// acknowledgement. The reference client's aura properties: 0 default, 1
+/// water, 2 earth, 3 fire, 4 wind. The archive ships yellow, blue and red
+/// rings only, so earth and wind fall back to the default yellow.
+pub fn cast_aura_texture(element: u32) -> &'static str {
+    match element {
+        1 => "effect\\ring_blue.tga",
+        3 => "effect\\ring_red.tga",
+        _ => "effect\\ring_yellow.tga",
+    }
 }
 
 pub const FROST_DIVER_FOLLOWUP_DELAY: f32 = 0.64;

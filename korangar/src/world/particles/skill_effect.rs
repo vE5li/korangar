@@ -222,6 +222,66 @@ pub const ARROW_ART: BoltProjectileArt = BoltProjectileArt {
     flight_override: Some(0.14),
 };
 
+/// The magic circle swirling around a caster for the length of a cast.
+///
+/// The classic aura is a rising textured cylinder; the fork's particle path
+/// draws camera-facing quads only, so this approximates it as a pulsing ring
+/// at the caster's feet, flattened to fake the ground perspective. It is
+/// removed by key when the cast is cancelled and expires with the cast
+/// duration otherwise.
+pub struct CastAura {
+    entity_id: EntityId,
+    position: Point3<f32>,
+    texture: Arc<Texture>,
+    duration: f32,
+    elapsed: f32,
+}
+
+impl CastAura {
+    pub fn new(entity_id: EntityId, position: Point3<f32>, texture: Arc<Texture>, duration: f32) -> Self {
+        Self {
+            entity_id,
+            position,
+            texture,
+            duration: duration.max(f32::EPSILON),
+            elapsed: 0.0,
+        }
+    }
+
+    pub fn entity_id(&self) -> EntityId {
+        self.entity_id
+    }
+
+    pub fn update(&mut self, entities: &[Entity], local_entity: Option<(EntityId, Point3<f32>)>, delta_time: f32) -> bool {
+        if let Some(position) = resolve_entity_position(self.entity_id, entities, local_entity) {
+            self.position = position;
+        }
+
+        self.elapsed += delta_time.max(0.0);
+        self.elapsed < self.duration
+    }
+
+    pub fn render(&self, renderer: &GameInterfaceRenderer, camera: &dyn Camera, window_size: ScreenSize) {
+        // A slow pulse, breathing rather than flashing.
+        let pulse = 1.0 + 0.1 * (self.elapsed * 2.0 * PI * 1.2).sin();
+        // Fade in quickly at the start and out at the natural end.
+        let alpha = (self.elapsed / 0.15).min((self.duration - self.elapsed) / 0.15).clamp(0.0, 0.85);
+
+        render_centered(
+            renderer,
+            self.texture.clone(),
+            self.position + Vector3::new(0.0, 1.0, 0.0),
+            camera,
+            window_size,
+            ScreenSize {
+                width: 76.0 * pulse,
+                height: 38.0 * pulse,
+            },
+            Color::rgba(1.0, 1.0, 1.0, alpha),
+        );
+    }
+}
+
 pub const COLD_BOLT_PARTICLE_DURATION: f32 = 0.44;
 pub const FROST_DIVER_TRAVEL_DURATION: f32 = 0.64;
 pub const FROST_DIVER_IMPACT_DURATION: f32 = 0.46;

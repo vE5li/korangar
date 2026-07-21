@@ -2613,6 +2613,28 @@ impl Client {
                     // packets and must not each raise a bubble.
                     if !matches!(action, 5 | 14) {
                         self.spawn_skill_name_bubble(source_entity_id, skill_id);
+
+                        // The caster fires with their attack motion, as both
+                        // reference clients do on skill use. Called directly
+                        // rather than through the auto-attack damage path,
+                        // whose buffering side effects skills must not touch.
+                        let target_position = self
+                            .client_state
+                            .follow(client_state().entities())
+                            .iter()
+                            .find(|entity| entity.get_entity_id() == destination_entity_id)
+                            .map(|entity| entity.get_tile_position());
+                        if let Some(entity) = self
+                            .client_state
+                            .follow_mut(client_state().entities())
+                            .iter_mut()
+                            .find(|entity| entity.get_entity_id() == source_entity_id)
+                        {
+                            if let Some(target_position) = target_position {
+                                entity.rotate_towards(target_position);
+                            }
+                            entity.set_attack(source_motion.max(0) as u32, false, client_tick);
+                        }
                     }
 
                     self.queue_skill_damage_particle(

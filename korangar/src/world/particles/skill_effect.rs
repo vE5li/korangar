@@ -77,12 +77,19 @@ impl BoltProjectileArt {
     }
 }
 
-/// Fire Bolt: six animated 128x64 streaks.
+/// Fire Bolt: six animated streaks.
+///
+/// Rendered at the reference client's declared size rather than the source
+/// texture's native 128x64. The official client deliberately draws that
+/// texture slightly downsampled, and the proportion is what matters: measured
+/// against `firehit2.str`, which both clients load from the same archive, the
+/// reference draws the streak 1.23x the impact's median width of 81. Native
+/// resolution put it at 1.58x, which read as too wide.
 pub const FIRE_BOLT_ART: BoltProjectileArt = BoltProjectileArt {
     frames: &FIRE_ARROW_TEXTURE_PATHS,
     frame_duration: FIRE_ARROW_FRAME_DURATION,
-    width: 128.0,
-    height: 64.0,
+    width: 100.0,
+    height: 50.0,
     launch_sounds: &FIRE_ARROW_LAUNCH_SOUND_PATHS,
     sound_range: 55.0,
 };
@@ -781,21 +788,37 @@ mod tests {
 
     #[test]
     fn bolt_quads_match_their_own_source_texture_aspect() {
-        // The two bolts do not share an aspect: the fire arrow is 128x64 and
-        // the ice shard is 128x128. Sizing them from one shared constant
-        // would stretch one of them, which is why size lives on the art.
+        // The two bolts do not share an aspect: the fire arrow texture is
+        // 128x64 and the ice shard 128x128. Sizing them from one shared
+        // constant would stretch one, which is why size lives on the art.
         assert_eq!(FIRE_BOLT_ART.width / FIRE_BOLT_ART.height, 2.0);
         assert_eq!(COLD_BOLT_ART.width / COLD_BOLT_ART.height, 1.0);
 
-        // The reference client sizes the ice shard at 50 against the fire
-        // arrow's 100x50: half the width, same height. A square reads much
-        // heavier than a streak, so matching widths would overpower it.
+        // The reference client declares these outright: the fire arrow at
+        // 100x50 and the ice shard at 50 square. Those are in the same units
+        // as STR frame coordinates, which each client divides by 35 to reach
+        // world space, so the numbers transfer directly. Note this is not the
+        // textures' native resolution: the official client draws them
+        // slightly downsampled.
+        assert_eq!((FIRE_BOLT_ART.width, FIRE_BOLT_ART.height), (100.0, 50.0));
+        assert_eq!((COLD_BOLT_ART.width, COLD_BOLT_ART.height), (50.0, 50.0));
+
+        // Half the width, same height. A square reads much heavier than a
+        // streak, so matching widths would overpower it.
         assert_eq!(COLD_BOLT_ART.width, FIRE_BOLT_ART.width * 0.5);
         assert_eq!(COLD_BOLT_ART.height, FIRE_BOLT_ART.height);
 
-        // Fire Bolt sits alongside the impact it precedes rather than beneath
-        // it: firehit2.str renders quads of median 81x137 in this space.
-        assert!(FIRE_BOLT_ART.width >= 81.0, "the streak must not be dwarfed by its own impact");
+        // Cross-check against an asset both clients load from the same
+        // archive, which cancels out any difference in their coordinate
+        // spaces: firehit2.str renders quads of median 81 wide, and the
+        // reference draws the streak at 1.23x that. Sizing from native
+        // texture resolution instead gave 1.58x, which read as too wide.
+        const FIRE_HIT_MEDIAN_WIDTH: f32 = 81.0;
+        let width_ratio = FIRE_BOLT_ART.width / FIRE_HIT_MEDIAN_WIDTH;
+        assert!(
+            (1.15..=1.30).contains(&width_ratio),
+            "streak width should track the reference's 1.23x of its impact, got {width_ratio}"
+        );
 
         for art in [FIRE_BOLT_ART, COLD_BOLT_ART] {
             assert_eq!(art.half_width() * 2.0, art.width);

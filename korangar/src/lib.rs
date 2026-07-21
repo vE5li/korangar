@@ -2293,6 +2293,9 @@ impl Client {
                     }
                     _ => {}
                 },
+                InputEvent::DropItem { index, amount } => {
+                    let _ = self.networking_system.drop_item(index, amount);
+                }
                 InputEvent::SendEmotion { emotion } => {
                     let _ = self.networking_system.send_emotion(emotion);
                 }
@@ -3171,6 +3174,7 @@ impl Client {
         let mouse_mode = self.interface.get_mouse_mode();
         let is_mouse_mode_default = mouse_mode.is_default();
         let last_walking_destination = mouse_mode.walk_destination();
+        let moved_inventory_item = mouse_mode.moved_inventory_item();
 
         let mut interface_frame = {
             #[cfg(feature = "debug")]
@@ -3273,6 +3277,23 @@ impl Client {
             }
 
             if input_report.mouse_button_released {
+                // Releasing an inventory item outside of any window throws it
+                // on the ground. This check must be position based:
+                // `is_interface_hovered` is not reliable while moving an item,
+                // since in custom mouse modes windows only count as hovered
+                // when an element explicitly marks them, which would drop the
+                // item when releasing over the background of a window.
+                if !interface_frame.is_position_over_window(input_report.mouse_position)
+                    && let Some(item) = moved_inventory_item
+                {
+                    let amount = match &item.details {
+                        korangar_networking::InventoryItemDetails::Regular { amount, .. } => *amount,
+                        korangar_networking::InventoryItemDetails::Equippable { .. } => 1,
+                    };
+
+                    self.input_event_buffer.push(InputEvent::DropItem { index: item.index, amount });
+                }
+
                 interface_frame.drop(&self.client_state);
             }
 

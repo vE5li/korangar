@@ -618,6 +618,14 @@ where
         index: packet.index,
         amount: packet.amount,
     })?;
+    packet_handler.register(|packet: DropItemAckPacket| match packet.amount {
+        0 => None,
+        amount => Some(NetworkEvent::InventoryItemRemoved {
+            reason: RemoveItemReason::Normal,
+            index: packet.inventory_index,
+            amount,
+        }),
+    })?;
     packet_handler.register(|packet: ServerTickPacket| NetworkEvent::UpdateClientTick {
         client_tick: packet.client_tick,
         received_at: Instant::now(),

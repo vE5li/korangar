@@ -775,6 +775,12 @@ where
         }
     }
 
+    pub fn drop_item(&mut self, item_index: InventoryIndex, amount: u16) -> Result<(), NotConnectedError> {
+        match self.map_server_packet_version()? {
+            SupportedPacketVersion::_20220406 => self.send_map_server_packet(DropItemPacket::new(item_index, amount)),
+        }
+    }
+
     pub fn request_item_equip(&mut self, item_index: InventoryIndex, equip_position: EquipPosition) -> Result<(), NotConnectedError> {
         match self.map_server_packet_version()? {
             SupportedPacketVersion::_20220406 => self.send_map_server_packet(RequestEquipItemPacket::new(item_index, equip_position)),
@@ -910,7 +916,10 @@ where
 mod packet_handlers {
     use ragnarok_bytes::{ByteReader, ByteWriter};
     use ragnarok_packets::handler::{HandlerResult, NoPacketCallback};
-    use ragnarok_packets::{DisplayEmotionPacket, EntityId, PacketExt, RequestEmotionPacket};
+    use ragnarok_packets::{
+        DisplayEmotionPacket, DropItemAckPacket, DropItemPacket, EntityId, InventoryIndex, PacketExt, RemoveItemReason,
+        RequestEmotionPacket,
+    };
 
     use crate::{NetworkEvent, NetworkingSystem, SupportedPacketVersion};
 
@@ -959,5 +968,58 @@ mod packet_handlers {
             entity_id: EntityId(0x1234_5678),
             emotion: 3,
         }]));
+    }
+
+    #[test]
+    fn failed_item_drop_does_not_remove_inventory_item() {
+        let mut handler = NetworkingSystem::create_map_server_packet_handler(NoPacketCallback, SupportedPacketVersion::_20220406).unwrap();
+        let packet = DropItemAckPacket {
+            inventory_index: InventoryIndex(5),
+            amount: 0,
+        };
+        let mut writer = ByteWriter::new();
+        packet.packet_to_bytes(&mut writer).unwrap();
+        let mut reader = ByteReader::without_metadata(writer.as_slice());
+
+        let HandlerResult::Ok(events) = handler.process_one(&mut reader) else {
+            panic!("item-drop acknowledgement was not handled");
+        };
+
+        assert!(events.0.is_empty());
+    }
+
+    #[test]
+    fn successful_item_drop_removes_acknowledged_amount() {
+        let mut handler = NetworkingSystem::create_map_server_packet_handler(NoPacketCallback, SupportedPacketVersion::_20220406).unwrap();
+        let packet = DropItemAckPacket {
+            inventory_index: InventoryIndex(5),
+            amount: 2,
+        };
+        let mut writer = ByteWriter::new();
+        packet.packet_to_bytes(&mut writer).unwrap();
+        let mut reader = ByteReader::without_metadata(writer.as_slice());
+
+        let HandlerResult::Ok(events) = handler.process_one(&mut reader) else {
+            panic!("item-drop acknowledgement was not handled");
+        };
+
+        assert!(matches!(events.0.as_slice(), [NetworkEvent::InventoryItemRemoved {
+            reason: RemoveItemReason::Normal,
+            index: InventoryIndex(5),
+            amount: 2,
+        }]));
+    }
+
+    #[test]
+    fn item_drop_request_uses_shuffled_header() {
+        let packet = DropItemPacket {
+            inventory_index: InventoryIndex(5),
+            amount: 2,
+        };
+        let mut writer = ByteWriter::new();
+        packet.packet_to_bytes(&mut writer).unwrap();
+
+        // InventoryIndex is zero-based in the client and two-based on the wire.
+        assert_eq!(writer.as_slice(), &[0x63, 0x03, 0x07, 0x00, 0x02, 0x00]);
     }
 }

@@ -49,6 +49,10 @@ impl Inventory {
     }
 
     pub fn remove_item(&mut self, index: InventoryIndex, remove_amount: u16) {
+        if remove_amount == 0 {
+            return;
+        }
+
         let position = self
             .items
             .iter()

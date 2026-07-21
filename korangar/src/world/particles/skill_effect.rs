@@ -356,11 +356,15 @@ impl CastRing {
         let (half_size, spin_speed) = match self.kind {
             // A gentle swirl under the caster.
             CastRingKind::Aura => (7.5, 45.0_f32.to_radians()),
-            // The reticle starts at the reference's three tiles and shrinks
-            // onto the target while spinning at its 270 degrees per second.
+            // The reference reticle snaps from fifteen cells down to three
+            // in a fifth of a second and rests there for the whole cast,
+            // spinning. The snap is the eye-catch; the rest size is the
+            // official three tiles.
             CastRingKind::LockOn => {
-                let shrink = 1.0 - 0.55 * (self.elapsed / 0.6).clamp(0.0, 1.0);
-                (7.5 * shrink, 270.0_f32.to_radians())
+                let snap = (self.elapsed / 0.2).clamp(0.0, 1.0);
+                let full_extent_tiles = 15.0 - 12.0 * snap;
+                // Half extent in world units: tiles x 5 / 2.
+                (full_extent_tiles * 2.5, 270.0_f32.to_radians())
             }
         };
 

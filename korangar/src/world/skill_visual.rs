@@ -88,10 +88,12 @@ pub struct SkillVisualRecipe {
     pub light: Option<SkillEffectLight>,
     pub repeating: bool,
     pub hit_interval: Option<f32>,
-    /// Whether this visual is a wind-up whose landing the hit must wait for,
-    /// like a projectile's flight. The lightning strike works this way: the
-    /// bolt falls first, the damage lands when it connects.
-    pub leads_impact: bool,
+    /// Wind-up time the hit must wait for, measured from the animation
+    /// itself: the seconds from the visual's first frame to the moment it
+    /// visibly connects. The lightning strike works this way, and its
+    /// wind-up is a property of the STR file, not of the caster's attack
+    /// motion, which is the wrong clock for it and far shorter.
+    pub lead_duration: Option<f32>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -188,19 +190,24 @@ pub fn skill_projectile_flight_time(source_motion: i32) -> f32 {
 
 /// Delay that hit feedback must wait so it resolves after the projectile or
 /// leading cast visual lands. Skills with neither are unaffected.
+///
+/// A projectile's lead comes from the server's attack motion, since its
+/// flight is paced to arrive when the server says the hit lands. A cast
+/// visual's lead is measured from its own animation, which plays at its own
+/// fixed rate regardless of the caster. A skill with both waits for the
+/// later of the two.
 pub fn skill_impact_lead_time(
     procedural: Option<SkillProceduralVisualRecipe>,
     cast_visual: Option<SkillVisualRecipe>,
     source_motion: i32,
 ) -> f32 {
-    let projectile_leads = procedural.is_some_and(|recipe| recipe.leads_impact);
-    let cast_visual_leads = cast_visual.is_some_and(|recipe| recipe.leads_impact);
+    let projectile_lead = match procedural {
+        Some(recipe) if recipe.leads_impact => skill_projectile_flight_time(source_motion),
+        _ => 0.0,
+    };
+    let cast_visual_lead = cast_visual.and_then(|recipe| recipe.lead_duration).unwrap_or(0.0);
 
-    if projectile_leads || cast_visual_leads {
-        skill_projectile_flight_time(source_motion)
-    } else {
-        0.0
-    }
+    projectile_lead.max(cast_visual_lead)
 }
 
 const FIRE_IMPACT_LIGHT: SkillEffectLight = SkillEffectLight {
@@ -230,7 +237,7 @@ const FIRE_BOLT_IMPACT: SkillVisualRecipe = SkillVisualRecipe {
     light: Some(FIRE_IMPACT_LIGHT),
     repeating: false,
     hit_interval: Some(BOLT_HIT_INTERVAL),
-    leads_impact: false,
+    lead_duration: None,
 };
 
 const FIRE_WALL_IMPACT: SkillVisualRecipe = SkillVisualRecipe {
@@ -249,7 +256,7 @@ const FIRE_WALL_GROUND: SkillVisualRecipe = SkillVisualRecipe {
     light: Some(FIRE_IMPACT_LIGHT),
     repeating: false,
     hit_interval: None,
-    leads_impact: false,
+    lead_duration: None,
 };
 
 const FIRE_WALL_UNIT: SkillVisualRecipe = SkillVisualRecipe {
@@ -266,7 +273,7 @@ const FIRE_WALL_UNIT: SkillVisualRecipe = SkillVisualRecipe {
     }),
     repeating: true,
     hit_interval: None,
-    leads_impact: false,
+    lead_duration: None,
 };
 
 const PNEUMA_UNIT: SkillVisualRecipe = SkillVisualRecipe {
@@ -283,8 +290,14 @@ const PNEUMA_UNIT: SkillVisualRecipe = SkillVisualRecipe {
     }),
     repeating: false,
     hit_interval: None,
-    leads_impact: false,
+    lead_duration: None,
 };
+
+/// When the strike visibly connects, measured from lightning.str itself:
+/// nothing renders for the first 0.58s, the rings swirl from key 35, the
+/// first bolt column appears at key 45 and the ground bang flash begins at
+/// key 56 of 60fps, which is the moment the damage belongs to.
+pub const LIGHTNING_STRIKE_CONNECT: f32 = 56.0 / 60.0;
 
 /// The big strike that resolves the cast. The official client plays this
 /// once (EF_LIGHTBOLT); the per-hit feedback is the separate wind hit below.
@@ -302,7 +315,7 @@ const LIGHTNING_BOLT_STRIKE: SkillVisualRecipe = SkillVisualRecipe {
     }),
     repeating: false,
     hit_interval: None,
-    leads_impact: true,
+    lead_duration: Some(LIGHTNING_STRIKE_CONNECT),
 };
 
 /// The official client varies the wind elemental hit per hit (EF_WINDHIT).
@@ -320,7 +333,7 @@ const LIGHTNING_BOLT_HIT: SkillVisualRecipe = SkillVisualRecipe {
     light: None,
     repeating: false,
     hit_interval: Some(BOLT_HIT_INTERVAL),
-    leads_impact: false,
+    lead_duration: None,
 };
 
 /// The wind hit's own sound, a generic elemental fist impact.
@@ -342,7 +355,7 @@ const HEAL_TARGET: SkillVisualRecipe = SkillVisualRecipe {
     light: None,
     repeating: false,
     hit_interval: None,
-    leads_impact: false,
+    lead_duration: None,
 };
 
 /// Kept for the direct-effect debug path only: ZC_NOTIFY_EFFECT carries a
@@ -789,11 +802,18 @@ mod tests {
             assert!(SKILL_SOUND_PATHS.contains(path), "{path} must be preloaded");
         }
 
-        // The strike is a wind-up: the bolt falls first and the damage lands
-        // when it connects, so every hit waits for the strike's lead while
-        // the strike itself starts immediately.
-        assert!(strike.leads_impact);
-        assert_eq!(skill_impact_lead_time(None, Some(strike), 420), 0.42);
+        // The strike is a wind-up: the rings and bolt play first and the
+        // damage lands when the bang flash connects. That moment is a
+        // property of the animation, measured from the STR, so the lead is
+        // fixed rather than derived from the caster's attack motion, which
+        // is far shorter than the 0.93s the animation takes to connect.
+        assert_eq!(strike.lead_duration, Some(LIGHTNING_STRIKE_CONNECT));
+        assert!((LIGHTNING_STRIKE_CONNECT - 0.933).abs() < 0.01);
+        assert_eq!(skill_impact_lead_time(None, Some(strike), 420), LIGHTNING_STRIKE_CONNECT);
+        assert!(
+            skill_impact_lead_time(None, Some(strike), 420) > PROJECTILE_FLIGHT_MAXIMUM,
+            "the attack-motion clamp could never reach the strike's connect moment"
+        );
         assert_eq!(
             skill_impact_lead_time(None, Some(hit), 420),
             0.0,

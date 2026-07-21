@@ -99,6 +99,11 @@ pub struct BoltProjectileArt {
     /// over the last, as the reference client does for travelling
     /// projectiles. Falling bolts render at full opacity.
     pub fade: bool,
+    /// Radians added to the flight heading so the art's own forward axis
+    /// ends up pointing along the movement. Zero means the art already
+    /// points along +X, like the fire arrow streaks, whose measured alpha
+    /// mass put the dense head at +X. Measured per art where possible.
+    pub base_angle: f32,
     pub launch_sounds: &'static [&'static str],
     pub sound_range: f32,
 }
@@ -132,6 +137,7 @@ pub const FIRE_BOLT_ART: BoltProjectileArt = BoltProjectileArt {
     },
     motion: BoltMotion::FallOntoTarget,
     fade: false,
+    base_angle: 0.0,
     launch_sounds: &FIRE_ARROW_LAUNCH_SOUND_PATHS,
     sound_range: 55.0,
 };
@@ -152,6 +158,7 @@ pub const COLD_BOLT_ART: BoltProjectileArt = BoltProjectileArt {
     size: BoltQuadSize::Fixed { width: 50.0, height: 50.0 },
     motion: BoltMotion::FallOntoTarget,
     fade: false,
+    base_angle: 0.0,
     launch_sounds: &ICE_ARROW_LAUNCH_SOUND_PATHS,
     sound_range: 55.0,
 };
@@ -170,6 +177,10 @@ pub const FIRE_BALL_ART: BoltProjectileArt = BoltProjectileArt {
     size: BoltQuadSize::Native { scale: 2.0 },
     motion: BoltMotion::TravelFromSource,
     fade: true,
+    // The frames' alpha mass sits above centre in every frame: the flame
+    // tail rises and the ball faces the image's bottom, so the sprite's
+    // forward axis is a quarter turn past the +X convention.
+    base_angle: -std::f32::consts::FRAC_PI_2,
     launch_sounds: &["effect\\ef_fireball.wav"],
     sound_range: 60.0,
 };
@@ -188,6 +199,11 @@ pub const ARROW_ART: BoltProjectileArt = BoltProjectileArt {
     size: BoltQuadSize::Native { scale: 1.0 },
     motion: BoltMotion::TravelFromSource,
     fade: true,
+    // The ammunition sprite is 8x61: drawn vertically, so a quarter turn is
+    // certain. Its alpha mass is symmetric, so which end is the head could
+    // not be measured; the head is assumed at the image top, and if arrows
+    // fly tail-first the sign of this constant is the one thing to flip.
+    base_angle: std::f32::consts::FRAC_PI_2,
     launch_sounds: &[],
     sound_range: 55.0,
 };
@@ -460,7 +476,7 @@ impl EffectBase for BoltProjectile {
         let launch = self.launch_position();
         let landing = self.landing_position();
         let position = launch + (landing - launch) * smoothstep(progress);
-        let angle = projectile_screen_angle(camera, renderer.window_size(), launch, landing);
+        let angle = projectile_screen_angle(camera, renderer.window_size(), launch, landing) + Rad(self.art.base_angle);
         let alpha = fade_envelope(progress, self.art.fade);
 
         // Corner order the effect renderer expects: top left, top right,
@@ -997,6 +1013,23 @@ mod tests {
         // it degrades to the falling entry rather than the world origin.
         let fallback = BoltProjectile::new(TRAVEL_ART, no_frames(), EntityId(9), target, None, 0, 0.42);
         assert!(fallback.launch_position().y > fallback.landing_position().y);
+    }
+
+    #[test]
+    fn base_orientation_matches_each_art_measurement() {
+        // The streak textures' measured alpha mass put the dense head at +X:
+        // no correction.
+        assert_eq!(FIRE_BOLT_ART.base_angle, 0.0);
+        assert_eq!(COLD_BOLT_ART.base_angle, 0.0);
+
+        // The fireball frames' alpha mass sits above centre in all six
+        // frames: tail up, ball facing the image bottom, so its forward is a
+        // quarter turn past +X and the correction subtracts one.
+        assert_eq!(FIRE_BALL_ART.base_angle, -std::f32::consts::FRAC_PI_2);
+
+        // The 8x61 ammunition sprite is vertical, so a quarter-turn
+        // magnitude is certain even though the head's end was unmeasurable.
+        assert_eq!(ARROW_ART.base_angle.abs(), std::f32::consts::FRAC_PI_2);
     }
 
     #[test]

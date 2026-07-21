@@ -1467,6 +1467,7 @@ impl Client {
     fn spawn_bolt_projectile(
         &mut self,
         art: BoltProjectileArt,
+        source_entity_id: EntityId,
         destination_entity_id: EntityId,
         sequence_index: usize,
         initial_elapsed: f32,
@@ -1476,13 +1477,45 @@ impl Client {
             return;
         };
 
-        let mut textures = Vec::with_capacity(art.frames.len());
-        for texture_path in art.frames {
-            let Some(texture) = self.load_skill_particle_texture(texture_path) else {
-                return;
-            };
-            textures.push(texture);
-        }
+        let (textures, frame_duration) = match art.source {
+            BoltFrameSource::Textures { paths, frame_duration } => {
+                let mut textures = Vec::with_capacity(paths.len());
+                for texture_path in paths {
+                    let Some(texture) = self.load_skill_particle_texture(texture_path) else {
+                        return;
+                    };
+                    textures.push(texture);
+                }
+                (textures, frame_duration)
+            }
+            BoltFrameSource::SpriteAction { sprite_path, action_path } => {
+                let Ok(sprite) = self.sprite_loader.get_or_load(sprite_path) else {
+                    #[cfg(feature = "debug")]
+                    print_debug!("[{}] failed to load projectile sprite '{}'", "error".red(), sprite_path);
+                    return;
+                };
+                let Ok(actions) = self.action_loader.get_or_load(action_path) else {
+                    #[cfg(feature = "debug")]
+                    print_debug!("[{}] failed to load projectile actions '{}'", "error".red(), action_path);
+                    return;
+                };
+
+                // The ACT's own cadence, from its first action.
+                let frame_duration = actions.delays.first().copied().unwrap_or(1.0).max(f32::EPSILON) * ACT_DELAY_UNIT;
+                (sprite.textures.clone(), frame_duration)
+            }
+        };
+
+        let (width, height) = match art.size {
+            BoltQuadSize::Fixed { width, height } => (width, height),
+            BoltQuadSize::Native { scale } => {
+                let Some(first) = textures.first() else {
+                    return;
+                };
+                let size = first.get_size();
+                (size.width as f32 * scale, size.height as f32 * scale)
+            }
+        };
 
         // The official client randomizes the launch sound per bolt.
         if let Some(first) = art.launch_sounds.first() {
@@ -1491,11 +1524,31 @@ impl Client {
             self.audio_engine.play_spatial_sound_effect(sound_effect, position, art.sound_range);
         }
 
+        // A travelling projectile launches from wherever the caster stood at
+        // spawn time. The fallback mirrors the Frost Diver convention for a
+        // caster that despawned before its projectile resolved.
+        let launch_origin = match art.motion {
+            BoltMotion::FallOntoTarget => None,
+            BoltMotion::TravelFromSource => Some(
+                self.entity_position(source_entity_id)
+                    .unwrap_or(position + Vector3::new(-22.0, 12.0, 0.0))
+                    + Vector3::new(0.0, 7.0, 0.0),
+            ),
+        };
+
+        let resolved = ResolvedBoltFrames {
+            textures,
+            frame_duration,
+            half_width: width * 0.5,
+            half_height: height * 0.5,
+        };
+
         let mut effect: Box<dyn EffectBase + Send + Sync> = Box::new(BoltProjectile::new(
             art,
+            resolved,
             destination_entity_id,
             position,
-            textures,
+            launch_origin,
             sequence_index,
             flight_time,
         ));
@@ -1523,6 +1576,7 @@ impl Client {
             SkillProceduralVisualKind::FireBoltProjectile => {
                 self.spawn_bolt_projectile(
                     FIRE_BOLT_ART,
+                    source_entity_id,
                     destination_entity_id,
                     sequence_index,
                     initial_elapsed,
@@ -1533,6 +1587,7 @@ impl Client {
             SkillProceduralVisualKind::ColdBolt => {
                 self.spawn_bolt_projectile(
                     COLD_BOLT_ART,
+                    source_entity_id,
                     destination_entity_id,
                     sequence_index,
                     initial_elapsed,

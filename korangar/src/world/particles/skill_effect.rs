@@ -46,35 +46,71 @@ const BOLT_DESCENT_HEIGHT: f32 = 38.0;
 /// animation's own offset.
 const BOLT_TARGET_HEIGHT: f32 = 5.0;
 
-/// Art and motion of a bolt that falls onto its target.
-///
-/// Fire Bolt and Cold Bolt are the same effect shape with different assets:
-/// the official client spawns both above the target and drops them, never
-/// involving the caster. Sizes are given in the effect renderer's pixel space
-/// and should match the source texture's native resolution, which keeps texel
-/// mapping 1:1 and puts the bolt in the same scale band as the impact it
-/// precedes (`firehit2.str` renders quads of median 81x137 in this space).
+/// How a projectile moves.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BoltMotion {
+    /// Spawns above the target and drops onto it, never involving the
+    /// caster. The classic bolt spells work this way.
+    FallOntoTarget,
+    /// Launches from the caster's position at spawn time and flies to the
+    /// target. Arrows and thrown projectiles work this way.
+    TravelFromSource,
+}
+
+/// Where a projectile's frames come from.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum BoltFrameSource {
+    /// Standalone textures cycled at a fixed cadence. A single entry renders
+    /// unanimated.
+    Textures {
+        paths: &'static [&'static str],
+        frame_duration: f32,
+    },
+    /// An SPR/ACT pair: the sprite provides the frames in order and the
+    /// action provides the cadence.
+    SpriteAction {
+        sprite_path: &'static str,
+        action_path: &'static str,
+    },
+}
+
+/// How the projectile quad is sized, in the effect renderer's pixel space
+/// (the same units as STR frame coordinates).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum BoltQuadSize {
+    /// A size declared outright, matching the reference client's tables.
+    Fixed { width: f32, height: f32 },
+    /// The first frame's native pixel size multiplied by `scale`, resolved
+    /// when the textures are loaded. For SPR sources whose frame sizes are
+    /// not knowable statically.
+    Native { scale: f32 },
+}
+
+/// The ACT delay unit in seconds: a delay of 1.0 is 50 milliseconds.
+pub const ACT_DELAY_UNIT: f32 = 0.05;
+
+/// Art and motion of a skill projectile.
 #[derive(Clone, Copy, Debug)]
 pub struct BoltProjectileArt {
-    /// Frames cycled while falling. A single entry renders unanimated.
-    pub frames: &'static [&'static str],
-    pub frame_duration: f32,
-    /// Native texture size. The aspect must match the source or the sprite
-    /// distorts, which is most visible once the bolt is rotated.
-    pub width: f32,
-    pub height: f32,
+    pub source: BoltFrameSource,
+    pub size: BoltQuadSize,
+    pub motion: BoltMotion,
+    /// Fade the projectile in over the first quarter of its flight and out
+    /// over the last, as the reference client does for travelling
+    /// projectiles. Falling bolts render at full opacity.
+    pub fade: bool,
     pub launch_sounds: &'static [&'static str],
     pub sound_range: f32,
 }
 
-impl BoltProjectileArt {
-    fn half_width(&self) -> f32 {
-        self.width * 0.5
+/// Alpha envelope of a projectile at `progress` through its flight.
+fn fade_envelope(progress: f32, enabled: bool) -> f32 {
+    if !enabled {
+        return 1.0;
     }
 
-    fn half_height(&self) -> f32 {
-        self.height * 0.5
-    }
+    let progress = progress.clamp(0.0, 1.0);
+    (progress / 0.25).min((1.0 - progress) / 0.25).clamp(0.0, 1.0)
 }
 
 /// Fire Bolt: six animated streaks.
@@ -86,10 +122,16 @@ impl BoltProjectileArt {
 /// reference draws the streak 1.23x the impact's median width of 81. Native
 /// resolution put it at 1.58x, which read as too wide.
 pub const FIRE_BOLT_ART: BoltProjectileArt = BoltProjectileArt {
-    frames: &FIRE_ARROW_TEXTURE_PATHS,
-    frame_duration: FIRE_ARROW_FRAME_DURATION,
-    width: 100.0,
-    height: 50.0,
+    source: BoltFrameSource::Textures {
+        paths: &FIRE_ARROW_TEXTURE_PATHS,
+        frame_duration: FIRE_ARROW_FRAME_DURATION,
+    },
+    size: BoltQuadSize::Fixed {
+        width: 100.0,
+        height: 50.0,
+    },
+    motion: BoltMotion::FallOntoTarget,
+    fade: false,
     launch_sounds: &FIRE_ARROW_LAUNCH_SOUND_PATHS,
     sound_range: 55.0,
 };
@@ -103,10 +145,13 @@ pub const FIRE_BOLT_ART: BoltProjectileArt = BoltProjectileArt {
 /// of the same width, so matching the fire arrow's 128 here would overpower
 /// it.
 pub const COLD_BOLT_ART: BoltProjectileArt = BoltProjectileArt {
-    frames: &[ICE_ARROW_TEXTURE_PATH],
-    frame_duration: FIRE_ARROW_FRAME_DURATION,
-    width: FIRE_BOLT_ART.height,
-    height: FIRE_BOLT_ART.height,
+    source: BoltFrameSource::Textures {
+        paths: &[ICE_ARROW_TEXTURE_PATH],
+        frame_duration: FIRE_ARROW_FRAME_DURATION,
+    },
+    size: BoltQuadSize::Fixed { width: 50.0, height: 50.0 },
+    motion: BoltMotion::FallOntoTarget,
+    fade: false,
     launch_sounds: &ICE_ARROW_LAUNCH_SOUND_PATHS,
     sound_range: 55.0,
 };
@@ -266,7 +311,16 @@ fn projectile_screen_angle(camera: &dyn Camera, window_size: ScreenSize, from: P
     screen_direction_angle(project(from), project(to), window_size)
 }
 
-/// One descending bolt projectile.
+/// Frames and quad extents resolved from a [`BoltProjectileArt`] at spawn,
+/// once the assets are loaded.
+pub struct ResolvedBoltFrames {
+    pub textures: Vec<Arc<Texture>>,
+    pub frame_duration: f32,
+    pub half_width: f32,
+    pub half_height: f32,
+}
+
+/// One skill projectile, either falling onto or travelling to its target.
 ///
 /// Rendered through the effect pipeline rather than as an interface sprite,
 /// because it needs to be rotated onto its flight direction and blended
@@ -277,7 +331,14 @@ pub struct BoltProjectile {
     art: BoltProjectileArt,
     target_entity_id: EntityId,
     target_position: Point3<f32>,
+    /// The fixed point a travelling projectile was launched from. Falling
+    /// bolts derive their entry point from the target instead, so they keep
+    /// tracking a moving target at both ends of the path.
+    launch_origin: Option<Point3<f32>>,
     textures: Vec<Arc<Texture>>,
+    frame_duration: f32,
+    half_width: f32,
+    half_height: f32,
     offset: Vector3<f32>,
     timeline: Timeline,
     deleted: bool,
@@ -286,9 +347,10 @@ pub struct BoltProjectile {
 impl BoltProjectile {
     pub fn new(
         art: BoltProjectileArt,
+        resolved: ResolvedBoltFrames,
         target_entity_id: EntityId,
         target_position: Point3<f32>,
-        textures: Vec<Arc<Texture>>,
+        launch_origin: Option<Point3<f32>>,
         bolt_index: usize,
         flight_duration: f32,
     ) -> Self {
@@ -296,7 +358,11 @@ impl BoltProjectile {
             art,
             target_entity_id,
             target_position,
-            textures,
+            launch_origin,
+            textures: resolved.textures,
+            frame_duration: resolved.frame_duration,
+            half_width: resolved.half_width,
+            half_height: resolved.half_height,
             offset: bolt_offset(bolt_index),
             timeline: Timeline::new(flight_duration),
             deleted: false,
@@ -308,17 +374,23 @@ impl BoltProjectile {
             return 0;
         }
 
-        let frame = self.timeline.elapsed.max(0.0) / self.art.frame_duration.max(f32::EPSILON);
+        let frame = self.timeline.elapsed.max(0.0) / self.frame_duration.max(f32::EPSILON);
         (frame as usize) % self.textures.len()
     }
 
-    /// Where the bolt enters, above and beside the target.
+    /// Where the projectile enters: above and beside the target for a
+    /// falling bolt, the caster's position at spawn for a travelling one.
     fn launch_position(&self) -> Point3<f32> {
-        self.landing_position() + self.offset + Vector3::new(0.0, BOLT_DESCENT_HEIGHT, 0.0)
+        match self.art.motion {
+            BoltMotion::FallOntoTarget => self.landing_position() + self.offset + Vector3::new(0.0, BOLT_DESCENT_HEIGHT, 0.0),
+            BoltMotion::TravelFromSource => self
+                .launch_origin
+                .unwrap_or_else(|| self.landing_position() + self.offset + Vector3::new(0.0, BOLT_DESCENT_HEIGHT, 0.0)),
+        }
     }
 
-    /// Where the bolt lands. The impact animation plays here, so the
-    /// projectile converges completely rather than keeping a residual offset.
+    /// Where the projectile lands. The impact animation plays here, so it
+    /// converges completely rather than keeping a residual offset.
     fn landing_position(&self) -> Point3<f32> {
         self.target_position + Vector3::new(0.0, BOLT_TARGET_HEIGHT, 0.0)
     }
@@ -348,15 +420,17 @@ impl EffectBase for BoltProjectile {
             return;
         };
 
+        let progress = self.timeline.progress();
         let launch = self.launch_position();
         let landing = self.landing_position();
-        let position = launch + (landing - launch) * smoothstep(self.timeline.progress());
+        let position = launch + (landing - launch) * smoothstep(progress);
         let angle = projectile_screen_angle(camera, renderer.window_size(), launch, landing);
+        let alpha = fade_envelope(progress, self.art.fade);
 
         // Corner order the effect renderer expects: top left, top right,
         // bottom left, bottom right.
-        let half_width = self.art.half_width();
-        let half_height = self.art.half_height();
+        let half_width = self.half_width;
+        let half_height = self.half_height;
         let corners = [
             Vector2::new(-half_width, -half_height),
             Vector2::new(half_width, -half_height),
@@ -383,7 +457,7 @@ impl EffectBase for BoltProjectile {
             // centred on the projectile and rotates about its own centre.
             EFFECT_ORIGIN,
             angle,
-            Color::rgb(1.0, 1.0, 1.0),
+            Color::rgba(1.0, 1.0, 1.0, alpha),
             // Additive, matching the reference client's blend mode for fire.
             BlendFactor::SrcAlpha,
             BlendFactor::One,
@@ -635,6 +709,23 @@ impl EntityParticle for FrostDiverParticle {
 mod tests {
     use super::*;
 
+    /// Frame-less resolution for constructor-level tests.
+    fn no_frames() -> ResolvedBoltFrames {
+        ResolvedBoltFrames {
+            textures: Vec::new(),
+            frame_duration: FIRE_ARROW_FRAME_DURATION,
+            half_width: 50.0,
+            half_height: 25.0,
+        }
+    }
+
+    fn fixed_size(art: &BoltProjectileArt) -> (f32, f32) {
+        match art.size {
+            BoltQuadSize::Fixed { width, height } => (width, height),
+            BoltQuadSize::Native { .. } => panic!("expected a declared size"),
+        }
+    }
+
     #[test]
     fn normalized_timeline_math_is_bounded() {
         assert_eq!(normalized_progress(-1.0, 1.0), 0.0);
@@ -719,7 +810,7 @@ mod tests {
     fn fire_bolt_descends_onto_the_target_and_expires_with_its_flight() {
         const FLIGHT: f32 = 0.42;
         let target = Point3::new(100.0, 20.0, 300.0);
-        let mut projectile = BoltProjectile::new(FIRE_BOLT_ART, EntityId(7), target, Vec::new(), 0, FLIGHT);
+        let mut projectile = BoltProjectile::new(FIRE_BOLT_ART, no_frames(), EntityId(7), target, None, 0, FLIGHT);
 
         // Enters above and beside the target.
         let launch = projectile.launch_position();
@@ -741,7 +832,7 @@ mod tests {
         // Unlike Cold Bolt, which keeps a residual offset, the fire bolt must
         // land on the target: the impact animation plays there.
         let target = Point3::new(10.0, 0.0, 20.0);
-        let projectile = BoltProjectile::new(FIRE_BOLT_ART, EntityId(1), target, Vec::new(), 3, 0.42);
+        let projectile = BoltProjectile::new(FIRE_BOLT_ART, no_frames(), EntityId(1), target, None, 3, 0.42);
 
         let launch = projectile.launch_position();
         let landing = projectile.landing_position();
@@ -791,8 +882,10 @@ mod tests {
         // The two bolts do not share an aspect: the fire arrow texture is
         // 128x64 and the ice shard 128x128. Sizing them from one shared
         // constant would stretch one, which is why size lives on the art.
-        assert_eq!(FIRE_BOLT_ART.width / FIRE_BOLT_ART.height, 2.0);
-        assert_eq!(COLD_BOLT_ART.width / COLD_BOLT_ART.height, 1.0);
+        let (fire_width, fire_height) = fixed_size(&FIRE_BOLT_ART);
+        let (cold_width, cold_height) = fixed_size(&COLD_BOLT_ART);
+        assert_eq!(fire_width / fire_height, 2.0);
+        assert_eq!(cold_width / cold_height, 1.0);
 
         // The reference client declares these outright: the fire arrow at
         // 100x50 and the ice shard at 50 square. Those are in the same units
@@ -800,13 +893,13 @@ mod tests {
         // world space, so the numbers transfer directly. Note this is not the
         // textures' native resolution: the official client draws them
         // slightly downsampled.
-        assert_eq!((FIRE_BOLT_ART.width, FIRE_BOLT_ART.height), (100.0, 50.0));
-        assert_eq!((COLD_BOLT_ART.width, COLD_BOLT_ART.height), (50.0, 50.0));
+        assert_eq!((fire_width, fire_height), (100.0, 50.0));
+        assert_eq!((cold_width, cold_height), (50.0, 50.0));
 
         // Half the width, same height. A square reads much heavier than a
         // streak, so matching widths would overpower it.
-        assert_eq!(COLD_BOLT_ART.width, FIRE_BOLT_ART.width * 0.5);
-        assert_eq!(COLD_BOLT_ART.height, FIRE_BOLT_ART.height);
+        assert_eq!(cold_width, fire_width * 0.5);
+        assert_eq!(cold_height, fire_height);
 
         // Cross-check against an asset both clients load from the same
         // archive, which cancels out any difference in their coordinate
@@ -814,29 +907,109 @@ mod tests {
         // reference draws the streak at 1.23x that. Sizing from native
         // texture resolution instead gave 1.58x, which read as too wide.
         const FIRE_HIT_MEDIAN_WIDTH: f32 = 81.0;
-        let width_ratio = FIRE_BOLT_ART.width / FIRE_HIT_MEDIAN_WIDTH;
+        let width_ratio = fire_width / FIRE_HIT_MEDIAN_WIDTH;
         assert!(
             (1.15..=1.30).contains(&width_ratio),
             "streak width should track the reference's 1.23x of its impact, got {width_ratio}"
         );
 
         for art in [FIRE_BOLT_ART, COLD_BOLT_ART] {
-            assert_eq!(art.half_width() * 2.0, art.width);
-            assert_eq!(art.half_height() * 2.0, art.height);
-            assert!(art.width > 0.0 && art.height > 0.0);
-            assert!(!art.frames.is_empty(), "a projectile with no frames renders nothing");
-            assert!(art.frame_duration > 0.0, "a zero frame duration would divide by zero");
+            let (width, height) = fixed_size(&art);
+            assert!(width > 0.0 && height > 0.0);
+            assert_eq!(art.motion, BoltMotion::FallOntoTarget);
+            assert!(!art.fade, "falling bolts render at full opacity");
+            match art.source {
+                BoltFrameSource::Textures { paths, frame_duration } => {
+                    assert!(!paths.is_empty(), "a projectile with no frames renders nothing");
+                    assert!(frame_duration > 0.0, "a zero frame duration would divide by zero");
+                }
+                BoltFrameSource::SpriteAction { .. } => panic!("bolts are texture-sourced"),
+            }
             assert!(!art.launch_sounds.is_empty());
         }
+    }
+
+    #[test]
+    fn travelling_projectiles_launch_from_the_caster_and_land_on_the_target() {
+        const TRAVEL_ART: BoltProjectileArt = BoltProjectileArt {
+            motion: BoltMotion::TravelFromSource,
+            fade: true,
+            ..FIRE_BOLT_ART
+        };
+        let source = Point3::new(0.0, 0.0, 0.0);
+        let target = Point3::new(60.0, 0.0, 40.0);
+        let mut projectile = BoltProjectile::new(TRAVEL_ART, no_frames(), EntityId(9), target, Some(source), 0, 0.42);
+
+        // Launches exactly from the stored origin, not from a target-derived
+        // corner: the per-bolt jitter belongs to falling bolts only.
+        assert_eq!(projectile.launch_position(), source);
+        let landing = projectile.landing_position();
+        assert_eq!(landing, target + Vector3::new(0.0, BOLT_TARGET_HEIGHT, 0.0));
+
+        // Full progress arrives exactly on the landing point.
+        let launch = projectile.launch_position();
+        let arrived = launch + (landing - launch) * smoothstep(1.0);
+        assert!((arrived.x - landing.x).abs() < 1.0e-6);
+        assert!((arrived.z - landing.z).abs() < 1.0e-6);
+
+        // The origin is fixed while the target keeps being followed, so a
+        // projectile in flight does not teleport when its caster moves.
+        assert!(projectile.update(&[], None, 0.1));
+        assert_eq!(projectile.launch_position(), source);
+
+        // A travelling art without an origin still renders somewhere sane:
+        // it degrades to the falling entry rather than the world origin.
+        let fallback = BoltProjectile::new(TRAVEL_ART, no_frames(), EntityId(9), target, None, 0, 0.42);
+        assert!(fallback.launch_position().y > fallback.landing_position().y);
+    }
+
+    #[test]
+    fn fade_envelope_ramps_over_the_outer_quarters_only_when_enabled() {
+        // Disabled: full opacity for the whole flight.
+        for progress in [0.0, 0.1, 0.5, 0.9, 1.0] {
+            assert_eq!(fade_envelope(progress, false), 1.0);
+        }
+
+        // Enabled: in over the first quarter, out over the last, opaque
+        // in between, and clamped outside the flight.
+        assert_eq!(fade_envelope(0.0, true), 0.0);
+        assert!((fade_envelope(0.125, true) - 0.5).abs() < 1.0e-6);
+        assert_eq!(fade_envelope(0.25, true), 1.0);
+        assert_eq!(fade_envelope(0.5, true), 1.0);
+        assert_eq!(fade_envelope(0.75, true), 1.0);
+        assert!((fade_envelope(0.875, true) - 0.5).abs() < 1.0e-6);
+        assert_eq!(fade_envelope(1.0, true), 0.0);
+        assert_eq!(fade_envelope(-1.0, true), 0.0);
+        assert_eq!(fade_envelope(2.0, true), 0.0);
+    }
+
+    #[test]
+    fn act_cadence_resolves_to_milliseconds() {
+        // The ACT delay unit is 50ms: korangar's own action renderer computes
+        // `delay * 50.0` milliseconds per frame. A typical delay of 4.0 must
+        // therefore cycle at 200ms.
+        assert_eq!(ACT_DELAY_UNIT, 0.05);
+        assert!((4.0 * ACT_DELAY_UNIT - 0.2).abs() < 1.0e-6);
     }
 
     #[test]
     fn cold_bolt_uses_the_authentic_shard_rather_than_an_approximation() {
         // The archive ships the real projectile texture, so the earlier
         // procedural stand-in is no longer needed.
-        assert_eq!(COLD_BOLT_ART.frames, &[ICE_ARROW_TEXTURE_PATH]);
+        assert_eq!(COLD_BOLT_ART.source, BoltFrameSource::Textures {
+            paths: &[ICE_ARROW_TEXTURE_PATH],
+            frame_duration: FIRE_ARROW_FRAME_DURATION,
+        });
         // A single frame must still index safely through the cycling logic.
-        let projectile = BoltProjectile::new(COLD_BOLT_ART, EntityId(2), Point3::new(0.0, 0.0, 0.0), Vec::new(), 0, 0.42);
+        let projectile = BoltProjectile::new(
+            COLD_BOLT_ART,
+            no_frames(),
+            EntityId(2),
+            Point3::new(0.0, 0.0, 0.0),
+            None,
+            0,
+            0.42,
+        );
         assert_eq!(projectile.frame_index(), 0);
     }
 
@@ -862,7 +1035,15 @@ mod tests {
 
     #[test]
     fn fire_bolt_follows_a_moving_target_and_can_be_cancelled() {
-        let mut projectile = BoltProjectile::new(FIRE_BOLT_ART, EntityId(1), Point3::new(0.0, 0.0, 0.0), Vec::new(), 0, 0.42);
+        let mut projectile = BoltProjectile::new(
+            FIRE_BOLT_ART,
+            no_frames(),
+            EntityId(1),
+            Point3::new(0.0, 0.0, 0.0),
+            None,
+            0,
+            0.42,
+        );
 
         // Effects are torn down on world transitions.
         projectile.mark_for_deletion();
@@ -873,7 +1054,15 @@ mod tests {
     fn fire_bolt_projectile_survives_a_missing_texture_list() {
         // load_skill_particle_texture can fail; the projectile must not panic
         // on an empty list.
-        let mut projectile = BoltProjectile::new(FIRE_BOLT_ART, EntityId(1), Point3::new(0.0, 0.0, 0.0), Vec::new(), 0, 0.42);
+        let mut projectile = BoltProjectile::new(
+            FIRE_BOLT_ART,
+            no_frames(),
+            EntityId(1),
+            Point3::new(0.0, 0.0, 0.0),
+            None,
+            0,
+            0.42,
+        );
 
         assert_eq!(projectile.frame_index(), 0);
         assert!(projectile.update(&[], None, 0.1));

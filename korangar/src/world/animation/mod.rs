@@ -62,6 +62,10 @@ impl AnimationActionType {
                 AnimationActionType::Attack1 => 2,
                 AnimationActionType::Hurt => 3,
                 AnimationActionType::Die => 4,
+                // Monster acts have no dedicated casting action; the classic
+                // client plays their attack motion for the wind-up instead
+                // of leaving them standing idle.
+                AnimationActionType::Skill => 2,
                 _ => 0,
             },
             EntityType::Warp => 0,

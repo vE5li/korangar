@@ -4512,3 +4512,63 @@ pub struct UpdateSkillPacket {
 pub struct RemoveSkillPacket {
     pub skill_id: SkillId,
 }
+
+/// Sent by the map server to open a special popup on the client.
+/// Introduced in client version 2022-10-05 (`ZC_SPECIALPOPUP`).
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0BBE)]
+pub struct SpecialPopupPacket {
+    pub popup_id: i32,
+}
+
+/// Sent by the map server to resize the currently open NPC dialog window.
+/// Introduced in client version 2022-05-04 (`ZC_DIALOG_WINDOW_SIZE`).
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0BA2)]
+pub struct DialogWindowSizePacket {
+    pub height: i32,
+    pub width: i32,
+}
+
+/// Sent by the map server to move the currently open NPC dialog window.
+/// Introduced in client version 2022-05-04 (`ZC_DIALOG_WINDOW_POS`).
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0BA3)]
+pub struct DialogWindowPosPacket {
+    pub x: i32,
+    pub y: i32,
+}
+
+/// Sent by the map server to move the currently open NPC dialog window.
+/// Introduced in client version 2022-05-04 (`ZC_DIALOG_WINDOW_POS2`).
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0BB5)]
+pub struct DialogWindowPos2Packet {
+    pub x: i32,
+    pub y: i32,
+}
+
+/// Sent by the map server to play a background music track. Replaces the
+/// fixed-size packet 0x07FE in client version 2022-05-04 (`ZC_PLAY_NPC_BGM`).
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0B8C)]
+#[variable_length]
+pub struct PlayNpcBgmPacket {
+    pub play_type: u8,
+    #[length_remaining]
+    pub bgm: String,
+}
+
+/// Sent by the map server as a response to the `/macrochecker` GM command.
+/// Introduced in client version 2024-05-02 (`ZC_GM_CHECKER`).
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0C0C)]
+pub struct MacroCheckerResultPacket {
+    pub result: i16,
+}

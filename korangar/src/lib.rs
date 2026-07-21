@@ -4239,6 +4239,7 @@ impl Client {
                 &self.top_interface_renderer,
                 input_report.mouse_position,
                 self.interface.get_mouse_mode().grabbed(),
+                self.armed_skill.map(|armed_skill| armed_skill.skill_level),
                 *self.client_state.follow(client_state().world_theme().cursor().color()),
                 self.client_state.follow(client_state().interface_settings().scaling()).get_factor(),
             );
@@ -4471,7 +4472,7 @@ impl Client {
             let cursor_state = match input_report.mouse_target {
                 _ if is_rotating_camera => MouseCursorState::RotateCamera,
                 _ if is_grabbing => MouseCursorState::GrabResource,
-                _ if armed_skill.is_some() && !is_interface_hovered => MouseCursorState::Attack,
+                _ if armed_skill.is_some() && !is_interface_hovered => MouseCursorState::Target,
                 PickerTarget::Entity(entity_id) if !is_interface_hovered => {
                     if self
                         .client_state

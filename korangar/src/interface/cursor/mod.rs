@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
 use korangar_interface::application::Clip;
-use ragnarok_packets::ClientTick;
+use ragnarok_packets::{ClientTick, SkillLevel};
 
 use crate::graphics::{Color, ScreenClip, ScreenPosition, ScreenSize};
 use crate::input::Grabbed;
-use crate::loaders::{ActionLoader, Sprite, SpriteLoader};
-use crate::renderer::{GameInterfaceRenderer, SpriteRenderer};
+use crate::loaders::{ActionLoader, FontSize, Sprite, SpriteLoader};
+use crate::renderer::{AlignHorizontal, GameInterfaceRenderer, SpriteRenderer};
 use crate::world::{Actions, SpriteAnimationState};
 
 const PICKUP_DURATION_MS: u32 = 150;
@@ -24,7 +24,9 @@ pub enum MouseCursorState {
     Warp = 7,
     NoAction = 8,
     Grab = 9,
-    Unsure1 = 10,
+    /// The spinning aim circle shown while a skill is armed for targeting.
+    /// Action 10 in the cursor act, matching the reference client's TARGET.
+    Target = 10,
     Unsure2 = 11,
     WarpFast = 12,
     Unsure3 = 13,
@@ -114,6 +116,7 @@ impl MouseCursor {
         renderer: &GameInterfaceRenderer,
         mouse_position: ScreenPosition,
         grabbed: Option<Grabbed>,
+        armed_skill_level: Option<SkillLevel>,
         color: Color,
         scaling: f32,
     ) {
@@ -194,6 +197,33 @@ impl MouseCursor {
                 color,
                 scaling,
             );
+        }
+
+        // The armed skill's cast level rides beside the aim circle, white
+        // over a dark offset copy so it reads on any ground. Offsets match
+        // the reference client's placement next to its target cursor.
+        if self.cursor_state == MouseCursorState::Target
+            && let Some(skill_level) = armed_skill_level
+        {
+            let text = skill_level.0.to_string();
+            let text_position = ScreenPosition {
+                left: mouse_position.left + 20.0 * scaling,
+                top: mouse_position.top - 18.0 * scaling,
+            };
+            let shadow_position = ScreenPosition {
+                left: text_position.left + 1.5,
+                top: text_position.top + 1.5,
+            };
+            let font_size = FontSize(20.0 * scaling);
+
+            renderer.render_text(
+                &text,
+                shadow_position,
+                Color::rgba_u8(30, 30, 30, 220),
+                font_size,
+                AlignHorizontal::Left,
+            );
+            renderer.render_text(&text, text_position, Color::WHITE, font_size, AlignHorizontal::Left);
         }
     }
 }

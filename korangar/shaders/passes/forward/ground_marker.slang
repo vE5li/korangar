@@ -10,6 +10,8 @@ struct GroundMarkerVertexOutput {
     float4 position : SV_Position;
     [[vk::location(0)]] var texture_coordinates: float2;
     [[vk::location(1)]] var color: float4;
+    [[vk::location(2)]] var base_coordinates: float2;
+    [[vk::location(3)]] var edge_fade: float;
 };
 
 struct GroundMarker {
@@ -17,6 +19,8 @@ struct GroundMarker {
     float4 color;
     // uv_scale.xy, uv_offset.zw
     float4 uv_transform;
+    // edge_fade in x, rest padding.
+    float4 parameters;
 };
 
 [[vk::binding(0, 0)]] var global_uniforms: ConstantBuffer<GlobalUniforms>;
@@ -29,16 +33,25 @@ func vs_main(uint vertex_index: SV_VulkanVertexID, uint instance_index: SV_Vulka
     let marker = markers[instance_index];
     let world_position = corner_data(marker, vertex_index);
 
+    let base_coordinates = uv_data(vertex_index);
+
     var output: GroundMarkerVertexOutput;
     output.position = mul(global_uniforms.view_projection, world_position);
-    output.texture_coordinates = uv_data(vertex_index) * marker.uv_transform.xy + marker.uv_transform.zw;
+    output.texture_coordinates = base_coordinates * marker.uv_transform.xy + marker.uv_transform.zw;
     output.color = marker.color;
+    output.base_coordinates = base_coordinates;
+    output.edge_fade = marker.parameters.x;
     return output;
 }
 
 [[shader("pixel")]]
 func fs_main(input: GroundMarkerVertexOutput) -> float4 {
-    return texture.Sample(linear_sampler, input.texture_coordinates) * input.color;
+    // Fading toward the horizontal edges hides the hard silhouette of quads
+    // faking a curved surface, and reads as the curvature itself: a glowing
+    // cylinder seen face-on is brightest at its centre.
+    let edge = sin(3.14159265 * input.base_coordinates.x);
+    let fade = lerp(1.0, edge, input.edge_fade);
+    return texture.Sample(linear_sampler, input.texture_coordinates) * input.color * fade;
 }
 
 // Corner order: 0 upper left, 1 upper right, 2 lower left, 3 lower right.
@@ -60,11 +73,24 @@ func corner_data(marker: GroundMarker, vertex_index: uint) -> float4 {
     }
 }
 
-// Same optimized truth table as the walk indicator.
+// Standard orientation: U runs left to right, V top to bottom, matching the
+// corner order. The walk indicator's table is transposed relative to this,
+// which its rotationally symmetric texture hides; the scrolling cone bands
+// do not.
 [ForceInline]
 func uv_data(vertex_index: uint) -> float2 {
-    let index = 1 << vertex_index;
-    let x = float((index & 0x2C) != 0);
-    let y = float((index & 0x32) != 0);
-    return float2(x, y);
+    switch (vertex_index) {
+        case 0:
+            return float2(0.0, 0.0);
+        case 1:
+            return float2(1.0, 0.0);
+        case 2:
+            return float2(0.0, 1.0);
+        case 3:
+            return float2(0.0, 1.0);
+        case 4:
+            return float2(1.0, 0.0);
+        default:
+            return float2(1.0, 1.0);
+    }
 }

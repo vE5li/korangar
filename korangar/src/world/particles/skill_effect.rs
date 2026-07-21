@@ -381,6 +381,7 @@ impl CastRing {
             color,
             uv_offset: Vector2::new(0.0, 0.0),
             uv_scale: Vector2::new(1.0, 1.0),
+            edge_fade: 0.0,
             texture: self.ground_texture.clone(),
         }
     }
@@ -425,6 +426,10 @@ impl CastRing {
                 color,
                 uv_offset: Vector2::new(scroll, 0.0),
                 uv_scale: Vector2::new(1.0, 1.0),
+                // A flat quad faking a cylinder: the band is opaque to its
+                // edges, so without the fade its slanted silhouette shows as
+                // hard diagonal lines.
+                edge_fade: 1.0,
                 texture: cone_texture.clone(),
             });
         }

@@ -264,6 +264,10 @@ pub struct GroundMarkerInstruction {
     /// Scale applied to the quad's unit texture coordinates before the
     /// offset.
     pub uv_scale: Vector2<f32>,
+    /// Fades the quad's alpha toward its left and right edges. Zero renders
+    /// uniformly; one fades fully. Used by quads faking a curved surface,
+    /// whose hard silhouette edges would otherwise show as lines.
+    pub edge_fade: f32,
     pub texture: Arc<Texture>,
 }
 

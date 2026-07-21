@@ -27,6 +27,8 @@ struct GpuGroundMarker {
     color: [f32; 4],
     // uv_scale.xy, uv_offset.xy
     uv_transform: [f32; 4],
+    // edge_fade in x, rest padding.
+    parameters: [f32; 4],
 }
 
 /// Emissive, depth-tested ground quads drawn at the end of the forward pass:
@@ -206,6 +208,7 @@ impl Prepare for ForwardGroundMarkerDrawer {
                 ],
                 color: marker.color.components_linear(),
                 uv_transform: [marker.uv_scale.x, marker.uv_scale.y, marker.uv_offset.x, marker.uv_offset.y],
+                parameters: [marker.edge_fade, 0.0, 0.0, 0.0],
             });
             self.textures.push(marker.texture.clone());
         }

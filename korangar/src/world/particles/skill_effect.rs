@@ -285,25 +285,48 @@ impl EntityParticle for SkillNameBubble {
     }
 }
 
-/// The magic circle swirling around a caster for the length of a cast.
+/// Which of a cast's two rings this is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CastRingKind {
+    /// The elemental magic circle swirling at the caster's feet.
+    Aura,
+    /// The lock-on circle shrinking onto the target, marking who the cast
+    /// will land on. Both reference clients draw this from the same
+    /// lockon128 texture.
+    LockOn,
+}
+
+/// A ring shown for the length of a cast: the aura at the caster, the
+/// lock-on at the target.
 ///
 /// The classic aura is a rising textured cylinder; the fork's particle path
-/// draws camera-facing quads only, so this approximates it as a pulsing ring
-/// at the caster's feet, flattened to fake the ground perspective. It is
-/// removed by key when the cast is cancelled and expires with the cast
+/// draws camera-facing quads only, so both rings are flattened quads faking
+/// the ground perspective. Rings are keyed by the caster so a cancelled cast
+/// tears down its aura and its lock-on together, and expire with the cast
 /// duration otherwise.
-pub struct CastAura {
-    entity_id: EntityId,
+pub struct CastRing {
+    kind: CastRingKind,
+    caster_entity_id: EntityId,
+    follow_entity_id: EntityId,
     position: Point3<f32>,
     texture: Arc<Texture>,
     duration: f32,
     elapsed: f32,
 }
 
-impl CastAura {
-    pub fn new(entity_id: EntityId, position: Point3<f32>, texture: Arc<Texture>, duration: f32) -> Self {
+impl CastRing {
+    pub fn new(
+        kind: CastRingKind,
+        caster_entity_id: EntityId,
+        follow_entity_id: EntityId,
+        position: Point3<f32>,
+        texture: Arc<Texture>,
+        duration: f32,
+    ) -> Self {
         Self {
-            entity_id,
+            kind,
+            caster_entity_id,
+            follow_entity_id,
             position,
             texture,
             duration: duration.max(f32::EPSILON),
@@ -311,12 +334,16 @@ impl CastAura {
         }
     }
 
-    pub fn entity_id(&self) -> EntityId {
-        self.entity_id
+    pub fn kind(&self) -> CastRingKind {
+        self.kind
+    }
+
+    pub fn caster_entity_id(&self) -> EntityId {
+        self.caster_entity_id
     }
 
     pub fn update(&mut self, entities: &[Entity], local_entity: Option<(EntityId, Point3<f32>)>, delta_time: f32) -> bool {
-        if let Some(position) = resolve_entity_position(self.entity_id, entities, local_entity) {
+        if let Some(position) = resolve_entity_position(self.follow_entity_id, entities, local_entity) {
             self.position = position;
         }
 
@@ -325,10 +352,23 @@ impl CastAura {
     }
 
     pub fn render(&self, renderer: &GameInterfaceRenderer, camera: &dyn Camera, window_size: ScreenSize) {
-        // A slow pulse, breathing rather than flashing.
-        let pulse = 1.0 + 0.1 * (self.elapsed * 2.0 * PI * 1.2).sin();
         // Fade in quickly at the start and out at the natural end.
         let alpha = (self.elapsed / 0.15).min((self.duration - self.elapsed) / 0.15).clamp(0.0, 0.85);
+
+        let (width, color) = match self.kind {
+            CastRingKind::Aura => {
+                // A slow pulse, breathing rather than flashing.
+                let pulse = 1.0 + 0.1 * (self.elapsed * 2.0 * PI * 1.2).sin();
+                (76.0 * pulse, Color::rgba(1.0, 1.0, 1.0, alpha))
+            }
+            CastRingKind::LockOn => {
+                // Shrinks onto the target, then breathes at its final size,
+                // in the reference's warm tint.
+                let shrink = 1.0 - 0.45 * (self.elapsed / 0.6).clamp(0.0, 1.0);
+                let pulse = 1.0 + 0.06 * (self.elapsed * 2.0 * PI * 1.6).sin();
+                (120.0 * shrink * pulse, Color::rgba(0.98, 0.62, 0.62, alpha))
+            }
+        };
 
         render_centered(
             renderer,
@@ -337,10 +377,10 @@ impl CastAura {
             camera,
             window_size,
             ScreenSize {
-                width: 76.0 * pulse,
-                height: 38.0 * pulse,
+                width,
+                height: width * 0.5,
             },
-            Color::rgba(1.0, 1.0, 1.0, alpha),
+            color,
         );
     }
 }

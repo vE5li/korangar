@@ -11,9 +11,6 @@ use crate::world::{Actions, SpriteAnimationState};
 
 const PICKUP_DURATION_MS: u32 = 150;
 
-/// Number of actions in the classic cursor act.
-const CURSOR_ACTION_COUNT: usize = 14;
-
 /// The direction that makes `base * 8 + direction` reduce to `base` modulo
 /// the cursor act's action count, so each cursor state reaches its own
 /// action. See the comment at the call site for the arithmetic.
@@ -245,6 +242,9 @@ impl MouseCursor {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Number of actions in the classic cursor act.
+    const CURSOR_ACTION_COUNT: usize = 14;
 
     #[test]
     fn every_cursor_state_reaches_its_own_action() {

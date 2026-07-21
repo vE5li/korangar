@@ -171,6 +171,10 @@ pub fn procedural_spawns_for_action(recipe: SkillProceduralVisualRecipe, action:
     !recipe.primary_hit_only || !matches!(action, 5 | 14)
 }
 
+/// The lock-on circle marking the cast's target, shared by both reference
+/// clients from this same texture.
+pub const CAST_LOCK_ON_TEXTURE_PATH: &str = "effect\\lockon128.tga";
+
 /// The cast aura's hum, played once when a cast begins.
 pub const CAST_AURA_SOUND_PATH: &str = "effect\\ef_beginspell.wav";
 

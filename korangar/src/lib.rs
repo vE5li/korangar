@@ -2032,6 +2032,7 @@ impl Client {
                 }
                 NetworkEvent::EntityStartCasting {
                     source_entity_id,
+                    destination_entity_id,
                     cast_time,
                     element,
                     ..
@@ -2052,14 +2053,35 @@ impl Client {
                         && let Some(position) = self.entity_position(source_entity_id)
                         && let Some(texture) = self.load_skill_particle_texture(cast_aura_texture(element))
                     {
+                        let duration = cast_time.get() as f32 / 1000.0;
                         let sound_effect = self.audio_engine.load(CAST_AURA_SOUND_PATH);
                         self.audio_engine.play_spatial_sound_effect(sound_effect, position, 55.0);
-                        self.particle_holder.spawn_cast_aura(CastAura::new(
+                        self.particle_holder.spawn_cast_ring(CastRing::new(
+                            CastRingKind::Aura,
+                            source_entity_id,
                             source_entity_id,
                             position,
                             texture,
-                            cast_time.get() as f32 / 1000.0,
+                            duration,
                         ));
+
+                        // The lock-on circle shrinking onto whoever the cast
+                        // will land on. Ground casts and self-casts carry no
+                        // separate victim to mark.
+                        if destination_entity_id != source_entity_id
+                            && destination_entity_id != EntityId(0)
+                            && let Some(target_position) = self.entity_position(destination_entity_id)
+                            && let Some(lock_on_texture) = self.load_skill_particle_texture(CAST_LOCK_ON_TEXTURE_PATH)
+                        {
+                            self.particle_holder.spawn_cast_ring(CastRing::new(
+                                CastRingKind::LockOn,
+                                source_entity_id,
+                                destination_entity_id,
+                                target_position,
+                                lock_on_texture,
+                                duration,
+                            ));
+                        }
                     }
                 }
                 NetworkEvent::EntityCancelCasting { entity_id } => {
@@ -2072,8 +2094,9 @@ impl Client {
                         entity.cancel_casting(client_tick);
                     }
 
-                    // An interrupted cast tears its aura down with it.
-                    self.particle_holder.remove_cast_aura(entity_id);
+                    // An interrupted cast tears down its aura and the
+                    // lock-on at its target with it.
+                    self.particle_holder.remove_cast_rings(entity_id);
                 }
                 NetworkEvent::DisplayEmotion { entity_id, emotion } => {
                     if let Some(entity) = self

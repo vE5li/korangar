@@ -156,6 +156,24 @@ pub const COLD_BOLT_ART: BoltProjectileArt = BoltProjectileArt {
     sound_range: 55.0,
 };
 
+/// Fire Ball: the thrown sphere, animated from its own SPR/ACT pair.
+///
+/// The frames' native pixel sizes are only knowable once the sprite is
+/// loaded, so the quad derives from them. The 2x scale reads the reference
+/// table's 200 as a percentage, which is the only interpretation that lands
+/// in a sane size band; treat it as tunable rather than measured.
+pub const FIRE_BALL_ART: BoltProjectileArt = BoltProjectileArt {
+    source: BoltFrameSource::SpriteAction {
+        sprite_path: "이팩트\\fireball.spr",
+        action_path: "이팩트\\fireball.act",
+    },
+    size: BoltQuadSize::Native { scale: 2.0 },
+    motion: BoltMotion::TravelFromSource,
+    fade: true,
+    launch_sounds: &["effect\\ef_fireball.wav"],
+    sound_range: 60.0,
+};
+
 pub const COLD_BOLT_PARTICLE_DURATION: f32 = 0.44;
 pub const FROST_DIVER_TRAVEL_DURATION: f32 = 0.64;
 pub const FROST_DIVER_IMPACT_DURATION: f32 = 0.46;

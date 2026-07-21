@@ -124,6 +124,7 @@ pub fn pick_variant(single: &'static str, variants: &'static [&'static str], rol
 pub enum SkillProceduralVisualKind {
     ColdBolt,
     ColdImpact,
+    FireBallProjectile,
     FireBoltProjectile,
     FrostDiver,
     FrostDiverPreview,
@@ -138,6 +139,17 @@ pub struct SkillProceduralVisualRecipe {
     /// resolves. Hit feedback for such skills is delayed by the projectile's
     /// flight time so the impact never precedes the projectile.
     pub leads_impact: bool,
+    /// Whether only the primary victim's packet spawns the visual. Splash
+    /// victims receive their own damage packets and would otherwise each
+    /// launch a projectile of their own.
+    pub primary_hit_only: bool,
+}
+
+/// Whether this packet's damage type should spawn the procedural visual.
+/// rAthena sends DMG_SPLASH (5) or DMG_SPLASH_ENDURE (14) for surrounding
+/// targets, while the primary target uses the normal single-hit types.
+pub fn procedural_spawns_for_action(recipe: SkillProceduralVisualRecipe, action: i8) -> bool {
+    !recipe.primary_hit_only || !matches!(action, 5 | 14)
 }
 
 pub const FROST_DIVER_FOLLOWUP_DELAY: f32 = 0.64;
@@ -302,7 +314,9 @@ const HEAL_TARGET: SkillVisualRecipe = SkillVisualRecipe {
     hit_interval: None,
 };
 
-const FIRE_BALL_IMPACT: SkillSpriteVisualRecipe = SkillSpriteVisualRecipe {
+/// Kept for the direct-effect debug path only: ZC_NOTIFY_EFFECT carries a
+/// single entity, so the sphere cannot travel and plays in place instead.
+const FIRE_BALL_SPRITE_DIRECT: SkillSpriteVisualRecipe = SkillSpriteVisualRecipe {
     sprite_path: "이팩트\\fireball.spr",
     action_path: "이팩트\\fireball.act",
     sound_path: Some("effect\\ef_fireball.wav"),
@@ -415,12 +429,14 @@ const COLD_BOLT_PROCEDURAL: SkillProceduralVisualRecipe = SkillProceduralVisualR
     kind: SkillProceduralVisualKind::ColdBolt,
     hit_interval: Some(BOLT_HIT_INTERVAL),
     leads_impact: true,
+    primary_hit_only: false,
 };
 
 const COLD_IMPACT_PROCEDURAL: SkillProceduralVisualRecipe = SkillProceduralVisualRecipe {
     kind: SkillProceduralVisualKind::ColdImpact,
     hit_interval: None,
     leads_impact: false,
+    primary_hit_only: false,
 };
 
 /// Fire Bolt's projectile stage.
@@ -432,29 +448,48 @@ const FIRE_BOLT_PROJECTILE_PROCEDURAL: SkillProceduralVisualRecipe = SkillProced
     kind: SkillProceduralVisualKind::FireBoltProjectile,
     hit_interval: Some(BOLT_HIT_INTERVAL),
     leads_impact: true,
+    primary_hit_only: false,
+};
+
+/// Fire Ball's projectile stage.
+///
+/// The official client models Fire Ball as a sphere thrown from the caster
+/// (its projectile table entry flies source-to-target playing the fireball
+/// sprite) with the shared fire hit as the impact. Only the primary victim's
+/// packet launches the sphere; splash victims get the impact alone.
+const FIRE_BALL_PROJECTILE_PROCEDURAL: SkillProceduralVisualRecipe = SkillProceduralVisualRecipe {
+    kind: SkillProceduralVisualKind::FireBallProjectile,
+    hit_interval: None,
+    leads_impact: true,
+    primary_hit_only: true,
 };
 
 const FROST_DIVER_PROCEDURAL: SkillProceduralVisualRecipe = SkillProceduralVisualRecipe {
     kind: SkillProceduralVisualKind::FrostDiver,
     hit_interval: None,
     leads_impact: false,
+    primary_hit_only: false,
 };
 
 const FROST_DIVER_PREVIEW_PROCEDURAL: SkillProceduralVisualRecipe = SkillProceduralVisualRecipe {
     kind: SkillProceduralVisualKind::FrostDiverPreview,
     hit_interval: None,
     leads_impact: false,
+    primary_hit_only: false,
 };
 
 const FROST_DIVER_IMPACT_PROCEDURAL: SkillProceduralVisualRecipe = SkillProceduralVisualRecipe {
     kind: SkillProceduralVisualKind::FrostDiverImpact,
     hit_interval: None,
     leads_impact: false,
+    primary_hit_only: false,
 };
 
 pub fn skill_damage_visual(skill_id: SkillId) -> Option<SkillVisualRecipe> {
     match skill_id {
         FIRE_WALL_SKILL => Some(FIRE_WALL_IMPACT),
+        // Fire Ball's impact is the shared fire hit, for splash victims too.
+        FIRE_BALL_SKILL => Some(FIRE_BOLT_IMPACT),
         FIRE_BOLT_SKILL => Some(FIRE_BOLT_IMPACT),
         LIGHTNING_BOLT_SKILL => Some(LIGHTNING_BOLT_HIT),
         _ => None,
@@ -478,13 +513,8 @@ pub fn ground_skill_visual(skill_id: SkillId) -> Option<SkillVisualRecipe> {
     }
 }
 
-pub fn skill_damage_sprite_visual(skill_id: SkillId, action: i8) -> Option<SkillSpriteVisualRecipe> {
+pub fn skill_damage_sprite_visual(skill_id: SkillId, _action: i8) -> Option<SkillSpriteVisualRecipe> {
     match skill_id {
-        // Splash victims receive their own damage packet. The classic client
-        // plays the Fire Ball animation only for the primary impact. rAthena
-        // sends DMG_SPLASH (5) or DMG_SPLASH_ENDURE (14) for surrounding
-        // targets, while the primary target uses the normal single-hit types.
-        FIRE_BALL_SKILL if !matches!(action, 5 | 14) => Some(FIRE_BALL_IMPACT),
         _ => None,
     }
 }
@@ -534,6 +564,7 @@ pub fn skill_damage_sound(skill_id: SkillId) -> Option<SkillSoundRecipe> {
 pub fn skill_damage_procedural_visual(skill_id: SkillId) -> Option<SkillProceduralVisualRecipe> {
     match skill_id {
         COLD_BOLT_SKILL => Some(COLD_BOLT_PROCEDURAL),
+        FIRE_BALL_SKILL => Some(FIRE_BALL_PROJECTILE_PROCEDURAL),
         FIRE_BOLT_SKILL => Some(FIRE_BOLT_PROJECTILE_PROCEDURAL),
         FROST_DIVER_SKILL => Some(FROST_DIVER_PROCEDURAL),
         _ => None,
@@ -597,7 +628,7 @@ pub fn special_effect_visual(effect_id: EffectId) -> Option<SkillVisualRecipe> {
 pub fn special_effect_sprite_visual(effect_id: EffectId) -> Option<SkillSpriteVisualRecipe> {
     let mut recipe = match effect_id {
         EffectId::Sight => SIGHT_SOURCE,
-        EffectId::Fireball => FIRE_BALL_IMPACT,
+        EffectId::Fireball => FIRE_BALL_SPRITE_DIRECT,
         EffectId::Blessing => BLESSING_TARGET,
         _ => return None,
     };
@@ -850,11 +881,33 @@ mod tests {
     }
 
     #[test]
-    fn fire_ball_only_renders_for_the_primary_impact() {
-        assert!(skill_damage_sprite_visual(FIRE_BALL_SKILL, 6).is_some());
-        assert!(skill_damage_sprite_visual(FIRE_BALL_SKILL, 4).is_some());
-        assert_eq!(skill_damage_sprite_visual(FIRE_BALL_SKILL, 5), None);
-        assert_eq!(skill_damage_sprite_visual(FIRE_BALL_SKILL, 14), None);
+    fn fire_ball_throws_one_sphere_and_burns_every_victim() {
+        // The sphere is the projectile stage, launched only by the primary
+        // victim's packet: splash victims receive their own damage packets
+        // and would otherwise each throw a sphere of their own.
+        let projectile = skill_damage_procedural_visual(FIRE_BALL_SKILL).unwrap();
+        assert_eq!(projectile.kind, SkillProceduralVisualKind::FireBallProjectile);
+        assert!(projectile.leads_impact);
+        assert!(projectile.primary_hit_only);
+        for primary_action in [0, 4, 6, 8] {
+            assert!(procedural_spawns_for_action(projectile, primary_action));
+        }
+        for splash_action in [5, 14] {
+            assert!(!procedural_spawns_for_action(projectile, splash_action));
+        }
+
+        // Splash-agnostic recipes are unaffected by the filter.
+        let fire_bolt = skill_damage_procedural_visual(FIRE_BOLT_SKILL).unwrap();
+        assert!(procedural_spawns_for_action(fire_bolt, 5));
+
+        // The impact is the shared fire hit, splash victims included, and it
+        // waits for the sphere's flight like every leading projectile.
+        let impact = skill_damage_visual(FIRE_BALL_SKILL).unwrap();
+        assert_eq!(impact.effect_path_variants, FIRE_HIT_VARIANTS);
+        assert_eq!(skill_impact_lead_time(Some(projectile), 420), 0.42);
+
+        // The stationary sphere no longer plays on the victim.
+        assert_eq!(skill_damage_sprite_visual(FIRE_BALL_SKILL, 6), None);
     }
 
     #[test]

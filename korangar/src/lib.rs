@@ -1584,6 +1584,17 @@ impl Client {
                 );
                 return;
             }
+            SkillProceduralVisualKind::FireBallProjectile => {
+                self.spawn_bolt_projectile(
+                    FIRE_BALL_ART,
+                    source_entity_id,
+                    destination_entity_id,
+                    sequence_index,
+                    initial_elapsed,
+                    flight_time,
+                );
+                return;
+            }
             SkillProceduralVisualKind::ColdBolt => {
                 self.spawn_bolt_projectile(
                     COLD_BOLT_ART,
@@ -2528,7 +2539,7 @@ impl Client {
                     if let Some(recipe) = sprite_recipe {
                         self.queue_skill_sprite_visual(recipe, source_entity_id, destination_entity_id, true, impact_delay);
                     }
-                    if let Some(recipe) = procedural_recipe {
+                    if let Some(recipe) = procedural_recipe.filter(|recipe| procedural_spawns_for_action(*recipe, action)) {
                         self.queue_procedural_skill_visual(
                             recipe,
                             source_entity_id,

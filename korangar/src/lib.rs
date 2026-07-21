@@ -1584,6 +1584,17 @@ impl Client {
                 );
                 return;
             }
+            SkillProceduralVisualKind::ArrowProjectile => {
+                self.spawn_bolt_projectile(
+                    ARROW_ART,
+                    source_entity_id,
+                    destination_entity_id,
+                    sequence_index,
+                    initial_elapsed,
+                    flight_time,
+                );
+                return;
+            }
             SkillProceduralVisualKind::FireBallProjectile => {
                 self.spawn_bolt_projectile(
                     FIRE_BALL_ART,

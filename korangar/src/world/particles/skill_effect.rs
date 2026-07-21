@@ -174,6 +174,24 @@ pub const FIRE_BALL_ART: BoltProjectileArt = BoltProjectileArt {
     sound_range: 60.0,
 };
 
+/// The arrow every bow skill shares, straight from the skeleton archer's
+/// ammunition sprite. The reference client uses this one sprite for all of
+/// its arrow skills and for ranged basic attacks.
+///
+/// Silent: the reference declares no launch sound for arrows, and the bow's
+/// own attack sound already plays through the attack motion.
+pub const ARROW_ART: BoltProjectileArt = BoltProjectileArt {
+    source: BoltFrameSource::SpriteAction {
+        sprite_path: "npc\\skel_archer_arrow.spr",
+        action_path: "npc\\skel_archer_arrow.act",
+    },
+    size: BoltQuadSize::Native { scale: 1.0 },
+    motion: BoltMotion::TravelFromSource,
+    fade: true,
+    launch_sounds: &[],
+    sound_range: 55.0,
+};
+
 pub const COLD_BOLT_PARTICLE_DURATION: f32 = 0.44;
 pub const FROST_DIVER_TRAVEL_DURATION: f32 = 0.64;
 pub const FROST_DIVER_IMPACT_DURATION: f32 = 0.46;

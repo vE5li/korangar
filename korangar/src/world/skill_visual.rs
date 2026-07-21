@@ -12,6 +12,17 @@ const BLESSING_SKILL: SkillId = SkillId(34);
 const COLD_BOLT_SKILL: SkillId = SkillId(14);
 const FROST_DIVER_SKILL: SkillId = SkillId(15);
 
+// The bow skills sharing the arrow projectile. Ids verified against
+// rAthena's skill_db.yml.
+const DOUBLE_STRAFE_SKILL: SkillId = SkillId(46);
+const CHARGE_ARROW_SKILL: SkillId = SkillId(148);
+const MUSICAL_STRIKE_SKILL: SkillId = SkillId(316);
+const THROW_ARROW_SKILL: SkillId = SkillId(324);
+const ARROW_VULCAN_SKILL: SkillId = SkillId(394);
+const PHANTASMIC_ARROW_SKILL: SkillId = SkillId(1009);
+const AIMED_BOLT_SKILL: SkillId = SkillId(2236);
+const TRIANGLE_SHOT_SKILL: SkillId = SkillId(2288);
+
 pub const SIGHT_ATTACHMENT_KEY: u32 = SIGHT_SKILL.0 as u32;
 pub const OPTION_SIGHT: u32 = 0x0000_0001;
 /// Launch sounds of the Fire Bolt projectile. The official client picks one
@@ -122,6 +133,7 @@ pub fn pick_variant(single: &'static str, variants: &'static [&'static str], rol
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SkillProceduralVisualKind {
+    ArrowProjectile,
     ColdBolt,
     ColdImpact,
     FireBallProjectile,
@@ -451,6 +463,15 @@ const FIRE_BOLT_PROJECTILE_PROCEDURAL: SkillProceduralVisualRecipe = SkillProced
     primary_hit_only: false,
 };
 
+/// The arrow shared by every bow skill. One arrow per hit, so a multi-hit
+/// volley like Arrow Vulcan streams arrows at the shared bolt cadence.
+const ARROW_PROJECTILE_PROCEDURAL: SkillProceduralVisualRecipe = SkillProceduralVisualRecipe {
+    kind: SkillProceduralVisualKind::ArrowProjectile,
+    hit_interval: Some(BOLT_HIT_INTERVAL),
+    leads_impact: true,
+    primary_hit_only: false,
+};
+
 /// Fire Ball's projectile stage.
 ///
 /// The official client models Fire Ball as a sphere thrown from the caster
@@ -513,10 +534,10 @@ pub fn ground_skill_visual(skill_id: SkillId) -> Option<SkillVisualRecipe> {
     }
 }
 
-pub fn skill_damage_sprite_visual(skill_id: SkillId, _action: i8) -> Option<SkillSpriteVisualRecipe> {
-    match skill_id {
-        _ => None,
-    }
+pub fn skill_damage_sprite_visual(_skill_id: SkillId, _action: i8) -> Option<SkillSpriteVisualRecipe> {
+    // No skill currently attaches a stationary sprite per damaging hit; the
+    // former user, Fire Ball, now throws its sprite as a projectile.
+    None
 }
 
 pub fn no_damage_sprite_visual(skill_id: SkillId) -> Option<SkillSpriteVisualRecipe> {
@@ -564,6 +585,14 @@ pub fn skill_damage_sound(skill_id: SkillId) -> Option<SkillSoundRecipe> {
 pub fn skill_damage_procedural_visual(skill_id: SkillId) -> Option<SkillProceduralVisualRecipe> {
     match skill_id {
         COLD_BOLT_SKILL => Some(COLD_BOLT_PROCEDURAL),
+        DOUBLE_STRAFE_SKILL
+        | CHARGE_ARROW_SKILL
+        | MUSICAL_STRIKE_SKILL
+        | THROW_ARROW_SKILL
+        | ARROW_VULCAN_SKILL
+        | PHANTASMIC_ARROW_SKILL
+        | AIMED_BOLT_SKILL
+        | TRIANGLE_SHOT_SKILL => Some(ARROW_PROJECTILE_PROCEDURAL),
         FIRE_BALL_SKILL => Some(FIRE_BALL_PROJECTILE_PROCEDURAL),
         FIRE_BOLT_SKILL => Some(FIRE_BOLT_PROJECTILE_PROCEDURAL),
         FROST_DIVER_SKILL => Some(FROST_DIVER_PROCEDURAL),
@@ -578,10 +607,10 @@ pub fn skill_damage_followup_sound(skill_id: SkillId) -> Option<(SkillSoundRecip
     }
 }
 
-pub fn skill_damage_number_interval(skill_id: SkillId) -> Option<f32> {
-    match skill_id {
-        _ => None,
-    }
+pub fn skill_damage_number_interval(_skill_id: SkillId) -> Option<f32> {
+    // No skill currently paces its damage numbers beyond what its per-hit
+    // visual already provides.
+    None
 }
 
 pub fn skill_effect_initial_delay(start_time: ClientTick, current_time: ClientTick) -> f32 {
@@ -877,6 +906,32 @@ mod tests {
         for raw in [0.0_f32, 0.5, 0.999_999, 1.0] {
             let index = ((raw * FIRE_ARROW_LAUNCH_SOUND_PATHS.len() as f32) as usize).min(FIRE_ARROW_LAUNCH_SOUND_PATHS.len() - 1);
             assert!(index < FIRE_ARROW_LAUNCH_SOUND_PATHS.len());
+        }
+    }
+
+    #[test]
+    fn every_bow_skill_shares_the_arrow_projectile() {
+        // Ids verified against rAthena's skill_db.yml.
+        let bow_skills = [
+            (DOUBLE_STRAFE_SKILL, 46),
+            (CHARGE_ARROW_SKILL, 148),
+            (MUSICAL_STRIKE_SKILL, 316),
+            (THROW_ARROW_SKILL, 324),
+            (ARROW_VULCAN_SKILL, 394),
+            (PHANTASMIC_ARROW_SKILL, 1009),
+            (AIMED_BOLT_SKILL, 2236),
+            (TRIANGLE_SHOT_SKILL, 2288),
+        ];
+
+        for (skill_id, expected_id) in bow_skills {
+            assert_eq!(skill_id.0, expected_id);
+
+            let recipe = skill_damage_procedural_visual(skill_id).unwrap();
+            assert_eq!(recipe.kind, SkillProceduralVisualKind::ArrowProjectile);
+            assert!(recipe.leads_impact, "the hit must wait for the arrow");
+            assert!(!recipe.primary_hit_only);
+            // One arrow per hit: Arrow Vulcan streams nine of them.
+            assert_eq!(recipe.hit_interval, Some(BOLT_HIT_INTERVAL));
         }
     }
 

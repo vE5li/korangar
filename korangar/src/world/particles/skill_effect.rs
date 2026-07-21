@@ -87,13 +87,19 @@ pub const FIRE_BOLT_ART: BoltProjectileArt = BoltProjectileArt {
     sound_range: 55.0,
 };
 
-/// Cold Bolt: one unanimated 128x128 shard. Square, unlike Fire Bolt, which
-/// is why the quad size is per projectile rather than shared.
+/// Cold Bolt: one unanimated shard, square where Fire Bolt is a streak.
+///
+/// Rendered at half Fire Bolt's width and the same height, which is the ratio
+/// the reference client uses: it sizes the ice shard at 50 against the fire
+/// arrow's 100x50. The source texture is 128x128, so this downsamples it, as
+/// the reference does too. A square reads considerably heavier than a streak
+/// of the same width, so matching the fire arrow's 128 here would overpower
+/// it.
 pub const COLD_BOLT_ART: BoltProjectileArt = BoltProjectileArt {
     frames: &[ICE_ARROW_TEXTURE_PATH],
     frame_duration: FIRE_ARROW_FRAME_DURATION,
-    width: 128.0,
-    height: 128.0,
+    width: FIRE_BOLT_ART.height,
+    height: FIRE_BOLT_ART.height,
     launch_sounds: &ICE_ARROW_LAUNCH_SOUND_PATHS,
     sound_range: 55.0,
 };
@@ -781,12 +787,20 @@ mod tests {
         assert_eq!(FIRE_BOLT_ART.width / FIRE_BOLT_ART.height, 2.0);
         assert_eq!(COLD_BOLT_ART.width / COLD_BOLT_ART.height, 1.0);
 
+        // The reference client sizes the ice shard at 50 against the fire
+        // arrow's 100x50: half the width, same height. A square reads much
+        // heavier than a streak, so matching widths would overpower it.
+        assert_eq!(COLD_BOLT_ART.width, FIRE_BOLT_ART.width * 0.5);
+        assert_eq!(COLD_BOLT_ART.height, FIRE_BOLT_ART.height);
+
+        // Fire Bolt sits alongside the impact it precedes rather than beneath
+        // it: firehit2.str renders quads of median 81x137 in this space.
+        assert!(FIRE_BOLT_ART.width >= 81.0, "the streak must not be dwarfed by its own impact");
+
         for art in [FIRE_BOLT_ART, COLD_BOLT_ART] {
             assert_eq!(art.half_width() * 2.0, art.width);
             assert_eq!(art.half_height() * 2.0, art.height);
-            // Sized to sit alongside the impact it precedes rather than
-            // beneath it: firehit2.str renders quads of median 81x137.
-            assert!(art.width >= 81.0, "projectile must not be dwarfed by its own impact");
+            assert!(art.width > 0.0 && art.height > 0.0);
             assert!(!art.frames.is_empty(), "a projectile with no frames renders nothing");
             assert!(art.frame_duration > 0.0, "a zero frame duration would divide by zero");
             assert!(!art.launch_sounds.is_empty());

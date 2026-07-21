@@ -569,6 +569,13 @@ impl ParticleHolder {
         self.cast_rings.retain_mut(|ring| ring.update(entities, local_entity, delta_time));
     }
 
+    /// Cast rings render through the effect pipeline, which can rotate and
+    /// blend additively, unlike the interface sprite path the other
+    /// particles use.
+    pub fn render_cast_rings(&self, renderer: &mut crate::renderer::EffectRenderer, camera: &dyn Camera) {
+        self.cast_rings.iter().for_each(|ring| ring.render(renderer, camera));
+    }
+
     #[cfg_attr(feature = "debug", korangar_debug::profile("render particles"))]
     pub fn render(
         &self,
@@ -587,7 +594,6 @@ impl ParticleHolder {
         self.attached_sprites
             .iter()
             .for_each(|sprite| sprite.render(renderer, camera, window_size));
-        self.cast_rings.iter().for_each(|ring| ring.render(renderer, camera, window_size));
 
         entities
             .iter()

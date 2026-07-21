@@ -351,37 +351,97 @@ impl CastRing {
         self.elapsed < self.duration
     }
 
-    pub fn render(&self, renderer: &GameInterfaceRenderer, camera: &dyn Camera, window_size: ScreenSize) {
+    pub fn render(&self, renderer: &mut EffectRenderer, camera: &dyn Camera) {
         // Fade in quickly at the start and out at the natural end.
         let alpha = (self.elapsed / 0.15).min((self.duration - self.elapsed) / 0.15).clamp(0.0, 0.85);
+        let anchor = self.position + Vector3::new(0.0, 1.0, 0.0);
 
-        let (width, color) = match self.kind {
+        match self.kind {
             CastRingKind::Aura => {
-                // A slow pulse, breathing rather than flashing.
-                let pulse = 1.0 + 0.1 * (self.elapsed * 2.0 * PI * 1.2).sin();
-                (76.0 * pulse, Color::rgba(1.0, 1.0, 1.0, alpha))
+                // The ring textures are cylinder wall bands, opaque to their
+                // edges and horizontally tileable, not top-down ring images:
+                // the reference clients wrap them around a rising cone and
+                // swirl it. The cone's silhouette is a trapezoid, and the
+                // swirl is a scroll of the band's U coordinate, which the
+                // repeat sampler is exactly suited to. Two layers at the
+                // reference's differing speeds read as the classic vortex.
+                for (scroll_speed, width_scale, layer_alpha) in [(0.5, 1.0, 0.55), (0.75, 1.25, 0.35)] {
+                    let scroll = self.elapsed * scroll_speed;
+                    let bottom_half_width = 22.0 * width_scale;
+                    let top_half_width = 52.0 * width_scale;
+                    let height = 64.0 * width_scale;
+
+                    // Corner order the effect renderer expects: top left,
+                    // top right, bottom left, bottom right.
+                    let corners = [
+                        Vector2::new(-top_half_width, -height),
+                        Vector2::new(top_half_width, -height),
+                        Vector2::new(-bottom_half_width, 0.0),
+                        Vector2::new(bottom_half_width, 0.0),
+                    ];
+                    // The renderer maps these as [2] top left, [1] top right,
+                    // [3] bottom left, [0] bottom right. One full U span per
+                    // quad, offset by the scroll.
+                    let texture_coordinates = [
+                        Vector2::new(scroll + 1.0, 1.0),
+                        Vector2::new(scroll + 1.0, 0.0),
+                        Vector2::new(scroll, 0.0),
+                        Vector2::new(scroll, 1.0),
+                    ];
+
+                    renderer.render_effect(
+                        camera,
+                        anchor,
+                        self.texture.clone(),
+                        corners,
+                        texture_coordinates,
+                        EFFECT_ORIGIN,
+                        Rad(0.0),
+                        Color::rgba(1.0, 1.0, 1.0, alpha * layer_alpha),
+                        // Additive, as the references render these bands.
+                        BlendFactor::SrcAlpha,
+                        BlendFactor::One,
+                    );
+                }
             }
             CastRingKind::LockOn => {
-                // Shrinks onto the target, then breathes at its final size,
-                // in the reference's warm tint.
+                // A reticle whose corner brackets are part of the art. It
+                // spins as a whole quad at the reference's 270 degrees per
+                // second; flattening after the rotation is the correct
+                // foreshortening of a ground spinner viewed obliquely.
+                let angle = self.elapsed * 270.0_f32.to_radians();
+                let (sin, cos) = angle.sin_cos();
                 let shrink = 1.0 - 0.45 * (self.elapsed / 0.6).clamp(0.0, 1.0);
-                let pulse = 1.0 + 0.06 * (self.elapsed * 2.0 * PI * 1.6).sin();
-                (120.0 * shrink * pulse, Color::rgba(0.98, 0.62, 0.62, alpha))
-            }
-        };
+                let half = 60.0 * shrink;
 
-        render_centered(
-            renderer,
-            self.texture.clone(),
-            self.position + Vector3::new(0.0, 1.0, 0.0),
-            camera,
-            window_size,
-            ScreenSize {
-                width,
-                height: width * 0.5,
-            },
-            color,
-        );
+                let rotate_flatten = |x: f32, y: f32| Vector2::new(x * cos - y * sin, (x * sin + y * cos) * 0.5);
+                let corners = [
+                    rotate_flatten(-half, -half),
+                    rotate_flatten(half, -half),
+                    rotate_flatten(-half, half),
+                    rotate_flatten(half, half),
+                ];
+                let texture_coordinates = [
+                    Vector2::new(1.0, 1.0),
+                    Vector2::new(1.0, 0.0),
+                    Vector2::new(0.0, 0.0),
+                    Vector2::new(0.0, 1.0),
+                ];
+
+                renderer.render_effect(
+                    camera,
+                    anchor,
+                    self.texture.clone(),
+                    corners,
+                    texture_coordinates,
+                    EFFECT_ORIGIN,
+                    Rad(0.0),
+                    Color::rgba(0.98, 0.62, 0.62, alpha),
+                    BlendFactor::SrcAlpha,
+                    BlendFactor::One,
+                );
+            }
+        }
     }
 }
 

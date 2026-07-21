@@ -5300,6 +5300,7 @@ impl<'a, 'm: 'a> MapRenderContext<'a, 'm> {
         );
 
         self.effect_holder.render(self.effect_renderer, self.current_camera);
+        self.particle_holder.render_cast_rings(self.effect_renderer, self.current_camera);
 
         let world_theme = self.client_state.follow(client_state().world_theme());
         for entity in self.client_state.follow(client_state().entities()).iter() {

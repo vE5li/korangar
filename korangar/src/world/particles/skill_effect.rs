@@ -177,10 +177,11 @@ pub const FIRE_BALL_ART: BoltProjectileArt = BoltProjectileArt {
     size: BoltQuadSize::Native { scale: 2.0 },
     motion: BoltMotion::TravelFromSource,
     fade: true,
-    // The frames' alpha mass sits above centre in every frame: the flame
-    // tail rises and the ball faces the image's bottom, so the sprite's
-    // forward axis is a quarter turn past the +X convention.
-    base_angle: -std::f32::consts::FRAC_PI_2,
+    // The frames' alpha mass sits above centre in every frame: that dense
+    // mass is the ball itself, with the flame trailing below, so the
+    // sprite's forward axis is the image top. Confirmed in motion: the
+    // opposite reading flew the sphere tail-first.
+    base_angle: std::f32::consts::FRAC_PI_2,
     launch_sounds: &["effect\\ef_fireball.wav"],
     sound_range: 60.0,
 };
@@ -1022,10 +1023,10 @@ mod tests {
         assert_eq!(FIRE_BOLT_ART.base_angle, 0.0);
         assert_eq!(COLD_BOLT_ART.base_angle, 0.0);
 
-        // The fireball frames' alpha mass sits above centre in all six
-        // frames: tail up, ball facing the image bottom, so its forward is a
-        // quarter turn past +X and the correction subtracts one.
-        assert_eq!(FIRE_BALL_ART.base_angle, -std::f32::consts::FRAC_PI_2);
+        // The fireball frames' dense alpha mass above centre is the ball
+        // itself, flame trailing below: forward is the image top. The
+        // opposite reading was tried first and flew the sphere tail-first.
+        assert_eq!(FIRE_BALL_ART.base_angle, std::f32::consts::FRAC_PI_2);
 
         // The 8x61 ammunition sprite is vertical, so a quarter-turn
         // magnitude is certain even though the head's end was unmeasurable.

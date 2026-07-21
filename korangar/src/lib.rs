@@ -2461,6 +2461,12 @@ impl Client {
                         hit_interval,
                         impact_delay,
                     );
+                    // The once-per-resolution component, independent of the
+                    // hit count. Mirrors the official client's split between
+                    // a skill's effect and its per-hit effect.
+                    if let Some(recipe) = skill_damage_cast_visual(skill_id) {
+                        self.queue_skill_damage_visual(recipe, source_entity_id, destination_entity_id, 1, impact_delay);
+                    }
                     if let Some(recipe) = visual_recipe {
                         self.queue_skill_damage_visual(recipe, source_entity_id, destination_entity_id, hit_count, impact_delay);
                     }

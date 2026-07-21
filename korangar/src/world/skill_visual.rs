@@ -42,6 +42,8 @@ pub const SKILL_SOUND_PATHS: &[&str] = &[
     "effect\\ef_icearrow3.wav",
     "effect\\ef_lightbolt.wav",
     "effect\\ef_sight.wav",
+    "_hit_fist1.wav",
+    "_hit_fist2.wav",
     "_hit_fist3.wav",
     "_hit_fist4.wav",
 ];
@@ -244,7 +246,9 @@ const PNEUMA_UNIT: SkillVisualRecipe = SkillVisualRecipe {
     hit_interval: None,
 };
 
-const LIGHTNING_BOLT_IMPACT: SkillVisualRecipe = SkillVisualRecipe {
+/// The big strike that resolves the cast. The official client plays this
+/// once (EF_LIGHTBOLT); the per-hit feedback is the separate wind hit below.
+const LIGHTNING_BOLT_STRIKE: SkillVisualRecipe = SkillVisualRecipe {
     effect_path: "lightning.str",
     effect_path_variants: &[],
     sound_path: Some("effect\\ef_lightbolt.wav"),
@@ -258,6 +262,32 @@ const LIGHTNING_BOLT_IMPACT: SkillVisualRecipe = SkillVisualRecipe {
     }),
     repeating: false,
     hit_interval: None,
+};
+
+/// The official client varies the wind elemental hit per hit (EF_WINDHIT).
+const WIND_HIT_VARIANTS: &[&str] = &["windhit1.str", "windhit2.str", "windhit3.str"];
+
+/// Lightning Bolt's per-hit impact. No light of its own: the strike above
+/// already lights the scene, and a multi-hit volley would stack point lights.
+const LIGHTNING_BOLT_HIT: SkillVisualRecipe = SkillVisualRecipe {
+    effect_path: "windhit1.str",
+    effect_path_variants: WIND_HIT_VARIANTS,
+    sound_path: None,
+    sound_range: 55.0,
+    anchor: SkillVisualAnchor::DestinationEntity,
+    effect_offset: [0.0, 5.0, 0.0],
+    light: None,
+    repeating: false,
+    hit_interval: Some(BOLT_HIT_INTERVAL),
+};
+
+/// The wind hit's own sound, a generic elemental fist impact.
+const LIGHTNING_BOLT_HIT_SOUND: SkillSoundRecipe = SkillSoundRecipe {
+    sound_path: "_hit_fist1.wav",
+    sound_path_variants: &["_hit_fist1.wav", "_hit_fist2.wav", "_hit_fist3.wav"],
+    sound_range: 55.0,
+    anchor: SkillVisualAnchor::DestinationEntity,
+    hit_interval: Some(BOLT_HIT_INTERVAL),
 };
 
 const HEAL_TARGET: SkillVisualRecipe = SkillVisualRecipe {
@@ -426,7 +456,17 @@ pub fn skill_damage_visual(skill_id: SkillId) -> Option<SkillVisualRecipe> {
     match skill_id {
         FIRE_WALL_SKILL => Some(FIRE_WALL_IMPACT),
         FIRE_BOLT_SKILL => Some(FIRE_BOLT_IMPACT),
-        LIGHTNING_BOLT_SKILL => Some(LIGHTNING_BOLT_IMPACT),
+        LIGHTNING_BOLT_SKILL => Some(LIGHTNING_BOLT_HIT),
+        _ => None,
+    }
+}
+
+/// The visual that plays once when the skill resolves, independent of how
+/// many hits the packet carries. This mirrors the official client's split
+/// between a skill's effect and its per-hit effect.
+pub fn skill_damage_cast_visual(skill_id: SkillId) -> Option<SkillVisualRecipe> {
+    match skill_id {
+        LIGHTNING_BOLT_SKILL => Some(LIGHTNING_BOLT_STRIKE),
         _ => None,
     }
 }
@@ -486,6 +526,7 @@ pub fn skill_damage_sound(skill_id: SkillId) -> Option<SkillSoundRecipe> {
         COLD_BOLT_SKILL => Some(COLD_BOLT_IMPACT_SOUND),
         FIRE_BOLT_SKILL => Some(FIRE_BOLT_SOUND),
         FROST_DIVER_SKILL => Some(FROST_DIVER_SOUND),
+        LIGHTNING_BOLT_SKILL => Some(LIGHTNING_BOLT_HIT_SOUND),
         _ => None,
     }
 }
@@ -508,9 +549,6 @@ pub fn skill_damage_followup_sound(skill_id: SkillId) -> Option<(SkillSoundRecip
 
 pub fn skill_damage_number_interval(skill_id: SkillId) -> Option<f32> {
     match skill_id {
-        // Lightning Bolt's STR and WAV already contain the complete multi-hit
-        // sequence, so only its damage numbers should be paced per hit.
-        LIGHTNING_BOLT_SKILL => Some(0.12),
         _ => None,
     }
 }
@@ -542,7 +580,7 @@ pub fn special_effect_visual(effect_id: EffectId) -> Option<SkillVisualRecipe> {
     let mut recipe = match effect_id {
         EffectId::Firehit => FIRE_BOLT_IMPACT,
         EffectId::Firewall => FIRE_WALL_GROUND,
-        EffectId::Lightbolt => LIGHTNING_BOLT_IMPACT,
+        EffectId::Lightbolt => LIGHTNING_BOLT_STRIKE,
         EffectId::Pneuma => PNEUMA_UNIT,
         EffectId::Heal => HEAL_TARGET,
         _ => return None,
@@ -609,8 +647,7 @@ mod tests {
         assert_eq!(fire_bolt.sound_path, None);
         assert_eq!(skill_damage_sound(FIRE_BOLT_SKILL), Some(FIRE_BOLT_SOUND));
         assert_eq!(lightning_bolt.anchor, SkillVisualAnchor::DestinationEntity);
-        assert_eq!(lightning_bolt.hit_interval, None);
-        assert_eq!(skill_damage_number_interval(LIGHTNING_BOLT_SKILL), Some(0.12));
+        assert_eq!(lightning_bolt.hit_interval, Some(BOLT_HIT_INTERVAL));
 
         // Both bolts are the same falling-projectile shape, so they share the
         // cadence and the leading behaviour.
@@ -648,6 +685,38 @@ mod tests {
             skill_damage_sound(FIRE_BOLT_SKILL).unwrap().hit_interval,
             Some(BOLT_HIT_INTERVAL)
         );
+    }
+
+    #[test]
+    fn lightning_bolt_splits_the_strike_from_the_per_hit_wind_impact() {
+        // The official client models Lightning Bolt as one strike per cast
+        // (EF_LIGHTBOLT) plus a wind elemental hit per damaging hit
+        // (EF_WINDHIT), each with its own sound.
+        let strike = skill_damage_cast_visual(LIGHTNING_BOLT_SKILL).unwrap();
+        assert_eq!(strike.effect_path, "lightning.str");
+        assert_eq!(strike.hit_interval, None, "the strike must not repeat per hit");
+        assert_eq!(strike.sound_path, Some("effect\\ef_lightbolt.wav"));
+
+        let hit = skill_damage_visual(LIGHTNING_BOLT_SKILL).unwrap();
+        assert_eq!(hit.effect_path_variants, WIND_HIT_VARIANTS);
+        assert!(WIND_HIT_VARIANTS.contains(&hit.effect_path));
+        assert_eq!(hit.hit_interval, Some(BOLT_HIT_INTERVAL));
+        assert_eq!(hit.light, None, "per-hit lights would stack across a volley");
+
+        let hit_sound = skill_damage_sound(LIGHTNING_BOLT_SKILL).unwrap();
+        assert_eq!(hit_sound.sound_path_variants.len(), 3);
+        assert!(hit_sound.sound_path_variants.contains(&hit_sound.sound_path));
+        for path in hit_sound.sound_path_variants {
+            assert!(SKILL_SOUND_PATHS.contains(path), "{path} must be preloaded");
+        }
+
+        // No skill both leads with a projectile and has a cast visual yet;
+        // the pacing chain must therefore come from the per-hit visual.
+        assert_eq!(skill_damage_number_interval(LIGHTNING_BOLT_SKILL), None);
+
+        // Skills without a cast visual are unaffected.
+        assert_eq!(skill_damage_cast_visual(FIRE_BOLT_SKILL), None);
+        assert_eq!(skill_damage_cast_visual(COLD_BOLT_SKILL), None);
     }
 
     #[test]

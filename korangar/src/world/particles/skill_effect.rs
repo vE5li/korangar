@@ -351,14 +351,16 @@ impl CastRing {
     pub fn ground_marker(&self) -> GroundMarkerInstruction {
         let alpha = (self.elapsed / 0.15).min((self.duration - self.elapsed) / 0.15).clamp(0.0, 0.85);
 
+        // One tile is five world units; the classic circles span about
+        // three tiles.
         let (half_size, spin_speed) = match self.kind {
-            // A gentle swirl under the caster, spanning about two tiles.
-            CastRingKind::Aura => (5.0, 45.0_f32.to_radians()),
-            // The reticle shrinks onto the target while spinning at the
-            // reference client's 270 degrees per second.
+            // A gentle swirl under the caster.
+            CastRingKind::Aura => (7.5, 45.0_f32.to_radians()),
+            // The reticle starts at the reference's three tiles and shrinks
+            // onto the target while spinning at its 270 degrees per second.
             CastRingKind::LockOn => {
-                let shrink = 1.0 - 0.45 * (self.elapsed / 0.6).clamp(0.0, 1.0);
-                (6.0 * shrink, 270.0_f32.to_radians())
+                let shrink = 1.0 - 0.55 * (self.elapsed / 0.6).clamp(0.0, 1.0);
+                (7.5 * shrink, 270.0_f32.to_radians())
             }
         };
 
@@ -400,9 +402,12 @@ impl CastRing {
         // classic vortex. Sizes are in world units, proportioned like the
         // reference cone: bottom narrow, top wide.
         for (scroll_speed, scale, layer_alpha) in [(0.5, 1.0, 0.55), (0.75, 1.25, 0.35)] {
-            let bottom_half_width = 3.0 * scale;
-            let top_half_width = 6.8 * scale;
-            let height = 8.4 * scale;
+            // The swirling arcs orbit wider than the body and rise past its
+            // height: roughly a character-height cone opening to three
+            // tiles, per the reference's own proportions.
+            let bottom_half_width = 4.0 * scale;
+            let top_half_width = 8.5 * scale;
+            let height = 11.0 * scale;
             let scroll = self.elapsed * scroll_speed;
 
             let color = Color::rgba(

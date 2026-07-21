@@ -48,6 +48,21 @@ impl Inventory {
         });
     }
 
+    /// Sets the remaining amount of an item, removing it from the inventory
+    /// when nothing is left.
+    pub fn set_item_amount(&mut self, index: InventoryIndex, new_amount: u16) {
+        let Some(position) = self.items.iter().position(|item| item.index == index) else {
+            return;
+        };
+
+        match &mut self.items[position].details {
+            InventoryItemDetails::Regular { amount, .. } if new_amount > 0 => *amount = new_amount,
+            _ => {
+                self.items.remove(position);
+            }
+        }
+    }
+
     pub fn remove_item(&mut self, index: InventoryIndex, remove_amount: u16) {
         let position = self
             .items

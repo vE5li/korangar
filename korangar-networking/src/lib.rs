@@ -775,6 +775,12 @@ where
         }
     }
 
+    pub fn use_item(&mut self, account_id: AccountId, item_index: InventoryIndex) -> Result<(), NotConnectedError> {
+        match self.map_server_packet_version()? {
+            SupportedPacketVersion::_20220406 => self.send_map_server_packet(UseItemPacket::new(item_index, account_id)),
+        }
+    }
+
     pub fn request_item_equip(&mut self, item_index: InventoryIndex, equip_position: EquipPosition) -> Result<(), NotConnectedError> {
         match self.map_server_packet_version()? {
             SupportedPacketVersion::_20220406 => self.send_map_server_packet(RequestEquipItemPacket::new(item_index, equip_position)),
@@ -910,7 +916,9 @@ where
 mod packet_handlers {
     use ragnarok_bytes::{ByteReader, ByteWriter};
     use ragnarok_packets::handler::{HandlerResult, NoPacketCallback};
-    use ragnarok_packets::{DisplayEmotionPacket, EntityId, PacketExt, RequestEmotionPacket};
+    use ragnarok_packets::{
+        AccountId, DisplayEmotionPacket, EntityId, InventoryIndex, ItemId, PacketExt, RequestEmotionPacket, UseItemAckPacket,
+    };
 
     use crate::{NetworkEvent, NetworkingSystem, SupportedPacketVersion};
 
@@ -958,6 +966,31 @@ mod packet_handlers {
         assert!(matches!(events.0.as_slice(), [NetworkEvent::DisplayEmotion {
             entity_id: EntityId(0x1234_5678),
             emotion: 3,
+        }]));
+    }
+
+    #[test]
+    fn item_use_acknowledgement_preserves_account_id() {
+        let mut handler = NetworkingSystem::create_map_server_packet_handler(NoPacketCallback, SupportedPacketVersion::_20220406).unwrap();
+        let packet = UseItemAckPacket {
+            inventory_index: InventoryIndex(5),
+            item_id: ItemId(501),
+            account_id: AccountId(0x1234),
+            remaining_amount: 2,
+            result: 1,
+        };
+        let mut writer = ByteWriter::new();
+        packet.packet_to_bytes(&mut writer).unwrap();
+        let mut reader = ByteReader::without_metadata(writer.as_slice());
+
+        let HandlerResult::Ok(events) = handler.process_one(&mut reader) else {
+            panic!("item-use acknowledgement was not handled");
+        };
+
+        assert!(matches!(events.0.as_slice(), [NetworkEvent::ItemUsed {
+            account_id: AccountId(0x1234),
+            index: InventoryIndex(5),
+            remaining_amount: 2,
         }]));
     }
 }

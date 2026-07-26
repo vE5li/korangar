@@ -283,7 +283,7 @@ impl AnimationLoader {
                         (frame_origin + frame_part_offset + frame_part_top_left_shift) - Vector2::<f32>::from_value(0.5);
 
                     // Generate the key points of the frame rectangle.
-                    let texture_frame_center = Vector2::new(0.0, 1.0);
+                    let texture_frame_center = Vector2::unit_y();
                     // Generate the key points of the frame part rectangle.
                     // In the variables, we removed the term frame_part,
                     // but we are still working with the frame part.

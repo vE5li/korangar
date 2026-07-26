@@ -113,7 +113,7 @@ impl Model {
                 (self.bounding_box.center().to_vec() - Vector3::new(0.0, half_height, 0.0))
                     .zip(size, |value, size| if size != 0.0 { value / size } else { 0.0 })
             }
-            false => Vector3::new(0.0, 0.0, 0.0),
+            false => Vector3::zero(),
         };
         let shift_matrix = Matrix4::from_translation(center_shift);
         let transform = Self::calculate_bounding_box_matrix(&self.bounding_box, transform) * shift_matrix;

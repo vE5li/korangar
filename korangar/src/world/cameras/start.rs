@@ -7,7 +7,7 @@ const DEFAULT_VIEW_ANGLE: f32 = 180_f32.to_radians();
 const DEFAULT_VIEW_DISTANCE: f32 = 150.0;
 const ROTATION_SPEED: f32 = 0.03;
 const VERTICAL_FOV: Deg<f32> = Deg(45.0);
-const LOOK_UP: Vector3<f32> = Vector3::new(0.0, 1.0, 0.0);
+const LOOK_UP: Vector3<f32> = Vector3::unit_y();
 
 pub struct StartCamera {
     focus_point: Point3<f32>,

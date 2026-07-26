@@ -30,7 +30,7 @@ impl Lighting {
     pub fn directional_light(&self) -> (Vector3<f32>, Color) {
         let rotation_around_x = Matrix3::from_angle_x(Deg(-self.light_latitude));
         let rotation_around_y = Matrix3::from_angle_y(Deg(self.light_longitude));
-        let light_direction = rotation_around_y * (rotation_around_x * Vector3::new(0.0, 1.0, 0.0));
+        let light_direction = rotation_around_y * (rotation_around_x * Vector3::unit_y());
 
         (light_direction, self.diffuse_color)
     }

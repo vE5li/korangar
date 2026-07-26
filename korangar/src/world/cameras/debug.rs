@@ -8,7 +8,7 @@ const LOOK_AROUND_SPEED: f32 = 0.005;
 const FLY_SPEED_FAST: f32 = 1000.0;
 const FLY_SPEED_SLOW: f32 = 100.0;
 const VERTICAL_FOV: Deg<f32> = Deg(45.0);
-const LOOK_UP_VECTOR: Vector3<f32> = Vector3::new(0.0, 1.0, 0.0);
+const LOOK_UP_VECTOR: Vector3<f32> = Vector3::unit_y();
 
 pub struct DebugCamera {
     camera_position: Point3<f32>,

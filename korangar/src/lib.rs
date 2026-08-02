@@ -2367,8 +2367,14 @@ impl Client {
                     }
                 }
                 InputEvent::CastSkill { slot, level } => {
-                    if let Some(learnable_skill) = self.client_state.follow(client_state().hotbar()).get_skill_in_slot(slot).as_ref()
-                        && let Some(learned_skill) =
+                    // Copy the details out of the skill lookup so the borrow of the
+                    // client state ends before any buffered action is written.
+                    let skill_information = self
+                        .client_state
+                        .follow(client_state().hotbar())
+                        .get_skill_in_slot(slot)
+                        .as_ref()
+                        .and_then(|learnable_skill| {
                             self.client_state
                                 .follow(client_state().skill_tree().skills())
                                 .iter()
@@ -2376,32 +2382,104 @@ impl Client {
                                     learned_skill.skill_id == learnable_skill.skill_id
                                         && learned_skill.skill_level.0 >= learnable_skill.maximum_level.0
                                 })
-                    {
-                        match learned_skill.skill_type {
+                                .map(|learned_skill| (learnable_skill.skill_id, learned_skill.skill_type, learned_skill.attack_range))
+                        });
+
+                    if let Some((skill_id, skill_type, attack_range)) = skill_information {
+                        match skill_type {
                             SkillType::Passive => {}
                             SkillType::Attack => {
-                                if let PickerTarget::Entity(entity_id) = input_report.mouse_target {
-                                    let _ = self.networking_system.cast_skill(learnable_skill.skill_id, level, entity_id);
+                                if let PickerTarget::Entity(entity_id) = input_report.mouse_target
+                                    && let Some(map) = &self.map
+                                {
+                                    let player_position =
+                                        self.client_state.try_follow(this_entity()).map(|player| player.get_tile_position());
+                                    let target_position = self
+                                        .client_state
+                                        .follow(client_state().entities())
+                                        .iter()
+                                        .find(|entity| entity.get_entity_id() == entity_id)
+                                        .map(|entity| entity.get_tile_position());
+
+                                    if let (Some(player_position), Some(target_position)) = (player_position, target_position) {
+                                        if player_position
+                                            .x
+                                            .abs_diff(target_position.x)
+                                            .max(player_position.y.abs_diff(target_position.y))
+                                            <= attack_range.0
+                                        {
+                                            let _ = self.networking_system.cast_skill(skill_id, level, entity_id);
+                                        } else if let Some(path) = self.path_finder.find_walkable_path_in_range(
+                                            &**map,
+                                            player_position,
+                                            target_position,
+                                            attack_range,
+                                        ) && let Some(nearest_tile) = path.last()
+                                        {
+                                            // The target is out of range, so walk towards it and
+                                            // send the cast right away. The server remembers skill
+                                            // requests made while walking and casts as soon as the
+                                            // target is in range, following the target's position
+                                            // at every step.
+                                            let _ = self.networking_system.player_move(WorldPosition {
+                                                x: nearest_tile.x,
+                                                y: nearest_tile.y,
+                                                direction: Direction::North,
+                                            });
+                                            let _ = self.networking_system.cast_skill(skill_id, level, entity_id);
+                                        }
+                                    }
                                 }
                             }
                             SkillType::Ground | SkillType::Trap => {
                                 if let PickerTarget::Tile { x, y } = input_report.mouse_target {
-                                    let _ = self
-                                        .networking_system
-                                        .cast_ground_skill(learnable_skill.skill_id, level, TilePosition { x, y });
+                                    let target_position = TilePosition { x, y };
+
+                                    if let Some(map) = &self.map {
+                                        let player_position =
+                                            self.client_state.try_follow(this_entity()).map(|player| player.get_tile_position());
+
+                                        if let Some(player_position) = player_position {
+                                            if player_position
+                                                .x
+                                                .abs_diff(target_position.x)
+                                                .max(player_position.y.abs_diff(target_position.y))
+                                                <= attack_range.0
+                                            {
+                                                let _ = self.networking_system.cast_ground_skill(skill_id, level, target_position);
+                                            } else if let Some(path) = self.path_finder.find_walkable_path_in_range(
+                                                &**map,
+                                                player_position,
+                                                target_position,
+                                                attack_range,
+                                            ) && let Some(nearest_tile) = path.last()
+                                            {
+                                                // The target is out of range, so walk towards it and
+                                                // send the cast right away. The server remembers
+                                                // skill requests made while walking and casts as
+                                                // soon as the position is in range.
+                                                let _ = self.networking_system.player_move(WorldPosition {
+                                                    x: nearest_tile.x,
+                                                    y: nearest_tile.y,
+                                                    direction: Direction::North,
+                                                });
+                                                let _ = self.networking_system.cast_ground_skill(skill_id, level, target_position);
+                                            }
+                                        }
+                                    }
                                 }
                             }
-                            SkillType::SelfCast => match learnable_skill.skill_id == ROLLING_CUTTER_ID {
+                            SkillType::SelfCast => match skill_id == ROLLING_CUTTER_ID {
                                 true => {
                                     let _ = self.networking_system.cast_channeling_skill(
-                                        learnable_skill.skill_id,
+                                        skill_id,
                                         level,
                                         self.client_state.follow(this_entity().manually_asserted()).get_entity_id(),
                                     );
                                 }
                                 false => {
                                     let _ = self.networking_system.cast_skill(
-                                        learnable_skill.skill_id,
+                                        skill_id,
                                         level,
                                         self.client_state.follow(this_entity().manually_asserted()).get_entity_id(),
                                     );
@@ -2409,10 +2487,48 @@ impl Client {
                             },
                             SkillType::Support => {
                                 if let PickerTarget::Entity(entity_id) = input_report.mouse_target {
-                                    let _ = self.networking_system.cast_skill(learnable_skill.skill_id, level, entity_id);
+                                    if let Some(map) = &self.map {
+                                        let player_position =
+                                            self.client_state.try_follow(this_entity()).map(|player| player.get_tile_position());
+                                        let target_position = self
+                                            .client_state
+                                            .follow(client_state().entities())
+                                            .iter()
+                                            .find(|entity| entity.get_entity_id() == entity_id)
+                                            .map(|entity| entity.get_tile_position());
+
+                                        if let (Some(player_position), Some(target_position)) = (player_position, target_position) {
+                                            if player_position
+                                                .x
+                                                .abs_diff(target_position.x)
+                                                .max(player_position.y.abs_diff(target_position.y))
+                                                <= attack_range.0
+                                            {
+                                                let _ = self.networking_system.cast_skill(skill_id, level, entity_id);
+                                            } else if let Some(path) = self.path_finder.find_walkable_path_in_range(
+                                                &**map,
+                                                player_position,
+                                                target_position,
+                                                attack_range,
+                                            ) && let Some(nearest_tile) = path.last()
+                                            {
+                                                // The target is out of range, so walk towards it and
+                                                // send the cast right away. The server remembers skill
+                                                // requests made while walking and casts as soon as the
+                                                // target is in range, following the target's position
+                                                // at every step.
+                                                let _ = self.networking_system.player_move(WorldPosition {
+                                                    x: nearest_tile.x,
+                                                    y: nearest_tile.y,
+                                                    direction: Direction::North,
+                                                });
+                                                let _ = self.networking_system.cast_skill(skill_id, level, entity_id);
+                                            }
+                                        }
+                                    }
                                 } else {
                                     let _ = self.networking_system.cast_skill(
-                                        learnable_skill.skill_id,
+                                        skill_id,
                                         level,
                                         self.client_state.follow(this_entity().manually_asserted()).get_entity_id(),
                                     );

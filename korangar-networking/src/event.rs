@@ -18,7 +18,7 @@ pub enum NetworkEvent {
     },
     LoginServerConnectionFailed {
         reason: UnifiedLoginFailedReason,
-        message: &'static str,
+        message: String,
     },
     LoginServerDisconnected {
         reason: DisconnectReason,

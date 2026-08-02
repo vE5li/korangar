@@ -30,30 +30,67 @@ where
     })?;
     packet_handler.register(|packet: LoginFailedPacket| {
         let (reason, message) = match packet.reason {
-            LoginFailedReason::ServerClosed => (UnifiedLoginFailedReason::ServerClosed, "Server closed"),
+            LoginFailedReason::ServerClosed => (UnifiedLoginFailedReason::ServerClosed, "Server closed".to_string()),
             LoginFailedReason::AlreadyLoggedIn => (
                 UnifiedLoginFailedReason::AlreadyLoggedIn,
-                "Someone has already logged in with this id",
+                "Someone has already logged in with this id".to_string(),
             ),
-            LoginFailedReason::AlreadyOnline => (UnifiedLoginFailedReason::AlreadyOnline, "Already online"),
+            LoginFailedReason::AlreadyOnline => (UnifiedLoginFailedReason::AlreadyOnline, "Already online".to_string()),
         };
 
         NetworkEvent::LoginServerConnectionFailed { reason, message }
     })?;
     packet_handler.register(|packet: LoginFailedPacket2| {
         let (reason, message) = match packet.reason {
-            LoginFailedReason2::UnregisteredId => (UnifiedLoginFailedReason::UnregisteredId, "Unregistered id"),
-            LoginFailedReason2::IncorrectPassword => (UnifiedLoginFailedReason::IncorrectPassword, "Incorrect password"),
-            LoginFailedReason2::IdExpired => (UnifiedLoginFailedReason::IdExpired, "Id has expired"),
-            LoginFailedReason2::RejectedFromServer => (UnifiedLoginFailedReason::RejectedFromServer, "Rejected from server"),
-            LoginFailedReason2::BlockedByGMTeam => (UnifiedLoginFailedReason::BlockedByGMTeam, "Blocked by gm team"),
-            LoginFailedReason2::GameOutdated => (UnifiedLoginFailedReason::GameOutdated, "Game outdated"),
-            LoginFailedReason2::LoginProhibitedUntil => (UnifiedLoginFailedReason::LoginProhibitedUntil, "Login prohibited until"),
-            LoginFailedReason2::ServerFull => (UnifiedLoginFailedReason::ServerFull, "Server is full"),
+            LoginFailedReason2::UnregisteredId => (UnifiedLoginFailedReason::UnregisteredId, "Unregistered id".to_string()),
+            LoginFailedReason2::IncorrectPassword => (UnifiedLoginFailedReason::IncorrectPassword, "Incorrect password".to_string()),
+            LoginFailedReason2::IdExpired => (UnifiedLoginFailedReason::IdExpired, "Id has expired".to_string()),
+            LoginFailedReason2::RejectedFromServer => (UnifiedLoginFailedReason::RejectedFromServer, "Rejected from server".to_string()),
+            LoginFailedReason2::BlockedByGMTeam => (UnifiedLoginFailedReason::BlockedByGMTeam, "Blocked by gm team".to_string()),
+            LoginFailedReason2::GameOutdated => (UnifiedLoginFailedReason::GameOutdated, "Game outdated".to_string()),
+            LoginFailedReason2::LoginProhibitedUntil => (
+                UnifiedLoginFailedReason::LoginProhibitedUntil,
+                format!("You are prohibited to log in until {}.", packet.date),
+            ),
+            LoginFailedReason2::ServerFull => (UnifiedLoginFailedReason::ServerFull, "Server is full".to_string()),
             LoginFailedReason2::CompanyAccountLimitReached => (
                 UnifiedLoginFailedReason::CompanyAccountLimitReached,
-                "Company account limit reached",
+                "Company account limit reached".to_string(),
             ),
+            LoginFailedReason2::BannedByDBATeam => (UnifiedLoginFailedReason::BannedByDBATeam, "Banned by DBA team".to_string()),
+            LoginFailedReason2::UnconfirmedEmail => (UnifiedLoginFailedReason::UnconfirmedEmail, "Email not confirmed".to_string()),
+            LoginFailedReason2::BannedByGMTeam => (UnifiedLoginFailedReason::BannedByGMTeam, "Banned by GM team".to_string()),
+            LoginFailedReason2::TemporaryBanForDatabaseWork => (
+                UnifiedLoginFailedReason::TemporaryBanForDatabaseWork,
+                "Working in DB".to_string(),
+            ),
+            LoginFailedReason2::SelfLocked => (UnifiedLoginFailedReason::SelfLocked, "Self lock".to_string()),
+            LoginFailedReason2::NotPermittedGroup => (UnifiedLoginFailedReason::NotPermittedGroup, "Not Permitted Group".to_string()),
+            LoginFailedReason2::AccountIdErased => (
+                UnifiedLoginFailedReason::AccountIdErased,
+                "This ID has been totally erased".to_string(),
+            ),
+            LoginFailedReason2::LoginInformationRemains => (
+                UnifiedLoginFailedReason::LoginInformationRemains,
+                format!("Login information remains at {}", packet.date),
+            ),
+            LoginFailedReason2::LockedForHackingInvestigation => (
+                UnifiedLoginFailedReason::LockedForHackingInvestigation,
+                "Account has been locked for a hacking investigation. Please contact the GM Team for more information".to_string(),
+            ),
+            LoginFailedReason2::TemporaryLockedForBugInvestigation => (
+                UnifiedLoginFailedReason::TemporaryLockedForBugInvestigation,
+                "This account has been temporarily prohibited from login due to a bug-related investigation".to_string(),
+            ),
+            LoginFailedReason2::DeletingCharacter => (
+                UnifiedLoginFailedReason::DeletingCharacter,
+                "This character is being deleted. Login is temporarily unavailable for the time being".to_string(),
+            ),
+            LoginFailedReason2::DeletingSpouseCharacter => (
+                UnifiedLoginFailedReason::DeletingSpouseCharacter,
+                "This character is being deleted. Login is temporarily unavailable for the time being".to_string(),
+            ),
+            LoginFailedReason2::UnknownError => (UnifiedLoginFailedReason::UnknownError, "Unknown error".to_string()),
         };
 
         NetworkEvent::LoginServerConnectionFailed { reason, message }

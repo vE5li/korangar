@@ -28,6 +28,19 @@ pub enum UnifiedLoginFailedReason {
     LoginProhibitedUntil,
     ServerFull,
     CompanyAccountLimitReached,
+    BannedByDBATeam,
+    UnconfirmedEmail,
+    BannedByGMTeam,
+    TemporaryBanForDatabaseWork,
+    SelfLocked,
+    NotPermittedGroup,
+    AccountIdErased,
+    LoginInformationRemains,
+    LockedForHackingInvestigation,
+    TemporaryLockedForBugInvestigation,
+    DeletingCharacter,
+    DeletingSpouseCharacter,
+    UnknownError,
 }
 
 #[derive(Debug, Clone, Copy)]

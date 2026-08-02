@@ -414,6 +414,7 @@ pub struct MapServerUnavailablePacket {
 
 #[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[numeric_type(u32)]
 pub enum LoginFailedReason2 {
     UnregisteredId,
     IncorrectPassword,
@@ -424,6 +425,25 @@ pub enum LoginFailedReason2 {
     LoginProhibitedUntil,
     ServerFull,
     CompanyAccountLimitReached,
+    BannedByDBATeam,
+    UnconfirmedEmail,
+    BannedByGMTeam,
+    TemporaryBanForDatabaseWork,
+    SelfLocked,
+    NotPermittedGroup,
+    #[numeric_value(99)]
+    AccountIdErased,
+    #[numeric_value(100)]
+    LoginInformationRemains,
+    #[numeric_value(101)]
+    LockedForHackingInvestigation,
+    #[numeric_value(102)]
+    TemporaryLockedForBugInvestigation,
+    #[numeric_value(103)]
+    DeletingCharacter,
+    #[numeric_value(104)]
+    DeletingSpouseCharacter,
+    UnknownError,
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket, LoginServer)]
@@ -431,6 +451,8 @@ pub enum LoginFailedReason2 {
 #[header(0x083E)]
 pub struct LoginFailedPacket2 {
     pub reason: LoginFailedReason2,
+    #[length(20)]
+    pub date: String,
 }
 
 #[derive(Debug, Clone, ByteConvertable)]

@@ -910,9 +910,9 @@ where
 mod packet_handlers {
     use ragnarok_bytes::{ByteReader, ByteWriter};
     use ragnarok_packets::handler::{HandlerResult, NoPacketCallback};
-    use ragnarok_packets::{DisplayEmotionPacket, EntityId, PacketExt, RequestEmotionPacket};
+    use ragnarok_packets::{DisplayEmotionPacket, EntityId, LoginFailedPacket2, LoginFailedReason2, PacketExt, RequestEmotionPacket};
 
-    use crate::{NetworkEvent, NetworkingSystem, SupportedPacketVersion};
+    use crate::{NetworkEvent, NetworkingSystem, SupportedPacketVersion, UnifiedLoginFailedReason};
 
     #[test]
     fn login_server() {

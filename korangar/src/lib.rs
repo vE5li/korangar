@@ -2316,64 +2316,52 @@ impl Client {
                             .clear_slot(&mut self.networking_system, slot);
                     }
                     (SkillSource::Hotbar { slot: source_slot }, SkillSource::Hotbar { slot: destination_slot }) => {
-                        match source_slot == destination_slot {
-                            // Clicking a hotbar slot without moving the skill to a
-                            // different slot uses the skill, like in the original client.
-                            // Skills that require a target switch to a target selection
-                            // mouse mode, while self cast skills are used immediately.
-                            true => {
-                                if let Some(learnable_skill) = self
-                                    .client_state
-                                    .follow(client_state().hotbar())
-                                    .get_skill_in_slot(source_slot)
-                                    .as_ref()
-                                    && let Some(learned_skill) =
-                                        self.client_state
-                                            .follow(client_state().skill_tree().skills())
-                                            .iter()
-                                            .find(|learned_skill| {
-                                                learned_skill.skill_id == learnable_skill.skill_id
-                                                    && learned_skill.skill_level.0 >= learnable_skill.maximum_level.0
-                                            })
-                                {
-                                    match learned_skill.skill_type {
-                                        SkillType::Passive => {}
-                                        SkillType::SelfCast => match learnable_skill.skill_id == ROLLING_CUTTER_ID {
-                                            true => {
-                                                let _ = self.networking_system.cast_channeling_skill(
-                                                    learnable_skill.skill_id,
-                                                    learnable_skill.maximum_level,
-                                                    self.client_state.follow(this_entity().manually_asserted()).get_entity_id(),
-                                                );
-                                            }
-                                            false => {
-                                                let _ = self.networking_system.cast_skill(
-                                                    learnable_skill.skill_id,
-                                                    learnable_skill.maximum_level,
-                                                    self.client_state.follow(this_entity().manually_asserted()).get_entity_id(),
-                                                );
-                                            }
-                                        },
-                                        skill_type => self.interface.set_mouse_mode(MouseMode::Custom {
-                                            mode: MouseInputMode::TargetSkill {
-                                                slot: source_slot,
-                                                skill_type,
-                                            },
-                                        }),
-                                    }
-                                }
-                            }
-                            false => {
-                                self.client_state.follow_mut(client_state().hotbar()).swap_slot(
-                                    &mut self.networking_system,
-                                    source_slot,
-                                    destination_slot,
-                                );
-                            }
-                        }
+                        self.client_state.follow_mut(client_state().hotbar()).swap_slot(
+                            &mut self.networking_system,
+                            source_slot,
+                            destination_slot,
+                        );
                     }
                     _ => {}
                 },
+                InputEvent::UseSkillInSlot { slot } => {
+                    // Skills that require a target switch to a target selection
+                    // mouse mode, while self cast skills are used immediately,
+                    // like in the original client.
+                    if let Some(learnable_skill) = self.client_state.follow(client_state().hotbar()).get_skill_in_slot(slot).as_ref()
+                        && let Some(learned_skill) =
+                            self.client_state
+                                .follow(client_state().skill_tree().skills())
+                                .iter()
+                                .find(|learned_skill| {
+                                    learned_skill.skill_id == learnable_skill.skill_id
+                                        && learned_skill.skill_level.0 >= learnable_skill.maximum_level.0
+                                })
+                    {
+                        match learned_skill.skill_type {
+                            SkillType::Passive => {}
+                            SkillType::SelfCast => match learnable_skill.skill_id == ROLLING_CUTTER_ID {
+                                true => {
+                                    let _ = self.networking_system.cast_channeling_skill(
+                                        learnable_skill.skill_id,
+                                        learnable_skill.maximum_level,
+                                        self.client_state.follow(this_entity().manually_asserted()).get_entity_id(),
+                                    );
+                                }
+                                false => {
+                                    let _ = self.networking_system.cast_skill(
+                                        learnable_skill.skill_id,
+                                        learnable_skill.maximum_level,
+                                        self.client_state.follow(this_entity().manually_asserted()).get_entity_id(),
+                                    );
+                                }
+                            },
+                            skill_type => self.interface.set_mouse_mode(MouseMode::Custom {
+                                mode: MouseInputMode::TargetSkill { slot, skill_type },
+                            }),
+                        }
+                    }
+                }
                 InputEvent::CastSkill { slot } => {
                     if let Some(learnable_skill) = self.client_state.follow(client_state().hotbar()).get_skill_in_slot(slot).as_ref()
                         && let Some(learned_skill) =

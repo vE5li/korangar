@@ -174,6 +174,13 @@ pub enum InputEvent {
         /// Slot of the hotbar that the skill is bound to.
         slot: HotbarSlot,
     },
+    /// Use the skill in a hotbar slot, like in the original client. Skills
+    /// that require a target start a target selection, self cast skills are
+    /// cast immediately.
+    UseSkillInSlot {
+        /// Slot of the hotbar that the skill is bound to.
+        slot: HotbarSlot,
+    },
     /// Stop a skill.
     StopSkill {
         /// Slot of the hotbar that the skill is bound to.

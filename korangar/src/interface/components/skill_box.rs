@@ -79,6 +79,15 @@ where
             mode: MouseInputMode::MoveSkill { source, skill },
         } = mouse_mode
         {
+            // Dropping a hotbar skill onto its own slot is a simple click,
+            // which uses the skill like in the original client.
+            if let (SkillSource::Hotbar { slot }, SkillSource::Hotbar { slot: destination_slot }) = (*source, self.source)
+                && slot == destination_slot
+            {
+                queue.queue(InputEvent::UseSkillInSlot { slot });
+                return;
+            }
+
             queue.queue(InputEvent::MoveSkill {
                 source: *source,
                 destination: self.source,

@@ -158,7 +158,7 @@ impl MouseCursor {
 
         // TODO: Figure out how this is actually supposed to work
         let direction = match self.cursor_state {
-            MouseCursorState::Default | MouseCursorState::Click | MouseCursorState::RotateCamera => 0,
+            MouseCursorState::Default | MouseCursorState::Click | MouseCursorState::RotateCamera | MouseCursorState::Target => 0,
             _ => 7,
         };
 

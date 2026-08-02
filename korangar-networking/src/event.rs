@@ -239,6 +239,27 @@ pub enum NetworkEvent {
         account_id: AccountId,
         character_id: CharacterId,
     },
+    PartyInvite {
+        party_id: PartyId,
+        party_name: String,
+    },
+    SetPartyInfo {
+        party_name: String,
+        members: Vec<PartyMember>,
+    },
+    PartyMemberAdded {
+        party_name: String,
+        member: PartyMember,
+    },
+    PartyMemberLeft {
+        account_id: AccountId,
+        player_name: String,
+        reason: PartyMemberLeaveReason,
+    },
+    PartyLeaderChanged {
+        previous_leader: AccountId,
+        new_leader: AccountId,
+    },
     SetHotkeyData {
         tab: HotbarTab,
         hotkeys: Vec<HotkeyState>,

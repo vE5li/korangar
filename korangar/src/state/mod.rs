@@ -26,7 +26,7 @@ use korangar_networking::{MessageColor, SellItem, ShopItem};
 use localization::Localization;
 #[cfg(feature = "debug")]
 use ragnarok_formats::map::{EffectSource, LightSource, MapData, SoundSource};
-use ragnarok_packets::{CharacterId, CharacterServerInformation, EntityId, Friend};
+use ragnarok_packets::{CharacterId, CharacterServerInformation, EntityId, Friend, PartyMember};
 #[cfg(feature = "debug")]
 use rust_state::{ManuallyAssertExt, VecIndexExt};
 use rust_state::{Path, PathExt, RustState, Selector};
@@ -41,8 +41,8 @@ use crate::graphics::RenderOptions;
 use crate::graphics::{Color, CornerDiameter, ScreenClip, ScreenPosition, ScreenSize, ShadowPadding};
 use crate::input::{InputEvent, MouseInputMode};
 use crate::interface::windows::{
-    ChatWindowState, DialogWindowState, FriendListWindowState, LoginWindowState, LoginWindowStatePathExt, SkillTreeWindowState,
-    WindowCache, WindowClass,
+    ChatWindowState, DialogWindowState, FriendListWindowState, LoginWindowState, LoginWindowStatePathExt, PartyWindowState,
+    SkillTreeWindowState, WindowCache, WindowClass,
 };
 #[cfg(feature = "debug")]
 use crate::interface::windows::{ProfilerWindowState, ThemeInspectorWindowState};
@@ -137,6 +137,8 @@ pub struct ClientState {
     chat_window: ChatWindowState,
     /// Internal state of the friend list window.
     friend_list_window: FriendListWindowState,
+    /// Internal state of the party window.
+    party_window: PartyWindowState,
     /// Internal state of the dialog window.
     dialog_window: DialogWindowState,
     /// Internal state of the skill tree window.
@@ -153,6 +155,10 @@ pub struct ClientState {
     chat_messages: Vec<ChatMessage>,
     /// List of all friends.
     friend_list: Vec<Friend>,
+    /// Name of the party the player is currently in.
+    party_name: String,
+    /// Members of the party the player is currently in.
+    party_members: Vec<PartyMember>,
     /// List of items offered in the shop.
     // TODO: Unhide this
     #[hidden_element]
@@ -320,6 +326,12 @@ impl ClientState {
             let friend_list_window = FriendListWindowState::default();
         });
 
+        time_phase!("create party state", {
+            let party_name = String::default();
+            let party_members = Vec::default();
+            let party_window = PartyWindowState::default();
+        });
+
         time_phase!("create player resources", {
             let dialog_window = DialogWindowState::default();
 
@@ -385,6 +397,7 @@ impl ClientState {
             login_window,
             chat_window,
             friend_list_window,
+            party_window,
             dialog_window,
             skill_tree_window,
             entities: Vec::new(),
@@ -392,6 +405,8 @@ impl ClientState {
             ground_items: Vec::new(),
             chat_messages,
             friend_list,
+            party_name,
+            party_members,
             shop_items,
             buy_cart,
             sell_items,

@@ -260,6 +260,24 @@ pub enum NetworkEvent {
         previous_leader: AccountId,
         new_leader: AccountId,
     },
+    PartyMemberHealth {
+        account_id: AccountId,
+        health_points: u32,
+        maximum_health_points: u32,
+    },
+    PartyMemberPosition {
+        account_id: AccountId,
+        x: u16,
+        y: u16,
+    },
+    PartyMemberJobLevel {
+        account_id: AccountId,
+        job_id: u16,
+        level: u16,
+    },
+    PartyMemberDead {
+        account_id: AccountId,
+    },
     SetHotkeyData {
         tab: HotbarTab,
         hotkeys: Vec<HotkeyState>,

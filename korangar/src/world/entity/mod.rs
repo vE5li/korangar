@@ -24,12 +24,12 @@ use crate::graphics::reduce_vertices;
 #[cfg(feature = "debug")]
 use crate::graphics::{BindlessSupport, DebugRectangleInstruction};
 use crate::graphics::{EntityInstruction, ScreenPosition, ScreenSize};
-use crate::loaders::GameFileLoader;
+use crate::loaders::{FontSize, GameFileLoader};
 #[cfg(feature = "debug")]
 use crate::loaders::{GAT_TILE_SIZE, split_mesh_by_texture};
-use crate::renderer::GameInterfaceRenderer;
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
+use crate::renderer::{AlignHorizontal, GameInterfaceRenderer};
 use crate::state::ClientState;
 use crate::state::theme::{InterfaceThemeType, WorldTheme};
 use crate::world::{
@@ -1430,6 +1430,66 @@ impl Entity {
             Self::Player(player) => player.render_status(renderer, camera, theme, window_size),
             Self::Npc(npc) => npc.render_status(renderer, camera, theme, window_size),
         }
+    }
+
+    /// Renders the health bar and name of a party member below their sprite.
+    /// The health comes from the party updates rather than the entity, since
+    /// the entity health of other players is not known to the client.
+    #[allow(clippy::too_many_arguments)]
+    pub fn render_party_status(
+        &self,
+        renderer: &GameInterfaceRenderer,
+        camera: &dyn Camera,
+        theme: &WorldTheme,
+        window_size: ScreenSize,
+        name: &str,
+        health_points: u32,
+        maximum_health_points: u32,
+    ) {
+        let common = self.get_common();
+
+        let clip_space_position = camera.view_projection_matrix() * common.world_position.to_homogeneous();
+        let screen_position = camera.clip_to_screen_space(clip_space_position);
+        let final_position = ScreenPosition {
+            left: screen_position.x * window_size.width,
+            top: screen_position.y * window_size.height + 5.0,
+        };
+
+        let bar_width = theme.status_bar.player_bar_width;
+        let health_height = theme.status_bar.health_height;
+        let mut name_offset = 4.0;
+
+        // A maximum of zero means the health of the member is not known yet.
+        if maximum_health_points > 0 {
+            let background_position = final_position - theme.status_bar.border_size - ScreenSize::only_width(bar_width / 2.0);
+            let background_size = ScreenSize {
+                width: bar_width,
+                height: health_height,
+            } + theme.status_bar.border_size * 2.0;
+
+            renderer.render_rectangle(background_position, background_size, theme.status_bar.background_color);
+
+            renderer.render_bar(
+                final_position,
+                ScreenSize {
+                    width: bar_width,
+                    height: health_height,
+                },
+                theme.status_bar.player_health_color,
+                maximum_health_points as f32,
+                health_points as f32,
+            );
+
+            name_offset += health_height + theme.status_bar.border_size.height;
+        }
+
+        renderer.render_text(
+            name,
+            final_position + ScreenPosition::only_top(name_offset),
+            crate::graphics::Color::WHITE,
+            FontSize(12.0),
+            AlignHorizontal::Center,
+        );
     }
 }
 

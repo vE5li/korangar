@@ -887,10 +887,33 @@ where
         reason: packet.reason,
     })?;
     packet_handler.register_noop::<UpdatePartyOptionsPacket>()?;
-    packet_handler.register_noop::<PartyMemberPositionPacket>()?;
-    packet_handler.register_noop::<PartyMemberHealthPacket>()?;
-    packet_handler.register_noop::<PartyMemberDeadPacket>()?;
-    packet_handler.register_noop::<PartyMemberJobLevelPacket>()?;
+    packet_handler.register(|packet: PartyMemberPositionPacket| {
+        // A coordinate of 65535 means the position is unavailable.
+        match packet.x == u16::MAX || packet.y == u16::MAX {
+            true => None,
+            false => Some(NetworkEvent::PartyMemberPosition {
+                account_id: packet.account_id,
+                x: packet.x,
+                y: packet.y,
+            }),
+        }
+    })?;
+    packet_handler.register(|packet: PartyMemberHealthPacket| NetworkEvent::PartyMemberHealth {
+        account_id: packet.account_id,
+        health_points: packet.health_points,
+        maximum_health_points: packet.maximum_health_points,
+    })?;
+    packet_handler.register(|packet: PartyMemberDeadPacket| match packet.is_dead != 0 {
+        true => Some(NetworkEvent::PartyMemberDead {
+            account_id: packet.account_id,
+        }),
+        false => None,
+    })?;
+    packet_handler.register(|packet: PartyMemberJobLevelPacket| NetworkEvent::PartyMemberJobLevel {
+        account_id: packet.account_id,
+        job_id: packet.job_id,
+        level: packet.level,
+    })?;
     packet_handler.register_noop::<UseSkillAckPacket>()?;
     packet_handler.register_noop::<NpcSpriteChangePacket>()?;
     packet_handler.register(|packet: PartyLeaderChangedPacket| NetworkEvent::PartyLeaderChanged {

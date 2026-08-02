@@ -26,7 +26,7 @@ use korangar_networking::{MessageColor, SellItem, ShopItem};
 use localization::Localization;
 #[cfg(feature = "debug")]
 use ragnarok_formats::map::{EffectSource, LightSource, MapData, SoundSource};
-use ragnarok_packets::{CharacterId, CharacterServerInformation, EntityId, Friend, PartyMember};
+use ragnarok_packets::{AccountId, CharacterId, CharacterServerInformation, EntityId, Friend, PartyMember};
 #[cfg(feature = "debug")]
 use rust_state::{ManuallyAssertExt, VecIndexExt};
 use rust_state::{Path, PathExt, RustState, Selector};
@@ -95,6 +95,50 @@ impl BufferedAction {
     }
 }
 
+/// Client side state of a party member, combining the information from the
+/// member list and join packets with the health and position updates that
+/// arrive separately.
+#[derive(Debug, Clone, RustState, StateElement)]
+pub struct PartyMemberState {
+    pub account_id: AccountId,
+    pub character_id: CharacterId,
+    pub name: String,
+    pub map_name: String,
+    pub is_leader: bool,
+    pub is_online: bool,
+    pub job_id: u16,
+    pub level: u16,
+    /// Health of the member. Not known until the server sends the first
+    /// health update, indicated by `maximum_health_points` being zero.
+    pub health_points: u32,
+    pub maximum_health_points: u32,
+    /// Position of the member on the map. A value of zero means the position
+    /// is not known.
+    pub x: u16,
+    pub y: u16,
+}
+
+impl From<PartyMember> for PartyMemberState {
+    fn from(member: PartyMember) -> Self {
+        Self {
+            account_id: member.account_id,
+            character_id: member.character_id,
+            name: member.name,
+            map_name: member.map_name,
+            // A value of zero means the member is the leader.
+            is_leader: member.leader == 0,
+            // A value of zero means the member is online.
+            is_online: member.offline == 0,
+            job_id: member.job_id,
+            level: member.level,
+            health_points: 0,
+            maximum_health_points: 0,
+            x: 0,
+            y: 0,
+        }
+    }
+}
+
 /// Internal state of the client. Everything that can be viewed or modified via
 /// the user interface should be in here. State that takes care of managing OS
 /// or rendering resources should be in [`Client`](super::Client).
@@ -158,7 +202,7 @@ pub struct ClientState {
     /// Name of the party the player is currently in.
     party_name: String,
     /// Members of the party the player is currently in.
-    party_members: Vec<PartyMember>,
+    party_members: Vec<PartyMemberState>,
     /// List of items offered in the shop.
     // TODO: Unhide this
     #[hidden_element]

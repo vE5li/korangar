@@ -84,7 +84,7 @@ use state::inventory::InventoryPathExt;
 use state::localization::Localization;
 use state::skills::SkillTreePathExt;
 use state::theme::{CursorThemePathExt, IndicatorThemePathExt, InterfaceThemePathExt, WorldThemePathExt};
-use state::{ChatMessage, ClientState, ClientStatePathExt, client_state, this_entity, this_player};
+use state::{ChatMessage, ClientState, ClientStatePathExt, PartyMemberState, client_state, this_entity, this_player};
 #[cfg(feature = "debug")]
 use wgpu::Device;
 use wgpu::util::initialize_adapter_from_env_or_default;
@@ -1705,11 +1705,13 @@ impl Client {
                 }
                 NetworkEvent::SetPartyInfo { party_name, members } => {
                     *self.client_state.follow_mut(client_state().party_name()) = party_name;
-                    *self.client_state.follow_mut(client_state().party_members()) = members;
+                    *self.client_state.follow_mut(client_state().party_members()) =
+                        members.into_iter().map(PartyMemberState::from).collect();
                 }
                 NetworkEvent::PartyMemberAdded { party_name, member } => {
                     *self.client_state.follow_mut(client_state().party_name()) = party_name;
 
+                    let member = PartyMemberState::from(member);
                     let party_members = self.client_state.follow_mut(client_state().party_members());
                     match party_members
                         .iter_mut()
@@ -1719,15 +1721,63 @@ impl Client {
                         None => party_members.push(member),
                     }
                 }
+                NetworkEvent::PartyMemberHealth {
+                    account_id,
+                    health_points,
+                    maximum_health_points,
+                } => {
+                    if let Some(member) = self
+                        .client_state
+                        .follow_mut(client_state().party_members())
+                        .iter_mut()
+                        .find(|member| member.account_id == account_id)
+                    {
+                        member.health_points = health_points;
+                        member.maximum_health_points = maximum_health_points;
+                    }
+                }
+                NetworkEvent::PartyMemberPosition { account_id, x, y } => {
+                    if let Some(member) = self
+                        .client_state
+                        .follow_mut(client_state().party_members())
+                        .iter_mut()
+                        .find(|member| member.account_id == account_id)
+                    {
+                        member.x = x;
+                        member.y = y;
+                        member.is_online = true;
+                    }
+                }
+                NetworkEvent::PartyMemberJobLevel { account_id, job_id, level } => {
+                    if let Some(member) = self
+                        .client_state
+                        .follow_mut(client_state().party_members())
+                        .iter_mut()
+                        .find(|member| member.account_id == account_id)
+                    {
+                        member.job_id = job_id;
+                        member.level = level;
+                    }
+                }
+                NetworkEvent::PartyMemberDead { account_id } => {
+                    if let Some(member) = self
+                        .client_state
+                        .follow_mut(client_state().party_members())
+                        .iter_mut()
+                        .find(|member| member.account_id == account_id)
+                    {
+                        member.health_points = 0;
+                    }
+                }
                 NetworkEvent::PartyLeaderChanged {
                     previous_leader,
                     new_leader,
                 } => {
                     for member in self.client_state.follow_mut(client_state().party_members()).iter_mut() {
                         if member.account_id == previous_leader {
-                            member.leader = 1;
+                            member.is_leader = false;
                         } else if member.account_id == new_leader {
-                            member.leader = 0;
+                            member.is_leader = true;
                         }
                     }
                 }
@@ -4019,6 +4069,36 @@ impl<'a, 'm: 'a> MapRenderContext<'a, 'm> {
                 self.client_state.follow(client_state().world_theme()),
                 self.screen_size,
             );
+        }
+
+        {
+            let party_members = self.client_state.follow(client_state().party_members());
+
+            if !party_members.is_empty() {
+                #[cfg(feature = "debug")]
+                profile_block!("render party member status");
+
+                let own_entity_id = self.client_state.try_follow(this_entity()).map(|entity| entity.get_entity_id());
+
+                for entity in self.client_state.follow(client_state().entities()).iter() {
+                    // The health bar of the local player is already rendered above.
+                    if Some(entity.get_entity_id()) == own_entity_id {
+                        continue;
+                    }
+
+                    if let Some(member) = party_members.iter().find(|member| member.account_id.0 == entity.get_entity_id().0) {
+                        entity.render_party_status(
+                            self.middle_interface_renderer,
+                            self.current_camera,
+                            self.client_state.follow(client_state().world_theme()),
+                            self.screen_size,
+                            &member.name,
+                            member.health_points,
+                            member.maximum_health_points,
+                        );
+                    }
+                }
+            }
         }
 
         if let Some(BufferedAction::AttackEntity { entity_id }) = self.buffered_action

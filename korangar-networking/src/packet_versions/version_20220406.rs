@@ -748,18 +748,36 @@ where
     })?;
     packet_handler.register_noop::<UseSkillSuccessPacket>()?;
     packet_handler.register(|packet: ToUseSkillSuccessPacket| {
-        // The server reports actions blocked by a missing skill requirement
-        // through this packet, for example creating or joining a party without
-        // Basic Skill level 7. A cause of 0 means the skill level is too low.
+        // The server reports skill use failures through this packet. A flag of
+        // zero means the skill failed. The causes match rAthena's
+        // `useskill_fail_cause` enum.
         const NOVICE_BASIC_SKILL: SkillId = SkillId(1);
 
-        match packet.flag == 0 && packet.cause == 0 && packet.skill_id == NOVICE_BASIC_SKILL {
-            true => Some(NetworkEvent::ChatMessage {
-                text: format!("You need Basic Skill level {} to do that.", packet.btype),
-                color: MessageColor::Error,
-            }),
-            false => None,
+        if packet.flag != 0 {
+            return None;
         }
+
+        let text = match packet.cause {
+            0 if packet.skill_id == NOVICE_BASIC_SKILL => format!("You need Basic Skill level {} to do that.", packet.btype),
+            0 => "Your skill level is too low.".to_owned(),
+            1 => "Not enough SP.".to_owned(),
+            2 => "Not enough HP.".to_owned(),
+            3 => "You are missing a required item.".to_owned(),
+            4 => "The skill is still on cooldown.".to_owned(),
+            5 => "Not enough Zeny.".to_owned(),
+            6 => "This skill cannot be used with your current weapon.".to_owned(),
+            7 => "You need a Red Gemstone.".to_owned(),
+            8 => "You need a Blue Gemstone.".to_owned(),
+            9 => "You are carrying too much weight.".to_owned(),
+            11 => "This skill cannot reach the target.".to_owned(),
+            23 => "The skill conditions are not met.".to_owned(),
+            _ => "The skill failed.".to_owned(),
+        };
+
+        Some(NetworkEvent::ChatMessage {
+            text,
+            color: MessageColor::Error,
+        })
     })?;
     packet_handler.register(|packet: NotifySkillUnitPacket| {
         let NotifySkillUnitPacket {

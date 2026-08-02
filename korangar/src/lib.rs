@@ -58,8 +58,8 @@ use korangar_debug::logging::{Colorize, print_debug};
 use korangar_debug::profile_block;
 #[cfg(feature = "debug")]
 use korangar_debug::profiling::Profiler;
-use korangar_interface::Interface;
 use korangar_interface::layout::MouseButton;
+use korangar_interface::{Interface, MouseMode};
 use korangar_networking::{
     DisconnectReason, HotkeyState, LoginServerLoginData, MessageColor, NetworkEvent, NetworkEventBuffer, NetworkingSystem, SellItem,
     SupportedPacketVersion,
@@ -2061,7 +2061,11 @@ impl Client {
                 InputEvent::RotateCamera { rotation } => self.player_camera.soft_rotate(rotation),
                 InputEvent::ResetCameraRotation => self.player_camera.reset_rotation(),
                 InputEvent::ToggleMenuWindow => {
-                    if self.client_state.try_follow(this_entity()).is_some() {
+                    // Escape cancels an active skill target selection instead of
+                    // opening the menu, like in the original client.
+                    if self.interface.get_mouse_mode().skill_target().is_some() {
+                        self.interface.set_mouse_mode(MouseMode::Default);
+                    } else if self.client_state.try_follow(this_entity()).is_some() {
                         match self.interface.is_window_with_class_open(WindowClass::Menu) {
                             true => self.interface.close_window_with_class(WindowClass::Menu),
                             false => self.interface.open_window(MenuWindow),
@@ -2312,11 +2316,61 @@ impl Client {
                             .clear_slot(&mut self.networking_system, slot);
                     }
                     (SkillSource::Hotbar { slot: source_slot }, SkillSource::Hotbar { slot: destination_slot }) => {
-                        self.client_state.follow_mut(client_state().hotbar()).swap_slot(
-                            &mut self.networking_system,
-                            source_slot,
-                            destination_slot,
-                        );
+                        match source_slot == destination_slot {
+                            // Clicking a hotbar slot without moving the skill to a
+                            // different slot uses the skill, like in the original client.
+                            // Skills that require a target switch to a target selection
+                            // mouse mode, while self cast skills are used immediately.
+                            true => {
+                                if let Some(learnable_skill) = self
+                                    .client_state
+                                    .follow(client_state().hotbar())
+                                    .get_skill_in_slot(source_slot)
+                                    .as_ref()
+                                    && let Some(learned_skill) =
+                                        self.client_state
+                                            .follow(client_state().skill_tree().skills())
+                                            .iter()
+                                            .find(|learned_skill| {
+                                                learned_skill.skill_id == learnable_skill.skill_id
+                                                    && learned_skill.skill_level.0 >= learnable_skill.maximum_level.0
+                                            })
+                                {
+                                    match learned_skill.skill_type {
+                                        SkillType::Passive => {}
+                                        SkillType::SelfCast => match learnable_skill.skill_id == ROLLING_CUTTER_ID {
+                                            true => {
+                                                let _ = self.networking_system.cast_channeling_skill(
+                                                    learnable_skill.skill_id,
+                                                    learnable_skill.maximum_level,
+                                                    self.client_state.follow(this_entity().manually_asserted()).get_entity_id(),
+                                                );
+                                            }
+                                            false => {
+                                                let _ = self.networking_system.cast_skill(
+                                                    learnable_skill.skill_id,
+                                                    learnable_skill.maximum_level,
+                                                    self.client_state.follow(this_entity().manually_asserted()).get_entity_id(),
+                                                );
+                                            }
+                                        },
+                                        skill_type => self.interface.set_mouse_mode(MouseMode::Custom {
+                                            mode: MouseInputMode::TargetSkill {
+                                                slot: source_slot,
+                                                skill_type,
+                                            },
+                                        }),
+                                    }
+                                }
+                            }
+                            false => {
+                                self.client_state.follow_mut(client_state().hotbar()).swap_slot(
+                                    &mut self.networking_system,
+                                    source_slot,
+                                    destination_slot,
+                                );
+                            }
+                        }
                     }
                     _ => {}
                 },
@@ -3171,6 +3225,7 @@ impl Client {
         let mouse_mode = self.interface.get_mouse_mode();
         let is_mouse_mode_default = mouse_mode.is_default();
         let last_walking_destination = mouse_mode.walk_destination();
+        let skill_target = mouse_mode.skill_target();
 
         let mut interface_frame = {
             #[cfg(feature = "debug")]
@@ -3192,6 +3247,7 @@ impl Client {
             let cursor_state = match input_report.mouse_target {
                 _ if is_rotating_camera => MouseCursorState::RotateCamera,
                 _ if is_grabbing => MouseCursorState::GrabResource,
+                _ if skill_target.is_some() => MouseCursorState::Target,
                 PickerTarget::Entity(entity_id) if !is_interface_hovered => {
                     if self
                         .client_state
@@ -3224,7 +3280,15 @@ impl Client {
                 } else {
                     interface_frame.unfocus();
 
-                    if mouse_button == MouseButton::Left {
+                    if let Some((slot, _)) = skill_target {
+                        // A skill target is being selected. Any click ends the
+                        // selection, and a left click casts the skill at whatever
+                        // is under the cursor. The mouse mode is reset by the
+                        // mouse button release.
+                        if mouse_button == MouseButton::Left {
+                            self.input_event_buffer.push(InputEvent::CastSkill { slot });
+                        }
+                    } else if mouse_button == MouseButton::Left {
                         match input_report.mouse_target {
                             PickerTarget::Nothing => {}
                             PickerTarget::Entity(entity_id) => {
@@ -3315,6 +3379,7 @@ impl Client {
                 is_mouse_mode_default,
                 is_interface_hovered: interface_frame.is_interface_hovered(),
                 last_walking_destination,
+                is_targeting_ground_skill: matches!(skill_target, Some((_, SkillType::Ground | SkillType::Trap))),
                 buffered_action: *self.client_state.follow(client_state().buffered_action()),
                 #[cfg(feature = "debug")]
                 render_options: &render_options,
@@ -3632,6 +3697,7 @@ struct MapRenderContext<'a, 'm: 'a> {
     is_mouse_mode_default: bool,
     is_interface_hovered: bool,
     last_walking_destination: Option<TilePosition>,
+    is_targeting_ground_skill: bool,
     buffered_action: Option<BufferedAction>,
     #[cfg(feature = "debug")]
     render_options: &'a RenderOptions,
@@ -3943,10 +4009,11 @@ impl<'a, 'm: 'a> MapRenderContext<'a, 'm> {
 
         match self.mouse_target {
             PickerTarget::Tile { x, y } => {
-                // Only show if the mouse mode is default or walking.
+                // Only show if the mouse mode is default, walking, or
+                // selecting the target of a ground skill.
                 if self.currently_playing
                     && !self.is_interface_hovered
-                    && (self.is_mouse_mode_default || self.last_walking_destination.is_some())
+                    && (self.is_mouse_mode_default || self.last_walking_destination.is_some() || self.is_targeting_ground_skill)
                 {
                     let walk_indicator_color = *self.client_state.follow(client_state().world_theme().indicator().walking());
 

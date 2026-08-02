@@ -392,6 +392,10 @@ where
         &self.mouse_mode
     }
 
+    pub fn set_mouse_mode(&mut self, mouse_mode: MouseMode<App>) {
+        self.mouse_mode = mouse_mode;
+    }
+
     pub fn has_focus(&self) -> bool {
         self.focused_element.is_some()
     }

@@ -24,7 +24,8 @@ pub enum MouseCursorState {
     Warp = 7,
     NoAction = 8,
     Grab = 9,
-    Unsure1 = 10,
+    /// The target selection cursor used while choosing a target for a skill.
+    Target = 10,
     Unsure2 = 11,
     WarpFast = 12,
     Unsure3 = 13,

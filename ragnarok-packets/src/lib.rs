@@ -4240,6 +4240,274 @@ pub struct PartyInvitePacket {
     pub party_name: String,
 }
 
+#[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x01E8)]
+pub struct CreatePartyPacket {
+    #[length(24)]
+    pub party_name: String,
+    pub item_pickup_rule: u8,
+    pub item_division_rule: u8,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, ByteConvertable)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub enum CreatePartyResult {
+    Success,
+    NameAlreadyExists,
+    AlreadyInParty,
+    NotAllowedOnMap,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x00FA)]
+pub struct CreatePartyResultPacket {
+    pub result: CreatePartyResult,
+}
+
+#[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x02C4)]
+pub struct InvitePlayerToPartyPacket {
+    #[length(24)]
+    pub player_name: String,
+}
+
+#[derive(Debug, Clone, ByteConvertable)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub enum PartyInviteResponse {
+    Reject,
+    Accept,
+}
+
+#[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x02C7)]
+pub struct PartyInviteResponsePacket {
+    pub party_id: PartyId,
+    pub response: PartyInviteResponse,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, ByteConvertable)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[numeric_type(u32)]
+pub enum PartyInviteResult {
+    AlreadyInParty,
+    Rejected,
+    Accepted,
+    PartyFull,
+    DuplicateMember,
+    JoinMessageRefused,
+    UnknownError,
+    UnknownCharacter,
+    InvalidMapProperty,
+    InvalidMapPropertySelf,
+    MemorialDungeon,
+    LevelMismatch,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x02C5)]
+pub struct PartyInviteResultPacket {
+    #[length(24)]
+    pub player_name: String,
+    pub result: PartyInviteResult,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0AE4)]
+pub struct PartyMemberAddedPacket {
+    pub account_id: AccountId,
+    pub character_id: CharacterId,
+    /// 0 means the member is the party leader.
+    pub leader: u32,
+    pub job_id: u16,
+    pub level: u16,
+    pub x: u16,
+    pub y: u16,
+    /// 0 means the member is online.
+    pub offline: u8,
+    #[length(24)]
+    pub party_name: String,
+    #[length(24)]
+    pub player_name: String,
+    #[length(16)]
+    pub map_name: String,
+    pub item_pickup_rule: u8,
+    pub item_division_rule: u8,
+}
+
+#[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub struct PartyMember {
+    pub account_id: AccountId,
+    pub character_id: CharacterId,
+    #[length(24)]
+    pub name: String,
+    #[length(16)]
+    pub map_name: String,
+    /// 0 means the member is the party leader.
+    pub leader: u8,
+    /// 0 means the member is online.
+    pub offline: u8,
+    pub job_id: u16,
+    pub level: u16,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0AE5)]
+#[variable_length]
+pub struct PartyMemberListPacket {
+    #[length(24)]
+    pub party_name: String,
+    #[repeating_remaining]
+    pub members: Vec<PartyMember>,
+}
+
+#[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0100)]
+pub struct LeavePartyPacket {}
+
+#[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0103)]
+pub struct RemovePartyMemberPacket {
+    pub account_id: AccountId,
+    #[length(24)]
+    pub player_name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, ByteConvertable)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub enum PartyMemberLeaveReason {
+    Left,
+    Expelled,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0105)]
+pub struct PartyMemberLeftPacket {
+    pub account_id: AccountId,
+    #[length(24)]
+    pub player_name: String,
+    pub reason: PartyMemberLeaveReason,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x07D8)]
+pub struct UpdatePartyOptionsPacket {
+    pub exp_share: u32,
+    pub item_pickup_rule: u8,
+    pub item_division_rule: u8,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0107)]
+pub struct PartyMemberPositionPacket {
+    pub account_id: AccountId,
+    pub x: u16,
+    pub y: u16,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x080E)]
+pub struct PartyMemberHealthPacket {
+    pub account_id: AccountId,
+    pub health_points: u32,
+    pub maximum_health_points: u32,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0AB2)]
+pub struct PartyMemberDeadPacket {
+    pub account_id: AccountId,
+    pub is_dead: u8,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0ABD)]
+pub struct PartyMemberJobLevelPacket {
+    pub account_id: AccountId,
+    pub job_id: u16,
+    pub level: u16,
+}
+
+/// The third generation skill use acknowledgment (ZC_USESKILL_ACK3),
+/// sent whenever an entity in view starts casting a skill.
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0B1A)]
+pub struct UseSkillAckPacket {
+    pub source_entity: EntityId,
+    pub destination_entity: EntityId,
+    pub x: u16,
+    pub y: u16,
+    pub skill_id: SkillId,
+    pub element: u32,
+    pub delay_time: u32,
+    pub disposable: u8,
+    pub attack_motion: u32,
+}
+
+/// Sent when an NPC or monster in view changes its sprite
+/// (ZC_NPCSPRITE_CHANGE), for example a monster transforming.
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x01B0)]
+pub struct NpcSpriteChangePacket {
+    pub entity_id: EntityId,
+    pub change_type: u8,
+    pub value: u32,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x07FC)]
+pub struct PartyLeaderChangedPacket {
+    pub previous_leader: AccountId,
+    pub new_leader: AccountId,
+}
+
+/// A chat message from a party member (ZC_NOTIFY_CHAT_PARTY). The message
+/// is formatted as `<character name> : <message>`.
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0109)]
+#[variable_length]
+pub struct PartyChatMessagePacket {
+    pub account_id: AccountId,
+    #[length_remaining]
+    pub message: String,
+}
+
+/// Notifies party members about an item another member picked up
+/// (ZC_ITEM_PICKUP_PARTY).
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0B67)]
+pub struct PartyItemPickupPacket {
+    pub account_id: AccountId,
+    pub item_id: u32,
+    pub identified: u8,
+    pub damaged: u8,
+    pub slot: [u32; 4],
+    pub location: u16,
+    pub item_type: u8,
+    pub refine: u8,
+    pub grade: u8,
+}
+
 #[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct ReputationEntry {
@@ -4533,4 +4801,140 @@ pub struct UpdateSkillPacket {
 #[header(0x0441)]
 pub struct RemoveSkillPacket {
     pub skill_id: SkillId,
+}
+
+#[cfg(test)]
+mod party_packet_tests {
+    use ragnarok_bytes::{ByteReader, ByteWriter};
+
+    use super::*;
+
+    /// The wire size expected by rAthena for `CZ_MAKE_GROUP2`.
+    #[test]
+    fn create_party_packet_has_correct_size_and_header() {
+        let packet = CreatePartyPacket::new("Party".to_owned(), 0, 0);
+
+        let mut byte_writer = ByteWriter::new();
+        let length = packet.packet_to_bytes(&mut byte_writer).unwrap();
+        let bytes = byte_writer.into_inner();
+
+        assert_eq!(length, 28);
+        assert_eq!(bytes.len(), 28);
+        assert_eq!(&bytes[..2], &[0xE8, 0x01]);
+        assert_eq!(&bytes[2..7], b"Party");
+    }
+
+    /// The wire size expected by rAthena for `CZ_PARTY_JOIN_REQ_ACK`.
+    #[test]
+    fn party_invite_response_packet_has_correct_size_and_flag() {
+        let packet = PartyInviteResponsePacket::new(PartyId(1234), PartyInviteResponse::Accept);
+
+        let mut byte_writer = ByteWriter::new();
+        let length = packet.packet_to_bytes(&mut byte_writer).unwrap();
+        let bytes = byte_writer.into_inner();
+
+        assert_eq!(length, 7);
+        assert_eq!(bytes.len(), 7);
+        assert_eq!(&bytes[..2], &[0xC7, 0x02]);
+        assert_eq!(bytes[6], 1);
+    }
+
+    #[test]
+    fn party_member_added_packet_round_trips() {
+        let packet = PartyMemberAddedPacket::new(
+            AccountId(2000001),
+            CharacterId(150001),
+            0,
+            4013,
+            99,
+            120,
+            75,
+            0,
+            "TestParty".to_owned(),
+            "Mantis".to_owned(),
+            "prontera".to_owned(),
+            0,
+            0,
+        );
+
+        let mut byte_writer = ByteWriter::new();
+        let length = packet.packet_to_bytes(&mut byte_writer).unwrap();
+        let bytes = byte_writer.into_inner();
+
+        // 2 header + 4 + 4 + 4 + 2 + 2 + 2 + 2 + 1 + 24 + 24 + 16 + 1 + 1
+        assert_eq!(length, 89);
+
+        let mut byte_reader = ByteReader::without_metadata(&bytes[2..]);
+        let parsed = PartyMemberAddedPacket::payload_from_bytes(&mut byte_reader).unwrap();
+
+        assert_eq!(parsed.account_id, packet.account_id);
+        assert_eq!(parsed.character_id, packet.character_id);
+        assert_eq!(parsed.job_id, packet.job_id);
+        assert_eq!(parsed.level, packet.level);
+        assert_eq!(parsed.party_name, packet.party_name);
+        assert_eq!(parsed.player_name, packet.player_name);
+        assert_eq!(parsed.map_name, packet.map_name);
+    }
+
+    /// Parses a synthetic `ZC_GROUP_LIST` packet with two 54 byte member
+    /// entries, the layout used since packet version 20171207.
+    #[test]
+    fn party_member_list_packet_parses_multiple_members() {
+        let mut payload = Vec::new();
+
+        let mut member = |account_id: u32, character_id: u32, name: &str, map: &str, leader: u8, job: u16, level: u16| {
+            payload.extend_from_slice(&account_id.to_le_bytes());
+            payload.extend_from_slice(&character_id.to_le_bytes());
+            let mut name_bytes = [0u8; 24];
+            name_bytes[..name.len()].copy_from_slice(name.as_bytes());
+            payload.extend_from_slice(&name_bytes);
+            let mut map_bytes = [0u8; 16];
+            map_bytes[..map.len()].copy_from_slice(map.as_bytes());
+            payload.extend_from_slice(&map_bytes);
+            payload.push(leader);
+            payload.push(0);
+            payload.extend_from_slice(&job.to_le_bytes());
+            payload.extend_from_slice(&level.to_le_bytes());
+        };
+
+        member(2000001, 150001, "Mantis", "prontera", 0, 4013, 99);
+        member(2000002, 150002, "Poring Slayer", "prontera", 1, 0, 12);
+
+        let mut bytes = Vec::new();
+        // Total packet length including the header and length field.
+        let total_length = (2 + 2 + 24 + payload.len()) as u16;
+        bytes.extend_from_slice(&total_length.to_le_bytes());
+        let mut party_name = [0u8; 24];
+        party_name[..8].copy_from_slice(b"wowparty");
+        bytes.extend_from_slice(&party_name);
+        bytes.extend_from_slice(&payload);
+
+        let mut byte_reader = ByteReader::without_metadata(&bytes);
+        let parsed = PartyMemberListPacket::payload_from_bytes(&mut byte_reader).unwrap();
+
+        assert_eq!(parsed.party_name, "wowparty");
+        assert_eq!(parsed.members.len(), 2);
+        assert_eq!(parsed.members[0].name, "Mantis");
+        assert_eq!(parsed.members[0].leader, 0);
+        assert_eq!(parsed.members[1].name, "Poring Slayer");
+        assert_eq!(parsed.members[1].account_id, AccountId(2000002));
+        assert_eq!(parsed.members[1].level, 12);
+    }
+
+    #[test]
+    fn party_member_left_packet_parses_expelled_reason() {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&2000002u32.to_le_bytes());
+        let mut name = [0u8; 24];
+        name[..13].copy_from_slice(b"Poring Slayer");
+        bytes.extend_from_slice(&name);
+        bytes.push(1);
+
+        let mut byte_reader = ByteReader::without_metadata(&bytes);
+        let parsed = PartyMemberLeftPacket::payload_from_bytes(&mut byte_reader).unwrap();
+
+        assert_eq!(parsed.account_id, AccountId(2000002));
+        assert_eq!(parsed.player_name, "Poring Slayer");
+        assert_eq!(parsed.reason, PartyMemberLeaveReason::Expelled);
+    }
 }

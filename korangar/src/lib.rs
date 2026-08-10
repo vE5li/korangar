@@ -84,7 +84,7 @@ use state::inventory::InventoryPathExt;
 use state::localization::Localization;
 use state::skills::SkillTreePathExt;
 use state::theme::{CursorThemePathExt, IndicatorThemePathExt, InterfaceThemePathExt, WorldThemePathExt};
-use state::{ChatMessage, ClientState, ClientStatePathExt, client_state, this_entity, this_player};
+use state::{ChatMessage, ClientState, ClientStatePathExt, PartyMemberState, client_state, this_entity, this_player};
 #[cfg(feature = "debug")]
 use wgpu::Device;
 use wgpu::util::initialize_adapter_from_env_or_default;
@@ -1700,6 +1700,109 @@ impl Client {
                 NetworkEvent::FriendAdded { friend } => {
                     self.client_state.follow_mut(client_state().friend_list()).push(friend);
                 }
+                NetworkEvent::PartyInvite { party_id, party_name } => {
+                    self.interface.open_window(PartyInviteWindow::new(party_id, party_name));
+                }
+                NetworkEvent::SetPartyInfo { party_name, members } => {
+                    *self.client_state.follow_mut(client_state().party_name()) = party_name;
+                    *self.client_state.follow_mut(client_state().party_members()) =
+                        members.into_iter().map(PartyMemberState::from).collect();
+                }
+                NetworkEvent::PartyMemberAdded { party_name, member } => {
+                    *self.client_state.follow_mut(client_state().party_name()) = party_name;
+
+                    let member = PartyMemberState::from(member);
+                    let party_members = self.client_state.follow_mut(client_state().party_members());
+                    match party_members
+                        .iter_mut()
+                        .find(|existing_member| existing_member.character_id == member.character_id)
+                    {
+                        Some(existing_member) => *existing_member = member,
+                        None => party_members.push(member),
+                    }
+                }
+                NetworkEvent::PartyMemberHealth {
+                    account_id,
+                    health_points,
+                    maximum_health_points,
+                } => {
+                    if let Some(member) = self
+                        .client_state
+                        .follow_mut(client_state().party_members())
+                        .iter_mut()
+                        .find(|member| member.account_id == account_id)
+                    {
+                        member.health_points = health_points;
+                        member.maximum_health_points = maximum_health_points;
+                    }
+                }
+                NetworkEvent::PartyMemberPosition { account_id, x, y } => {
+                    if let Some(member) = self
+                        .client_state
+                        .follow_mut(client_state().party_members())
+                        .iter_mut()
+                        .find(|member| member.account_id == account_id)
+                    {
+                        member.x = x;
+                        member.y = y;
+                        member.is_online = true;
+                    }
+                }
+                NetworkEvent::PartyMemberJobLevel { account_id, job_id, level } => {
+                    if let Some(member) = self
+                        .client_state
+                        .follow_mut(client_state().party_members())
+                        .iter_mut()
+                        .find(|member| member.account_id == account_id)
+                    {
+                        member.job_id = job_id;
+                        member.level = level;
+                    }
+                }
+                NetworkEvent::PartyMemberDead { account_id } => {
+                    if let Some(member) = self
+                        .client_state
+                        .follow_mut(client_state().party_members())
+                        .iter_mut()
+                        .find(|member| member.account_id == account_id)
+                    {
+                        member.health_points = 0;
+                    }
+                }
+                NetworkEvent::PartyLeaderChanged {
+                    previous_leader,
+                    new_leader,
+                } => {
+                    for member in self.client_state.follow_mut(client_state().party_members()).iter_mut() {
+                        if member.account_id == previous_leader {
+                            member.is_leader = false;
+                        } else if member.account_id == new_leader {
+                            member.is_leader = true;
+                        }
+                    }
+                }
+                NetworkEvent::PartyMemberLeft {
+                    account_id,
+                    player_name: _,
+                    reason: _,
+                } => {
+                    let is_self = self
+                        .client_state
+                        .try_follow(this_entity())
+                        .is_some_and(|entity| entity.get_entity_id().0 == account_id.0);
+
+                    match is_self {
+                        true => {
+                            self.client_state.follow_mut(client_state().party_name()).clear();
+                            self.client_state.follow_mut(client_state().party_members()).clear();
+                        }
+                        false => {
+                            self.client_state
+                                .follow_mut(client_state().party_members())
+                                .retain(|member| member.account_id != account_id);
+                        }
+                    }
+                }
                 NetworkEvent::VisualEffect { effect_path, entity_id } => {
                     let effect = self.effect_loader.get_or_load(effect_path, &self.texture_loader).unwrap();
                     let frame_timer = effect.new_frame_timer();
@@ -2141,6 +2244,18 @@ impl Client {
                         }
                     }
                 }
+                InputEvent::TogglePartyWindow => {
+                    if self.client_state.try_follow(this_entity()).is_some() {
+                        match self.interface.is_window_with_class_open(WindowClass::Party) {
+                            true => self.interface.close_window_with_class(WindowClass::Party),
+                            false => self.interface.open_window(PartyWindow::new(
+                                client_state().party_window(),
+                                client_state().party_name(),
+                                client_state().party_members(),
+                            )),
+                        }
+                    }
+                }
                 InputEvent::CloseTopWindow => self.interface.close_top_window(&self.client_state),
                 InputEvent::ToggleShowInterface => self.show_interface = !self.show_interface,
                 InputEvent::SelectCharacter { slot } => {
@@ -2410,6 +2525,36 @@ impl Client {
                 InputEvent::AcceptFriendRequest { account_id, character_id } => {
                     let _ = self.networking_system.accept_friend_request(account_id, character_id);
                     self.interface.close_window_with_class(WindowClass::FriendRequest);
+                }
+                InputEvent::CreateParty { party_name } => {
+                    if party_name.len() > 24 {
+                        #[cfg(feature = "debug")]
+                        print_debug!("[{}] party name {} is too long", "error".red(), party_name.magenta());
+                    } else {
+                        let _ = self.networking_system.create_party(party_name);
+                    }
+                }
+                InputEvent::InvitePlayerToParty { player_name } => {
+                    if player_name.len() > 24 {
+                        #[cfg(feature = "debug")]
+                        print_debug!("[{}] player name {} is too long", "error".red(), player_name.magenta());
+                    } else {
+                        let _ = self.networking_system.invite_player_to_party(player_name);
+                    }
+                }
+                InputEvent::RejectPartyInvite { party_id } => {
+                    let _ = self.networking_system.reject_party_invite(party_id);
+                    self.interface.close_window_with_class(WindowClass::PartyInvite);
+                }
+                InputEvent::AcceptPartyInvite { party_id } => {
+                    let _ = self.networking_system.accept_party_invite(party_id);
+                    self.interface.close_window_with_class(WindowClass::PartyInvite);
+                }
+                InputEvent::LeaveParty => {
+                    let _ = self.networking_system.leave_party();
+                }
+                InputEvent::ExpelPartyMember { account_id, player_name } => {
+                    let _ = self.networking_system.expel_party_member(account_id, player_name);
                 }
                 InputEvent::BuyItems { items } => {
                     let _ = self.networking_system.purchase_items(items);
@@ -3924,6 +4069,36 @@ impl<'a, 'm: 'a> MapRenderContext<'a, 'm> {
                 self.client_state.follow(client_state().world_theme()),
                 self.screen_size,
             );
+        }
+
+        {
+            let party_members = self.client_state.follow(client_state().party_members());
+
+            if !party_members.is_empty() {
+                #[cfg(feature = "debug")]
+                profile_block!("render party member status");
+
+                let own_entity_id = self.client_state.try_follow(this_entity()).map(|entity| entity.get_entity_id());
+
+                for entity in self.client_state.follow(client_state().entities()).iter() {
+                    // The health bar of the local player is already rendered above.
+                    if Some(entity.get_entity_id()) == own_entity_id {
+                        continue;
+                    }
+
+                    if let Some(member) = party_members.iter().find(|member| member.account_id.0 == entity.get_entity_id().0) {
+                        entity.render_party_status(
+                            self.middle_interface_renderer,
+                            self.current_camera,
+                            self.client_state.follow(client_state().world_theme()),
+                            self.screen_size,
+                            &member.name,
+                            member.health_points,
+                            member.maximum_health_points,
+                        );
+                    }
+                }
+            }
         }
 
         if let Some(BufferedAction::AttackEntity { entity_id }) = self.buffered_action

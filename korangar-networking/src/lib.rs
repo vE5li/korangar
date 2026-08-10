@@ -855,6 +855,46 @@ where
         }
     }
 
+    pub fn create_party(&mut self, party_name: String) -> Result<(), NotConnectedError> {
+        match self.map_server_packet_version()? {
+            SupportedPacketVersion::_20220406 => self.send_map_server_packet(CreatePartyPacket::new(party_name, 0, 0)),
+        }
+    }
+
+    pub fn invite_player_to_party(&mut self, player_name: String) -> Result<(), NotConnectedError> {
+        match self.map_server_packet_version()? {
+            SupportedPacketVersion::_20220406 => self.send_map_server_packet(InvitePlayerToPartyPacket::new(player_name)),
+        }
+    }
+
+    pub fn reject_party_invite(&mut self, party_id: PartyId) -> Result<(), NotConnectedError> {
+        match self.map_server_packet_version()? {
+            SupportedPacketVersion::_20220406 => {
+                self.send_map_server_packet(PartyInviteResponsePacket::new(party_id, PartyInviteResponse::Reject))
+            }
+        }
+    }
+
+    pub fn accept_party_invite(&mut self, party_id: PartyId) -> Result<(), NotConnectedError> {
+        match self.map_server_packet_version()? {
+            SupportedPacketVersion::_20220406 => {
+                self.send_map_server_packet(PartyInviteResponsePacket::new(party_id, PartyInviteResponse::Accept))
+            }
+        }
+    }
+
+    pub fn leave_party(&mut self) -> Result<(), NotConnectedError> {
+        match self.map_server_packet_version()? {
+            SupportedPacketVersion::_20220406 => self.send_map_server_packet(LeavePartyPacket::new()),
+        }
+    }
+
+    pub fn expel_party_member(&mut self, account_id: AccountId, player_name: String) -> Result<(), NotConnectedError> {
+        match self.map_server_packet_version()? {
+            SupportedPacketVersion::_20220406 => self.send_map_server_packet(RemovePartyMemberPacket::new(account_id, player_name)),
+        }
+    }
+
     pub fn set_hotkey_data(&mut self, tab: HotbarTab, index: HotbarSlot, hotkey_data: HotkeyData) -> Result<(), NotConnectedError> {
         match self.map_server_packet_version()? {
             SupportedPacketVersion::_20220406 => self.send_map_server_packet(SetHotkeyData2Packet::new(tab, index, hotkey_data)),

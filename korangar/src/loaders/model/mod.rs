@@ -182,7 +182,7 @@ impl ModelLoader {
     }
 
     fn calculate_centroid(vertices: &[NativeModelVertex]) -> Point3<f32> {
-        let sum = vertices.iter().fold(Vector3::new(0.0, 0.0, 0.0), |accumulator, vertex| {
+        let sum = vertices.iter().fold(Vector3::zero(), |accumulator, vertex| {
             accumulator + vertex.position.to_vec()
         });
         Point3::from_vec(sum / vertices.len() as f32)

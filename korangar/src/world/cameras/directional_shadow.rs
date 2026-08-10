@@ -6,8 +6,8 @@ use crate::graphics::{
     DirectionalLightPartitionInstruction, DirectionalShadowPartition, PARTITION_COUNT, ScreenSize, orthographic_reverse_lh,
 };
 
-const ORIGIN: Point3<f32> = Point3::new(0.0, 0.0, 0.0);
-const LOOK_UP: Vector3<f32> = Vector3::new(0.0, 1.0, 0.0);
+const ORIGIN: Point3<f32> = Point3::origin();
+const LOOK_UP: Vector3<f32> = Vector3::unit_y();
 
 const CAMERA_NEAR_PLANE: f32 = 0.1;
 const CAMERA_FAR_PLANE: f32 = 1000.0;

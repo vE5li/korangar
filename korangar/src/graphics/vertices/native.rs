@@ -38,9 +38,9 @@ impl NativeModelVertex {
 
     pub const fn zeroed() -> NativeModelVertex {
         NativeModelVertex {
-            position: Point3::new(0.0, 0.0, 0.0),
-            normal: Vector3::new(0.0, 0.0, 0.0),
-            texture_coordinates: Vector2::new(0.0, 0.0),
+            position: Point3::origin(),
+            normal: Vector3::zero(),
+            texture_coordinates: Vector2::zero(),
             texture_index: 0,
             color: Color::rgba(0.0, 0.0, 0.0, 0.0),
             wind_affinity: 0.0,

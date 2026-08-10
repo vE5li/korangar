@@ -10,7 +10,7 @@ const DEFAULT_ANGLE: f32 = 180_f32.to_radians();
 const CAMERA_PITCH: Deg<f32> = Deg(-55.0);
 const VERTICAL_FOV: Deg<f32> = Deg(15.5);
 const THRESHOLD: f32 = 0.01;
-const LOOK_UP: Vector3<f32> = Vector3::new(0.0, 1.0, 0.0);
+const LOOK_UP: Vector3<f32> = Vector3::unit_y();
 
 const ROTATION_SPEED_THRESHOLD: f32 = 0.02;
 const ZOOM_SPEED_THRESHOLD: f32 = 20.0;

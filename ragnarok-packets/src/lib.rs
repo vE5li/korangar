@@ -267,10 +267,7 @@ pub struct LoginServerLoginSuccessPacket {
     pub ip_address: u32,
     /// Deprecated and always 0 on rAthena
     #[new_default]
-    pub name: [u8; 24],
-    /// Always 0 on rAthena
-    #[new_default]
-    pub unknown: u16,
+    pub last_login: [u8; 26],
     pub sex: Sex,
     pub auth_token: AuthToken,
     #[repeating_remaining]
@@ -283,16 +280,15 @@ pub struct LoginServerLoginSuccessPacket {
 #[derive(Debug, Clone, Packet, ServerPacket, CharacterServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x082D)]
+#[variable_length]
 pub struct CharacterServerLoginSuccessPacket {
-    /// Always 29 on rAthena
-    pub unknown: u16,
     pub normal_slot_count: u8,
     pub vip_slot_count: u8,
     pub billing_slot_count: u8,
     pub producible_slot_count: u8,
     pub valid_slot: u8,
-    #[new_default]
-    pub unused: [u8; 20],
+    #[length_remaining]
+    pub extension: String,
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket, CharacterServer)]
@@ -304,7 +300,7 @@ pub struct CharacterListPacket {
     pub available_slot_count: u8,
     pub vip_slot_count: u8,
     #[new_default]
-    pub unknown: [u8; 20],
+    pub extension: [u8; 20],
     #[repeating_remaining]
     pub character_information: Vec<CharacterInformation>,
 }
@@ -345,10 +341,9 @@ pub struct LoginPincodePacket {
 #[derive(Debug, Clone, Packet, ServerPacket, CharacterServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x0B18)]
-pub struct Packet0b18 {
-    /// Possibly inventory related
+pub struct InventoryExpansionInfoPacket {
     #[new_default]
-    pub unknown: u16,
+    pub expansion_size: u16,
 }
 
 #[derive(Debug, Clone, ByteConvertable)]
@@ -380,8 +375,7 @@ pub struct MapServerLoginSuccessPacket {
     pub client_tick: ClientTick,
     pub position: WorldPosition,
     /// Always [5, 5] on rAthena
-    #[new_default]
-    pub ignored: [u8; 2],
+    pub position_size: [u8; 2],
     pub font: u16,
 }
 
@@ -407,9 +401,17 @@ pub struct LoginFailedPacket {
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x0840)]
 #[variable_length]
-pub struct MapServerUnavailablePacket {
-    #[length_remaining]
-    pub unknown: String,
+pub struct MapAvailabilityPacket {
+    #[repeating_remaining]
+    pub map_availability_information: Vec<MapAvailabilityInformation>,
+}
+
+#[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub struct MapAvailabilityInformation {
+    pub status: i32,
+    #[length(16)]
+    pub map_filename: String,
 }
 
 #[derive(Debug, Clone, ByteConvertable)]
@@ -484,7 +486,7 @@ pub struct CharacterSelectionSuccessPacket {
     pub map_server_port: u16,
     // NOTE: Could be `new_default` but Rust doesn't implement `[u8; 128]: Default`.
     #[new_value([0; 128])]
-    pub unknown: [u8; 128],
+    pub map_server_domain: [u8; 128],
 }
 
 #[derive(Debug, Clone, ByteConvertable)]
@@ -1705,10 +1707,10 @@ pub enum SwitchCharacterSlotResponseStatus {
 #[derive(Debug, Clone, Packet, ServerPacket, CharacterServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x0B70)]
+#[variable_length]
 pub struct SwitchCharacterSlotResponsePacket {
-    #[new_default]
-    pub unknown: u16, // is always 8 ?
     pub status: SwitchCharacterSlotResponseStatus,
+    #[length_remaining]
     pub remaining_moves: u16,
 }
 

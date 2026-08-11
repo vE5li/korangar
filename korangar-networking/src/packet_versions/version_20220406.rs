@@ -127,7 +127,7 @@ where
     packet_handler.register_noop::<CharacterSlotPagePacket>()?;
     packet_handler.register_noop::<CharacterBanListPacket>()?;
     packet_handler.register_noop::<LoginPincodePacket>()?;
-    packet_handler.register_noop::<Packet0b18>()?;
+    packet_handler.register_noop::<InventoryExpansionInfoPacket>()?;
     packet_handler.register(|packet: CharacterSelectionSuccessPacket| {
         let login_data = CharacterServerLoginData {
             server_ip: IpAddr::V4(packet.map_server_ip.into()),
@@ -147,7 +147,10 @@ where
 
         NetworkEvent::CharacterSelectionFailed { reason, message }
     })?;
-    packet_handler.register(|_: MapServerUnavailablePacket| {
+    // TODO: This packet should render a window so the user can select which map he
+    // wants to connect. This is commonly used by the AEGIS server, which has
+    // support for multiple Zone Servers.
+    packet_handler.register(|_: MapAvailabilityPacket| {
         let reason = UnifiedCharacterSelectionFailedReason::MapServerUnavailable;
         let message = "Map server currently unavailable";
 
@@ -763,7 +766,7 @@ where
         _ => None,
     })?;
     packet_handler.register_noop::<Packet8302>()?;
-    packet_handler.register_noop::<Packet0b18>()?;
+    packet_handler.register_noop::<InventoryExpansionInfoPacket>()?;
     packet_handler.register_noop::<ConnectionRefusedPacket>()?;
     packet_handler.register(|packet: MapServerLoginSuccessPacket| NetworkEvent::UpdateClientTick {
         client_tick: packet.client_tick,

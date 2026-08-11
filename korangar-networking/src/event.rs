@@ -135,6 +135,13 @@ pub enum NetworkEvent {
         text: String,
         color: MessageColor,
     },
+    /// A skill use was rejected by the map server.
+    SkillUseRejected {
+        skill_id: SkillId,
+        detail: i32,
+        item_id: ItemId,
+        cause: SkillUseFailureCode,
+    },
     CharacterSlotSwitched,
     CharacterSlotSwitchFailed,
     /// Update entity details. Mostly received when the client sends
@@ -155,6 +162,34 @@ pub enum NetworkEvent {
         damage_amount: Option<usize>,
         attack_duration: u32,
         is_critical: bool,
+    },
+    /// An entity started casting a skill.
+    EntityStartCasting {
+        entity_id: EntityId,
+        /// Cast duration in milliseconds.
+        cast_time: u32,
+    },
+    /// The server cancelled an entity's active skill cast.
+    EntityCancelCasting {
+        entity_id: EntityId,
+    },
+    /// A skill hit resolved.
+    ///
+    /// Signed protocol fields are retained because the server uses negative
+    /// values as display controls and sentinels. This stays separate from
+    /// [`NetworkEvent::DamageEffect`] so skill hits cannot advance normal
+    /// auto-attacks or replace sprite animations.
+    SkillDamage {
+        skill_id: SkillId,
+        source_entity_id: EntityId,
+        destination_entity_id: EntityId,
+        start_time: ClientTick,
+        source_motion: i32,
+        target_motion: i32,
+        damage: i32,
+        skill_level: i16,
+        hit_count: i16,
+        action: i8,
     },
     EntityPickUpItem {
         entity_id: EntityId,

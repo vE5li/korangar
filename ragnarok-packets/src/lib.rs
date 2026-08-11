@@ -124,6 +124,39 @@ pub struct EntityId(pub u32);
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct SkillId(pub u16);
 
+/// rAthena's `useskill_fail_cause`.
+///
+/// This remains a newtype instead of an enum so packets containing newer,
+/// unknown failure codes can still be decoded and inspected.
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub struct SkillUseFailureCode(pub u8);
+
+impl SkillUseFailureCode {
+    pub const COOLDOWN: Self = Self(4);
+    pub const FAILED: Self = Self(10);
+    pub const GENERIC: Self = Self(0);
+    pub const INVALID_DIRECTION: Self = Self(18);
+    pub const INVALID_POSITION: Self = Self(26);
+    pub const INVALID_TARGET: Self = Self(11);
+    pub const MISSING_ITEMS: Self = Self(3);
+    pub const NEED_AMMUNITION: Self = Self(84);
+    pub const NEED_BLUE_GEMSTONE: Self = Self(8);
+    pub const NEED_COINS: Self = Self(85);
+    pub const NEED_COMBO_SKILL: Self = Self(73);
+    pub const NEED_EQUIPMENT: Self = Self(72);
+    pub const NEED_HOLY_WATER: Self = Self(13);
+    pub const NEED_ITEM: Self = Self(71);
+    pub const NEED_OTHER_SKILL: Self = Self(16);
+    pub const NEED_RED_GEMSTONE: Self = Self(7);
+    pub const NEED_SPIRITS: Self = Self(74);
+    pub const NOT_ENOUGH_HP: Self = Self(2);
+    pub const NOT_ENOUGH_MONEY: Self = Self(5);
+    pub const NOT_ENOUGH_SP: Self = Self(1);
+    pub const OVERWEIGHT: Self = Self(9);
+    pub const WRONG_WEAPON: Self = Self(6);
+}
+
 #[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct SkillLevel(pub u16);
@@ -3208,6 +3241,7 @@ pub struct DisplaySkillCooldownPacket {
     pub until: ClientTick,
 }
 
+/// `ZC_NOTIFY_SKILL`, sent when a skill hit resolves.
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x01DE)]
@@ -3216,12 +3250,65 @@ pub struct DisplaySkillEffectAndDamagePacket {
     pub source_entity_id: EntityId,
     pub destination_entity_id: EntityId,
     pub start_time: ClientTick,
-    pub soruce_delay: u32,
-    pub destination_delay: u32,
-    pub damage: u32,
-    pub level: SkillLevel,
-    pub div: u16,
-    pub skill_type: u8,
+    pub source_motion: i32,
+    pub target_motion: i32,
+    /// Negative values are server-side display sentinels and must not be
+    /// interpreted as damage amounts.
+    pub damage: i32,
+    pub skill_level: i16,
+    pub hit_count: i16,
+    pub action: i8,
+}
+
+#[cfg(test)]
+mod skill_damage_packet_tests {
+    use super::*;
+
+    #[test]
+    fn skill_damage_packet_preserves_signed_wire_fields() {
+        let expected = [
+            0xDE, 0x01, // header
+            0x34, 0x12, // skill id
+            0x04, 0x03, 0x02, 0x01, // source entity
+            0x08, 0x07, 0x06, 0x05, // destination entity
+            0x0D, 0x0C, 0x0B, 0x0A, // start tick
+            0xFE, 0xFF, 0xFF, 0xFF, // source motion: -2
+            0xFD, 0xFF, 0xFF, 0xFF, // target motion: -3
+            0xD0, 0x8A, 0xFF, 0xFF, // damage sentinel: -30000
+            0xFE, 0xFF, // skill level: -2
+            0xFC, 0xFF, // hit count: -4
+            0x0E, // action: 14
+        ];
+        let packet = DisplaySkillEffectAndDamagePacket {
+            skill_id: SkillId(0x1234),
+            source_entity_id: EntityId(0x0102_0304),
+            destination_entity_id: EntityId(0x0506_0708),
+            start_time: ClientTick(0x0A0B_0C0D),
+            source_motion: -2,
+            target_motion: -3,
+            damage: -30000,
+            skill_level: -2,
+            hit_count: -4,
+            action: 14,
+        };
+
+        let mut writer = ByteWriter::new();
+        assert_eq!(packet.packet_to_bytes(&mut writer).unwrap(), expected.len());
+        assert_eq!(writer.as_slice(), expected);
+
+        let mut reader = ByteReader::without_metadata(&expected);
+        let decoded = DisplaySkillEffectAndDamagePacket::packet_from_bytes(&mut reader).unwrap();
+        assert_eq!(decoded.skill_id, packet.skill_id);
+        assert_eq!(decoded.source_entity_id, packet.source_entity_id);
+        assert_eq!(decoded.destination_entity_id, packet.destination_entity_id);
+        assert_eq!(decoded.start_time.0, packet.start_time.0);
+        assert_eq!(decoded.source_motion, packet.source_motion);
+        assert_eq!(decoded.target_motion, packet.target_motion);
+        assert_eq!(decoded.damage, packet.damage);
+        assert_eq!(decoded.skill_level, packet.skill_level);
+        assert_eq!(decoded.hit_count, packet.hit_count);
+        assert_eq!(decoded.action, packet.action);
+    }
 }
 
 #[derive(Debug, Clone, ByteConvertable)]
@@ -3878,9 +3965,21 @@ pub struct EndUseSkillPacket {
     pub skill_id: SkillId,
 }
 
+/// `ZC_DISPEL`, sent when an entity's skill cast is cancelled.
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
-#[header(0x07FB)]
+#[header(0x01B9)]
+pub struct CancelSkillCastPacket {
+    pub entity_id: EntityId,
+}
+
+/// Modern `ZC_USESKILL_ACK` sent when an entity starts casting a skill.
+///
+/// This is the `PACKETVER >= 20181212` layout used by packet version
+/// 20220406. `delay_time` is the cast time in milliseconds.
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0B1A)]
 pub struct UseSkillSuccessPacket {
     pub source_entity: EntityId,
     pub destination_entity: EntityId,
@@ -3889,17 +3988,124 @@ pub struct UseSkillSuccessPacket {
     pub element: u32,
     pub delay_time: u32,
     pub disposable: u8,
+    pub attack_motion: u32,
 }
 
+/// Modern `ZC_ACK_TOUSESKILL` result for a requested skill use.
+///
+/// This is the 14-byte layout used since the 2018 packet versions.
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x0110)]
 pub struct ToUseSkillSuccessPacket {
     pub skill_id: SkillId,
-    pub btype: i32,
+    /// Failure-specific detail. For example, a required item quantity or
+    /// prerequisite skill id.
+    pub detail: i32,
     pub item_id: ItemId,
+    /// Zero when the skill was rejected; nonzero for a successful
+    /// acknowledgement.
     pub flag: u8,
-    pub cause: u8,
+    pub cause: SkillUseFailureCode,
+}
+
+#[cfg(test)]
+mod skill_use_result_packet_tests {
+    use super::*;
+
+    #[test]
+    fn modern_skill_rejection_has_exact_wire_layout() {
+        let expected = [
+            0x10, 0x01, // header
+            0x34, 0x12, // skill id
+            0xFE, 0xFF, 0xFF, 0xFF, // signed detail: -2
+            0xEF, 0xCD, 0xAB, 0x89, // item id
+            0x00, // rejected
+            0x47, // required item
+        ];
+        let packet = ToUseSkillSuccessPacket {
+            skill_id: SkillId(0x1234),
+            detail: -2,
+            item_id: ItemId(0x89AB_CDEF),
+            flag: 0,
+            cause: SkillUseFailureCode::NEED_ITEM,
+        };
+
+        let mut writer = ByteWriter::new();
+        assert_eq!(packet.packet_to_bytes(&mut writer).unwrap(), expected.len());
+        assert_eq!(writer.as_slice(), expected);
+
+        let mut reader = ByteReader::without_metadata(&expected);
+        let decoded = ToUseSkillSuccessPacket::packet_from_bytes(&mut reader).unwrap();
+        assert_eq!(decoded.skill_id, packet.skill_id);
+        assert_eq!(decoded.detail, packet.detail);
+        assert_eq!(decoded.item_id, packet.item_id);
+        assert_eq!(decoded.flag, packet.flag);
+        assert_eq!(decoded.cause, packet.cause);
+    }
+}
+
+#[cfg(test)]
+mod skill_cast_packet_tests {
+    use super::*;
+
+    #[test]
+    fn modern_skill_cast_acknowledgement_has_exact_wire_layout() {
+        let packet = UseSkillSuccessPacket {
+            source_entity: EntityId(0x0102_0304),
+            destination_entity: EntityId(0x0506_0708),
+            position: TilePosition { x: 0x1112, y: 0x1314 },
+            skill_id: SkillId(0x1516),
+            element: 0x1718_191A,
+            delay_time: 0x1B1C_1D1E,
+            disposable: 0x1F,
+            attack_motion: 0x2021_2223,
+        };
+
+        let expected = [
+            0x1A, 0x0B, // header
+            0x04, 0x03, 0x02, 0x01, // source entity
+            0x08, 0x07, 0x06, 0x05, // destination entity
+            0x12, 0x11, // x
+            0x14, 0x13, // y
+            0x16, 0x15, // skill id
+            0x1A, 0x19, 0x18, 0x17, // element
+            0x1E, 0x1D, 0x1C, 0x1B, // cast delay
+            0x1F, // disposable
+            0x23, 0x22, 0x21, 0x20, // attack motion
+        ];
+
+        let mut writer = ByteWriter::new();
+        assert_eq!(packet.packet_to_bytes(&mut writer).unwrap(), expected.len());
+        assert_eq!(writer.as_slice(), expected);
+
+        let mut reader = ByteReader::without_metadata(&expected);
+        let decoded = UseSkillSuccessPacket::packet_from_bytes(&mut reader).unwrap();
+        assert_eq!(decoded.source_entity, packet.source_entity);
+        assert_eq!(decoded.destination_entity, packet.destination_entity);
+        assert_eq!(decoded.position, packet.position);
+        assert_eq!(decoded.skill_id, packet.skill_id);
+        assert_eq!(decoded.element, packet.element);
+        assert_eq!(decoded.delay_time, packet.delay_time);
+        assert_eq!(decoded.disposable, packet.disposable);
+        assert_eq!(decoded.attack_motion, packet.attack_motion);
+    }
+
+    #[test]
+    fn cancelled_skill_cast_has_exact_wire_layout() {
+        let packet = CancelSkillCastPacket {
+            entity_id: EntityId(0x0102_0304),
+        };
+        let expected = [0xB9, 0x01, 0x04, 0x03, 0x02, 0x01];
+
+        let mut writer = ByteWriter::new();
+        assert_eq!(packet.packet_to_bytes(&mut writer).unwrap(), expected.len());
+        assert_eq!(writer.as_slice(), expected);
+
+        let mut reader = ByteReader::without_metadata(&expected);
+        let decoded = CancelSkillCastPacket::packet_from_bytes(&mut reader).unwrap();
+        assert_eq!(decoded.entity_id, packet.entity_id);
+    }
 }
 
 #[derive(Debug, Clone, ByteConvertable)]

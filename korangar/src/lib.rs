@@ -44,6 +44,7 @@ mod world;
 
 use std::io::Cursor;
 use std::net::{SocketAddr, ToSocketAddrs};
+use std::num::NonZeroU32;
 use std::ops::Deref;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
@@ -69,8 +70,8 @@ use networking::{PacketHistory, PacketHistoryCallback};
 #[cfg(not(feature = "debug"))]
 use ragnarok_packets::handler::NoPacketCallback;
 use ragnarok_packets::{
-    AttackRange, BuyShopItemsResult, CharacterServerInformation, ClientTick, Direction, DisappearanceReason, HotbarSlot, SellItemsResult,
-    SkillId, SkillLevel, SkillType, TilePosition, UnitId, WorldPosition,
+    AttackRange, BuyShopItemsResult, CharacterServerInformation, ClientTick, Direction, DisappearanceReason, EntityId, HotbarSlot,
+    SellItemsResult, SkillId, SkillLevel, SkillType, SkillUseFailureCode, TilePosition, UnitId, WorldPosition,
 };
 use renderer::InterfaceRenderer;
 use rust_state::{ManuallyAssertExt, State};
@@ -102,7 +103,7 @@ use winit::keyboard::PhysicalKey;
 use winit::window::{Icon, Window, WindowId};
 
 use crate::graphics::*;
-use crate::input::{InputEvent, InputReport, InputSystem};
+use crate::input::{InputEvent, InputReport, InputSystem, SkillActivation, SkillCastTarget};
 use crate::interface::cursor::{MouseCursor, MouseCursorState};
 use crate::interface::resource::{ItemSource, SkillSource};
 use crate::interface::windows::*;
@@ -132,6 +133,96 @@ const ITEM_PICKUP_RANGE: AttackRange = AttackRange(1);
 // through the graphics settings. For now I just chose an arbitrary smaller
 // number that should be playable on most devices.
 const NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS: usize = 6;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ArmedSkill {
+    skill_id: SkillId,
+    skill_level: SkillLevel,
+    skill_type: SkillType,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ActiveContinuousSkill {
+    skill_id: SkillId,
+    held_by: Option<HotbarSlot>,
+}
+
+fn is_skill_target_confirmation(mouse_button: MouseButton) -> bool {
+    matches!(mouse_button, MouseButton::Left | MouseButton::DoubleLeft)
+}
+
+fn is_skill_target_cancellation(mouse_button: MouseButton) -> bool {
+    matches!(mouse_button, MouseButton::Right | MouseButton::DoubleRight)
+}
+
+fn resolve_skill_cast_target(
+    skill_type: SkillType,
+    picker_target: PickerTarget,
+    player_entity_id: Option<EntityId>,
+    entity_position: impl Fn(EntityId) -> Option<TilePosition>,
+    ground_item_position: impl Fn(EntityId) -> Option<TilePosition>,
+) -> Option<SkillCastTarget> {
+    match skill_type {
+        SkillType::Attack => match picker_target {
+            PickerTarget::Entity(entity_id) if entity_position(entity_id).is_some() => Some(SkillCastTarget::Entity(entity_id)),
+            _ => None,
+        },
+        SkillType::Support => match picker_target {
+            PickerTarget::Entity(entity_id) if entity_position(entity_id).is_some() => Some(SkillCastTarget::Entity(entity_id)),
+            PickerTarget::Nothing | PickerTarget::Tile { .. } => player_entity_id.map(SkillCastTarget::Entity),
+            _ => None,
+        },
+        SkillType::Ground | SkillType::Trap => match picker_target {
+            PickerTarget::Tile { x, y } => Some(SkillCastTarget::Ground(TilePosition { x, y })),
+            PickerTarget::Entity(entity_id) => entity_position(entity_id)
+                .or_else(|| ground_item_position(entity_id))
+                .map(SkillCastTarget::Ground),
+            _ => None,
+        },
+        SkillType::Passive | SkillType::SelfCast => None,
+    }
+}
+
+fn take_resolved_armed_skill(
+    armed_skill: &mut Option<ArmedSkill>,
+    resolved_target: Option<SkillCastTarget>,
+) -> Option<(ArmedSkill, SkillCastTarget)> {
+    let resolved_target = resolved_target?;
+    armed_skill.take().map(|armed_skill| (armed_skill, resolved_target))
+}
+
+fn activate_continuous_skill(
+    active_skill: &mut Option<ActiveContinuousSkill>,
+    skill_id: SkillId,
+    activation: SkillActivation,
+    source_slot: Option<HotbarSlot>,
+) -> (Option<SkillId>, bool) {
+    if activation == SkillActivation::Toggle
+        && active_skill.is_some_and(|active_skill| active_skill.skill_id == skill_id && active_skill.held_by.is_none())
+    {
+        return (active_skill.take().map(|active_skill| active_skill.skill_id), false);
+    }
+
+    let stopped_skill_id = active_skill.take().map(|active_skill| active_skill.skill_id);
+    let held_by = match activation {
+        SkillActivation::Hold => {
+            debug_assert!(source_slot.is_some());
+            source_slot
+        }
+        SkillActivation::Toggle => None,
+    };
+
+    *active_skill = Some(ActiveContinuousSkill { skill_id, held_by });
+
+    (stopped_skill_id, true)
+}
+
+fn release_continuous_skill(active_skill: &mut Option<ActiveContinuousSkill>, slot: HotbarSlot) -> Option<SkillId> {
+    match active_skill.is_some_and(|active_skill| active_skill.held_by == Some(slot)) {
+        true => active_skill.take().map(|active_skill| active_skill.skill_id),
+        false => None,
+    }
+}
 
 const INITIAL_SCREEN_SIZE: ScreenSize = ScreenSize {
     width: 1280.0,
@@ -233,6 +324,8 @@ pub struct Client {
 
     input_event_buffer: Vec<InputEvent>,
     network_event_buffer: NetworkEventBuffer,
+    armed_skill: Option<ArmedSkill>,
+    active_continuous_skill: Option<ActiveContinuousSkill>,
     // TODO: Move or remove this.
     saved_login_data: Option<LoginServerLoginData>,
     // TODO: Move or remove this.
@@ -691,6 +784,8 @@ impl Client {
             point_shadow_camera,
             input_event_buffer,
             network_event_buffer,
+            armed_skill: None,
+            active_continuous_skill: None,
             saved_login_data,
             saved_character_server,
             saved_login_server_address,
@@ -912,7 +1007,9 @@ impl Client {
     fn handle_network_events(&mut self, client_tick: ClientTick) {
         self.networking_system.get_events(&mut self.network_event_buffer);
 
-        for event in self.network_event_buffer.drain() {
+        let events: Vec<NetworkEvent> = self.network_event_buffer.drain().collect();
+
+        for event in events {
             match event {
                 NetworkEvent::LoginServerConnected {
                     character_servers,
@@ -1006,6 +1103,8 @@ impl Client {
                     }
                 }
                 NetworkEvent::MapServerDisconnected { reason } => {
+                    self.clear_skill_cast_state();
+
                     if reason != DisconnectReason::ClosedByClient {
                         // TODO: Make this an on-screen popup.
                         #[cfg(feature = "debug")]
@@ -1075,6 +1174,27 @@ impl Client {
                         .find(|entity| entity.get_entity_id() == entity_id)
                     {
                         entity.set_idle(client_tick);
+                    }
+                }
+                NetworkEvent::EntityStartCasting { entity_id, cast_time } => {
+                    if let Some(cast_time) = NonZeroU32::new(cast_time)
+                        && let Some(entity) = self
+                            .client_state
+                            .follow_mut(client_state().entities())
+                            .iter_mut()
+                            .find(|entity| entity.get_entity_id() == entity_id)
+                    {
+                        entity.set_casting(cast_time, client_tick);
+                    }
+                }
+                NetworkEvent::EntityCancelCasting { entity_id } => {
+                    if let Some(entity) = self
+                        .client_state
+                        .follow_mut(client_state().entities())
+                        .iter_mut()
+                        .find(|entity| entity.get_entity_id() == entity_id)
+                    {
+                        entity.cancel_casting(client_tick);
                     }
                 }
                 NetworkEvent::DisplayEmotion { entity_id, emotion } => {
@@ -1404,6 +1524,9 @@ impl Client {
                     }
                 }
                 NetworkEvent::ChangeMap { map_name, position } => {
+                    self.armed_skill = None;
+                    self.stop_active_continuous_skill();
+                    self.input_system.clear_hotbar_key_ownership();
                     self.map = None;
                     self.particle_holder.clear();
                     self.effect_holder.clear();
@@ -1411,7 +1534,11 @@ impl Client {
                     self.audio_engine.clear_ambient_sound();
 
                     // Only the player must stay alive between map changes.
-                    self.client_state.follow_mut(client_state().entities()).truncate(1);
+                    let entities = self.client_state.follow_mut(client_state().entities());
+                    if let Some(player) = entities.first_mut() {
+                        player.cancel_casting(client_tick);
+                    }
+                    entities.truncate(1);
                     self.client_state.follow_mut(client_state().dead_entities()).clear();
                     self.client_state.follow_mut(client_state().ground_items()).clear();
                     *self.client_state.follow_mut(client_state().buffered_action()) = None;
@@ -1428,6 +1555,34 @@ impl Client {
                     self.client_state
                         .follow_mut(client_state().chat_messages())
                         .push(ChatMessage::new(text, color));
+                }
+                NetworkEvent::SkillUseRejected {
+                    skill_id,
+                    detail,
+                    item_id,
+                    cause,
+                } => {
+                    let item_name = (item_id.0 != 0
+                        && matches!(cause, SkillUseFailureCode::NEED_ITEM | SkillUseFailureCode::NEED_EQUIPMENT))
+                    .then(|| {
+                        self.library
+                            .get::<ItemName>(ItemNameKey {
+                                item_id,
+                                is_identified: true,
+                            })
+                            .to_string()
+                    })
+                    .filter(|name| name != "NOTFOUND");
+                    let message = self.client_state.follow(client_state().localization()).skill_use_failure_message(
+                        skill_id,
+                        detail,
+                        item_id,
+                        item_name.as_deref(),
+                        cause,
+                    );
+                    self.client_state
+                        .follow_mut(client_state().chat_messages())
+                        .push(ChatMessage::new(message, MessageColor::Error));
                 }
                 NetworkEvent::UpdateEntityDetails { entity_id, name } => {
                     let entity = self
@@ -1499,6 +1654,41 @@ impl Client {
                         };
 
                         self.particle_holder.spawn_particle(particle);
+                    }
+                }
+                NetworkEvent::SkillDamage {
+                    destination_entity_id,
+                    damage,
+                    action,
+                    ..
+                } => {
+                    // Skill hits intentionally provide number feedback only.
+                    // Normal DamageEffect also drives auto-attacks and sprite
+                    // actions, which must not be triggered by this packet.
+                    if let Some(entity) = self
+                        .client_state
+                        .follow(client_state().entities())
+                        .iter()
+                        .find(|entity| entity.get_entity_id() == destination_entity_id)
+                        .or_else(|| {
+                            self.client_state
+                                .try_follow(this_entity())
+                                .filter(|player| player.get_entity_id() == destination_entity_id)
+                        })
+                    {
+                        let particle: Option<Box<dyn Particle + Send + Sync>> = match SkillDamageDisplay::from_packet(damage, action) {
+                            SkillDamageDisplay::Suppressed => None,
+                            SkillDamageDisplay::Miss => Some(Box::new(Miss::new(entity.get_position()))),
+                            SkillDamageDisplay::Damage { amount, is_critical } => Some(Box::new(DamageNumber::new(
+                                entity.get_position(),
+                                amount.to_string(),
+                                is_critical,
+                            ))),
+                        };
+
+                        if let Some(particle) = particle {
+                            self.particle_holder.spawn_particle(particle);
+                        }
                     }
                 }
                 NetworkEvent::EntityPickUpItem { entity_id, item_entity_id } => {
@@ -1687,6 +1877,7 @@ impl Client {
                     }
                 }
                 NetworkEvent::LoggedOut => {
+                    self.clear_skill_cast_state();
                     self.networking_system.disconnect_from_map_server();
                 }
                 NetworkEvent::FriendRequest { requestee } => {
@@ -1953,6 +2144,23 @@ impl Client {
                     );
                 }
                 NetworkEvent::RemoveSkill { skill_id } => {
+                    let removed_armed_skill = self.armed_skill.is_some_and(|armed_skill| armed_skill.skill_id == skill_id);
+                    let removed_active_skill = self
+                        .active_continuous_skill
+                        .is_some_and(|active_skill| active_skill.skill_id == skill_id);
+
+                    if removed_armed_skill {
+                        self.armed_skill = None;
+                    }
+
+                    if removed_active_skill {
+                        self.active_continuous_skill = None;
+                    }
+
+                    if removed_armed_skill || removed_active_skill {
+                        self.input_system.clear_hotbar_key_ownership();
+                    }
+
                     self.client_state.follow_mut(client_state().skill_tree()).remove_skill(skill_id);
                     self.client_state
                         .follow_mut(client_state().skill_tree_window().chosen_skill_level())
@@ -1960,6 +2168,99 @@ impl Client {
                 }
             }
         }
+    }
+
+    fn clear_skill_cast_state(&mut self) {
+        self.armed_skill = None;
+        self.active_continuous_skill = None;
+        self.input_system.clear_hotbar_key_ownership();
+    }
+
+    fn stop_active_continuous_skill(&mut self) {
+        if let Some(active_skill) = self.active_continuous_skill.take() {
+            let _ = self.networking_system.stop_channeling_skill(active_skill.skill_id);
+        }
+    }
+
+    fn cast_resolved_skill(
+        &mut self,
+        skill_id: SkillId,
+        skill_level: SkillLevel,
+        skill_type: SkillType,
+        activation: SkillActivation,
+        source_slot: Option<HotbarSlot>,
+    ) {
+        self.armed_skill = None;
+
+        if skill_type == SkillType::Passive {
+            return;
+        }
+
+        let Some(player_entity_id) = self.client_state.try_follow(this_entity()).map(Entity::get_entity_id) else {
+            self.stop_active_continuous_skill();
+            return;
+        };
+
+        if skill_type == SkillType::SelfCast && skill_id == ROLLING_CUTTER_ID {
+            let (stopped_skill_id, should_start) =
+                activate_continuous_skill(&mut self.active_continuous_skill, skill_id, activation, source_slot);
+
+            if let Some(stopped_skill_id) = stopped_skill_id {
+                let _ = self.networking_system.stop_channeling_skill(stopped_skill_id);
+            }
+
+            if should_start
+                && self
+                    .networking_system
+                    .cast_channeling_skill(skill_id, skill_level, player_entity_id)
+                    .is_err()
+            {
+                self.active_continuous_skill = None;
+            }
+
+            return;
+        }
+
+        self.stop_active_continuous_skill();
+
+        match skill_type {
+            SkillType::SelfCast => {
+                let _ = self.networking_system.cast_skill(skill_id, skill_level, player_entity_id);
+            }
+            skill_type @ (SkillType::Attack | SkillType::Support | SkillType::Ground | SkillType::Trap) => {
+                self.armed_skill = Some(ArmedSkill {
+                    skill_id,
+                    skill_level,
+                    skill_type,
+                });
+            }
+            SkillType::Passive => unreachable!(),
+        }
+    }
+
+    fn resolve_armed_skill_target(&self, picker_target: PickerTarget) -> Option<SkillCastTarget> {
+        let armed_skill = self.armed_skill?;
+        let player_entity_id = self.client_state.try_follow(this_entity()).map(Entity::get_entity_id);
+
+        resolve_skill_cast_target(
+            armed_skill.skill_type,
+            picker_target,
+            player_entity_id,
+            |entity_id| {
+                self.client_state
+                    .follow(client_state().entities())
+                    .iter()
+                    .find(|entity| entity.get_entity_id() == entity_id)
+                    .map(Entity::get_tile_position)
+            },
+            |entity_id| {
+                self.client_state
+                    .follow(client_state().ground_items())
+                    .iter()
+                    .find(|item| item.get_entity_id() == entity_id)
+                    .map(GroundItem::get_tile_position)
+            },
+        )
     }
 
     /// Returns whether or not the interface is focused.
@@ -1974,6 +2275,11 @@ impl Client {
         self.interface.process_events(&mut self.input_event_buffer);
 
         let interface_has_focus = self.interface.has_focus();
+        let cancelled_armed_skill = self.armed_skill.is_some() && self.input_system.escape_pressed();
+
+        if cancelled_armed_skill {
+            self.armed_skill = None;
+        }
 
         if self.interface.get_mouse_mode().is_rotating_camera() {
             // TODO: Does this really need to be a InputEvent?
@@ -1991,7 +2297,11 @@ impl Client {
             );
         }
 
-        for event in self.input_event_buffer.drain(..) {
+        self.input_system.handle_hotbar_key_releases(&mut self.input_event_buffer);
+
+        let events: Vec<InputEvent> = self.input_event_buffer.drain(..).collect();
+
+        for event in events {
             match event {
                 InputEvent::LogIn {
                     service_id,
@@ -2051,17 +2361,28 @@ impl Client {
                     self.interface.close_window_with_class(WindowClass::Respawn);
                 }
                 InputEvent::LogOut => {
+                    self.armed_skill = None;
+                    self.stop_active_continuous_skill();
+                    self.input_system.clear_hotbar_key_ownership();
                     let _ = self.networking_system.log_out();
                 }
                 InputEvent::LogOutCharacter => {
+                    self.armed_skill = None;
+                    self.stop_active_continuous_skill();
+                    self.input_system.clear_hotbar_key_ownership();
                     self.networking_system.disconnect_from_character_server();
                 }
-                InputEvent::Exit => SHUTDOWN_SIGNAL.store(true, Ordering::SeqCst),
+                InputEvent::Exit => {
+                    self.armed_skill = None;
+                    self.stop_active_continuous_skill();
+                    self.input_system.clear_hotbar_key_ownership();
+                    SHUTDOWN_SIGNAL.store(true, Ordering::SeqCst);
+                }
                 InputEvent::ZoomCamera { zoom_factor } => self.player_camera.soft_zoom(zoom_factor),
                 InputEvent::RotateCamera { rotation } => self.player_camera.soft_rotate(rotation),
                 InputEvent::ResetCameraRotation => self.player_camera.reset_rotation(),
                 InputEvent::ToggleMenuWindow => {
-                    if self.client_state.try_follow(this_entity()).is_some() {
+                    if !cancelled_armed_skill && self.client_state.try_follow(this_entity()).is_some() {
                         match self.interface.is_window_with_class_open(WindowClass::Menu) {
                             true => self.interface.close_window_with_class(WindowClass::Menu),
                             false => self.interface.open_window(MenuWindow),
@@ -2320,9 +2641,13 @@ impl Client {
                     }
                     _ => {}
                 },
-                InputEvent::CastSkill { slot } => {
-                    if let Some(learnable_skill) = self.client_state.follow(client_state().hotbar()).get_skill_in_slot(slot).as_ref()
-                        && let Some(learned_skill) =
+                InputEvent::CastSkill { slot, activation } => {
+                    let skill = self
+                        .client_state
+                        .follow(client_state().hotbar())
+                        .get_skill_in_slot(slot)
+                        .as_ref()
+                        .and_then(|learnable_skill| {
                             self.client_state
                                 .follow(client_state().skill_tree().skills())
                                 .iter()
@@ -2330,66 +2655,64 @@ impl Client {
                                     learned_skill.skill_id == learnable_skill.skill_id
                                         && learned_skill.skill_level.0 >= learnable_skill.maximum_level.0
                                 })
-                    {
-                        match learned_skill.skill_type {
-                            SkillType::Passive => {}
-                            SkillType::Attack => {
-                                if let PickerTarget::Entity(entity_id) = input_report.mouse_target {
-                                    let _ = self.networking_system.cast_skill(
+                                .map(|learned_skill| {
+                                    (
                                         learnable_skill.skill_id,
                                         learnable_skill.maximum_level,
-                                        entity_id,
-                                    );
-                                }
-                            }
-                            SkillType::Ground | SkillType::Trap => {
-                                if let PickerTarget::Tile { x, y } = input_report.mouse_target {
-                                    let _ = self.networking_system.cast_ground_skill(
-                                        learnable_skill.skill_id,
-                                        learnable_skill.maximum_level,
-                                        TilePosition { x, y },
-                                    );
-                                }
-                            }
-                            SkillType::SelfCast => match learnable_skill.skill_id == ROLLING_CUTTER_ID {
-                                true => {
-                                    let _ = self.networking_system.cast_channeling_skill(
-                                        learnable_skill.skill_id,
-                                        learnable_skill.maximum_level,
-                                        self.client_state.follow(this_entity().manually_asserted()).get_entity_id(),
-                                    );
-                                }
-                                false => {
-                                    let _ = self.networking_system.cast_skill(
-                                        learnable_skill.skill_id,
-                                        learnable_skill.maximum_level,
-                                        self.client_state.follow(this_entity().manually_asserted()).get_entity_id(),
-                                    );
-                                }
-                            },
-                            SkillType::Support => {
-                                if let PickerTarget::Entity(entity_id) = input_report.mouse_target {
-                                    let _ = self.networking_system.cast_skill(
-                                        learnable_skill.skill_id,
-                                        learnable_skill.maximum_level,
-                                        entity_id,
-                                    );
-                                } else {
-                                    let _ = self.networking_system.cast_skill(
-                                        learnable_skill.skill_id,
-                                        learnable_skill.maximum_level,
-                                        self.client_state.follow(this_entity().manually_asserted()).get_entity_id(),
-                                    );
-                                }
-                            }
-                        }
+                                        learned_skill.skill_type,
+                                    )
+                                })
+                        });
+
+                    if let Some((skill_id, skill_level, skill_type)) = skill {
+                        self.cast_resolved_skill(skill_id, skill_level, skill_type, activation, Some(slot));
                     }
                 }
+                InputEvent::CastLearnedSkill {
+                    skill_id,
+                    skill_level,
+                    skill_type,
+                    activation,
+                } => {
+                    self.cast_resolved_skill(skill_id, skill_level, skill_type, activation, None);
+                }
+                InputEvent::CastSkillAt {
+                    skill_id,
+                    skill_level,
+                    target,
+                } => match target {
+                    SkillCastTarget::Entity(entity_id) => {
+                        let _ = self.networking_system.cast_skill(skill_id, skill_level, entity_id);
+                    }
+                    SkillCastTarget::Ground(position) => {
+                        let _ = self.networking_system.cast_ground_skill(skill_id, skill_level, position);
+                    }
+                },
                 InputEvent::StopSkill { slot } => {
-                    if let Some(skill) = self.client_state.follow(client_state().hotbar()).get_skill_in_slot(slot).as_ref()
-                        && skill.skill_id == ROLLING_CUTTER_ID
-                    {
-                        let _ = self.networking_system.stop_channeling_skill(skill.skill_id);
+                    if let Some(skill_id) = release_continuous_skill(&mut self.active_continuous_skill, slot) {
+                        let _ = self.networking_system.stop_channeling_skill(skill_id);
+                    }
+                }
+                InputEvent::CycleSkillLevel { slot } => {
+                    let learned_maximum_level = self
+                        .client_state
+                        .follow(client_state().hotbar())
+                        .get_skill_in_slot(slot)
+                        .as_ref()
+                        .and_then(|skill| {
+                            self.client_state
+                                .follow(client_state().skill_tree().skills())
+                                .iter()
+                                .find(|learned_skill| learned_skill.skill_id == skill.skill_id)
+                                .map(|learned_skill| learned_skill.skill_level)
+                        });
+
+                    if let Some(learned_maximum_level) = learned_maximum_level {
+                        self.client_state.follow_mut(client_state().hotbar()).cycle_skill_level(
+                            &mut self.networking_system,
+                            slot,
+                            learned_maximum_level,
+                        );
                     }
                 }
                 InputEvent::AddFriend { character_name } => {
@@ -3153,6 +3476,9 @@ impl Client {
             _ => None,
         };
 
+        let mut armed_skill = self.armed_skill;
+        let armed_skill_target = self.resolve_armed_skill_target(input_report.mouse_target);
+
         let point_light_set = Self::create_point_light_set(
             &mut self.point_light_manager,
             &mut self.point_light_set_buffer,
@@ -3171,6 +3497,7 @@ impl Client {
         let mouse_mode = self.interface.get_mouse_mode();
         let is_mouse_mode_default = mouse_mode.is_default();
         let last_walking_destination = mouse_mode.walk_destination();
+        let mut clear_armed_skill = false;
 
         let mut interface_frame = {
             #[cfg(feature = "debug")]
@@ -3192,6 +3519,7 @@ impl Client {
             let cursor_state = match input_report.mouse_target {
                 _ if is_rotating_camera => MouseCursorState::RotateCamera,
                 _ if is_grabbing => MouseCursorState::GrabResource,
+                _ if armed_skill.is_some() && !is_interface_hovered => MouseCursorState::Attack,
                 PickerTarget::Entity(entity_id) if !is_interface_hovered => {
                     if self
                         .client_state
@@ -3219,8 +3547,23 @@ impl Client {
             self.mouse_cursor.set_state(cursor_state, client_tick);
 
             if let Some(mouse_button) = input_report.mouse_click {
-                if is_interface_hovered {
+                if armed_skill.is_some() && is_skill_target_cancellation(mouse_button) {
+                    interface_frame.unfocus();
+                    armed_skill = None;
+                    clear_armed_skill = true;
+                } else if is_interface_hovered {
                     interface_frame.click(&self.client_state, mouse_button);
+                } else if armed_skill.is_some() && is_skill_target_confirmation(mouse_button) {
+                    interface_frame.unfocus();
+
+                    if let Some((armed_skill, target)) = take_resolved_armed_skill(&mut armed_skill, armed_skill_target) {
+                        self.input_event_buffer.push(InputEvent::CastSkillAt {
+                            skill_id: armed_skill.skill_id,
+                            skill_level: armed_skill.skill_level,
+                            target,
+                        });
+                        clear_armed_skill = true;
+                    }
                 } else {
                     interface_frame.unfocus();
 
@@ -3298,6 +3641,16 @@ impl Client {
             interface_frame
         };
 
+        let is_interface_hovered = interface_frame.is_interface_hovered();
+        let skill_target_highlight = match (is_interface_hovered, armed_skill, input_report.mouse_target, armed_skill_target) {
+            (false, Some(_), PickerTarget::Entity(entity_id), Some(_)) => Some((entity_id, Color::rgb_u8(255, 130, 130))),
+            _ => None,
+        };
+
+        if clear_armed_skill {
+            self.armed_skill = None;
+        }
+
         {
             let mut render_context = MapRenderContext {
                 map: &map,
@@ -3313,8 +3666,9 @@ impl Client {
                 animation_timer_ms,
                 currently_playing,
                 is_mouse_mode_default,
-                is_interface_hovered: interface_frame.is_interface_hovered(),
+                is_interface_hovered,
                 last_walking_destination,
+                skill_target_highlight,
                 buffered_action: *self.client_state.follow(client_state().buffered_action()),
                 #[cfg(feature = "debug")]
                 render_options: &render_options,
@@ -3542,6 +3896,9 @@ impl ApplicationHandler for Client {
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _window_id: WindowId, event: WindowEvent) {
         match event {
             WindowEvent::CloseRequested => {
+                self.armed_skill = None;
+                self.stop_active_continuous_skill();
+                self.input_system.clear_hotbar_key_ownership();
                 event_loop.exit();
             }
             WindowEvent::Resized(screen_size) => {
@@ -3561,6 +3918,9 @@ impl ApplicationHandler for Client {
             }
             WindowEvent::Focused(focused) => {
                 if !focused {
+                    self.armed_skill = None;
+                    self.stop_active_continuous_skill();
+                    self.input_system.clear_hotbar_key_ownership();
                     self.input_system.reset();
                 }
 
@@ -3632,6 +3992,7 @@ struct MapRenderContext<'a, 'm: 'a> {
     is_mouse_mode_default: bool,
     is_interface_hovered: bool,
     last_walking_destination: Option<TilePosition>,
+    skill_target_highlight: Option<(EntityId, Color)>,
     buffered_action: Option<BufferedAction>,
     #[cfg(feature = "debug")]
     render_options: &'a RenderOptions,
@@ -3768,7 +4129,7 @@ impl<'a, 'm: 'a> MapRenderContext<'a, 'm> {
 
             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(self.render_options.show_entities))]
             self.map
-                .render_entities(entity_instructions, entities, &partition_camera, self.client_tick);
+                .render_entities(entity_instructions, entities, &partition_camera, self.client_tick, None);
 
             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(self.render_options.show_entities))]
             self.map
@@ -3850,8 +4211,13 @@ impl<'a, 'm: 'a> MapRenderContext<'a, 'm> {
             .render_ground_items(self.entity_instructions, ground_items, entity_camera, self.client_tick);
 
         #[cfg_attr(feature = "debug", korangar_debug::debug_condition(self.render_options.show_entities))]
-        self.map
-            .render_entities(self.entity_instructions, entities, entity_camera, self.client_tick);
+        self.map.render_entities(
+            self.entity_instructions,
+            entities,
+            entity_camera,
+            self.client_tick,
+            self.skill_target_highlight,
+        );
 
         #[cfg_attr(feature = "debug", korangar_debug::debug_condition(self.render_options.show_entities))]
         self.map
@@ -3914,6 +4280,16 @@ impl<'a, 'm: 'a> MapRenderContext<'a, 'm> {
 
         self.effect_holder.render(self.effect_renderer, self.current_camera);
 
+        let world_theme = self.client_state.follow(client_state().world_theme());
+        for entity in self.client_state.follow(client_state().entities()).iter() {
+            entity.render_cast_bar(
+                self.middle_interface_renderer,
+                self.current_camera,
+                world_theme,
+                self.screen_size,
+            );
+        }
+
         if let Some(player) = self.client_state.try_follow(this_entity()) {
             #[cfg(feature = "debug")]
             profile_block!("render player status");
@@ -3921,7 +4297,7 @@ impl<'a, 'm: 'a> MapRenderContext<'a, 'm> {
             player.render_status(
                 self.middle_interface_renderer,
                 self.current_camera,
-                self.client_state.follow(client_state().world_theme()),
+                world_theme,
                 self.screen_size,
             );
         }
@@ -3936,7 +4312,7 @@ impl<'a, 'm: 'a> MapRenderContext<'a, 'm> {
             entity.render_status(
                 self.middle_interface_renderer,
                 self.current_camera,
-                self.client_state.follow(client_state().world_theme()),
+                world_theme,
                 self.screen_size,
             );
         }
@@ -3972,7 +4348,7 @@ impl<'a, 'm: 'a> MapRenderContext<'a, 'm> {
                             entity.render_status(
                                 self.middle_interface_renderer,
                                 self.current_camera,
-                                self.client_state.follow(client_state().world_theme()),
+                                world_theme,
                                 self.screen_size,
                             );
                         }
@@ -4002,5 +4378,155 @@ impl<'a, 'm: 'a> MapRenderContext<'a, 'm> {
             }
             _ => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod skill_casting_tests {
+    use super::*;
+
+    const PLAYER_ID: EntityId = EntityId(1);
+    const ENTITY_ID: EntityId = EntityId(2);
+    const ITEM_ID: EntityId = EntityId(3);
+    const STALE_ID: EntityId = EntityId(4);
+    const ENTITY_POSITION: TilePosition = TilePosition { x: 10, y: 20 };
+    const ITEM_POSITION: TilePosition = TilePosition { x: 30, y: 40 };
+
+    fn entity_position(entity_id: EntityId) -> Option<TilePosition> {
+        match entity_id {
+            PLAYER_ID => Some(TilePosition { x: 1, y: 1 }),
+            ENTITY_ID => Some(ENTITY_POSITION),
+            _ => None,
+        }
+    }
+
+    fn ground_item_position(entity_id: EntityId) -> Option<TilePosition> {
+        (entity_id == ITEM_ID).then_some(ITEM_POSITION)
+    }
+
+    fn resolve(skill_type: SkillType, picker_target: PickerTarget) -> Option<SkillCastTarget> {
+        resolve_skill_cast_target(
+            skill_type,
+            picker_target,
+            Some(PLAYER_ID),
+            entity_position,
+            ground_item_position,
+        )
+    }
+
+    #[test]
+    fn targeted_skills_only_accept_live_entities() {
+        assert_eq!(
+            resolve(SkillType::Attack, PickerTarget::Entity(ENTITY_ID)),
+            Some(SkillCastTarget::Entity(ENTITY_ID))
+        );
+        assert_eq!(resolve(SkillType::Attack, PickerTarget::Entity(STALE_ID)), None);
+        assert_eq!(resolve(SkillType::Attack, PickerTarget::Tile { x: 5, y: 6 }), None);
+    }
+
+    #[test]
+    fn support_skills_fall_back_to_the_player() {
+        assert_eq!(
+            resolve(SkillType::Support, PickerTarget::Entity(ENTITY_ID)),
+            Some(SkillCastTarget::Entity(ENTITY_ID))
+        );
+        assert_eq!(
+            resolve(SkillType::Support, PickerTarget::Nothing),
+            Some(SkillCastTarget::Entity(PLAYER_ID))
+        );
+        assert_eq!(
+            resolve(SkillType::Support, PickerTarget::Tile { x: 5, y: 6 }),
+            Some(SkillCastTarget::Entity(PLAYER_ID))
+        );
+        assert_eq!(resolve(SkillType::Support, PickerTarget::Entity(ITEM_ID)), None);
+    }
+
+    #[test]
+    fn ground_skills_resolve_tiles_entities_and_ground_items() {
+        assert_eq!(
+            resolve(SkillType::Ground, PickerTarget::Tile { x: 5, y: 6 }),
+            Some(SkillCastTarget::Ground(TilePosition { x: 5, y: 6 }))
+        );
+        assert_eq!(
+            resolve(SkillType::Ground, PickerTarget::Entity(ENTITY_ID)),
+            Some(SkillCastTarget::Ground(ENTITY_POSITION))
+        );
+        assert_eq!(
+            resolve(SkillType::Trap, PickerTarget::Entity(ITEM_ID)),
+            Some(SkillCastTarget::Ground(ITEM_POSITION))
+        );
+        assert_eq!(resolve(SkillType::Ground, PickerTarget::Entity(STALE_ID)), None);
+    }
+
+    #[test]
+    fn passive_and_self_cast_skills_never_resolve_world_targets() {
+        assert_eq!(resolve(SkillType::Passive, PickerTarget::Entity(ENTITY_ID)), None);
+        assert_eq!(resolve(SkillType::SelfCast, PickerTarget::Entity(ENTITY_ID)), None);
+    }
+
+    #[test]
+    fn invalid_confirmation_keeps_the_skill_armed() {
+        let armed = ArmedSkill {
+            skill_id: SkillId(10),
+            skill_level: SkillLevel(3),
+            skill_type: SkillType::Attack,
+        };
+        let mut armed_skill = Some(armed);
+
+        assert_eq!(take_resolved_armed_skill(&mut armed_skill, None), None);
+        assert_eq!(armed_skill, Some(armed));
+
+        let target = SkillCastTarget::Entity(ENTITY_ID);
+        assert_eq!(take_resolved_armed_skill(&mut armed_skill, Some(target)), Some((armed, target)));
+        assert_eq!(armed_skill, None);
+    }
+
+    #[test]
+    fn single_and_double_mouse_buttons_confirm_or_cancel_targeting() {
+        assert!(is_skill_target_confirmation(MouseButton::Left));
+        assert!(is_skill_target_confirmation(MouseButton::DoubleLeft));
+        assert!(is_skill_target_cancellation(MouseButton::Right));
+        assert!(is_skill_target_cancellation(MouseButton::DoubleRight));
+    }
+
+    #[test]
+    fn held_continuous_skill_stops_only_for_its_owner() {
+        let skill_id = ROLLING_CUTTER_ID;
+        let mut active_skill = None;
+
+        assert_eq!(
+            activate_continuous_skill(&mut active_skill, skill_id, SkillActivation::Hold, Some(HotbarSlot(2)),),
+            (None, true)
+        );
+        assert_eq!(release_continuous_skill(&mut active_skill, HotbarSlot(1)), None);
+        assert_eq!(release_continuous_skill(&mut active_skill, HotbarSlot(2)), Some(skill_id));
+        assert_eq!(active_skill, None);
+    }
+
+    #[test]
+    fn continuous_skill_ownership_transfers_between_inputs() {
+        let skill_id = ROLLING_CUTTER_ID;
+        let mut active_skill = None;
+
+        assert_eq!(
+            activate_continuous_skill(&mut active_skill, skill_id, SkillActivation::Hold, Some(HotbarSlot(0)),),
+            (None, true)
+        );
+        assert_eq!(
+            activate_continuous_skill(&mut active_skill, skill_id, SkillActivation::Hold, Some(HotbarSlot(1)),),
+            (Some(skill_id), true)
+        );
+        assert_eq!(release_continuous_skill(&mut active_skill, HotbarSlot(0)), None);
+        assert_eq!(release_continuous_skill(&mut active_skill, HotbarSlot(1)), Some(skill_id));
+
+        assert_eq!(
+            activate_continuous_skill(&mut active_skill, skill_id, SkillActivation::Toggle, None),
+            (None, true)
+        );
+        assert_eq!(
+            activate_continuous_skill(&mut active_skill, skill_id, SkillActivation::Toggle, None),
+            (Some(skill_id), false)
+        );
+        assert_eq!(active_skill, None);
     }
 }

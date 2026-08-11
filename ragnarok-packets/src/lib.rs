@@ -356,12 +356,12 @@ pub struct Packet0b18 {
 #[numeric_type(u16)]
 pub enum ConnectionRefusedReason {
     #[numeric_value(1)]
-    Unknown1,
+    InvalidPacketVersion,
     InvalidAccountId,
     InvalidChracterId,
     #[numeric_value(6)]
     InvalidSex,
-    Unkown2,
+    UnknownError,
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
@@ -495,7 +495,7 @@ pub enum CharacterCreationFailedReason {
     #[numeric_value(3)]
     NotAllowedToUseSlot,
     #[numeric_value(255)]
-    CharacterCerationFailed,
+    CharacterCreationFailed,
 }
 
 /// Sent by the character server as a response to [CreateCharacterPacket]

@@ -162,7 +162,7 @@ where
             CharacterCreationFailedReason::CharacterNameAlreadyUsed => "Character name is already used",
             CharacterCreationFailedReason::NotOldEnough => "You are not old enough to create a character",
             CharacterCreationFailedReason::NotAllowedToUseSlot => "You are not allowed to use this character slot",
-            CharacterCreationFailedReason::CharacterCerationFailed => "Character creation failed",
+            CharacterCreationFailedReason::CharacterCreationFailed => "Character creation failed",
         };
 
         NetworkEvent::CharacterCreationFailed { reason, message }

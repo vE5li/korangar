@@ -58,8 +58,8 @@ use korangar_debug::logging::{Colorize, print_debug};
 use korangar_debug::profile_block;
 #[cfg(feature = "debug")]
 use korangar_debug::profiling::Profiler;
-use korangar_interface::Interface;
 use korangar_interface::layout::MouseButton;
+use korangar_interface::{Interface, MouseMode};
 use korangar_networking::{
     DisconnectReason, HotkeyState, LoginServerLoginData, MessageColor, NetworkEvent, NetworkEventBuffer, NetworkingSystem, SellItem,
     SupportedPacketVersion,
@@ -2061,7 +2061,11 @@ impl Client {
                 InputEvent::RotateCamera { rotation } => self.player_camera.soft_rotate(rotation),
                 InputEvent::ResetCameraRotation => self.player_camera.reset_rotation(),
                 InputEvent::ToggleMenuWindow => {
-                    if self.client_state.try_follow(this_entity()).is_some() {
+                    // Escape cancels an active skill target selection instead of
+                    // opening the menu, like in the original client.
+                    if self.interface.get_mouse_mode().skill_target().is_some() {
+                        self.interface.set_mouse_mode(MouseMode::Default);
+                    } else if self.client_state.try_follow(this_entity()).is_some() {
                         match self.interface.is_window_with_class_open(WindowClass::Menu) {
                             true => self.interface.close_window_with_class(WindowClass::Menu),
                             false => self.interface.open_window(MenuWindow),
@@ -2320,7 +2324,10 @@ impl Client {
                     }
                     _ => {}
                 },
-                InputEvent::CastSkill { slot } => {
+                InputEvent::UseSkillInSlot { slot } => {
+                    // Skills that require a target switch to a target selection
+                    // mouse mode, while self cast skills are used immediately,
+                    // like in the original client.
                     if let Some(learnable_skill) = self.client_state.follow(client_state().hotbar()).get_skill_in_slot(slot).as_ref()
                         && let Some(learned_skill) =
                             self.client_state
@@ -2333,24 +2340,6 @@ impl Client {
                     {
                         match learned_skill.skill_type {
                             SkillType::Passive => {}
-                            SkillType::Attack => {
-                                if let PickerTarget::Entity(entity_id) = input_report.mouse_target {
-                                    let _ = self.networking_system.cast_skill(
-                                        learnable_skill.skill_id,
-                                        learnable_skill.maximum_level,
-                                        entity_id,
-                                    );
-                                }
-                            }
-                            SkillType::Ground | SkillType::Trap => {
-                                if let PickerTarget::Tile { x, y } = input_report.mouse_target {
-                                    let _ = self.networking_system.cast_ground_skill(
-                                        learnable_skill.skill_id,
-                                        learnable_skill.maximum_level,
-                                        TilePosition { x, y },
-                                    );
-                                }
-                            }
                             SkillType::SelfCast => match learnable_skill.skill_id == ROLLING_CUTTER_ID {
                                 true => {
                                     let _ = self.networking_system.cast_channeling_skill(
@@ -2367,17 +2356,180 @@ impl Client {
                                     );
                                 }
                             },
+                            skill_type => self.interface.set_mouse_mode(MouseMode::Custom {
+                                mode: MouseInputMode::TargetSkill {
+                                    slot,
+                                    skill_type,
+                                    level: learnable_skill.maximum_level,
+                                },
+                            }),
+                        }
+                    }
+                }
+                InputEvent::CastSkill { slot, level } => {
+                    // Copy the details out of the skill lookup so the borrow of the
+                    // client state ends before any buffered action is written.
+                    let skill_information = self
+                        .client_state
+                        .follow(client_state().hotbar())
+                        .get_skill_in_slot(slot)
+                        .as_ref()
+                        .and_then(|learnable_skill| {
+                            self.client_state
+                                .follow(client_state().skill_tree().skills())
+                                .iter()
+                                .find(|learned_skill| {
+                                    learned_skill.skill_id == learnable_skill.skill_id
+                                        && learned_skill.skill_level.0 >= learnable_skill.maximum_level.0
+                                })
+                                .map(|learned_skill| (learnable_skill.skill_id, learned_skill.skill_type, learned_skill.attack_range))
+                        });
+
+                    if let Some((skill_id, skill_type, attack_range)) = skill_information {
+                        match skill_type {
+                            SkillType::Passive => {}
+                            SkillType::Attack => {
+                                if let PickerTarget::Entity(entity_id) = input_report.mouse_target
+                                    && let Some(map) = &self.map
+                                {
+                                    let player_position =
+                                        self.client_state.try_follow(this_entity()).map(|player| player.get_tile_position());
+                                    let target_position = self
+                                        .client_state
+                                        .follow(client_state().entities())
+                                        .iter()
+                                        .find(|entity| entity.get_entity_id() == entity_id)
+                                        .map(|entity| entity.get_tile_position());
+
+                                    if let (Some(player_position), Some(target_position)) = (player_position, target_position) {
+                                        if player_position
+                                            .x
+                                            .abs_diff(target_position.x)
+                                            .max(player_position.y.abs_diff(target_position.y))
+                                            <= attack_range.0
+                                        {
+                                            let _ = self.networking_system.cast_skill(skill_id, level, entity_id);
+                                        } else if let Some(path) = self.path_finder.find_walkable_path_in_range(
+                                            &**map,
+                                            player_position,
+                                            target_position,
+                                            attack_range,
+                                        ) && let Some(nearest_tile) = path.last()
+                                        {
+                                            // The target is out of range, so walk towards it and
+                                            // send the cast right away. The server remembers skill
+                                            // requests made while walking and casts as soon as the
+                                            // target is in range, following the target's position
+                                            // at every step.
+                                            let _ = self.networking_system.player_move(WorldPosition {
+                                                x: nearest_tile.x,
+                                                y: nearest_tile.y,
+                                                direction: Direction::North,
+                                            });
+                                            let _ = self.networking_system.cast_skill(skill_id, level, entity_id);
+                                        }
+                                    }
+                                }
+                            }
+                            SkillType::Ground | SkillType::Trap => {
+                                if let PickerTarget::Tile { x, y } = input_report.mouse_target {
+                                    let target_position = TilePosition { x, y };
+
+                                    if let Some(map) = &self.map {
+                                        let player_position =
+                                            self.client_state.try_follow(this_entity()).map(|player| player.get_tile_position());
+
+                                        if let Some(player_position) = player_position {
+                                            if player_position
+                                                .x
+                                                .abs_diff(target_position.x)
+                                                .max(player_position.y.abs_diff(target_position.y))
+                                                <= attack_range.0
+                                            {
+                                                let _ = self.networking_system.cast_ground_skill(skill_id, level, target_position);
+                                            } else if let Some(path) = self.path_finder.find_walkable_path_in_range(
+                                                &**map,
+                                                player_position,
+                                                target_position,
+                                                attack_range,
+                                            ) && let Some(nearest_tile) = path.last()
+                                            {
+                                                // The target is out of range, so walk towards it and
+                                                // send the cast right away. The server remembers
+                                                // skill requests made while walking and casts as
+                                                // soon as the position is in range.
+                                                let _ = self.networking_system.player_move(WorldPosition {
+                                                    x: nearest_tile.x,
+                                                    y: nearest_tile.y,
+                                                    direction: Direction::North,
+                                                });
+                                                let _ = self.networking_system.cast_ground_skill(skill_id, level, target_position);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            SkillType::SelfCast => match skill_id == ROLLING_CUTTER_ID {
+                                true => {
+                                    let _ = self.networking_system.cast_channeling_skill(
+                                        skill_id,
+                                        level,
+                                        self.client_state.follow(this_entity().manually_asserted()).get_entity_id(),
+                                    );
+                                }
+                                false => {
+                                    let _ = self.networking_system.cast_skill(
+                                        skill_id,
+                                        level,
+                                        self.client_state.follow(this_entity().manually_asserted()).get_entity_id(),
+                                    );
+                                }
+                            },
                             SkillType::Support => {
                                 if let PickerTarget::Entity(entity_id) = input_report.mouse_target {
-                                    let _ = self.networking_system.cast_skill(
-                                        learnable_skill.skill_id,
-                                        learnable_skill.maximum_level,
-                                        entity_id,
-                                    );
+                                    if let Some(map) = &self.map {
+                                        let player_position =
+                                            self.client_state.try_follow(this_entity()).map(|player| player.get_tile_position());
+                                        let target_position = self
+                                            .client_state
+                                            .follow(client_state().entities())
+                                            .iter()
+                                            .find(|entity| entity.get_entity_id() == entity_id)
+                                            .map(|entity| entity.get_tile_position());
+
+                                        if let (Some(player_position), Some(target_position)) = (player_position, target_position) {
+                                            if player_position
+                                                .x
+                                                .abs_diff(target_position.x)
+                                                .max(player_position.y.abs_diff(target_position.y))
+                                                <= attack_range.0
+                                            {
+                                                let _ = self.networking_system.cast_skill(skill_id, level, entity_id);
+                                            } else if let Some(path) = self.path_finder.find_walkable_path_in_range(
+                                                &**map,
+                                                player_position,
+                                                target_position,
+                                                attack_range,
+                                            ) && let Some(nearest_tile) = path.last()
+                                            {
+                                                // The target is out of range, so walk towards it and
+                                                // send the cast right away. The server remembers skill
+                                                // requests made while walking and casts as soon as the
+                                                // target is in range, following the target's position
+                                                // at every step.
+                                                let _ = self.networking_system.player_move(WorldPosition {
+                                                    x: nearest_tile.x,
+                                                    y: nearest_tile.y,
+                                                    direction: Direction::North,
+                                                });
+                                                let _ = self.networking_system.cast_skill(skill_id, level, entity_id);
+                                            }
+                                        }
+                                    }
                                 } else {
                                     let _ = self.networking_system.cast_skill(
-                                        learnable_skill.skill_id,
-                                        learnable_skill.maximum_level,
+                                        skill_id,
+                                        level,
                                         self.client_state.follow(this_entity().manually_asserted()).get_entity_id(),
                                     );
                                 }
@@ -3171,6 +3323,7 @@ impl Client {
         let mouse_mode = self.interface.get_mouse_mode();
         let is_mouse_mode_default = mouse_mode.is_default();
         let last_walking_destination = mouse_mode.walk_destination();
+        let skill_target = mouse_mode.skill_target();
 
         let mut interface_frame = {
             #[cfg(feature = "debug")]
@@ -3192,6 +3345,7 @@ impl Client {
             let cursor_state = match input_report.mouse_target {
                 _ if is_rotating_camera => MouseCursorState::RotateCamera,
                 _ if is_grabbing => MouseCursorState::GrabResource,
+                _ if skill_target.is_some() => MouseCursorState::Target,
                 PickerTarget::Entity(entity_id) if !is_interface_hovered => {
                     if self
                         .client_state
@@ -3224,7 +3378,15 @@ impl Client {
                 } else {
                     interface_frame.unfocus();
 
-                    if mouse_button == MouseButton::Left {
+                    if let Some((slot, _, level)) = skill_target {
+                        // A skill target is being selected. Any click ends the
+                        // selection, and a left click casts the skill at whatever
+                        // is under the cursor. The mouse mode is reset by the
+                        // mouse button release.
+                        if mouse_button == MouseButton::Left {
+                            self.input_event_buffer.push(InputEvent::CastSkill { slot, level });
+                        }
+                    } else if mouse_button == MouseButton::Left {
                         match input_report.mouse_target {
                             PickerTarget::Nothing => {}
                             PickerTarget::Entity(entity_id) => {
@@ -3277,7 +3439,24 @@ impl Client {
             }
 
             if let Some(delta) = input_report.scroll {
-                if is_interface_hovered {
+                if let Some((slot, skill_type, level)) = skill_target {
+                    // While selecting a skill target the mouse wheel adjusts the
+                    // cast level instead of zooming, like in the original client.
+                    let maximum_level = self
+                        .client_state
+                        .follow(client_state().hotbar())
+                        .get_skill_in_slot(slot)
+                        .as_ref()
+                        .map(|skill| skill.maximum_level.0)
+                        .unwrap_or(1);
+
+                    let level = match delta > 0.0 {
+                        true => SkillLevel(level.0.saturating_add(1).min(maximum_level)),
+                        false => SkillLevel(level.0.saturating_sub(1).max(1)),
+                    };
+
+                    interface_frame.set_mouse_mode(MouseInputMode::TargetSkill { slot, skill_type, level });
+                } else if is_interface_hovered {
                     interface_frame.scroll(&self.client_state, delta);
                 } else {
                     #[cfg_attr(feature = "debug", korangar_debug::debug_condition(!render_options.use_debug_camera))]
@@ -3315,6 +3494,8 @@ impl Client {
                 is_mouse_mode_default,
                 is_interface_hovered: interface_frame.is_interface_hovered(),
                 last_walking_destination,
+                is_targeting_ground_skill: matches!(skill_target, Some((_, SkillType::Ground | SkillType::Trap, _))),
+                skill_target_level: skill_target.map(|(_, _, level)| level),
                 buffered_action: *self.client_state.follow(client_state().buffered_action()),
                 #[cfg(feature = "debug")]
                 render_options: &render_options,
@@ -3632,6 +3813,8 @@ struct MapRenderContext<'a, 'm: 'a> {
     is_mouse_mode_default: bool,
     is_interface_hovered: bool,
     last_walking_destination: Option<TilePosition>,
+    is_targeting_ground_skill: bool,
+    skill_target_level: Option<SkillLevel>,
     buffered_action: Option<BufferedAction>,
     #[cfg(feature = "debug")]
     render_options: &'a RenderOptions,
@@ -3943,10 +4126,11 @@ impl<'a, 'm: 'a> MapRenderContext<'a, 'm> {
 
         match self.mouse_target {
             PickerTarget::Tile { x, y } => {
-                // Only show if the mouse mode is default or walking.
+                // Only show if the mouse mode is default, walking, or
+                // selecting the target of a ground skill.
                 if self.currently_playing
                     && !self.is_interface_hovered
-                    && (self.is_mouse_mode_default || self.last_walking_destination.is_some())
+                    && (self.is_mouse_mode_default || self.last_walking_destination.is_some() || self.is_targeting_ground_skill)
                 {
                     let walk_indicator_color = *self.client_state.follow(client_state().world_theme().indicator().walking());
 
@@ -4001,6 +4185,15 @@ impl<'a, 'm: 'a> MapRenderContext<'a, 'm> {
                 }
             }
             _ => {}
+        }
+
+        // While selecting a skill target, show the level the skill will be
+        // cast at next to the cursor, like in the original client.
+        if let Some(level) = self.skill_target_level {
+            // TODO: Don't allocate every frame
+            let text = level.0.to_string();
+            self.middle_interface_renderer
+                .render_hover_text(&text, self.scaling, self.mouse_position);
         }
     }
 }

@@ -165,7 +165,7 @@ korangar_debug::create_profiler_threads!(threads, {
 pub fn init_tls_rand() {
     use std::random::*;
     let mut seed = [0; 32];
-    DefaultRandomSource.fill_bytes(&mut seed);
+    SystemRng.fill_bytes(&mut seed);
     rand_aes::tls::rand_seed(seed.into());
 }
 

@@ -287,6 +287,7 @@ fn main() {
         RestartResponsePacket,
         DisconnectResponsePacket,
         UseSkillSuccessPacket,
+        CancelSkillCastPacket,
         ToUseSkillSuccessPacket,
         NotifySkillUnitPacket,
         SkillUnitDisappearPacket,

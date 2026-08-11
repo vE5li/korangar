@@ -73,15 +73,15 @@ impl EffectLoader {
                     let mut previous_source_blend_factor = None;
                     let mut previous_destination_blend_factor = None;
 
-                    Layer::new(
+                    Ok::<_, LoadError>(Layer::new(
                         layer_data
                             .texture_names
                             .into_iter()
                             .map(|name| {
                                 let path = format!("effect\\{}{}", prefix, name.name);
-                                texture_loader.get_or_load(&path, ImageType::Color).unwrap()
+                                texture_loader.get_or_load(&path, ImageType::Color)
                             })
-                            .collect(),
+                            .collect::<Result<Vec<_>, _>>()?,
                         {
                             let frame_count = layer_data.frames.len();
                             let mut map = Vec::with_capacity(frame_count);
@@ -152,9 +152,9 @@ impl EffectLoader {
                                 )
                             })
                             .collect(),
-                    )
+                    ))
                 })
-                .collect(),
+                .collect::<Result<Vec<_>, _>>()?,
         ));
 
         let _result = self.cache.lock().unwrap().insert(path.to_string(), effect.clone());
@@ -186,7 +186,10 @@ impl EffectLoader {
 
 fn parse_blend_factor(value: i32, previous: Option<BlendFactor>, is_source: bool) -> BlendFactor {
     match value {
-        0 => previous.unwrap(),
+        // Zero reuses the previous frame's value. Variant or malformed STR
+        // files may use it on the first frame, where Direct3D's defaults are
+        // the safest non-panicking fallback.
+        0 => previous.unwrap_or(if is_source { BlendFactor::One } else { BlendFactor::Zero }),
         1 => BlendFactor::Zero,
         2 => BlendFactor::One,
         3 => BlendFactor::Src,
@@ -247,5 +250,17 @@ fn parse_mt_present(value: i32) -> MultiTexturePresent {
             print_debug!("[{}] unknown multi texture present found in frame data: {value}", "error".red());
             MultiTexturePresent::None
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn first_frame_zero_blend_values_use_direct3d_defaults() {
+        assert_eq!(parse_blend_factor(0, None, true), BlendFactor::One);
+        assert_eq!(parse_blend_factor(0, None, false), BlendFactor::Zero);
+        assert_eq!(parse_blend_factor(0, Some(BlendFactor::SrcAlpha), true), BlendFactor::SrcAlpha);
     }
 }

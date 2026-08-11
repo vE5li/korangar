@@ -14,6 +14,19 @@ impl Decibels {
     /// silent.
     pub(crate) const SILENCE: Self = Self(-60.0);
 
+    /// Converts amplitude, a linear volume measurement from `0.0`-`1.0`,
+    /// into decibels. The inverse of [`as_amplitude`](Self::as_amplitude);
+    /// amplitudes at or below silence map to [`SILENCE`](Self::SILENCE).
+    pub(crate) fn from_amplitude(amplitude: f32) -> Self {
+        if amplitude >= 1.0 {
+            return Self::IDENTITY;
+        }
+        if amplitude <= 0.001 {
+            return Self::SILENCE;
+        }
+        Self(20.0 * amplitude.log10())
+    }
+
     /// Converts decibels to amplitude, a linear volume measurement.
     ///
     /// This returns a number from `0.0`-`1.0` that you can multiply

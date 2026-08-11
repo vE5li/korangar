@@ -1,4 +1,5 @@
 #![allow(incomplete_features)]
+#![recursion_limit = "256"]
 #![feature(adt_const_params)]
 #![feature(allocator_api)]
 #![feature(generic_const_exprs)]
@@ -44,6 +45,7 @@ mod world;
 
 use std::io::Cursor;
 use std::net::{SocketAddr, ToSocketAddrs};
+use std::num::NonZeroU32;
 use std::ops::Deref;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
@@ -69,8 +71,8 @@ use networking::{PacketHistory, PacketHistoryCallback};
 #[cfg(not(feature = "debug"))]
 use ragnarok_packets::handler::NoPacketCallback;
 use ragnarok_packets::{
-    AttackRange, BuyShopItemsResult, CharacterServerInformation, ClientTick, Direction, DisappearanceReason, HotbarSlot, SellItemsResult,
-    SkillId, SkillLevel, SkillType, TilePosition, UnitId, WorldPosition,
+    AttackRange, BuyShopItemsResult, CharacterServerInformation, ClientTick, Direction, DisappearanceReason, EntityId, HotbarSlot,
+    SellItemsResult, SkillId, SkillLevel, SkillType, SkillUseFailureCode, TilePosition, WorldPosition,
 };
 use renderer::InterfaceRenderer;
 use rust_state::{ManuallyAssertExt, State};
@@ -102,7 +104,7 @@ use winit::keyboard::PhysicalKey;
 use winit::window::{Icon, Window, WindowId};
 
 use crate::graphics::*;
-use crate::input::{InputEvent, InputReport, InputSystem};
+use crate::input::{InputEvent, InputReport, InputSystem, SkillActivation, SkillCastTarget};
 use crate::interface::cursor::{MouseCursor, MouseCursorState};
 use crate::interface::resource::{ItemSource, SkillSource};
 use crate::interface::windows::*;
@@ -132,6 +134,194 @@ const ITEM_PICKUP_RANGE: AttackRange = AttackRange(1);
 // through the graphics settings. For now I just chose an arbitrary smaller
 // number that should be playable on most devices.
 const NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS: usize = 6;
+const SKILL_SOUND_LOAD_TIMEOUT_SECONDS: f32 = 1.0;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ArmedSkill {
+    skill_id: SkillId,
+    skill_level: SkillLevel,
+    skill_type: SkillType,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ActiveContinuousSkill {
+    skill_id: SkillId,
+    held_by: Option<HotbarSlot>,
+}
+
+#[derive(Clone, Copy)]
+struct PendingSkillEffect {
+    remaining_delay: f32,
+    recipe: SkillVisualRecipe,
+    source_entity_id: EntityId,
+    destination_entity_id: EntityId,
+    ground_position: Option<TilePosition>,
+    unit_entity_id: Option<EntityId>,
+}
+
+#[derive(Clone, Copy)]
+struct PendingSkillSound {
+    timing: SkillSoundSequenceTiming,
+    recipe: SkillSoundRecipe,
+    sound_effect_key: SoundEffectKey,
+    source_entity_id: EntityId,
+    destination_entity_id: EntityId,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct SkillSoundSequenceTiming {
+    next_delay: f32,
+    load_wait_remaining: f32,
+    hit_interval: f32,
+    hits_remaining: usize,
+}
+
+impl SkillSoundSequenceTiming {
+    fn new(next_delay: f32, hit_interval: f32, hits_remaining: usize) -> Self {
+        Self {
+            next_delay: next_delay.max(0.0),
+            load_wait_remaining: SKILL_SOUND_LOAD_TIMEOUT_SECONDS,
+            hit_interval,
+            hits_remaining: hits_remaining.max(1),
+        }
+    }
+
+    /// Advances the sequence and returns how much of this frame elapsed after
+    /// the next hit became due.
+    fn wait_elapsed_if_due(&mut self, delta_time: f32) -> Option<f32> {
+        if self.next_delay > delta_time {
+            self.next_delay -= delta_time;
+            return None;
+        }
+
+        let wait_elapsed = (delta_time - self.next_delay).max(0.0);
+        self.next_delay = 0.0;
+        Some(wait_elapsed)
+    }
+
+    /// Records a successful playback and returns whether the sequence remains
+    /// active.
+    fn playback_succeeded(&mut self) -> bool {
+        self.hits_remaining = self.hits_remaining.saturating_sub(1);
+        if self.hits_remaining == 0 {
+            return false;
+        }
+
+        self.next_delay = self.hit_interval;
+        self.load_wait_remaining = SKILL_SOUND_LOAD_TIMEOUT_SECONDS;
+        true
+    }
+
+    /// Records time spent waiting for decoded audio and returns whether the
+    /// sequence should retry.
+    fn playback_unavailable(&mut self, wait_elapsed: f32) -> bool {
+        self.load_wait_remaining -= wait_elapsed;
+        self.load_wait_remaining > 0.0
+    }
+}
+
+#[derive(Clone, Copy)]
+struct PendingSkillSprite {
+    remaining_delay: f32,
+    recipe: SkillSpriteVisualRecipe,
+    source_entity_id: EntityId,
+    destination_entity_id: EntityId,
+    play_sound: bool,
+}
+
+#[derive(Clone, Copy)]
+struct PendingSkillDamageParticle {
+    remaining_delay: f32,
+    destination_entity_id: EntityId,
+    display: SkillDamageDisplay,
+}
+
+#[derive(Clone, Copy)]
+struct PendingProceduralSkillVisual {
+    remaining_delay: f32,
+    recipe: SkillProceduralVisualRecipe,
+    source_entity_id: EntityId,
+    destination_entity_id: EntityId,
+    sequence_index: usize,
+    flight_time: f32,
+}
+
+fn is_skill_target_confirmation(mouse_button: MouseButton) -> bool {
+    matches!(mouse_button, MouseButton::Left | MouseButton::DoubleLeft)
+}
+
+fn is_skill_target_cancellation(mouse_button: MouseButton) -> bool {
+    matches!(mouse_button, MouseButton::Right | MouseButton::DoubleRight)
+}
+
+fn resolve_skill_cast_target(
+    skill_type: SkillType,
+    picker_target: PickerTarget,
+    player_entity_id: Option<EntityId>,
+    entity_position: impl Fn(EntityId) -> Option<TilePosition>,
+    ground_item_position: impl Fn(EntityId) -> Option<TilePosition>,
+) -> Option<SkillCastTarget> {
+    match skill_type {
+        SkillType::Attack => match picker_target {
+            PickerTarget::Entity(entity_id) if entity_position(entity_id).is_some() => Some(SkillCastTarget::Entity(entity_id)),
+            _ => None,
+        },
+        SkillType::Support => match picker_target {
+            PickerTarget::Entity(entity_id) if entity_position(entity_id).is_some() => Some(SkillCastTarget::Entity(entity_id)),
+            PickerTarget::Nothing | PickerTarget::Tile { .. } => player_entity_id.map(SkillCastTarget::Entity),
+            _ => None,
+        },
+        SkillType::Ground | SkillType::Trap => match picker_target {
+            PickerTarget::Tile { x, y } => Some(SkillCastTarget::Ground(TilePosition { x, y })),
+            PickerTarget::Entity(entity_id) => entity_position(entity_id)
+                .or_else(|| ground_item_position(entity_id))
+                .map(SkillCastTarget::Ground),
+            _ => None,
+        },
+        SkillType::Passive | SkillType::SelfCast => None,
+    }
+}
+
+fn take_resolved_armed_skill(
+    armed_skill: &mut Option<ArmedSkill>,
+    resolved_target: Option<SkillCastTarget>,
+) -> Option<(ArmedSkill, SkillCastTarget)> {
+    let resolved_target = resolved_target?;
+    armed_skill.take().map(|armed_skill| (armed_skill, resolved_target))
+}
+
+fn activate_continuous_skill(
+    active_skill: &mut Option<ActiveContinuousSkill>,
+    skill_id: SkillId,
+    activation: SkillActivation,
+    source_slot: Option<HotbarSlot>,
+) -> (Option<SkillId>, bool) {
+    if activation == SkillActivation::Toggle
+        && active_skill.is_some_and(|active_skill| active_skill.skill_id == skill_id && active_skill.held_by.is_none())
+    {
+        return (active_skill.take().map(|active_skill| active_skill.skill_id), false);
+    }
+
+    let stopped_skill_id = active_skill.take().map(|active_skill| active_skill.skill_id);
+    let held_by = match activation {
+        SkillActivation::Hold => {
+            debug_assert!(source_slot.is_some());
+            source_slot
+        }
+        SkillActivation::Toggle => None,
+    };
+
+    *active_skill = Some(ActiveContinuousSkill { skill_id, held_by });
+
+    (stopped_skill_id, true)
+}
+
+fn release_continuous_skill(active_skill: &mut Option<ActiveContinuousSkill>, slot: HotbarSlot) -> Option<SkillId> {
+    match active_skill.is_some_and(|active_skill| active_skill.held_by == Some(slot)) {
+        true => active_skill.take().map(|active_skill| active_skill.skill_id),
+        false => None,
+    }
+}
 
 const INITIAL_SCREEN_SIZE: ScreenSize = ScreenSize {
     width: 1280.0,
@@ -215,6 +405,7 @@ pub struct Client {
     point_shadow_entity_instructions: Vec<EntityInstruction>,
     point_light_with_shadow_instructions: Vec<PointLightWithShadowInstruction>,
     point_light_instructions: Vec<PointLightInstruction>,
+    ground_marker_instructions: Vec<GroundMarkerInstruction>,
 
     input_system: InputSystem,
 
@@ -233,6 +424,8 @@ pub struct Client {
 
     input_event_buffer: Vec<InputEvent>,
     network_event_buffer: NetworkEventBuffer,
+    armed_skill: Option<ArmedSkill>,
+    active_continuous_skill: Option<ActiveContinuousSkill>,
     // TODO: Move or remove this.
     saved_login_data: Option<LoginServerLoginData>,
     // TODO: Move or remove this.
@@ -249,6 +442,11 @@ pub struct Client {
     particle_holder: ParticleHolder,
     point_light_manager: PointLightManager,
     effect_holder: EffectHolder,
+    pending_skill_effects: Vec<PendingSkillEffect>,
+    pending_skill_sounds: Vec<PendingSkillSound>,
+    pending_skill_sprites: Vec<PendingSkillSprite>,
+    pending_skill_damage_particles: Vec<PendingSkillDamageParticle>,
+    pending_procedural_skill_visuals: Vec<PendingProceduralSkillVisual>,
     path_finder: PathFinder,
 
     point_light_set_buffer: ResourceSetBuffer<LightSourceKey>,
@@ -512,6 +710,7 @@ impl Client {
             let point_shadow_entity_instructions = Vec::default();
             let point_light_with_shadow_instructions = Vec::default();
             let point_light_instructions = Vec::default();
+            let ground_marker_instructions = Vec::default();
         });
 
         time_phase!("create graphics engine", {
@@ -604,6 +803,12 @@ impl Client {
             let tile_texture_set = Arc::new(tile_texture_set);
 
             let main_menu_click_sound_effect = audio_engine.load(MAIN_MENU_CLICK_SOUND_EFFECT);
+            // Multi-hit skill sounds are scheduled only fractions of a second
+            // apart. Start loading the verified GRF WAVs during client setup so
+            // first-use async loading cannot collapse those requests together.
+            for sound_path in SKILL_SOUND_PATHS {
+                let _ = audio_engine.load(sound_path);
+            }
         });
 
         time_phase!("load default map", {
@@ -677,6 +882,7 @@ impl Client {
             point_shadow_entity_instructions,
             point_light_with_shadow_instructions,
             point_light_instructions,
+            ground_marker_instructions,
             input_system,
             interface,
             mouse_cursor,
@@ -691,6 +897,8 @@ impl Client {
             point_shadow_camera,
             input_event_buffer,
             network_event_buffer,
+            armed_skill: None,
+            active_continuous_skill: None,
             saved_login_data,
             saved_character_server,
             saved_login_server_address,
@@ -700,6 +908,11 @@ impl Client {
             particle_holder,
             point_light_manager,
             effect_holder,
+            pending_skill_effects: Vec::new(),
+            pending_skill_sounds: Vec::new(),
+            pending_skill_sprites: Vec::new(),
+            pending_skill_damage_particles: Vec::new(),
+            pending_procedural_skill_visuals: Vec::new(),
             path_finder,
             point_light_set_buffer,
             directional_shadow_object_set_buffer,
@@ -907,12 +1120,757 @@ impl Client {
         }
     }
 
+    fn entity_position(&self, entity_id: EntityId) -> Option<Point3<f32>> {
+        self.client_state
+            .follow(client_state().entities())
+            .iter()
+            .find(|entity| entity.get_entity_id() == entity_id)
+            .map(Entity::get_position)
+            .or_else(|| {
+                self.client_state
+                    .follow(client_state().dead_entities())
+                    .iter()
+                    .find(|entity| entity.get_entity_id() == entity_id)
+                    .map(Entity::get_position)
+            })
+            .or_else(|| {
+                self.client_state
+                    .try_follow(this_entity())
+                    .filter(|entity| entity.get_entity_id() == entity_id)
+                    .map(Entity::get_position)
+            })
+    }
+
+    fn spawn_skill_visual(
+        &mut self,
+        recipe: SkillVisualRecipe,
+        source_entity_id: EntityId,
+        destination_entity_id: EntityId,
+        ground_position: Option<TilePosition>,
+        unit_entity_id: Option<EntityId>,
+    ) {
+        let (center, effect_position) = match recipe.anchor {
+            SkillVisualAnchor::SourceEntity => {
+                let Some(position) = self.entity_position(source_entity_id) else {
+                    return;
+                };
+                (EffectCenter::Entity(source_entity_id, position), position)
+            }
+            SkillVisualAnchor::DestinationEntity => {
+                let Some(position) = self.entity_position(destination_entity_id) else {
+                    return;
+                };
+                (EffectCenter::Entity(destination_entity_id, position), position)
+            }
+            SkillVisualAnchor::GroundPosition | SkillVisualAnchor::SkillUnit => {
+                let Some(map) = &self.map else {
+                    return;
+                };
+                let Some(tile_position) = ground_position else {
+                    return;
+                };
+                let Some(position) = map.get_world_position(tile_position) else {
+                    #[cfg(feature = "debug")]
+                    print_debug!("[{}] skill effect at {:?} is out of map bounds", "error".red(), tile_position);
+                    return;
+                };
+                (EffectCenter::Position(position), position)
+            }
+        };
+
+        if let Some(sound_path) = recipe.sound_path {
+            let sound_effect = self.audio_engine.load(sound_path);
+            self.audio_engine
+                .play_spatial_sound_effect(sound_effect, effect_position, recipe.sound_range);
+        }
+
+        // The official client varies several impact animations per hit.
+        let effect_path = pick_variant(recipe.effect_path, recipe.effect_path_variants, rand_aes::tls::rand_f32());
+        let effect = match self.effect_loader.get_or_load(effect_path, &self.texture_loader) {
+            Ok(effect) => effect,
+            Err(_error) => {
+                #[cfg(feature = "debug")]
+                print_debug!(
+                    "[{}] failed to load skill effect '{}': {:?}",
+                    "error".red(),
+                    effect_path,
+                    _error
+                );
+                return;
+            }
+        };
+        let frame_timer = effect.new_frame_timer();
+        let effect_offset = Vector3::new(recipe.effect_offset[0], recipe.effect_offset[1], recipe.effect_offset[2]);
+
+        let effect: Box<dyn EffectBase + Send + Sync> = match recipe.light {
+            Some(light) => Box::new(EffectWithLight::new(
+                effect,
+                frame_timer,
+                center,
+                effect_offset,
+                next_dynamic_point_light_id(),
+                Vector3::new(light.offset[0], light.offset[1], light.offset[2]),
+                light.color,
+                light.intensity,
+                recipe.repeating,
+            )),
+            None => Box::new(EffectWithLight::without_light(
+                effect,
+                frame_timer,
+                center,
+                effect_offset,
+                recipe.repeating,
+            )),
+        };
+
+        match unit_entity_id {
+            Some(entity_id) => self.effect_holder.add_unit(effect, entity_id),
+            None => self.effect_holder.add_effect(effect),
+        }
+    }
+
+    fn queue_skill_damage_visual(
+        &mut self,
+        recipe: SkillVisualRecipe,
+        source_entity_id: EntityId,
+        destination_entity_id: EntityId,
+        hit_count: i16,
+        initial_delay: f32,
+    ) {
+        let repeat_delays = std::iter::once(0.0).chain(skill_effect_repeat_delays(recipe.hit_interval, hit_count));
+
+        for repeat_delay in repeat_delays {
+            let remaining_delay = initial_delay + repeat_delay;
+            if remaining_delay <= 0.0 {
+                self.spawn_skill_visual(recipe, source_entity_id, destination_entity_id, None, None);
+            } else {
+                self.pending_skill_effects.push(PendingSkillEffect {
+                    recipe,
+                    source_entity_id,
+                    destination_entity_id,
+                    remaining_delay,
+                    ground_position: None,
+                    unit_entity_id: None,
+                });
+            }
+        }
+    }
+
+    fn update_pending_skill_effects(&mut self, delta_time: f32) {
+        let pending_effects = std::mem::take(&mut self.pending_skill_effects);
+
+        for mut pending in pending_effects {
+            pending.remaining_delay -= delta_time;
+
+            if pending.remaining_delay <= 0.0 {
+                self.spawn_skill_visual(
+                    pending.recipe,
+                    pending.source_entity_id,
+                    pending.destination_entity_id,
+                    pending.ground_position,
+                    pending.unit_entity_id,
+                );
+            } else {
+                self.pending_skill_effects.push(pending);
+            }
+        }
+    }
+
+    fn queue_ground_skill_visual(
+        &mut self,
+        recipe: SkillVisualRecipe,
+        source_entity_id: EntityId,
+        ground_position: TilePosition,
+        initial_delay: f32,
+    ) {
+        if initial_delay <= 0.0 {
+            self.spawn_skill_visual(recipe, source_entity_id, source_entity_id, Some(ground_position), None);
+        } else {
+            self.pending_skill_effects.push(PendingSkillEffect {
+                remaining_delay: initial_delay,
+                recipe,
+                source_entity_id,
+                destination_entity_id: source_entity_id,
+                ground_position: Some(ground_position),
+                unit_entity_id: None,
+            });
+        }
+    }
+
+    fn spawn_skill_sprite_visual(
+        &mut self,
+        recipe: SkillSpriteVisualRecipe,
+        source_entity_id: EntityId,
+        destination_entity_id: EntityId,
+        play_sound: bool,
+    ) {
+        let entity_id = match recipe.anchor {
+            SkillVisualAnchor::SourceEntity => source_entity_id,
+            SkillVisualAnchor::DestinationEntity => destination_entity_id,
+            SkillVisualAnchor::GroundPosition | SkillVisualAnchor::SkillUnit => return,
+        };
+        let Some(position) = self.entity_position(entity_id) else {
+            return;
+        };
+
+        if play_sound && let Some(sound_path) = recipe.sound_path {
+            let sound_effect = self.audio_engine.load(sound_path);
+            self.audio_engine
+                .play_spatial_sound_effect(sound_effect, position, recipe.sound_range);
+        }
+
+        let sprite = match self.sprite_loader.get_or_load(recipe.sprite_path) {
+            Ok(sprite) => sprite,
+            Err(_error) => {
+                #[cfg(feature = "debug")]
+                print_debug!(
+                    "[{}] failed to load skill sprite '{}': {:?}",
+                    "error".red(),
+                    recipe.sprite_path,
+                    _error
+                );
+                return;
+            }
+        };
+        let actions = match self.action_loader.get_or_load(recipe.action_path) {
+            Ok(actions) => actions,
+            Err(_error) => {
+                #[cfg(feature = "debug")]
+                print_debug!(
+                    "[{}] failed to load skill actions '{}': {:?}",
+                    "error".red(),
+                    recipe.action_path,
+                    _error
+                );
+                return;
+            }
+        };
+
+        self.particle_holder.spawn_attached_sprite(EntityAttachedSprite::new(
+            entity_id,
+            recipe.attachment_key,
+            position,
+            Vector3::new(recipe.position_offset[0], recipe.position_offset[1], recipe.position_offset[2]),
+            sprite,
+            actions,
+            recipe.action_index,
+            recipe.repeating,
+            recipe.maximum_duration,
+            recipe.scaling,
+        ));
+    }
+
+    fn queue_skill_sprite_visual(
+        &mut self,
+        recipe: SkillSpriteVisualRecipe,
+        source_entity_id: EntityId,
+        destination_entity_id: EntityId,
+        play_sound: bool,
+        initial_delay: f32,
+    ) {
+        if initial_delay <= 0.0 {
+            self.spawn_skill_sprite_visual(recipe, source_entity_id, destination_entity_id, play_sound);
+        } else {
+            self.pending_skill_sprites.push(PendingSkillSprite {
+                remaining_delay: initial_delay,
+                recipe,
+                source_entity_id,
+                destination_entity_id,
+                play_sound,
+            });
+        }
+    }
+
+    fn update_pending_skill_sprites(&mut self, delta_time: f32) {
+        let pending_sprites = std::mem::take(&mut self.pending_skill_sprites);
+
+        for mut pending in pending_sprites {
+            pending.remaining_delay -= delta_time;
+
+            if pending.remaining_delay <= 0.0 {
+                self.spawn_skill_sprite_visual(
+                    pending.recipe,
+                    pending.source_entity_id,
+                    pending.destination_entity_id,
+                    pending.play_sound,
+                );
+            } else {
+                self.pending_skill_sprites.push(pending);
+            }
+        }
+    }
+
+    fn spawn_skill_damage_particle(&mut self, destination_entity_id: EntityId, display: SkillDamageDisplay) {
+        let Some(position) = self.entity_position(destination_entity_id) else {
+            return;
+        };
+        let particle: Box<dyn Particle + Send + Sync> = match display {
+            SkillDamageDisplay::Suppressed => return,
+            SkillDamageDisplay::Miss => Box::new(Miss::new(position)),
+            SkillDamageDisplay::Damage { amount, is_critical } => Box::new(DamageNumber::new(position, amount.to_string(), is_critical)),
+        };
+        self.particle_holder.spawn_particle(particle);
+    }
+
+    fn queue_skill_damage_particle(
+        &mut self,
+        destination_entity_id: EntityId,
+        display: SkillDamageDisplay,
+        hit_count: i16,
+        hit_interval: Option<f32>,
+        initial_delay: f32,
+    ) {
+        let displays = match hit_interval {
+            Some(_) => display.split_for_hits(hit_count),
+            None => (display != SkillDamageDisplay::Suppressed).then_some(display).into_iter().collect(),
+        };
+
+        for (hit_index, display) in displays.into_iter().enumerate() {
+            let remaining_delay = initial_delay + hit_interval.unwrap_or_default() * hit_index as f32;
+            if remaining_delay <= 0.0 {
+                self.spawn_skill_damage_particle(destination_entity_id, display);
+            } else {
+                self.pending_skill_damage_particles.push(PendingSkillDamageParticle {
+                    remaining_delay,
+                    destination_entity_id,
+                    display,
+                });
+            }
+        }
+    }
+
+    fn update_pending_skill_damage_particles(&mut self, delta_time: f32) {
+        let pending_particles = std::mem::take(&mut self.pending_skill_damage_particles);
+
+        for mut pending in pending_particles {
+            pending.remaining_delay -= delta_time;
+
+            if pending.remaining_delay <= 0.0 {
+                self.spawn_skill_damage_particle(pending.destination_entity_id, pending.display);
+            } else {
+                self.pending_skill_damage_particles.push(pending);
+            }
+        }
+    }
+
+    fn load_skill_particle_texture(&self, path: &str) -> Option<Arc<Texture>> {
+        self.texture_loader
+            .get_or_load(path, ImageType::Color)
+            .inspect_err(|_error| {
+                #[cfg(feature = "debug")]
+                print_debug!(
+                    "[{}] failed to load skill particle texture '{}': {:?}",
+                    "error".red(),
+                    path,
+                    _error
+                );
+            })
+            .ok()
+    }
+
+    /// Floats the skill's name over its caster, as the classic client does
+    /// when a cast fires. Names come from the archive's own skill table, so
+    /// any caster's skills are covered, not only the local player's.
+    fn spawn_skill_name_bubble(&mut self, source_entity_id: EntityId, skill_id: SkillId) {
+        let name = &self.library.get::<SkillListInformation>(skill_id).name;
+        if name.is_empty() {
+            return;
+        }
+        let Some(position) = self.entity_position(source_entity_id) else {
+            return;
+        };
+
+        let text = format!("{name} !!");
+        self.particle_holder
+            .spawn_entity_particle(Box::new(SkillNameBubble::new(source_entity_id, position, text)));
+    }
+
+    fn spawn_bolt_projectile(
+        &mut self,
+        art: BoltProjectileArt,
+        source_entity_id: EntityId,
+        destination_entity_id: EntityId,
+        sequence_index: usize,
+        initial_elapsed: f32,
+        flight_time: f32,
+    ) {
+        let Some(position) = self.entity_position(destination_entity_id) else {
+            return;
+        };
+
+        let (textures, frame_duration) = match art.source {
+            BoltFrameSource::Textures { paths, frame_duration } => {
+                let mut textures = Vec::with_capacity(paths.len());
+                for texture_path in paths {
+                    let Some(texture) = self.load_skill_particle_texture(texture_path) else {
+                        return;
+                    };
+                    textures.push(texture);
+                }
+                (textures, frame_duration)
+            }
+            BoltFrameSource::SpriteAction { sprite_path, action_path } => {
+                let Ok(sprite) = self.sprite_loader.get_or_load(sprite_path) else {
+                    #[cfg(feature = "debug")]
+                    print_debug!("[{}] failed to load projectile sprite '{}'", "error".red(), sprite_path);
+                    return;
+                };
+                let Ok(actions) = self.action_loader.get_or_load(action_path) else {
+                    #[cfg(feature = "debug")]
+                    print_debug!("[{}] failed to load projectile actions '{}'", "error".red(), action_path);
+                    return;
+                };
+
+                // The ACT's own cadence, from its first action.
+                let frame_duration = actions.delays.first().copied().unwrap_or(1.0).max(f32::EPSILON) * ACT_DELAY_UNIT;
+                (sprite.textures.clone(), frame_duration)
+            }
+        };
+
+        let (width, height) = match art.size {
+            BoltQuadSize::Fixed { width, height } => (width, height),
+            BoltQuadSize::Native { scale } => {
+                let Some(first) = textures.first() else {
+                    return;
+                };
+                let size = first.get_size();
+                (size.width as f32 * scale, size.height as f32 * scale)
+            }
+        };
+
+        // The official client randomizes the launch sound per bolt.
+        if let Some(first) = art.launch_sounds.first() {
+            let sound_path = pick_variant(first, art.launch_sounds, rand_aes::tls::rand_f32());
+            let sound_effect = self.audio_engine.load(sound_path);
+            self.audio_engine.play_spatial_sound_effect(sound_effect, position, art.sound_range);
+        }
+
+        // A fixed reference flight time takes precedence over the attack-
+        // motion derivation; the hit keeps the server's own timing either
+        // way, so a faster projectile lands earlier than the impact rather
+        // than desynchronizing it.
+        let flight_time = art.flight_override.unwrap_or(flight_time);
+
+        // A travelling projectile launches from wherever the caster stood at
+        // spawn time. The fallback mirrors the Frost Diver convention for a
+        // caster that despawned before its projectile resolved.
+        let launch_origin = match art.motion {
+            BoltMotion::FallOntoTarget => None,
+            BoltMotion::TravelFromSource => Some(
+                self.entity_position(source_entity_id)
+                    .unwrap_or(position + Vector3::new(-22.0, 12.0, 0.0))
+                    + Vector3::new(0.0, 7.0, 0.0),
+            ),
+        };
+
+        let resolved = ResolvedBoltFrames {
+            textures,
+            frame_duration,
+            half_width: width * 0.5,
+            half_height: height * 0.5,
+        };
+
+        let mut effect: Box<dyn EffectBase + Send + Sync> = Box::new(BoltProjectile::new(
+            art,
+            resolved,
+            destination_entity_id,
+            position,
+            launch_origin,
+            sequence_index,
+            flight_time,
+        ));
+
+        if initial_elapsed > 0.0 && !effect.update(&[], None, initial_elapsed) {
+            return;
+        }
+
+        self.effect_holder.add_effect(effect);
+    }
+
+    fn spawn_procedural_skill_visual(
+        &mut self,
+        recipe: SkillProceduralVisualRecipe,
+        source_entity_id: EntityId,
+        destination_entity_id: EntityId,
+        sequence_index: usize,
+        initial_elapsed: f32,
+        flight_time: f32,
+    ) {
+        let mut particle: Box<dyn EntityParticle + Send + Sync> = match recipe.kind {
+            // Both bolts render through the effect pipeline so they can be
+            // rotated onto their flight direction, so they do not join the
+            // interface-sprite particles below.
+            SkillProceduralVisualKind::FireBoltProjectile => {
+                self.spawn_bolt_projectile(
+                    FIRE_BOLT_ART,
+                    source_entity_id,
+                    destination_entity_id,
+                    sequence_index,
+                    initial_elapsed,
+                    flight_time,
+                );
+                return;
+            }
+            SkillProceduralVisualKind::ArrowProjectile => {
+                self.spawn_bolt_projectile(
+                    ARROW_ART,
+                    source_entity_id,
+                    destination_entity_id,
+                    sequence_index,
+                    initial_elapsed,
+                    flight_time,
+                );
+                return;
+            }
+            SkillProceduralVisualKind::FireBallProjectile => {
+                self.spawn_bolt_projectile(
+                    FIRE_BALL_ART,
+                    source_entity_id,
+                    destination_entity_id,
+                    sequence_index,
+                    initial_elapsed,
+                    flight_time,
+                );
+                return;
+            }
+            SkillProceduralVisualKind::ColdBolt => {
+                self.spawn_bolt_projectile(
+                    COLD_BOLT_ART,
+                    source_entity_id,
+                    destination_entity_id,
+                    sequence_index,
+                    initial_elapsed,
+                    flight_time,
+                );
+                return;
+            }
+            SkillProceduralVisualKind::ColdImpact => {
+                let Some(position) = self.entity_position(destination_entity_id) else {
+                    return;
+                };
+                let Some(arrow_texture) = self.load_skill_particle_texture(ICE_ARROW_TEXTURE_PATH) else {
+                    return;
+                };
+                let Some(impact_texture) = self.load_skill_particle_texture(ICE_IMPACT_TEXTURE_PATH) else {
+                    return;
+                };
+
+                Box::new(ColdBoltParticle::impact(
+                    destination_entity_id,
+                    position,
+                    arrow_texture,
+                    impact_texture,
+                ))
+            }
+            SkillProceduralVisualKind::FrostDiver => {
+                let Some(destination_position) = self.entity_position(destination_entity_id) else {
+                    return;
+                };
+                let source_position = self
+                    .entity_position(source_entity_id)
+                    .unwrap_or(destination_position + Vector3::new(-22.0, 12.0, 0.0));
+                let Some(projectile_texture) = self.load_skill_particle_texture(FROST_DIVER_TEXTURE_PATH) else {
+                    return;
+                };
+                let Some(impact_texture) = self.load_skill_particle_texture(ICE_IMPACT_TEXTURE_PATH) else {
+                    return;
+                };
+
+                Box::new(FrostDiverParticle::new(
+                    None,
+                    Some(destination_entity_id),
+                    source_position,
+                    destination_position,
+                    projectile_texture,
+                    impact_texture,
+                ))
+            }
+            SkillProceduralVisualKind::FrostDiverPreview => {
+                let Some(destination_position) = self.entity_position(destination_entity_id) else {
+                    return;
+                };
+                let source_position = destination_position + Vector3::new(-22.0, 12.0, 0.0);
+                let Some(projectile_texture) = self.load_skill_particle_texture(FROST_DIVER_TEXTURE_PATH) else {
+                    return;
+                };
+
+                Box::new(FrostDiverParticle::travel_only(
+                    source_position,
+                    destination_entity_id,
+                    destination_position,
+                    projectile_texture,
+                ))
+            }
+            SkillProceduralVisualKind::FrostDiverImpact => {
+                let Some(position) = self.entity_position(destination_entity_id) else {
+                    return;
+                };
+                let Some(impact_texture) = self.load_skill_particle_texture(ICE_IMPACT_TEXTURE_PATH) else {
+                    return;
+                };
+
+                Box::new(FrostDiverParticle::impact(destination_entity_id, position, impact_texture))
+            }
+        };
+
+        if initial_elapsed > 0.0 && !particle.update(&[], None, initial_elapsed) {
+            return;
+        }
+
+        self.particle_holder.spawn_entity_particle(particle);
+    }
+
+    fn queue_procedural_skill_visual(
+        &mut self,
+        recipe: SkillProceduralVisualRecipe,
+        source_entity_id: EntityId,
+        destination_entity_id: EntityId,
+        hit_count: i16,
+        initial_delay: f32,
+        flight_time: f32,
+    ) {
+        let repeat_delays = std::iter::once(0.0).chain(skill_effect_repeat_delays(recipe.hit_interval, hit_count));
+
+        for (sequence_index, repeat_delay) in repeat_delays.enumerate() {
+            let remaining_delay = initial_delay + repeat_delay;
+            if remaining_delay <= 0.0 {
+                self.spawn_procedural_skill_visual(
+                    recipe,
+                    source_entity_id,
+                    destination_entity_id,
+                    sequence_index,
+                    0.0,
+                    flight_time,
+                );
+            } else {
+                self.pending_procedural_skill_visuals.push(PendingProceduralSkillVisual {
+                    remaining_delay,
+                    recipe,
+                    source_entity_id,
+                    destination_entity_id,
+                    sequence_index,
+                    flight_time,
+                });
+            }
+        }
+    }
+
+    fn update_pending_procedural_skill_visuals(&mut self, delta_time: f32) {
+        let pending_visuals = std::mem::take(&mut self.pending_procedural_skill_visuals);
+
+        for mut pending in pending_visuals {
+            pending.remaining_delay -= delta_time;
+
+            if pending.remaining_delay <= 0.0 {
+                self.spawn_procedural_skill_visual(
+                    pending.recipe,
+                    pending.source_entity_id,
+                    pending.destination_entity_id,
+                    pending.sequence_index,
+                    -pending.remaining_delay,
+                    pending.flight_time,
+                );
+            } else {
+                self.pending_procedural_skill_visuals.push(pending);
+            }
+        }
+    }
+
+    fn play_skill_sound(
+        &self,
+        recipe: SkillSoundRecipe,
+        source_entity_id: EntityId,
+        destination_entity_id: EntityId,
+        ground_position: Option<TilePosition>,
+    ) {
+        let position = match recipe.anchor {
+            SkillVisualAnchor::SourceEntity => self.entity_position(source_entity_id),
+            SkillVisualAnchor::DestinationEntity => self.entity_position(destination_entity_id),
+            SkillVisualAnchor::GroundPosition | SkillVisualAnchor::SkillUnit => {
+                let map = self.map.as_ref();
+                ground_position.and_then(|position| map.and_then(|map| map.get_world_position(position)))
+            }
+        };
+        let Some(position) = position else {
+            return;
+        };
+
+        let sound_path = pick_variant(recipe.sound_path, recipe.sound_path_variants, rand_aes::tls::rand_f32());
+        let sound_effect = self.audio_engine.load(sound_path);
+        self.audio_engine
+            .play_spatial_sound_effect(sound_effect, position, recipe.sound_range);
+    }
+
+    fn play_skill_damage_sound(
+        &mut self,
+        recipe: SkillSoundRecipe,
+        source_entity_id: EntityId,
+        destination_entity_id: EntityId,
+        hit_count: i16,
+        initial_delay: f32,
+    ) {
+        let hits_remaining = 1 + skill_effect_repeat_delays(recipe.hit_interval, hit_count).len();
+        let sound_path = pick_variant(recipe.sound_path, recipe.sound_path_variants, rand_aes::tls::rand_f32());
+        let sound_effect_key = self.audio_engine.load(sound_path);
+        let mut pending = PendingSkillSound {
+            timing: SkillSoundSequenceTiming::new(initial_delay, recipe.hit_interval.unwrap_or_default(), hits_remaining),
+            recipe,
+            sound_effect_key,
+            source_entity_id,
+            destination_entity_id,
+        };
+
+        if self.update_skill_sound_sequence(&mut pending, 0.0) {
+            self.pending_skill_sounds.push(pending);
+        }
+    }
+
+    fn update_skill_sound_sequence(&self, pending: &mut PendingSkillSound, delta_time: f32) -> bool {
+        let Some(wait_elapsed) = pending.timing.wait_elapsed_if_due(delta_time) else {
+            return true;
+        };
+
+        let entity_id = match pending.recipe.anchor {
+            SkillVisualAnchor::SourceEntity => pending.source_entity_id,
+            SkillVisualAnchor::DestinationEntity => pending.destination_entity_id,
+            SkillVisualAnchor::GroundPosition | SkillVisualAnchor::SkillUnit => return false,
+        };
+        let Some(position) = self.entity_position(entity_id) else {
+            return false;
+        };
+
+        if self
+            .audio_engine
+            .try_play_spatial_sound_effect(pending.sound_effect_key, position, pending.recipe.sound_range)
+        {
+            pending.timing.playback_succeeded()
+        } else {
+            // The entry may have been evicted between sequence hits. `load`
+            // deduplicates in-flight work and restarts loading for an existing
+            // key that is no longer cached.
+            pending.sound_effect_key = self.audio_engine.load(pending.recipe.sound_path);
+            pending.timing.playback_unavailable(wait_elapsed)
+        }
+    }
+
+    fn update_pending_skill_sounds(&mut self, delta_time: f32) {
+        let pending_sounds = std::mem::take(&mut self.pending_skill_sounds);
+
+        for mut pending in pending_sounds {
+            if self.update_skill_sound_sequence(&mut pending, delta_time) {
+                self.pending_skill_sounds.push(pending);
+            }
+        }
+    }
+
     #[inline(always)]
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     fn handle_network_events(&mut self, client_tick: ClientTick) {
         self.networking_system.get_events(&mut self.network_event_buffer);
 
-        for event in self.network_event_buffer.drain() {
+        let events: Vec<NetworkEvent> = self.network_event_buffer.drain().collect();
+
+        for event in events {
             match event {
                 NetworkEvent::LoginServerConnected {
                     character_servers,
@@ -1006,6 +1964,8 @@ impl Client {
                     }
                 }
                 NetworkEvent::MapServerDisconnected { reason } => {
+                    self.clear_skill_cast_state();
+
                     if reason != DisconnectReason::ClosedByClient {
                         // TODO: Make this an on-screen popup.
                         #[cfg(feature = "debug")]
@@ -1019,10 +1979,7 @@ impl Client {
 
                     self.map = None;
 
-                    self.particle_holder.clear();
-                    self.effect_holder.clear();
-                    self.point_light_manager.clear();
-                    self.audio_engine.clear_ambient_sound();
+                    self.clear_world_feedback();
 
                     self.client_state.follow_mut(client_state().entities()).clear();
                     self.client_state.follow_mut(client_state().dead_entities()).clear();
@@ -1076,6 +2033,86 @@ impl Client {
                     {
                         entity.set_idle(client_tick);
                     }
+                }
+                NetworkEvent::EntityStartCasting {
+                    source_entity_id,
+                    destination_entity_id,
+                    cast_time,
+                    element,
+                    ..
+                } => {
+                    if let Some(cast_time) = NonZeroU32::new(cast_time)
+                        && let Some(entity) = self
+                            .client_state
+                            .follow_mut(client_state().entities())
+                            .iter_mut()
+                            .find(|entity| entity.get_entity_id() == source_entity_id)
+                    {
+                        entity.set_casting(cast_time, client_tick);
+                    }
+
+                    // The magic circle swirling for the length of the cast,
+                    // in the element the acknowledgement declares.
+                    if let Some(cast_time) = NonZeroU32::new(cast_time)
+                        && let Some(position) = self.entity_position(source_entity_id)
+                        && let Some(texture) = self.load_skill_particle_texture(cast_aura_texture(element))
+                    {
+                        let duration = cast_time.get() as f32 / 1000.0;
+                        // At half volume: the hum underlines the cast and
+                        // must not drown it out for the caster standing at
+                        // distance zero, matching the reference client's own
+                        // half-volume cast hum.
+                        let sound_effect = self.audio_engine.load(CAST_AURA_SOUND_PATH);
+                        self.audio_engine
+                            .play_spatial_sound_effect_with_volume(sound_effect, position, 55.0, 0.5);
+
+                        if let Some(ground_texture) = self.load_skill_particle_texture(CAST_GROUND_CIRCLE_TEXTURE_PATH) {
+                            self.particle_holder.spawn_cast_ring(CastRing::new(
+                                CastRingKind::Aura,
+                                source_entity_id,
+                                source_entity_id,
+                                position,
+                                Some(texture),
+                                ground_texture,
+                                cast_aura_tint(element),
+                                duration,
+                            ));
+                        }
+
+                        // The lock-on reticle shrinking onto whoever the cast
+                        // will land on. Ground casts and self-casts carry no
+                        // separate victim to mark.
+                        if destination_entity_id != source_entity_id
+                            && destination_entity_id != EntityId(0)
+                            && let Some(target_position) = self.entity_position(destination_entity_id)
+                            && let Some(lock_on_texture) = self.load_skill_particle_texture(CAST_LOCK_ON_TEXTURE_PATH)
+                        {
+                            self.particle_holder.spawn_cast_ring(CastRing::new(
+                                CastRingKind::LockOn,
+                                source_entity_id,
+                                destination_entity_id,
+                                target_position,
+                                None,
+                                lock_on_texture,
+                                Color::rgb_u8(250, 160, 160),
+                                duration,
+                            ));
+                        }
+                    }
+                }
+                NetworkEvent::EntityCancelCasting { entity_id } => {
+                    if let Some(entity) = self
+                        .client_state
+                        .follow_mut(client_state().entities())
+                        .iter_mut()
+                        .find(|entity| entity.get_entity_id() == entity_id)
+                    {
+                        entity.cancel_casting(client_tick);
+                    }
+
+                    // An interrupted cast tears down its aura and the
+                    // lock-on at its target with it.
+                    self.particle_holder.remove_cast_rings(entity_id);
                 }
                 NetworkEvent::DisplayEmotion { entity_id, emotion } => {
                     if let Some(entity) = self
@@ -1197,10 +2234,7 @@ impl Client {
 
                     self.map = None;
 
-                    self.particle_holder.clear();
-                    self.effect_holder.clear();
-                    self.point_light_manager.clear();
-                    self.audio_engine.clear_ambient_sound();
+                    self.clear_world_feedback();
                 }
                 NetworkEvent::CharacterCreated { character_information } => {
                     self.client_state
@@ -1220,6 +2254,9 @@ impl Client {
                         .open_window(ErrorWindow::new("Failed to switch character slots".to_owned()));
                 }
                 NetworkEvent::AddEntity { entity_data } => {
+                    let effect_state = entity_data.effect_state;
+                    let mut sight_entity_id = None;
+
                     if let Some(map) = &self.map
                         && let Some(npc) = Npc::new(&self.library, map, &mut self.path_finder, entity_data, client_tick)
                     {
@@ -1252,6 +2289,14 @@ impl Client {
                         npc.generate_pathing_mesh(&self.device, &self.queue, self.graphics_engine.bindless_support(), map);
 
                         entities.push(npc);
+
+                        if effect_state & OPTION_SIGHT != 0 {
+                            sight_entity_id = Some(entity_id);
+                        }
+                    }
+
+                    if let Some(entity_id) = sight_entity_id {
+                        self.spawn_skill_sprite_visual(sight_sprite_visual(), entity_id, entity_id, false);
                     }
                 }
                 NetworkEvent::RemoveEntity { entity_id, reason } => {
@@ -1297,6 +2342,8 @@ impl Client {
                             entity.fade_out(reason, client_tick);
                         }
                     }
+
+                    self.particle_holder.remove_attached_sprite(entity_id, SIGHT_ATTACHMENT_KEY);
 
                     // If the entity that was removed had an attack buffered we remove the entity
                     // from the buffer.
@@ -1404,14 +2451,18 @@ impl Client {
                     }
                 }
                 NetworkEvent::ChangeMap { map_name, position } => {
+                    self.armed_skill = None;
+                    self.stop_active_continuous_skill();
+                    self.input_system.clear_hotbar_key_ownership();
                     self.map = None;
-                    self.particle_holder.clear();
-                    self.effect_holder.clear();
-                    self.point_light_manager.clear();
-                    self.audio_engine.clear_ambient_sound();
+                    self.clear_world_feedback();
 
                     // Only the player must stay alive between map changes.
-                    self.client_state.follow_mut(client_state().entities()).truncate(1);
+                    let entities = self.client_state.follow_mut(client_state().entities());
+                    if let Some(player) = entities.first_mut() {
+                        player.cancel_casting(client_tick);
+                    }
+                    entities.truncate(1);
                     self.client_state.follow_mut(client_state().dead_entities()).clear();
                     self.client_state.follow_mut(client_state().ground_items()).clear();
                     *self.client_state.follow_mut(client_state().buffered_action()) = None;
@@ -1428,6 +2479,34 @@ impl Client {
                     self.client_state
                         .follow_mut(client_state().chat_messages())
                         .push(ChatMessage::new(text, color));
+                }
+                NetworkEvent::SkillUseRejected {
+                    skill_id,
+                    detail,
+                    item_id,
+                    cause,
+                } => {
+                    let item_name = (item_id.0 != 0
+                        && matches!(cause, SkillUseFailureCode::NEED_ITEM | SkillUseFailureCode::NEED_EQUIPMENT))
+                    .then(|| {
+                        self.library
+                            .get::<ItemName>(ItemNameKey {
+                                item_id,
+                                is_identified: true,
+                            })
+                            .to_string()
+                    })
+                    .filter(|name| name != "NOTFOUND");
+                    let message = self.client_state.follow(client_state().localization()).skill_use_failure_message(
+                        skill_id,
+                        detail,
+                        item_id,
+                        item_name.as_deref(),
+                        cause,
+                    );
+                    self.client_state
+                        .follow_mut(client_state().chat_messages())
+                        .push(ChatMessage::new(message, MessageColor::Error));
                 }
                 NetworkEvent::UpdateEntityDetails { entity_id, name } => {
                     let entity = self
@@ -1501,6 +2580,110 @@ impl Client {
                         self.particle_holder.spawn_particle(particle);
                     }
                 }
+                NetworkEvent::SkillDamage {
+                    skill_id,
+                    source_entity_id,
+                    destination_entity_id,
+                    start_time,
+                    source_motion,
+                    damage,
+                    hit_count,
+                    action,
+                    ..
+                } => {
+                    // Skill hits intentionally provide number feedback only.
+                    // Normal DamageEffect also drives auto-attacks and sprite
+                    // actions, which must not be triggered by this packet.
+                    let initial_delay = skill_effect_initial_delay(start_time, client_tick);
+                    let visual_recipe = skill_damage_visual(skill_id);
+                    let cast_visual_recipe = skill_damage_cast_visual(skill_id);
+                    let sprite_recipe = skill_damage_sprite_visual(skill_id, action);
+                    let procedural_recipe = skill_damage_procedural_visual(skill_id);
+                    let sound_recipe = skill_damage_sound(skill_id);
+                    let hit_interval = visual_recipe
+                        .and_then(|recipe| recipe.hit_interval)
+                        .or_else(|| procedural_recipe.and_then(|recipe| recipe.hit_interval))
+                        .or_else(|| sound_recipe.and_then(|recipe| recipe.hit_interval))
+                        .or_else(|| skill_damage_number_interval(skill_id));
+
+                    // A projectile or leading cast visual launches when the
+                    // packet says the skill resolved, but its hit only lands
+                    // once it arrives. The server's attack motion is that
+                    // flight time, so all hit feedback waits for it. Skills
+                    // with neither keep a zero lead and are unaffected.
+                    let flight_time = skill_impact_lead_time(procedural_recipe, cast_visual_recipe, source_motion);
+                    let impact_delay = initial_delay + flight_time;
+
+                    // One name per cast: splash victims carry their own
+                    // packets and must not each raise a bubble.
+                    if !matches!(action, 5 | 14) {
+                        self.spawn_skill_name_bubble(source_entity_id, skill_id);
+
+                        // The caster fires with their attack motion, as both
+                        // reference clients do on skill use. Called directly
+                        // rather than through the auto-attack damage path,
+                        // whose buffering side effects skills must not touch.
+                        let target_position = self
+                            .client_state
+                            .follow(client_state().entities())
+                            .iter()
+                            .find(|entity| entity.get_entity_id() == destination_entity_id)
+                            .map(|entity| entity.get_tile_position());
+                        if let Some(entity) = self
+                            .client_state
+                            .follow_mut(client_state().entities())
+                            .iter_mut()
+                            .find(|entity| entity.get_entity_id() == source_entity_id)
+                        {
+                            if let Some(target_position) = target_position {
+                                entity.rotate_towards(target_position);
+                            }
+                            entity.set_attack(source_motion.max(0) as u32, false, client_tick);
+                        }
+                    }
+
+                    self.queue_skill_damage_particle(
+                        destination_entity_id,
+                        SkillDamageDisplay::from_packet(damage, action),
+                        hit_count,
+                        hit_interval,
+                        impact_delay,
+                    );
+                    // The once-per-resolution component, independent of the
+                    // hit count. Mirrors the official client's split between
+                    // a skill's effect and its per-hit effect.
+                    if let Some(recipe) = cast_visual_recipe {
+                        self.queue_skill_damage_visual(recipe, source_entity_id, destination_entity_id, 1, initial_delay);
+                    }
+                    if let Some(recipe) = visual_recipe {
+                        self.queue_skill_damage_visual(recipe, source_entity_id, destination_entity_id, hit_count, impact_delay);
+                    }
+                    if let Some(recipe) = sprite_recipe {
+                        self.queue_skill_sprite_visual(recipe, source_entity_id, destination_entity_id, true, impact_delay);
+                    }
+                    if let Some(recipe) = procedural_recipe.filter(|recipe| procedural_spawns_for_action(*recipe, action)) {
+                        self.queue_procedural_skill_visual(
+                            recipe,
+                            source_entity_id,
+                            destination_entity_id,
+                            hit_count,
+                            initial_delay,
+                            flight_time,
+                        );
+                    }
+                    if let Some(recipe) = sound_recipe {
+                        self.play_skill_damage_sound(recipe, source_entity_id, destination_entity_id, hit_count, impact_delay);
+                    }
+                    if let Some((recipe, followup_delay)) = skill_damage_followup_sound(skill_id) {
+                        self.play_skill_damage_sound(
+                            recipe,
+                            source_entity_id,
+                            destination_entity_id,
+                            1,
+                            impact_delay + followup_delay,
+                        );
+                    }
+                }
                 NetworkEvent::EntityPickUpItem { entity_id, item_entity_id } => {
                     let item_position = self
                         .client_state
@@ -1524,16 +2707,43 @@ impl Client {
                         }
                     }
                 }
-                NetworkEvent::HealEffect { entity_id, heal_amount } => {
-                    if let Some(entity) = self
-                        .client_state
-                        .follow(client_state().entities())
-                        .iter()
-                        .find(|entity| entity.get_entity_id() == entity_id)
-                        .or_else(|| self.client_state.try_follow(this_entity()))
+                NetworkEvent::SkillEffectNoDamage {
+                    skill_id,
+                    heal_amount,
+                    destination_entity_id,
+                    source_entity_id,
+                    result,
+                } => {
+                    if result != 0
+                        && should_display_heal_number(skill_id)
+                        && heal_amount > 0
+                        && let Some(entity) = self
+                            .client_state
+                            .follow(client_state().entities())
+                            .iter()
+                            .find(|entity| entity.get_entity_id() == destination_entity_id)
+                            .or_else(|| {
+                                self.client_state
+                                    .try_follow(this_entity())
+                                    .filter(|entity| entity.get_entity_id() == destination_entity_id)
+                            })
                     {
                         self.particle_holder
                             .spawn_particle(Box::new(HealNumber::new(entity.get_position(), heal_amount.to_string())));
+                    }
+
+                    if result != 0 {
+                        self.spawn_skill_name_bubble(source_entity_id, skill_id);
+
+                        if let Some(recipe) = no_damage_skill_visual(skill_id) {
+                            self.spawn_skill_visual(recipe, source_entity_id, destination_entity_id, None, None);
+                        }
+                        if let Some(recipe) = no_damage_sprite_visual(skill_id) {
+                            self.spawn_skill_sprite_visual(recipe, source_entity_id, destination_entity_id, true);
+                        }
+                        if let Some(recipe) = no_damage_skill_sound(skill_id) {
+                            self.play_skill_sound(recipe, source_entity_id, destination_entity_id, None);
+                        }
                     }
                 }
                 NetworkEvent::UpdateEntityHealth {
@@ -1687,6 +2897,8 @@ impl Client {
                     }
                 }
                 NetworkEvent::LoggedOut => {
+                    self.clear_skill_cast_state();
+                    self.clear_world_feedback();
                     self.networking_system.disconnect_from_map_server();
                 }
                 NetworkEvent::FriendRequest { requestee } => {
@@ -1701,87 +2913,92 @@ impl Client {
                     self.client_state.follow_mut(client_state().friend_list()).push(friend);
                 }
                 NetworkEvent::VisualEffect { effect_path, entity_id } => {
-                    let effect = self.effect_loader.get_or_load(effect_path, &self.texture_loader).unwrap();
+                    let Some(position) = self.entity_position(entity_id) else {
+                        continue;
+                    };
+                    let effect = match self.effect_loader.get_or_load(effect_path, &self.texture_loader) {
+                        Ok(effect) => effect,
+                        Err(_error) => {
+                            #[cfg(feature = "debug")]
+                            print_debug!(
+                                "[{}] failed to load entity effect '{}': {:?}",
+                                "error".red(),
+                                effect_path,
+                                _error
+                            );
+                            continue;
+                        }
+                    };
                     let frame_timer = effect.new_frame_timer();
 
                     self.effect_holder.add_effect(Box::new(EffectWithLight::new(
                         effect,
                         frame_timer,
-                        EffectCenter::Entity(entity_id, Point3::new(0.0, 0.0, 0.0)),
+                        EffectCenter::Entity(entity_id, position),
                         Vector3::new(0.0, 9.0, 0.0),
-                        // FIX: The point light id needs to be unique.
-                        // The point light manager uses the id to decide which point light
-                        // renders with a shadow. Having duplicate ids might cause some
-                        // visual artifacts, such as flickering, as the point lights switch
-                        // between shadows and no shadows.
-                        PointLightId::new(entity_id.0),
+                        next_dynamic_point_light_id(),
                         Vector3::new(0.0, 12.0, 0.0),
                         Color::WHITE,
                         50.0,
                         false,
                     )));
                 }
+                NetworkEvent::SpecialEffect { entity_id, effect_id } => {
+                    if let Some(recipe) = special_effect_visual(effect_id) {
+                        self.spawn_skill_visual(recipe, entity_id, entity_id, None, None);
+                    }
+                    if let Some(recipe) = special_effect_sprite_visual(effect_id) {
+                        self.spawn_skill_sprite_visual(recipe, entity_id, entity_id, true);
+                    }
+                    if let Some(recipe) = special_effect_procedural_visual(effect_id) {
+                        // ZC_NOTIFY_EFFECT carries no motion time. None of the
+                        // direct-effect recipes lead an impact, so the flight
+                        // time is unused; the floor keeps any future
+                        // projectile visible rather than single-frame.
+                        self.spawn_procedural_skill_visual(recipe, entity_id, entity_id, 0, 0.0, skill_projectile_flight_time(0));
+                    }
+                    if let Some(recipe) = special_effect_sound(effect_id) {
+                        self.play_skill_sound(recipe, entity_id, entity_id, None);
+                    }
+                }
+                NetworkEvent::GroundSkill {
+                    skill_id,
+                    source_entity_id,
+                    position,
+                    start_time,
+                    ..
+                } => {
+                    if let Some(recipe) = ground_skill_visual(skill_id) {
+                        self.queue_ground_skill_visual(
+                            recipe,
+                            source_entity_id,
+                            position,
+                            skill_effect_initial_delay(start_time, client_tick),
+                        );
+                    }
+                }
+                NetworkEvent::StatusChange { .. } => {}
+                NetworkEvent::EntityStateChange {
+                    entity_id, effect_state, ..
+                } => {
+                    if effect_state & OPTION_SIGHT == 0 {
+                        self.particle_holder.remove_attached_sprite(entity_id, SIGHT_ATTACHMENT_KEY);
+                    } else if !self.particle_holder.has_attached_sprite(entity_id, SIGHT_ATTACHMENT_KEY) {
+                        self.spawn_skill_sprite_visual(sight_sprite_visual(), entity_id, entity_id, false);
+                    }
+                }
                 NetworkEvent::AddSkillUnit {
                     entity_id,
+                    creator_id,
                     unit_id,
                     position,
+                    visible,
+                    ..
                 } => {
-                    let Some(map) = &self.map else {
-                        continue;
-                    };
-
-                    match unit_id {
-                        UnitId::Firewall => {
-                            let Some(position) = map.get_world_position(position) else {
-                                #[cfg(feature = "debug")]
-                                print_debug!("[{}] entity with id {:?} is out of map bounds", "error".red(), entity_id);
-                                continue;
-                            };
-
-                            let effect = self.effect_loader.get_or_load("firewall.str", &self.texture_loader).unwrap();
-                            let frame_timer = effect.new_frame_timer();
-
-                            self.effect_holder.add_unit(
-                                Box::new(EffectWithLight::new(
-                                    effect,
-                                    frame_timer,
-                                    EffectCenter::Position(position),
-                                    Vector3::new(0.0, 0.0, 0.0),
-                                    PointLightId::new(unit_id as u32),
-                                    Vector3::new(0.0, 6.0, 0.0),
-                                    Color::rgb_u8(255, 30, 0),
-                                    60.0,
-                                    true,
-                                )),
-                                entity_id,
-                            );
-                        }
-                        UnitId::Pneuma => {
-                            let Some(position) = map.get_world_position(position) else {
-                                #[cfg(feature = "debug")]
-                                print_debug!("[{}] entity with id {:?} is out of map bounds", "error".red(), entity_id);
-                                continue;
-                            };
-
-                            let effect = self.effect_loader.get_or_load("pneuma1.str", &self.texture_loader).unwrap();
-                            let frame_timer = effect.new_frame_timer();
-
-                            self.effect_holder.add_unit(
-                                Box::new(EffectWithLight::new(
-                                    effect,
-                                    frame_timer,
-                                    EffectCenter::Position(position),
-                                    Vector3::new(0.0, 0.0, 0.0),
-                                    PointLightId::new(unit_id as u32),
-                                    Vector3::new(0.0, 6.0, 0.0),
-                                    Color::rgb_u8(83, 220, 108),
-                                    40.0,
-                                    false,
-                                )),
-                                entity_id,
-                            );
-                        }
-                        _ => {}
+                    if visible != 0
+                        && let Some(recipe) = skill_unit_visual(unit_id)
+                    {
+                        self.spawn_skill_visual(recipe, creator_id, entity_id, Some(position), Some(entity_id));
                     }
                 }
                 NetworkEvent::RemoveSkillUnit { entity_id } => {
@@ -1953,6 +3170,23 @@ impl Client {
                     );
                 }
                 NetworkEvent::RemoveSkill { skill_id } => {
+                    let removed_armed_skill = self.armed_skill.is_some_and(|armed_skill| armed_skill.skill_id == skill_id);
+                    let removed_active_skill = self
+                        .active_continuous_skill
+                        .is_some_and(|active_skill| active_skill.skill_id == skill_id);
+
+                    if removed_armed_skill {
+                        self.armed_skill = None;
+                    }
+
+                    if removed_active_skill {
+                        self.active_continuous_skill = None;
+                    }
+
+                    if removed_armed_skill || removed_active_skill {
+                        self.input_system.clear_hotbar_key_ownership();
+                    }
+
                     self.client_state.follow_mut(client_state().skill_tree()).remove_skill(skill_id);
                     self.client_state
                         .follow_mut(client_state().skill_tree_window().chosen_skill_level())
@@ -1960,6 +3194,112 @@ impl Client {
                 }
             }
         }
+    }
+
+    fn clear_skill_cast_state(&mut self) {
+        self.armed_skill = None;
+        self.active_continuous_skill = None;
+        self.input_system.clear_hotbar_key_ownership();
+    }
+
+    fn clear_world_feedback(&mut self) {
+        self.particle_holder.clear();
+        self.effect_holder.clear();
+        self.pending_skill_effects.clear();
+        self.pending_skill_sounds.clear();
+        self.pending_skill_sprites.clear();
+        self.pending_skill_damage_particles.clear();
+        self.pending_procedural_skill_visuals.clear();
+        self.point_light_manager.clear();
+        self.audio_engine.clear_ambient_sound();
+        self.audio_engine.clear_queued_sound_effects();
+    }
+
+    fn stop_active_continuous_skill(&mut self) {
+        if let Some(active_skill) = self.active_continuous_skill.take() {
+            let _ = self.networking_system.stop_channeling_skill(active_skill.skill_id);
+        }
+    }
+
+    fn cast_resolved_skill(
+        &mut self,
+        skill_id: SkillId,
+        skill_level: SkillLevel,
+        skill_type: SkillType,
+        activation: SkillActivation,
+        source_slot: Option<HotbarSlot>,
+    ) {
+        self.armed_skill = None;
+
+        if skill_type == SkillType::Passive {
+            return;
+        }
+
+        let Some(player_entity_id) = self.client_state.try_follow(this_entity()).map(Entity::get_entity_id) else {
+            self.stop_active_continuous_skill();
+            return;
+        };
+
+        if skill_type == SkillType::SelfCast && skill_id == ROLLING_CUTTER_ID {
+            let (stopped_skill_id, should_start) =
+                activate_continuous_skill(&mut self.active_continuous_skill, skill_id, activation, source_slot);
+
+            if let Some(stopped_skill_id) = stopped_skill_id {
+                let _ = self.networking_system.stop_channeling_skill(stopped_skill_id);
+            }
+
+            if should_start
+                && self
+                    .networking_system
+                    .cast_channeling_skill(skill_id, skill_level, player_entity_id)
+                    .is_err()
+            {
+                self.active_continuous_skill = None;
+            }
+
+            return;
+        }
+
+        self.stop_active_continuous_skill();
+
+        match skill_type {
+            SkillType::SelfCast => {
+                let _ = self.networking_system.cast_skill(skill_id, skill_level, player_entity_id);
+            }
+            skill_type @ (SkillType::Attack | SkillType::Support | SkillType::Ground | SkillType::Trap) => {
+                self.armed_skill = Some(ArmedSkill {
+                    skill_id,
+                    skill_level,
+                    skill_type,
+                });
+            }
+            SkillType::Passive => unreachable!(),
+        }
+    }
+
+    fn resolve_armed_skill_target(&self, picker_target: PickerTarget) -> Option<SkillCastTarget> {
+        let armed_skill = self.armed_skill?;
+        let player_entity_id = self.client_state.try_follow(this_entity()).map(Entity::get_entity_id);
+
+        resolve_skill_cast_target(
+            armed_skill.skill_type,
+            picker_target,
+            player_entity_id,
+            |entity_id| {
+                self.client_state
+                    .follow(client_state().entities())
+                    .iter()
+                    .find(|entity| entity.get_entity_id() == entity_id)
+                    .map(Entity::get_tile_position)
+            },
+            |entity_id| {
+                self.client_state
+                    .follow(client_state().ground_items())
+                    .iter()
+                    .find(|item| item.get_entity_id() == entity_id)
+                    .map(GroundItem::get_tile_position)
+            },
+        )
     }
 
     /// Returns whether or not the interface is focused.
@@ -1974,6 +3314,11 @@ impl Client {
         self.interface.process_events(&mut self.input_event_buffer);
 
         let interface_has_focus = self.interface.has_focus();
+        let cancelled_armed_skill = self.armed_skill.is_some() && self.input_system.escape_pressed();
+
+        if cancelled_armed_skill {
+            self.armed_skill = None;
+        }
 
         if self.interface.get_mouse_mode().is_rotating_camera() {
             // TODO: Does this really need to be a InputEvent?
@@ -1991,7 +3336,11 @@ impl Client {
             );
         }
 
-        for event in self.input_event_buffer.drain(..) {
+        self.input_system.handle_hotbar_key_releases(&mut self.input_event_buffer);
+
+        let events: Vec<InputEvent> = self.input_event_buffer.drain(..).collect();
+
+        for event in events {
             match event {
                 InputEvent::LogIn {
                     service_id,
@@ -2051,17 +3400,28 @@ impl Client {
                     self.interface.close_window_with_class(WindowClass::Respawn);
                 }
                 InputEvent::LogOut => {
+                    self.armed_skill = None;
+                    self.stop_active_continuous_skill();
+                    self.input_system.clear_hotbar_key_ownership();
                     let _ = self.networking_system.log_out();
                 }
                 InputEvent::LogOutCharacter => {
+                    self.armed_skill = None;
+                    self.stop_active_continuous_skill();
+                    self.input_system.clear_hotbar_key_ownership();
                     self.networking_system.disconnect_from_character_server();
                 }
-                InputEvent::Exit => SHUTDOWN_SIGNAL.store(true, Ordering::SeqCst),
+                InputEvent::Exit => {
+                    self.armed_skill = None;
+                    self.stop_active_continuous_skill();
+                    self.input_system.clear_hotbar_key_ownership();
+                    SHUTDOWN_SIGNAL.store(true, Ordering::SeqCst);
+                }
                 InputEvent::ZoomCamera { zoom_factor } => self.player_camera.soft_zoom(zoom_factor),
                 InputEvent::RotateCamera { rotation } => self.player_camera.soft_rotate(rotation),
                 InputEvent::ResetCameraRotation => self.player_camera.reset_rotation(),
                 InputEvent::ToggleMenuWindow => {
-                    if self.client_state.try_follow(this_entity()).is_some() {
+                    if !cancelled_armed_skill && self.client_state.try_follow(this_entity()).is_some() {
                         match self.interface.is_window_with_class_open(WindowClass::Menu) {
                             true => self.interface.close_window_with_class(WindowClass::Menu),
                             false => self.interface.open_window(MenuWindow),
@@ -2320,9 +3680,13 @@ impl Client {
                     }
                     _ => {}
                 },
-                InputEvent::CastSkill { slot } => {
-                    if let Some(learnable_skill) = self.client_state.follow(client_state().hotbar()).get_skill_in_slot(slot).as_ref()
-                        && let Some(learned_skill) =
+                InputEvent::CastSkill { slot, activation } => {
+                    let skill = self
+                        .client_state
+                        .follow(client_state().hotbar())
+                        .get_skill_in_slot(slot)
+                        .as_ref()
+                        .and_then(|learnable_skill| {
                             self.client_state
                                 .follow(client_state().skill_tree().skills())
                                 .iter()
@@ -2330,66 +3694,64 @@ impl Client {
                                     learned_skill.skill_id == learnable_skill.skill_id
                                         && learned_skill.skill_level.0 >= learnable_skill.maximum_level.0
                                 })
-                    {
-                        match learned_skill.skill_type {
-                            SkillType::Passive => {}
-                            SkillType::Attack => {
-                                if let PickerTarget::Entity(entity_id) = input_report.mouse_target {
-                                    let _ = self.networking_system.cast_skill(
+                                .map(|learned_skill| {
+                                    (
                                         learnable_skill.skill_id,
                                         learnable_skill.maximum_level,
-                                        entity_id,
-                                    );
-                                }
-                            }
-                            SkillType::Ground | SkillType::Trap => {
-                                if let PickerTarget::Tile { x, y } = input_report.mouse_target {
-                                    let _ = self.networking_system.cast_ground_skill(
-                                        learnable_skill.skill_id,
-                                        learnable_skill.maximum_level,
-                                        TilePosition { x, y },
-                                    );
-                                }
-                            }
-                            SkillType::SelfCast => match learnable_skill.skill_id == ROLLING_CUTTER_ID {
-                                true => {
-                                    let _ = self.networking_system.cast_channeling_skill(
-                                        learnable_skill.skill_id,
-                                        learnable_skill.maximum_level,
-                                        self.client_state.follow(this_entity().manually_asserted()).get_entity_id(),
-                                    );
-                                }
-                                false => {
-                                    let _ = self.networking_system.cast_skill(
-                                        learnable_skill.skill_id,
-                                        learnable_skill.maximum_level,
-                                        self.client_state.follow(this_entity().manually_asserted()).get_entity_id(),
-                                    );
-                                }
-                            },
-                            SkillType::Support => {
-                                if let PickerTarget::Entity(entity_id) = input_report.mouse_target {
-                                    let _ = self.networking_system.cast_skill(
-                                        learnable_skill.skill_id,
-                                        learnable_skill.maximum_level,
-                                        entity_id,
-                                    );
-                                } else {
-                                    let _ = self.networking_system.cast_skill(
-                                        learnable_skill.skill_id,
-                                        learnable_skill.maximum_level,
-                                        self.client_state.follow(this_entity().manually_asserted()).get_entity_id(),
-                                    );
-                                }
-                            }
-                        }
+                                        learned_skill.skill_type,
+                                    )
+                                })
+                        });
+
+                    if let Some((skill_id, skill_level, skill_type)) = skill {
+                        self.cast_resolved_skill(skill_id, skill_level, skill_type, activation, Some(slot));
                     }
                 }
+                InputEvent::CastLearnedSkill {
+                    skill_id,
+                    skill_level,
+                    skill_type,
+                    activation,
+                } => {
+                    self.cast_resolved_skill(skill_id, skill_level, skill_type, activation, None);
+                }
+                InputEvent::CastSkillAt {
+                    skill_id,
+                    skill_level,
+                    target,
+                } => match target {
+                    SkillCastTarget::Entity(entity_id) => {
+                        let _ = self.networking_system.cast_skill(skill_id, skill_level, entity_id);
+                    }
+                    SkillCastTarget::Ground(position) => {
+                        let _ = self.networking_system.cast_ground_skill(skill_id, skill_level, position);
+                    }
+                },
                 InputEvent::StopSkill { slot } => {
-                    if let Some(skill) = self.client_state.follow(client_state().hotbar()).get_skill_in_slot(slot).as_ref()
-                        && skill.skill_id == ROLLING_CUTTER_ID
-                    {
-                        let _ = self.networking_system.stop_channeling_skill(skill.skill_id);
+                    if let Some(skill_id) = release_continuous_skill(&mut self.active_continuous_skill, slot) {
+                        let _ = self.networking_system.stop_channeling_skill(skill_id);
+                    }
+                }
+                InputEvent::CycleSkillLevel { slot } => {
+                    let learned_maximum_level = self
+                        .client_state
+                        .follow(client_state().hotbar())
+                        .get_skill_in_slot(slot)
+                        .as_ref()
+                        .and_then(|skill| {
+                            self.client_state
+                                .follow(client_state().skill_tree().skills())
+                                .iter()
+                                .find(|learned_skill| learned_skill.skill_id == skill.skill_id)
+                                .map(|learned_skill| learned_skill.skill_level)
+                        });
+
+                    if let Some(learned_maximum_level) = learned_maximum_level {
+                        self.client_state.follow_mut(client_state().hotbar()).cycle_skill_level(
+                            &mut self.networking_system,
+                            slot,
+                            learned_maximum_level,
+                        );
                     }
                 }
                 InputEvent::AddFriend { character_name } => {
@@ -2983,6 +4345,7 @@ impl Client {
                 &self.top_interface_renderer,
                 input_report.mouse_position,
                 self.interface.get_mouse_mode().grabbed(),
+                self.armed_skill.map(|armed_skill| armed_skill.skill_level),
                 *self.client_state.follow(client_state().world_theme().cursor().color()),
                 self.client_state.follow(client_state().interface_settings().scaling()).get_factor(),
             );
@@ -3092,9 +4455,28 @@ impl Client {
         }
 
         // Update particles.
-        self.particle_holder.update(delta_time as f32);
-        self.effect_holder
-            .update(self.client_state.follow(client_state().entities()), delta_time as f32);
+        self.update_pending_skill_effects(delta_time as f32);
+        self.update_pending_skill_sounds(delta_time as f32);
+        self.update_pending_skill_sprites(delta_time as f32);
+        self.update_pending_skill_damage_particles(delta_time as f32);
+        let local_entity = self
+            .client_state
+            .try_follow(this_entity())
+            .map(|entity| (entity.get_entity_id(), entity.get_position()));
+        self.particle_holder.update_with_local_entity(
+            self.client_state.follow(client_state().entities()),
+            local_entity,
+            delta_time as f32,
+        );
+        // Delayed procedural particles are spawned after existing particles
+        // advance. Their per-event overshoot is applied on creation, preserving
+        // multi-hit phase spacing even when one frame crosses several deadlines.
+        self.update_pending_procedural_skill_visuals(delta_time as f32);
+        self.effect_holder.update_with_local_entity(
+            self.client_state.follow(client_state().entities()),
+            local_entity,
+            delta_time as f32,
+        );
 
         let current_camera: &(dyn Camera + Send + Sync) = match currently_playing {
             #[cfg(feature = "debug")]
@@ -3105,6 +4487,13 @@ impl Client {
 
         let (view_matrix, projection_matrix) = current_camera.view_projection_matrices();
         let camera_position = current_camera.camera_position().to_homogeneous();
+        // The cast cone layers billboard around the vertical axis, so they
+        // need the camera's horizontal right vector. Computed here while the
+        // camera borrow is active and carried as a plain value.
+        let camera_right = {
+            let view_direction = current_camera.view_direction();
+            cgmath::InnerSpace::normalize(Vector3::new(-view_direction.z, 0.0, view_direction.x))
+        };
 
         #[cfg(feature = "debug")]
         let update_shadow_camera_measurement = Profiler::start_measurement("update directional shadow camera");
@@ -3153,6 +4542,9 @@ impl Client {
             _ => None,
         };
 
+        let mut armed_skill = self.armed_skill;
+        let armed_skill_target = self.resolve_armed_skill_target(input_report.mouse_target);
+
         let point_light_set = Self::create_point_light_set(
             &mut self.point_light_manager,
             &mut self.point_light_set_buffer,
@@ -3171,6 +4563,7 @@ impl Client {
         let mouse_mode = self.interface.get_mouse_mode();
         let is_mouse_mode_default = mouse_mode.is_default();
         let last_walking_destination = mouse_mode.walk_destination();
+        let mut clear_armed_skill = false;
 
         let mut interface_frame = {
             #[cfg(feature = "debug")]
@@ -3192,6 +4585,7 @@ impl Client {
             let cursor_state = match input_report.mouse_target {
                 _ if is_rotating_camera => MouseCursorState::RotateCamera,
                 _ if is_grabbing => MouseCursorState::GrabResource,
+                _ if armed_skill.is_some() && !is_interface_hovered => MouseCursorState::Target,
                 PickerTarget::Entity(entity_id) if !is_interface_hovered => {
                     if self
                         .client_state
@@ -3219,8 +4613,23 @@ impl Client {
             self.mouse_cursor.set_state(cursor_state, client_tick);
 
             if let Some(mouse_button) = input_report.mouse_click {
-                if is_interface_hovered {
+                if armed_skill.is_some() && is_skill_target_cancellation(mouse_button) {
+                    interface_frame.unfocus();
+                    armed_skill = None;
+                    clear_armed_skill = true;
+                } else if is_interface_hovered {
                     interface_frame.click(&self.client_state, mouse_button);
+                } else if armed_skill.is_some() && is_skill_target_confirmation(mouse_button) {
+                    interface_frame.unfocus();
+
+                    if let Some((armed_skill, target)) = take_resolved_armed_skill(&mut armed_skill, armed_skill_target) {
+                        self.input_event_buffer.push(InputEvent::CastSkillAt {
+                            skill_id: armed_skill.skill_id,
+                            skill_level: armed_skill.skill_level,
+                            target,
+                        });
+                        clear_armed_skill = true;
+                    }
                 } else {
                     interface_frame.unfocus();
 
@@ -3298,6 +4707,16 @@ impl Client {
             interface_frame
         };
 
+        let is_interface_hovered = interface_frame.is_interface_hovered();
+        let skill_target_highlight = match (is_interface_hovered, armed_skill, input_report.mouse_target, armed_skill_target) {
+            (false, Some(_), PickerTarget::Entity(entity_id), Some(_)) => Some((entity_id, Color::rgb_u8(255, 130, 130))),
+            _ => None,
+        };
+
+        if clear_armed_skill {
+            self.armed_skill = None;
+        }
+
         {
             let mut render_context = MapRenderContext {
                 map: &map,
@@ -3313,8 +4732,9 @@ impl Client {
                 animation_timer_ms,
                 currently_playing,
                 is_mouse_mode_default,
-                is_interface_hovered: interface_frame.is_interface_hovered(),
+                is_interface_hovered,
                 last_walking_destination,
+                skill_target_highlight,
                 buffered_action: *self.client_state.follow(client_state().buffered_action()),
                 #[cfg(feature = "debug")]
                 render_options: &render_options,
@@ -3423,11 +4843,16 @@ impl Client {
             color: directional_light_color,
         };
 
+        self.ground_marker_instructions.clear();
+        self.particle_holder
+            .collect_ground_markers(&mut self.ground_marker_instructions, camera_right);
+
         let render_instruction = RenderInstruction {
             show_interface: self.show_interface,
             picker_position,
             uniforms,
             indicator: indicator_instruction,
+            ground_markers: &self.ground_marker_instructions,
             interface: interface_instructions.as_slice(),
             bottom_layer_rectangles: bottom_layer_instructions.as_slice(),
             middle_layer_rectangles: middle_layer_instructions.as_slice(),
@@ -3542,6 +4967,9 @@ impl ApplicationHandler for Client {
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _window_id: WindowId, event: WindowEvent) {
         match event {
             WindowEvent::CloseRequested => {
+                self.armed_skill = None;
+                self.stop_active_continuous_skill();
+                self.input_system.clear_hotbar_key_ownership();
                 event_loop.exit();
             }
             WindowEvent::Resized(screen_size) => {
@@ -3561,6 +4989,9 @@ impl ApplicationHandler for Client {
             }
             WindowEvent::Focused(focused) => {
                 if !focused {
+                    self.armed_skill = None;
+                    self.stop_active_continuous_skill();
+                    self.input_system.clear_hotbar_key_ownership();
                     self.input_system.reset();
                 }
 
@@ -3632,6 +5063,7 @@ struct MapRenderContext<'a, 'm: 'a> {
     is_mouse_mode_default: bool,
     is_interface_hovered: bool,
     last_walking_destination: Option<TilePosition>,
+    skill_target_highlight: Option<(EntityId, Color)>,
     buffered_action: Option<BufferedAction>,
     #[cfg(feature = "debug")]
     render_options: &'a RenderOptions,
@@ -3768,7 +5200,7 @@ impl<'a, 'm: 'a> MapRenderContext<'a, 'm> {
 
             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(self.render_options.show_entities))]
             self.map
-                .render_entities(entity_instructions, entities, &partition_camera, self.client_tick);
+                .render_entities(entity_instructions, entities, &partition_camera, self.client_tick, None);
 
             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(self.render_options.show_entities))]
             self.map
@@ -3850,8 +5282,13 @@ impl<'a, 'm: 'a> MapRenderContext<'a, 'm> {
             .render_ground_items(self.entity_instructions, ground_items, entity_camera, self.client_tick);
 
         #[cfg_attr(feature = "debug", korangar_debug::debug_condition(self.render_options.show_entities))]
-        self.map
-            .render_entities(self.entity_instructions, entities, entity_camera, self.client_tick);
+        self.map.render_entities(
+            self.entity_instructions,
+            entities,
+            entity_camera,
+            self.client_tick,
+            self.skill_target_highlight,
+        );
 
         #[cfg_attr(feature = "debug", korangar_debug::debug_condition(self.render_options.show_entities))]
         self.map
@@ -3914,6 +5351,16 @@ impl<'a, 'm: 'a> MapRenderContext<'a, 'm> {
 
         self.effect_holder.render(self.effect_renderer, self.current_camera);
 
+        let world_theme = self.client_state.follow(client_state().world_theme());
+        for entity in self.client_state.follow(client_state().entities()).iter() {
+            entity.render_cast_bar(
+                self.middle_interface_renderer,
+                self.current_camera,
+                world_theme,
+                self.screen_size,
+            );
+        }
+
         if let Some(player) = self.client_state.try_follow(this_entity()) {
             #[cfg(feature = "debug")]
             profile_block!("render player status");
@@ -3921,7 +5368,7 @@ impl<'a, 'm: 'a> MapRenderContext<'a, 'm> {
             player.render_status(
                 self.middle_interface_renderer,
                 self.current_camera,
-                self.client_state.follow(client_state().world_theme()),
+                world_theme,
                 self.screen_size,
             );
         }
@@ -3936,7 +5383,7 @@ impl<'a, 'm: 'a> MapRenderContext<'a, 'm> {
             entity.render_status(
                 self.middle_interface_renderer,
                 self.current_camera,
-                self.client_state.follow(client_state().world_theme()),
+                world_theme,
                 self.screen_size,
             );
         }
@@ -3972,7 +5419,7 @@ impl<'a, 'm: 'a> MapRenderContext<'a, 'm> {
                             entity.render_status(
                                 self.middle_interface_renderer,
                                 self.current_camera,
-                                self.client_state.follow(client_state().world_theme()),
+                                world_theme,
                                 self.screen_size,
                             );
                         }
@@ -4002,5 +5449,222 @@ impl<'a, 'm: 'a> MapRenderContext<'a, 'm> {
             }
             _ => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod skill_casting_tests {
+    use super::*;
+
+    const PLAYER_ID: EntityId = EntityId(1);
+    const ENTITY_ID: EntityId = EntityId(2);
+    const ITEM_ID: EntityId = EntityId(3);
+    const STALE_ID: EntityId = EntityId(4);
+    const ENTITY_POSITION: TilePosition = TilePosition { x: 10, y: 20 };
+    const ITEM_POSITION: TilePosition = TilePosition { x: 30, y: 40 };
+
+    fn entity_position(entity_id: EntityId) -> Option<TilePosition> {
+        match entity_id {
+            PLAYER_ID => Some(TilePosition { x: 1, y: 1 }),
+            ENTITY_ID => Some(ENTITY_POSITION),
+            _ => None,
+        }
+    }
+
+    fn ground_item_position(entity_id: EntityId) -> Option<TilePosition> {
+        (entity_id == ITEM_ID).then_some(ITEM_POSITION)
+    }
+
+    fn resolve(skill_type: SkillType, picker_target: PickerTarget) -> Option<SkillCastTarget> {
+        resolve_skill_cast_target(
+            skill_type,
+            picker_target,
+            Some(PLAYER_ID),
+            entity_position,
+            ground_item_position,
+        )
+    }
+
+    fn update_sound_timing(timing: &mut SkillSoundSequenceTiming, delta_time: f32, ready: bool, playback_count: &mut usize) -> bool {
+        let Some(wait_elapsed) = timing.wait_elapsed_if_due(delta_time) else {
+            return true;
+        };
+
+        if ready {
+            *playback_count += 1;
+            timing.playback_succeeded()
+        } else {
+            timing.playback_unavailable(wait_elapsed)
+        }
+    }
+
+    #[test]
+    fn targeted_skills_only_accept_live_entities() {
+        assert_eq!(
+            resolve(SkillType::Attack, PickerTarget::Entity(ENTITY_ID)),
+            Some(SkillCastTarget::Entity(ENTITY_ID))
+        );
+        assert_eq!(resolve(SkillType::Attack, PickerTarget::Entity(STALE_ID)), None);
+        assert_eq!(resolve(SkillType::Attack, PickerTarget::Tile { x: 5, y: 6 }), None);
+    }
+
+    #[test]
+    fn support_skills_fall_back_to_the_player() {
+        assert_eq!(
+            resolve(SkillType::Support, PickerTarget::Entity(ENTITY_ID)),
+            Some(SkillCastTarget::Entity(ENTITY_ID))
+        );
+        assert_eq!(
+            resolve(SkillType::Support, PickerTarget::Nothing),
+            Some(SkillCastTarget::Entity(PLAYER_ID))
+        );
+        assert_eq!(
+            resolve(SkillType::Support, PickerTarget::Tile { x: 5, y: 6 }),
+            Some(SkillCastTarget::Entity(PLAYER_ID))
+        );
+        assert_eq!(resolve(SkillType::Support, PickerTarget::Entity(ITEM_ID)), None);
+    }
+
+    #[test]
+    fn ground_skills_resolve_tiles_entities_and_ground_items() {
+        assert_eq!(
+            resolve(SkillType::Ground, PickerTarget::Tile { x: 5, y: 6 }),
+            Some(SkillCastTarget::Ground(TilePosition { x: 5, y: 6 }))
+        );
+        assert_eq!(
+            resolve(SkillType::Ground, PickerTarget::Entity(ENTITY_ID)),
+            Some(SkillCastTarget::Ground(ENTITY_POSITION))
+        );
+        assert_eq!(
+            resolve(SkillType::Trap, PickerTarget::Entity(ITEM_ID)),
+            Some(SkillCastTarget::Ground(ITEM_POSITION))
+        );
+        assert_eq!(resolve(SkillType::Ground, PickerTarget::Entity(STALE_ID)), None);
+    }
+
+    #[test]
+    fn passive_and_self_cast_skills_never_resolve_world_targets() {
+        assert_eq!(resolve(SkillType::Passive, PickerTarget::Entity(ENTITY_ID)), None);
+        assert_eq!(resolve(SkillType::SelfCast, PickerTarget::Entity(ENTITY_ID)), None);
+    }
+
+    #[test]
+    fn invalid_confirmation_keeps_the_skill_armed() {
+        let armed = ArmedSkill {
+            skill_id: SkillId(10),
+            skill_level: SkillLevel(3),
+            skill_type: SkillType::Attack,
+        };
+        let mut armed_skill = Some(armed);
+
+        assert_eq!(take_resolved_armed_skill(&mut armed_skill, None), None);
+        assert_eq!(armed_skill, Some(armed));
+
+        let target = SkillCastTarget::Entity(ENTITY_ID);
+        assert_eq!(take_resolved_armed_skill(&mut armed_skill, Some(target)), Some((armed, target)));
+        assert_eq!(armed_skill, None);
+    }
+
+    #[test]
+    fn single_and_double_mouse_buttons_confirm_or_cancel_targeting() {
+        assert!(is_skill_target_confirmation(MouseButton::Left));
+        assert!(is_skill_target_confirmation(MouseButton::DoubleLeft));
+        assert!(is_skill_target_cancellation(MouseButton::Right));
+        assert!(is_skill_target_cancellation(MouseButton::DoubleRight));
+    }
+
+    #[test]
+    fn held_continuous_skill_stops_only_for_its_owner() {
+        let skill_id = ROLLING_CUTTER_ID;
+        let mut active_skill = None;
+
+        assert_eq!(
+            activate_continuous_skill(&mut active_skill, skill_id, SkillActivation::Hold, Some(HotbarSlot(2)),),
+            (None, true)
+        );
+        assert_eq!(release_continuous_skill(&mut active_skill, HotbarSlot(1)), None);
+        assert_eq!(release_continuous_skill(&mut active_skill, HotbarSlot(2)), Some(skill_id));
+        assert_eq!(active_skill, None);
+    }
+
+    #[test]
+    fn continuous_skill_ownership_transfers_between_inputs() {
+        let skill_id = ROLLING_CUTTER_ID;
+        let mut active_skill = None;
+
+        assert_eq!(
+            activate_continuous_skill(&mut active_skill, skill_id, SkillActivation::Hold, Some(HotbarSlot(0)),),
+            (None, true)
+        );
+        assert_eq!(
+            activate_continuous_skill(&mut active_skill, skill_id, SkillActivation::Hold, Some(HotbarSlot(1)),),
+            (Some(skill_id), true)
+        );
+        assert_eq!(release_continuous_skill(&mut active_skill, HotbarSlot(0)), None);
+        assert_eq!(release_continuous_skill(&mut active_skill, HotbarSlot(1)), Some(skill_id));
+
+        assert_eq!(
+            activate_continuous_skill(&mut active_skill, skill_id, SkillActivation::Toggle, None),
+            (None, true)
+        );
+        assert_eq!(
+            activate_continuous_skill(&mut active_skill, skill_id, SkillActivation::Toggle, None),
+            (Some(skill_id), false)
+        );
+        assert_eq!(active_skill, None);
+    }
+
+    #[test]
+    fn ready_multi_hit_sound_plays_first_hit_immediately() {
+        let mut timing = SkillSoundSequenceTiming::new(0.0, 0.12, 3);
+        let mut playback_count = 0;
+
+        assert!(update_sound_timing(&mut timing, 0.0, true, &mut playback_count));
+        assert_eq!(playback_count, 1);
+        assert_eq!(timing.hits_remaining, 2);
+        assert!((timing.next_delay - 0.12).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn unavailable_multi_hit_sound_preserves_hits_and_spacing_after_load() {
+        let mut timing = SkillSoundSequenceTiming::new(0.0, 0.12, 3);
+        let mut playback_count = 0;
+
+        assert!(update_sound_timing(&mut timing, 0.0, false, &mut playback_count));
+        assert_eq!(timing.hits_remaining, 3);
+
+        // The asset becomes ready at t=0.50. Subsequent calls at t=0.61 and
+        // t=0.62 demonstrate that the second hit is not emitted in the same
+        // frame as the delayed first hit.
+        assert!(update_sound_timing(&mut timing, 0.50, true, &mut playback_count));
+        assert_eq!(playback_count, 1);
+        assert!(update_sound_timing(&mut timing, 0.11, true, &mut playback_count));
+        assert_eq!(playback_count, 1);
+        assert!(update_sound_timing(&mut timing, 0.01, true, &mut playback_count));
+        assert_eq!(playback_count, 2);
+        assert!(!update_sound_timing(&mut timing, 0.12, true, &mut playback_count));
+        assert_eq!(playback_count, 3);
+    }
+
+    #[test]
+    fn unavailable_skill_sound_expires_after_one_second() {
+        let mut timing = SkillSoundSequenceTiming::new(0.0, 0.12, 3);
+        let mut playback_count = 0;
+
+        assert!(update_sound_timing(&mut timing, 0.5, false, &mut playback_count));
+        assert!(!update_sound_timing(&mut timing, 0.5, false, &mut playback_count));
+        assert_eq!(playback_count, 0);
+        assert_eq!(timing.hits_remaining, 3);
+    }
+
+    #[test]
+    fn large_frame_delta_emits_at_most_one_sequence_hit() {
+        let mut timing = SkillSoundSequenceTiming::new(0.0, 0.12, 3);
+        let mut playback_count = 0;
+
+        assert!(update_sound_timing(&mut timing, 0.0, true, &mut playback_count));
+        assert!(update_sound_timing(&mut timing, 10.0, true, &mut playback_count));
+        assert_eq!(playback_count, 2);
+        assert_eq!(timing.hits_remaining, 1);
     }
 }

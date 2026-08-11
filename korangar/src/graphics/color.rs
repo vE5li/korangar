@@ -194,6 +194,19 @@ impl Mul<f32> for Color {
     }
 }
 
+impl Mul<Color> for Color {
+    type Output = Color;
+
+    fn mul(self, rhs: Color) -> Self::Output {
+        Self {
+            red: self.red * rhs.red,
+            green: self.green * rhs.green,
+            blue: self.blue * rhs.blue,
+            alpha: self.alpha * rhs.alpha,
+        }
+    }
+}
+
 impl From<Color> for [f32; 3] {
     fn from(val: Color) -> Self {
         [val.red, val.green, val.blue]
@@ -366,5 +379,18 @@ impl StateElement<ClientState> for Color {
                 Inner { path: self_path }
             ),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn color_multiplication_is_component_wise() {
+        let color = Color::rgba(0.8, 0.6, 0.4, 0.5);
+        let tint = Color::rgba(0.5, 0.25, 1.0, 0.8);
+
+        assert_eq!(color * tint, Color::rgba(0.4, 0.15, 0.4, 0.4));
     }
 }

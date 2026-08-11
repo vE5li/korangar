@@ -5,6 +5,7 @@ use korangar_interface::components::drop_down::DropDownItem;
 use korangar_interface::element::Element;
 use korangar_interface::element::StateElement;
 use korangar_loaders::FileLoader;
+use ragnarok_packets::{ItemId, SkillId, SkillUseFailureCode};
 #[cfg(feature = "debug")]
 use ron::ser::PrettyConfig;
 use rust_state::RustState;
@@ -123,6 +124,42 @@ impl StateElement<ClientState> for LocalizationControls {
     }
 }
 
+/// Localized messages and format templates for rejected skill uses.
+#[derive(Serialize, Deserialize, RustState, StateElement)]
+pub(crate) struct SkillUseFailureLocalization {
+    generic: String,
+    not_enough_sp: String,
+    not_enough_hp: String,
+    missing_items: String,
+    cooldown: String,
+    not_enough_money: String,
+    wrong_weapon: String,
+    need_red_gemstone: String,
+    need_blue_gemstone: String,
+    overweight: String,
+    invalid_target: String,
+    need_holy_water: String,
+    need_other_skill: String,
+    invalid_direction: String,
+    invalid_position: String,
+    need_item: String,
+    need_equipment: String,
+    need_equipment_generic: String,
+    need_combo_skill: String,
+    need_spirits: String,
+    need_spirits_generic: String,
+    need_ammunition: String,
+    need_coins: String,
+    need_coins_generic: String,
+    basic_emotions: String,
+    basic_sit: String,
+    basic_chat: String,
+    basic_party: String,
+    basic_shout: String,
+    basic_pvp: String,
+    basic_alignment: String,
+}
+
 /// Localization for the client in form of a string lookup.
 #[derive(Serialize, Deserialize, RustState, StateElement)]
 pub struct Localization {
@@ -200,9 +237,70 @@ pub struct Localization {
     cancel_skill_points_button_text: String,
     apply_skill_points_button_text: String,
     distribute_skill_points_button_text: String,
+    skill_use_failure: SkillUseFailureLocalization,
 }
 
 impl Localization {
+    /// Formats a localized map-server skill rejection.
+    pub fn skill_use_failure_message(
+        &self,
+        skill_id: SkillId,
+        detail: i32,
+        item_id: ItemId,
+        item_name: Option<&str>,
+        cause: SkillUseFailureCode,
+    ) -> String {
+        const BASIC_SKILL_ID: SkillId = SkillId(1);
+
+        let messages = &self.skill_use_failure;
+        match cause {
+            SkillUseFailureCode::GENERIC if skill_id == BASIC_SKILL_ID => match detail {
+                1 => messages.basic_emotions.clone(),
+                2 => messages.basic_sit.clone(),
+                3 => messages.basic_chat.clone(),
+                4 => messages.basic_party.clone(),
+                5 => messages.basic_shout.clone(),
+                6 => messages.basic_pvp.clone(),
+                7 => messages.basic_alignment.clone(),
+                _ => messages.generic.clone(),
+            },
+            SkillUseFailureCode::NOT_ENOUGH_SP => messages.not_enough_sp.clone(),
+            SkillUseFailureCode::NOT_ENOUGH_HP => messages.not_enough_hp.clone(),
+            SkillUseFailureCode::MISSING_ITEMS => messages.missing_items.clone(),
+            SkillUseFailureCode::COOLDOWN => messages.cooldown.clone(),
+            SkillUseFailureCode::NOT_ENOUGH_MONEY => messages.not_enough_money.clone(),
+            SkillUseFailureCode::WRONG_WEAPON => messages.wrong_weapon.clone(),
+            SkillUseFailureCode::NEED_RED_GEMSTONE => messages.need_red_gemstone.clone(),
+            SkillUseFailureCode::NEED_BLUE_GEMSTONE => messages.need_blue_gemstone.clone(),
+            SkillUseFailureCode::OVERWEIGHT => messages.overweight.clone(),
+            SkillUseFailureCode::INVALID_TARGET => messages.invalid_target.clone(),
+            SkillUseFailureCode::NEED_HOLY_WATER => messages.need_holy_water.clone(),
+            SkillUseFailureCode::NEED_OTHER_SKILL => messages.need_other_skill.clone(),
+            SkillUseFailureCode::INVALID_DIRECTION => messages.invalid_direction.clone(),
+            SkillUseFailureCode::INVALID_POSITION => messages.invalid_position.clone(),
+            SkillUseFailureCode::NEED_ITEM if detail > 0 && item_id.0 != 0 => {
+                let fallback_item_name = format!("#{}", item_id.0);
+                messages
+                    .need_item
+                    .replace("{count}", &detail.to_string())
+                    .replace("{item}", item_name.unwrap_or(&fallback_item_name))
+            }
+            SkillUseFailureCode::NEED_EQUIPMENT if item_id.0 != 0 => {
+                let fallback_item_name = format!("#{}", item_id.0);
+                messages.need_equipment.replace("{item}", item_name.unwrap_or(&fallback_item_name))
+            }
+            SkillUseFailureCode::NEED_EQUIPMENT => messages.need_equipment_generic.clone(),
+            SkillUseFailureCode::NEED_COMBO_SKILL if detail > 0 => messages.need_combo_skill.replace("{skill_id}", &detail.to_string()),
+            SkillUseFailureCode::NEED_COMBO_SKILL => messages.need_other_skill.clone(),
+            SkillUseFailureCode::NEED_SPIRITS if detail > 0 => messages.need_spirits.replace("{count}", &detail.to_string()),
+            SkillUseFailureCode::NEED_SPIRITS => messages.need_spirits_generic.clone(),
+            SkillUseFailureCode::NEED_AMMUNITION => messages.need_ammunition.clone(),
+            SkillUseFailureCode::NEED_COINS if detail > 0 => messages.need_coins.replace("{count}", &detail.to_string()),
+            SkillUseFailureCode::NEED_COINS => messages.need_coins_generic.clone(),
+            _ => messages.generic.clone(),
+        }
+    }
+
     /// Save the localization to a file based on the provided language.
     // TODO: Currently this will just save to the file system but we might want to
     // save using the `GameFileLoader` instead.
@@ -251,7 +349,16 @@ impl Localization {
 
 #[cfg(test)]
 mod languages {
+    use ragnarok_packets::{ItemId, SkillId, SkillUseFailureCode};
+
     use crate::state::localization::{Language, Localization};
+
+    fn load_language_file(language: Language) -> Localization {
+        let locale_code = language.to_locale_code();
+        let file_name = format!("archive/data/languages/{locale_code}.ron");
+        let file_content = std::fs::read_to_string(file_name).expect("language file should exist");
+        ron::de::from_str(&file_content).expect("language file should be valid")
+    }
 
     #[test]
     fn language_files_are_valid() {
@@ -263,12 +370,47 @@ mod languages {
             // after adding a language.
             match language {
                 Language::English | Language::German => {
-                    let locale_code = language.to_locale_code();
-                    let file_name = format!("archive/data/languages/{locale_code}.ron");
-                    let file_content = std::fs::read_to_string(file_name).expect("language file should exist");
-                    let _: Localization = ron::de::from_str(&file_content).expect("language file should be valid");
+                    load_language_file(language);
                 }
             }
         }
+    }
+
+    #[test]
+    fn skill_use_failure_messages_are_localized_and_unknown_tolerant() {
+        let english = load_language_file(Language::English);
+        let german = load_language_file(Language::German);
+        let no_item = ItemId(0);
+
+        assert_eq!(
+            english.skill_use_failure_message(SkillId(100), 0, no_item, None, SkillUseFailureCode::NOT_ENOUGH_SP,),
+            "Not enough SP."
+        );
+        assert_eq!(
+            german.skill_use_failure_message(SkillId(100), 0, no_item, None, SkillUseFailureCode::NOT_ENOUGH_SP,),
+            "Nicht genügend SP."
+        );
+        assert_eq!(
+            english.skill_use_failure_message(SkillId(100), 0, no_item, None, SkillUseFailureCode::GENERIC),
+            "Skill failed."
+        );
+        assert_eq!(
+            english.skill_use_failure_message(SkillId(100), 0, no_item, None, SkillUseFailureCode(255)),
+            "Skill failed."
+        );
+        assert_eq!(
+            english.skill_use_failure_message(SkillId(1), 2, no_item, None, SkillUseFailureCode::GENERIC),
+            "Sitting requires a higher Basic Skill level."
+        );
+        assert_eq!(
+            english.skill_use_failure_message(
+                SkillId(100),
+                2,
+                ItemId(717),
+                Some("Blue Gemstone"),
+                SkillUseFailureCode::NEED_ITEM,
+            ),
+            "Requires 2 × Blue Gemstone."
+        );
     }
 }

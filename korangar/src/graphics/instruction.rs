@@ -19,6 +19,7 @@ pub struct RenderInstruction<'a> {
     pub picker_position: ScreenPosition,
     pub uniforms: Uniforms,
     pub indicator: Option<IndicatorInstruction>,
+    pub ground_markers: &'a [GroundMarkerInstruction],
     pub interface: &'a [InterfaceRectangleInstruction],
     /// Between 3D world and effects.
     pub bottom_layer_rectangles: &'a [RectangleInstruction],
@@ -246,6 +247,28 @@ pub struct MarkerInstruction {
     pub screen_position: ScreenPosition,
     pub screen_size: ScreenSize,
     pub identifier: MarkerIdentifier,
+}
+
+/// An emissive, depth-tested ground quad: cast rings and similar markers.
+#[derive(Clone, Debug)]
+pub struct GroundMarkerInstruction {
+    pub upper_left: Point3<f32>,
+    pub upper_right: Point3<f32>,
+    pub lower_left: Point3<f32>,
+    pub lower_right: Point3<f32>,
+    pub color: Color,
+    /// Offset added to the quad's unit texture coordinates. A non-zero U
+    /// with a repeat-sampled band texture scrolls it, which is how the cast
+    /// cone swirls.
+    pub uv_offset: Vector2<f32>,
+    /// Scale applied to the quad's unit texture coordinates before the
+    /// offset.
+    pub uv_scale: Vector2<f32>,
+    /// Fades the quad's alpha toward its left and right edges. Zero renders
+    /// uniformly; one fades fully. Used by quads faking a curved surface,
+    /// whose hard silhouette edges would otherwise show as lines.
+    pub edge_fade: f32,
+    pub texture: Arc<Texture>,
 }
 
 #[derive(Clone, Debug)]

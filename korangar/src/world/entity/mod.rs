@@ -1198,8 +1198,8 @@ impl Npc {
 
 #[derive(Clone, StateElement)]
 pub enum Entity {
-    Player(Player),
-    Npc(Npc),
+    Player(#[hidden_element] Player),
+    Npc(#[hidden_element] Npc),
 }
 
 impl Entity {

@@ -44,7 +44,10 @@ impl SpriteAnimationState {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, RustState, StateElement)]
 pub enum ActionEvent {
     /// Start playing a WAV sound file.
-    Sound { key: SoundEffectKey },
+    Sound {
+        #[hidden_element]
+        key: SoundEffectKey,
+    },
     /// An attack event when the "flinch" animation is played.
     Attack,
     /// Start playing a WAV sound file.

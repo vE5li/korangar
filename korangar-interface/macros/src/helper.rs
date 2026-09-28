@@ -37,10 +37,7 @@ pub fn state_element_helper(
         let field_identifier = field.ident.as_ref().map(|ident| quote!(#ident)).unwrap_or(quote!(#counter_ident));
         counter += 1;
 
-        let display_name = get_unique_attribute(&mut field.attrs, "name")
-            .map(|attribute| attribute.parse_args().expect(""))
-            .map(|name: LitStr| name.value())
-            .unwrap_or_else(|| str::replace(&field_variable.to_string(), "_", " "));
+        let display_name = field_display_name(&mut field, &field_variable.to_string());
 
         initializers
             .push(quote!(korangar_interface::element::StateElement::to_element(self_path.#field_identifier(), #display_name.to_string())));
@@ -51,4 +48,13 @@ pub fn state_element_helper(
     }
 
     (initializers, initializers_mut, is_unnamed, window_title, window_class)
+}
+
+/// Get the name to display for a field. Uses the `#[name("...")]` attribute if
+/// present, otherwise `fallback` with underscores replaced by spaces.
+pub fn field_display_name(field: &mut Field, fallback: &str) -> String {
+    get_unique_attribute(&mut field.attrs, "name")
+        .map(|attribute| attribute.parse_args().expect(""))
+        .map(|name: LitStr| name.value())
+        .unwrap_or_else(|| str::replace(fallback, "_", " "))
 }

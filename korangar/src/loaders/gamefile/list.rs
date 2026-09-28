@@ -4,7 +4,10 @@ use korangar_interface::element::StateElement;
 use rust_state::RustState;
 use serde::{Deserialize, Serialize};
 
+use crate::state::ClientState;
+
 #[derive(Serialize, Deserialize, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub(super) struct GameArchiveList {
     pub archives: Vec<String>,
 }

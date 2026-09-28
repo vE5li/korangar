@@ -5,6 +5,7 @@ use rust_state::{Path, PathExt, RustState, Selector};
 use crate::state::ClientState;
 
 #[derive(Default, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct CharacterSlots {
     slots: Vec<Option<CharacterInformation>>,
 }

@@ -13,8 +13,10 @@ use serde::{Deserialize, Serialize};
 
 pub use self::client_info::{ClientInfo, ClientInfoPathExt, PacketVersion};
 use super::GameFileLoader;
+use crate::state::ClientState;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct ServiceId(pub usize);
 
 pub fn load_client_info(game_file_loader: &GameFileLoader) -> ClientInfo {

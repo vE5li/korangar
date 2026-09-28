@@ -4,157 +4,73 @@ use quote::quote;
 use syn::{Attribute, DataEnum, DataStruct, Generics, Ident};
 
 use super::helper::{field_display_name, state_element_helper};
-use super::utils::get_unique_attribute;
+use super::utils::{ImplTarget, get_impl_target, get_unique_attribute};
 
 pub fn derive_state_element_struct(
     data_struct: DataStruct,
     generics: Generics,
-    attributes: Vec<Attribute>,
+    mut attributes: Vec<Attribute>,
     name: Ident,
 ) -> InterfaceTokenStream {
+    let ImplTarget {
+        impl_generics,
+        type_generics,
+        where_clause,
+        app,
+    } = get_impl_target(&mut attributes, &generics);
+
     let (initializers, initializers_mut, is_unnamed, _window_title, _window_class) =
         state_element_helper(data_struct, attributes, name.to_string());
-    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
-    // TODO: Instead get this from the proc macro.
-    let impl_for = match std::env::var("CARGO_PKG_NAME").unwrap() == "korangar" {
-        true => Some(quote!(crate::state::ClientState)),
-        false => None,
-    };
-
-    if let Some(impl_for) = impl_for {
-        if initializers.len() == 1 && is_unnamed {
-            return quote! {
-                impl #impl_generics korangar_interface::element::StateElement<#impl_for> for #name #type_generics #where_clause {
-                    type LayoutInfoMut = impl std::any::Any;
-                    type ReturnMut<P>
-                        = impl korangar_interface::element::Element<#impl_for, LayoutInfo = Self::LayoutInfoMut>
-                    where
-                        P: rust_state::Path<#impl_for, Self>;
-                    type LayoutInfo = impl std::any::Any;
-                    type Return<P>
-                        = impl korangar_interface::element::Element<#impl_for, LayoutInfo = Self::LayoutInfo>
-                    where
-                        P: rust_state::Path<#impl_for, Self>;
-
-                    fn to_element<P>(self_path: P, name: String) -> Self::Return<P>
-                        where P: rust_state::Path<#impl_for, Self>
-                    {
-                        korangar_interface::element::StateElement::to_element(self_path._0(), name)
-                    }
-
-                    fn to_element_mut<P>(self_path: P, name: String) -> Self::ReturnMut<P>
-                        where P: rust_state::Path<#impl_for, Self>
-                    {
-                        korangar_interface::element::StateElement::to_element_mut(self_path._0(), name)
-                    }
-                }
-            }
-            .into();
-        }
-
-        return quote! {
-            impl #impl_generics korangar_interface::element::StateElement<#impl_for> for #name #type_generics #where_clause {
-                type LayoutInfoMut = impl std::any::Any;
-                type ReturnMut<P>
-                    = impl korangar_interface::element::Element<#impl_for, LayoutInfo = Self::LayoutInfoMut>
-                where
-                    P: rust_state::Path<#impl_for, Self>;
-                type LayoutInfo = impl std::any::Any;
-                type Return<P>
-                    = impl korangar_interface::element::Element<#impl_for, LayoutInfo = Self::LayoutInfo>
-                where
-                    P: rust_state::Path<#impl_for, Self>;
-
-                fn to_element<P>(self_path: P, name: String) -> Self::Return<P>
-                    where P: rust_state::Path<#impl_for, Self>
-                {
-                    use korangar_interface::prelude::*;
-
-                    collapsible! {
-                        text: name,
-                        children: (#(#initializers,)*),
-                    }
-                }
-
-                fn to_element_mut<P>(self_path: P, name: String) -> Self::ReturnMut<P>
-                    where P: rust_state::Path<#impl_for, Self>
-                {
-                    use korangar_interface::prelude::*;
-
-                    collapsible! {
-                        text: name,
-                        children: (#(#initializers_mut,)*),
-                    }
-                }
-            }
-        }
-        .into();
-    }
-
-    if initializers.len() == 1 && is_unnamed {
-        return quote! {
-            impl<App: korangar_interface::application::Application> #impl_generics korangar_interface::element::StateElement<App> for #name #type_generics #where_clause {
-                type LayoutInfoMut = impl std::any::Any;
-                type ReturnMut<P>
-                    = impl korangar_interface::element::Element<App, LayoutInfo = Self::LayoutInfoMut>
-                where
-                    P: rust_state::Path<App, Self>;
-                type LayoutInfo = impl std::any::Any;
-                type Return<P>
-                    = impl korangar_interface::element::Element<App, LayoutInfo = Self::LayoutInfo>
-                where
-                    P: rust_state::Path<App, Self>;
-
-                fn to_element<P>(self_path: P, name: String) -> Self::Return<P>
-                    where P: rust_state::Path<App, Self>
-                {
-                    korangar_interface::element::StateElement::to_element(self_path._0(), name)
-                }
-
-                fn to_element_mut<P>(self_path: P, name: String) -> Self::ReturnMut<P>
-                    where P: rust_state::Path<App, Self>
-                {
-                    korangar_interface::element::StateElement::to_element_mut(self_path._0(), name)
-                }
-            }
-        }
-        .into();
-    }
-
-    quote! {
-        impl<App: korangar_interface::application::Application> #impl_generics korangar_interface::element::StateElement<App> for #name #type_generics #where_clause {
-            type LayoutInfoMut = impl std::any::Any;
-            type ReturnMut<P>
-                = impl korangar_interface::element::Element<App, LayoutInfo = Self::LayoutInfoMut>
-            where
-                P: rust_state::Path<App, Self>;
-            type LayoutInfo = impl std::any::Any;
-            type Return<P>
-                = impl korangar_interface::element::Element<App, LayoutInfo = Self::LayoutInfo>
-            where
-                P: rust_state::Path<App, Self>;
-
-            fn to_element<P>(self_path: P, name: String) -> Self::Return<P>
-                where P: rust_state::Path<App, Self>
-            {
+    // Newtypes are displayed like their inner value.
+    let (to_element_body, to_element_mut_body) = match initializers.len() == 1 && is_unnamed {
+        true => (
+            quote!(korangar_interface::element::StateElement::to_element(self_path._0(), name)),
+            quote!(korangar_interface::element::StateElement::to_element_mut(self_path._0(), name)),
+        ),
+        false => (
+            quote! {
                 use korangar_interface::prelude::*;
 
                 collapsible! {
                     text: name,
                     children: (#(#initializers,)*),
                 }
-            }
-
-            fn to_element_mut<P>(self_path: P, name: String) -> Self::ReturnMut<P>
-                where P: rust_state::Path<App, Self>
-            {
+            },
+            quote! {
                 use korangar_interface::prelude::*;
 
                 collapsible! {
                     text: name,
                     children: (#(#initializers_mut,)*),
                 }
+            },
+        ),
+    };
+
+    quote! {
+        impl #impl_generics korangar_interface::element::StateElement<#app> for #name #type_generics #where_clause {
+            type LayoutInfoMut = impl std::any::Any;
+            type ReturnMut<P>
+                = impl korangar_interface::element::Element<#app, LayoutInfo = Self::LayoutInfoMut>
+            where
+                P: rust_state::Path<#app, Self>;
+            type LayoutInfo = impl std::any::Any;
+            type Return<P>
+                = impl korangar_interface::element::Element<#app, LayoutInfo = Self::LayoutInfo>
+            where
+                P: rust_state::Path<#app, Self>;
+
+            fn to_element<P>(self_path: P, name: String) -> Self::Return<P>
+                where P: rust_state::Path<#app, Self>
+            {
+                #to_element_body
+            }
+
+            fn to_element_mut<P>(self_path: P, name: String) -> Self::ReturnMut<P>
+                where P: rust_state::Path<#app, Self>
+            {
+                #to_element_mut_body
             }
         }
     }
@@ -171,6 +87,10 @@ pub fn derive_state_element_struct(
 ///   fields. Every visible field type needs to implement [`StateElement`].
 ///
 /// Generic enums are not supported.
+///
+/// Like for structs, `#[impl_for(MyApplication)]` can be added to the enum to
+/// implement [`StateElement`] only for `MyApplication` instead of any
+/// application.
 ///
 /// # Compile time considerations
 ///
@@ -231,37 +151,49 @@ pub fn derive_state_element_struct(
 ///   types in the same order) and store each group in an array, so the number
 ///   of generic parameters depends on the number of distinct shapes rather than
 ///   the number of variants.
-pub fn derive_state_element_enum(data_enum: DataEnum, generics: Generics, name: Ident) -> InterfaceTokenStream {
+pub fn derive_state_element_enum(
+    data_enum: DataEnum,
+    generics: Generics,
+    mut attributes: Vec<Attribute>,
+    name: Ident,
+) -> InterfaceTokenStream {
     if !generics.params.is_empty() {
         panic!("deriving StateElement is not supported for generic enums");
     }
 
+    let ImplTarget {
+        impl_generics,
+        type_generics,
+        where_clause,
+        app,
+    } = get_impl_target(&mut attributes, &generics);
+
     let variants = collect_enum_variants(data_enum, &name);
 
-    let to_element_body = enum_element_body(&name, &variants, false);
-    let to_element_mut_body = enum_element_body(&name, &variants, true);
+    let to_element_body = enum_element_body(&name, &app, &variants, false);
+    let to_element_mut_body = enum_element_body(&name, &app, &variants, true);
 
     quote! {
-        impl<App: korangar_interface::application::Application> korangar_interface::element::StateElement<App> for #name {
+        impl #impl_generics korangar_interface::element::StateElement<#app> for #name #type_generics #where_clause {
             type LayoutInfoMut = impl std::any::Any;
             type ReturnMut<P>
-                = impl korangar_interface::element::Element<App, LayoutInfo = Self::LayoutInfoMut>
+                = impl korangar_interface::element::Element<#app, LayoutInfo = Self::LayoutInfoMut>
             where
-                P: rust_state::Path<App, Self>;
+                P: rust_state::Path<#app, Self>;
             type LayoutInfo = impl std::any::Any;
             type Return<P>
-                = impl korangar_interface::element::Element<App, LayoutInfo = Self::LayoutInfo>
+                = impl korangar_interface::element::Element<#app, LayoutInfo = Self::LayoutInfo>
             where
-                P: rust_state::Path<App, Self>;
+                P: rust_state::Path<#app, Self>;
 
             fn to_element<P>(self_path: P, name: String) -> Self::Return<P>
-                where P: rust_state::Path<App, Self>
+                where P: rust_state::Path<#app, Self>
             {
                 #to_element_body
             }
 
             fn to_element_mut<P>(self_path: P, name: String) -> Self::ReturnMut<P>
-                where P: rust_state::Path<App, Self>
+                where P: rust_state::Path<#app, Self>
             {
                 #to_element_mut_body
             }
@@ -351,7 +283,12 @@ fn collect_enum_variants(data_enum: DataEnum, name: &Ident) -> Vec<EnumVariant> 
 ///
 /// See [`derive_state_element_enum`] for why the code is structured the way it
 /// is.
-fn enum_element_body(name: &Ident, variants: &[EnumVariant], mutable: bool) -> TokenStream {
+///
+/// `app` is the application type the trait is implemented for. Note that the
+/// local helper items (paths, selector, `__pin`, `Inner`) are separate items
+/// with their own generic `App` parameter, so only code directly in the
+/// function body uses `app`.
+fn enum_element_body(name: &Ident, app: &TokenStream, variants: &[EnumVariant], mutable: bool) -> TokenStream {
     let to_element = match mutable {
         true => quote!(to_element_mut),
         false => quote!(to_element),
@@ -438,15 +375,15 @@ fn enum_element_body(name: &Ident, variants: &[EnumVariant], mutable: bool) -> T
         let field_path_types = variant.fields.iter().map(|field| &field.path_type);
 
         quote! {
-            __pin::<App, _>(collapsible! {
+            __pin::<#app, _>(collapsible! {
                 text: format!("{name}: {}", #variant_string),
                 children: (
                     #(
                         // The field path is only valid while this variant is
                         // active. That's fine since `Inner` only creates the
                         // layout for the element of the active variant.
-                        <#field_types as korangar_interface::element::StateElement<App>>::#to_element(
-                            rust_state::ManuallyAssertExt::<App, #field_types>::manually_asserted(#field_path_types { path: self_path }),
+                        <#field_types as korangar_interface::element::StateElement<#app>>::#to_element(
+                            rust_state::ManuallyAssertExt::<#app, #field_types>::manually_asserted(#field_path_types { path: self_path }),
                             #field_display_names.to_string(),
                         ),
                     )*
@@ -554,7 +491,7 @@ fn enum_element_body(name: &Ident, variants: &[EnumVariant], mutable: bool) -> T
             let #data_element_fields = #data_elements;
         )*
 
-        let simple_element = __pin::<App, _>(split! {
+        let simple_element = __pin::<#app, _>(split! {
             children: (
                 text! {
                     text: name,

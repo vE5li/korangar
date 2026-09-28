@@ -13,8 +13,10 @@ use rust_state::RustState;
 use crate::graphics::{Color, ScreenClip, ScreenPosition, ScreenSize};
 use crate::loaders::Sprite;
 use crate::renderer::SpriteRenderer;
+use crate::state::ClientState;
 
 #[derive(Clone, Debug, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct SpriteAnimationState {
     pub action_base_offset: usize,
     pub start_time: ClientTick,
@@ -55,6 +57,7 @@ pub enum ActionEvent {
 }
 
 #[derive(Debug, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct Actions {
     pub actions: Vec<Action>,
     pub delays: Vec<f32>,

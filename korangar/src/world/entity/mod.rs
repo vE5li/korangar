@@ -65,6 +65,7 @@ impl<T> ResourceState<T> {
 }
 
 #[derive(Clone, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct Movement {
     #[hidden_element]
     steps: ArrayVec<Step, MAX_WALK_PATH_SIZE>,
@@ -152,6 +153,7 @@ impl SoundState {
 }
 
 #[derive(Clone, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct Common {
     pub entity_id: EntityId,
     pub job_id: JobId,
@@ -897,6 +899,7 @@ impl Common {
 }
 
 #[derive(Clone, RustState, StateWindow)]
+#[impl_for(ClientState)]
 pub struct Player {
     common: Common,
     pub hair_id: usize,
@@ -1109,6 +1112,7 @@ impl Player {
 }
 
 #[derive(Clone, RustState, StateWindow)]
+#[impl_for(ClientState)]
 pub struct Npc {
     common: Common,
 }

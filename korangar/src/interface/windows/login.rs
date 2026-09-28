@@ -18,6 +18,7 @@ const MAXIMUM_PASSWORD_LENGTH: usize = 24;
 
 /// Internal state of the login window.
 #[derive(RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct LoginWindowState {
     selected_service: ServiceId,
 }

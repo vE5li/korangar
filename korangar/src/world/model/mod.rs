@@ -17,9 +17,11 @@ use crate::graphics::Color;
 #[cfg(feature = "debug")]
 use crate::graphics::DebugAabbInstruction;
 use crate::graphics::ModelInstruction;
+use crate::state::ClientState;
 use crate::world::Camera;
 
 #[derive(RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct Model {
     pub version: InternalVersion,
     pub root_nodes: Vec<Node>,

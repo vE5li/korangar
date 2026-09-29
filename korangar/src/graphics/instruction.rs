@@ -37,7 +37,7 @@ pub struct RenderInstruction<'a> {
     pub directional_shadow_models: &'a [ModelInstruction],
     pub directional_shadow_entities: &'a mut [Vec<EntityInstruction>],
     pub point_shadow_models: &'a [ModelInstruction],
-    pub point_shadow_entities: &'a [EntityInstruction],
+    pub point_shadow_entities: &'a mut [EntityInstruction],
     pub effects: &'a [EffectInstruction],
     pub water: Option<WaterInstruction<'a>>,
     pub map_picker_tile_vertex_buffer: Option<&'a Buffer<TileVertex>>,

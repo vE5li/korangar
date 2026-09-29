@@ -14,10 +14,6 @@ struct EntityVertexOutput {
     [[vk::location(6)]] var alpha: float;
 };
 
-struct EntityFragmentOutput {
-    float depth: SV_Depth;
-};
-
 [[vk::binding(1, 0)]] var nearest_sampler: SamplerState;
 [[vk::binding(0, 1)]] var pass_uniforms: ConstantBuffer<PassUniforms>;
 [[vk::binding(0, 2)]] var instance_data: StructuredBuffer<EntityInstanceData>;
@@ -56,21 +52,40 @@ func vs_main(input: EntityVertexInput) -> EntityVertexOutput {
 }
 
 [[shader("pixel")]]
-func fs_main(input: EntityVertexOutput) -> EntityFragmentOutput {
+func fs_main_opaque(input: EntityVertexOutput) -> EntityFragmentOutput {
     let diffuse_color = texture.Sample(nearest_sampler, input.texture_coordinates);
+
     if (diffuse_color.a != 1.0 || input.alpha != 1.0) {
         discard;
     }
 
-    // Adjust the sprite as if it was standing upright
-    let depth_offset = input.depth_offset * input.original_depth_offset;
-    let curvature_offset = (0.5 - pow(input.curvature, 2.0)) * input.original_curvature;
-    let view_position = mul(pass_uniforms.view, input.world_position);
-    let adjusted_view_position = view_position - float4(0.0, 0.0, depth_offset + curvature_offset, 0.0);
-    let adjusted_world_position = mul(pass_uniforms.inverse_view, adjusted_view_position);
-    let light_distance = length(adjusted_world_position.xyz - pass_uniforms.light_position.xyz);
+    return create_output(input, 1.0);
+}
+
+[[shader("pixel")]]
+func fs_main_transparent(input: EntityVertexOutput) -> EntityFragmentOutput {
+    let diffuse_color = texture.Sample(nearest_sampler, input.texture_coordinates);
+
+    if (diffuse_color.a != 1.0 || input.alpha < 0.05) {
+        discard;
+    }
+
+    return create_output(input, input.alpha);
+}
+
+[ForceInline]
+func create_output(input: EntityVertexOutput, alpha: float) -> EntityFragmentOutput {
+    let light_distance = calculate_adjusted_light_distance(
+        input.world_position,
+        input.depth_offset,
+        input.curvature,
+        input.original_depth_offset,
+        input.original_curvature,
+        pass_uniforms
+    );
 
     var output: EntityFragmentOutput;
+    output.translucence = 1.0 - alpha;
     output.depth = depth.linearToNonLinear(light_distance);
     return output;
 }

@@ -41,6 +41,7 @@ struct ModelBindlessVertexOutput {
 [[vk::binding(6, 1)]] var directional_light_partitions: StructuredBuffer<DirectionalLightPartition>;
 [[vk::binding(7, 1)]] var kernel_uniforms: ConstantBuffer<KernelUniforms>;
 [[vk::binding(8, 1)]] var shadow_translucence: Texture2DArray;
+[[vk::binding(9, 1)]] var point_shadow_translucence: TextureCubeArray;
 [[vk::binding(0, 2)]] var instance_data: StructuredBuffer<ModelInstanceData>;
 [[vk::binding(0, 3)]] var textures: Texture2D[];
 
@@ -206,6 +207,7 @@ func fragment(input: ModelBindlessVertexOutput) -> float4 {
                 );
 
                 visibility = float(distance_to_light > closest_distance);
+\n                let translucence = point_shadow_translucence.SampleLevel(\n                    linear_sampler,\n                    float4(light_direction, light.texture_index - 1),\n                    0.0\n                ).r;\n                visibility *= translucence;
             }
 
             let intensity = 10.0;

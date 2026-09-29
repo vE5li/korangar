@@ -11,9 +11,9 @@ pub(crate) use indicator::PointShadowIndicatorDrawer;
 pub(crate) use model::PointShadowModelDrawer;
 use wgpu::util::StagingBelt;
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, CommandEncoder,
-    Device, LoadOp, Operations, Queue, RenderPass, RenderPassDepthStencilAttachment, RenderPassDescriptor, ShaderStages, StoreOp,
-    TextureFormat,
+    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, Color,
+    CommandEncoder, Device, LoadOp, Operations, Queue, RenderPass, RenderPassColorAttachment, RenderPassDepthStencilAttachment,
+    RenderPassDescriptor, ShaderStages, StoreOp, TextureFormat,
 };
 
 use super::{BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, RenderPassContext};
@@ -55,17 +55,19 @@ pub(crate) struct PointShadowModelBatchData<'a> {
 
 pub(crate) struct PointShadowRenderPassContext {
     point_shadow_texture_format: TextureFormat,
+    point_shadow_translucence_format: TextureFormat,
     uniforms_buffer: DynamicUniformBuffer<PassUniforms>,
     bind_group: BindGroup,
 }
 
-impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAttachmentCount::One }>
+impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttachmentCount::One }>
     for PointShadowRenderPassContext
 {
     type PassData<'data> = PointShadowData;
 
     fn new(device: &Device, _queue: &Queue, _texture_loader: &TextureLoader, global_context: &GlobalContext) -> Self {
         let point_shadow_texture_format = global_context.point_shadow_map_textures.get_texture_format();
+        let point_shadow_translucence_format = global_context.point_shadow_translucence_textures.get_texture_format();
 
         let uniforms_buffer = DynamicUniformBuffer::new(device, &format!("{PASS_NAME} pass uniforms"));
 
@@ -73,6 +75,7 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, 
 
         Self {
             point_shadow_texture_format,
+            point_shadow_translucence_format,
             uniforms_buffer,
             bind_group,
         }
@@ -90,7 +93,17 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, 
 
         let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
             label: Some(PASS_NAME),
-            color_attachments: &[],
+            color_attachments: &[Some(RenderPassColorAttachment {
+                view: global_context
+                    .point_shadow_translucence_textures
+                    .get_texture_face_view(pass_data.shadow_caster_index, pass_data.face_index),
+                resolve_target: None,
+                ops: Operations {
+                    load: LoadOp::Clear(Color::WHITE),
+                    store: StoreOp::Store,
+                },
+                depth_slice: None,
+            })],
             depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
                 view: global_context
                     .point_shadow_map_textures
@@ -138,8 +151,8 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, 
         [GlobalContext::global_bind_group_layout(device), layout]
     }
 
-    fn color_attachment_formats(&self) -> [TextureFormat; 0] {
-        []
+    fn color_attachment_formats(&self) -> [TextureFormat; 1] {
+        [self.point_shadow_translucence_format]
     }
 
     fn depth_attachment_output_format(&self) -> [TextureFormat; 1] {

@@ -14,7 +14,7 @@ use cgmath::{Array, EuclideanSpace, InnerSpace, Matrix4, MetricSpace, Point3, Ve
 pub use self::debug::DebugCamera;
 pub use self::directional_shadow::DirectionalShadowCamera;
 pub use self::player::PlayerCamera;
-pub use self::point_shadow::PointShadowCamera;
+pub use self::point_shadow::{PointShadowCamera, PointShadowEntityCamera};
 pub use self::smoothed::SmoothedValue;
 pub use self::start::StartCamera;
 #[cfg(feature = "debug")]

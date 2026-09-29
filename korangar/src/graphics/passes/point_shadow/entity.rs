@@ -201,7 +201,6 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
 
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(2, &self.bind_group, &[]);
-        pass.draw(0..6, offset..end);
 
         if self.bindless_support {
             pass.draw(0..6, offset..end);

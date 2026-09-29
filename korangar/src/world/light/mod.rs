@@ -1,19 +1,21 @@
 use std::sync::Arc;
 
-use cgmath::{Matrix4, Point3, SquareMatrix, Vector3};
+use cgmath::{Matrix4, MetricSpace, Point3, SquareMatrix, Vector3};
 use korangar_collision::Sphere;
 use ragnarok_formats::map::LightSource;
+use ragnarok_packets::ClientTick;
 
 #[cfg(feature = "debug")]
 use crate::graphics::RenderOptions;
 use crate::graphics::{
-    Buffer, ModelInstruction, ModelVertex, PointLightInstruction, PointLightWithShadowInstruction, ScreenSize, TextureSet,
+    Buffer, EntityInstruction, ModelInstruction, ModelVertex, PointLightInstruction, PointLightWithShadowInstruction, ScreenSize,
+    TextureSet,
 };
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
-use crate::world::{Map, ObjectKey, PointShadowCamera, ResourceSetBuffer};
+use crate::world::{Entity, GroundItem, Map, ObjectKey, PointShadowCamera, PointShadowEntityCamera, ResourceSetBuffer};
 use crate::{Camera, Color, NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS};
 
 pub trait LightSourceExt {
@@ -92,6 +94,19 @@ impl PointLight {
             model_count,
         });
     }
+}
+
+/// Height above the entity position that is used as the center of an entity
+/// when orienting it towards a point light and for culling.
+const ENTITY_SHADOW_CENTER_HEIGHT: f32 = 7.0;
+/// Conservative radius of the bounding sphere of an entity used for culling.
+const ENTITY_SHADOW_RADIUS: f32 = 15.0;
+
+pub struct PointShadowEntities<'a> {
+    pub entities: &'a [Entity],
+    pub dead_entities: &'a [Entity],
+    pub ground_items: &'a [GroundItem],
+    pub client_tick: ClientTick,
 }
 
 pub struct PointLightManager {
@@ -225,7 +240,9 @@ impl PointLightSet<'_> {
         point_shadow_camera: &mut PointShadowCamera,
         point_shadow_object_set_buffer: &mut ResourceSetBuffer<ObjectKey>,
         point_shadow_model_instructions: &mut Vec<ModelInstruction>,
+        point_shadow_entity_instructions: &mut Vec<EntityInstruction>,
         point_light_with_shadow_instructions: &mut Vec<PointLightWithShadowInstruction>,
+        point_shadow_entities: &PointShadowEntities,
         animation_timer_ms: f32,
         #[cfg(feature = "debug")] render_options: &RenderOptions,
     ) {
@@ -235,8 +252,8 @@ impl PointLightSet<'_> {
             let mut view_projection_matrices = [Matrix4::identity(); NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS];
             let mut view_matrices = [Matrix4::identity(); NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS];
 
-            let entity_offsets = [0; NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS];
-            let entity_counts = [0; NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS];
+            let mut entity_offsets = [0; NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS];
+            let mut entity_counts = [0; NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS];
             let mut model_offsets = [0; NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS];
             let mut model_counts = [0; NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS];
 
@@ -269,6 +286,38 @@ impl PointLightSet<'_> {
 
                 model_offsets[face_index as usize] = model_offset;
                 model_counts[face_index as usize] = point_shadow_model_instructions.len() - model_offset;
+
+                let entity_offset = point_shadow_entity_instructions.len();
+
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_ground_items))]
+                Self::render_ground_item_shadows(
+                    point_shadow_entity_instructions,
+                    point_shadow_camera,
+                    point_light,
+                    point_shadow_entities.ground_items,
+                    point_shadow_entities.client_tick,
+                );
+
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_entities))]
+                Self::render_entity_shadows(
+                    point_shadow_entity_instructions,
+                    point_shadow_camera,
+                    point_light,
+                    point_shadow_entities.entities,
+                    point_shadow_entities.client_tick,
+                );
+
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_entities))]
+                Self::render_entity_shadows(
+                    point_shadow_entity_instructions,
+                    point_shadow_camera,
+                    point_light,
+                    point_shadow_entities.dead_entities,
+                    point_shadow_entities.client_tick,
+                );
+
+                entity_offsets[face_index as usize] = entity_offset;
+                entity_counts[face_index as usize] = point_shadow_entity_instructions.len() - entity_offset;
             }
 
             point_light.render_with_shadows(
@@ -283,6 +332,56 @@ impl PointLightSet<'_> {
                 model_offsets,
                 model_counts,
             );
+        }
+    }
+
+    /// Returns the center that an entity at the given position should be
+    /// oriented towards the light with, if it can cast a shadow into the
+    /// current face of the point shadow camera.
+    fn entity_shadow_center(
+        point_shadow_camera: &PointShadowCamera,
+        point_light: &PointLight,
+        position: Point3<f32>,
+        scale: f32,
+    ) -> Option<Point3<f32>> {
+        let center = position + Vector3::unit_y() * (ENTITY_SHADOW_CENTER_HEIGHT * scale);
+        let radius = ENTITY_SHADOW_RADIUS * scale;
+
+        let in_range = point_light.position.distance(center) <= point_light.range + radius;
+        let in_face = point_shadow_camera.sphere_intersects_face(center, radius);
+
+        (in_range && in_face).then_some(center)
+    }
+
+    fn render_entity_shadows(
+        instructions: &mut Vec<EntityInstruction>,
+        point_shadow_camera: &PointShadowCamera,
+        point_light: &PointLight,
+        entities: &[Entity],
+        client_tick: ClientTick,
+    ) {
+        for entity in entities {
+            let (position, scale) = (entity.get_position(), entity.get_scale());
+
+            if let Some(center) = Self::entity_shadow_center(point_shadow_camera, point_light, position, scale) {
+                let camera = PointShadowEntityCamera::new(point_shadow_camera, center);
+                entity.render(instructions, &camera, false, client_tick);
+            }
+        }
+    }
+
+    fn render_ground_item_shadows(
+        instructions: &mut Vec<EntityInstruction>,
+        point_shadow_camera: &PointShadowCamera,
+        point_light: &PointLight,
+        ground_items: &[GroundItem],
+        client_tick: ClientTick,
+    ) {
+        for ground_item in ground_items {
+            if let Some(center) = Self::entity_shadow_center(point_shadow_camera, point_light, ground_item.world_position, 1.0) {
+                let camera = PointShadowEntityCamera::new(point_shadow_camera, center);
+                ground_item.render(instructions, &camera, client_tick);
+            }
         }
     }
 }

@@ -1324,6 +1324,10 @@ impl Entity {
         self.get_common().world_position
     }
 
+    pub fn get_scale(&self) -> f32 {
+        self.get_common().scale
+    }
+
     pub fn set_position(&mut self, map: &Map, position: TilePosition, client_tick: ClientTick) {
         self.get_common_mut().set_position(map, position, client_tick);
     }

@@ -32,6 +32,12 @@ public struct ModelInstanceData {
 };
 
 public struct ModelFragmentOutput {
+    [[vk::location(0)]] public var translucence: float;
+    public float depth: SV_Depth;
+};
+
+public struct EntityFragmentOutput {
+    [[vk::location(0)]] public var translucence: float;
     public float depth: SV_Depth;
 };
 
@@ -74,4 +80,22 @@ public func entity_vertex_data(vertex_index: uint) -> EntityVertex {
     vertex.position = float3(x, y, z);
     vertex.texture_coordinates = float2(u, v);
     return vertex;
+}
+
+[ForceInline]
+public func calculate_adjusted_light_distance(
+    world_position: float4,
+    depth_offset: float,
+    curvature: float,
+    original_depth_offset: float,
+    original_curvature: float,
+    pass_uniforms: PassUniforms
+) -> float {
+    // Adjust the sprite as if it was standing upright.
+    let depth_offset_adjusted = depth_offset * original_depth_offset;
+    let curvature_offset = (0.5 - pow(curvature, 2.0)) * original_curvature;
+    let view_position = mul(pass_uniforms.view, world_position);
+    let adjusted_view_position = view_position - float4(0.0, 0.0, depth_offset_adjusted + curvature_offset, 0.0);
+    let adjusted_world_position = mul(pass_uniforms.inverse_view, adjusted_view_position);
+    return length(adjusted_world_position.xyz - pass_uniforms.light_position.xyz);
 }

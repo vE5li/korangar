@@ -377,6 +377,7 @@ pub(crate) struct GlobalContext {
     pub(crate) directional_shadow_map_texture: AttachmentTexture,
     pub(crate) directional_shadow_translucence_texture: AttachmentTexture,
     pub(crate) point_shadow_map_textures: CubeArrayTexture,
+    pub(crate) point_shadow_translucence_textures: CubeArrayTexture,
     pub(crate) tile_light_count_texture: StorageTexture,
     pub(crate) global_uniforms_buffer: Buffer<GlobalUniforms>,
     pub(crate) kernel_uniforms_buffer: Buffer<KernelUniforms>,
@@ -587,6 +588,7 @@ impl Prepare for GlobalContext {
                 &self.directional_shadow_map_texture,
                 &self.directional_shadow_translucence_texture,
                 &self.point_shadow_map_textures,
+                &self.point_shadow_translucence_textures,
                 &self.directional_light_partitions_buffer,
                 &self.kernel_uniforms_buffer,
             );
@@ -663,6 +665,7 @@ impl GlobalContext {
         let directional_shadow_translucence_texture =
             Self::create_directional_shadow_translucence_textures(device, directional_shadow_size);
         let point_shadow_map_textures = Self::create_point_shadow_textures(device, point_shadow_size);
+        let point_shadow_translucence_textures = Self::create_point_shadow_translucence_textures(device, point_shadow_size);
         let resolved_color_texture = Self::create_resolved_color_texture(device, forward_size, msaa);
         let supersampled_color_texture = Self::create_supersampled_texture(device, screen_size, ssaa);
         let interface_buffer_texture = Self::create_interface_texture(device, interface_size);
@@ -781,6 +784,7 @@ impl GlobalContext {
             &directional_shadow_map_texture,
             &directional_shadow_translucence_texture,
             &point_shadow_map_textures,
+            &point_shadow_translucence_textures,
             &directional_light_partitions_buffer,
             &kernel_uniforms_buffer,
         );
@@ -828,6 +832,7 @@ impl GlobalContext {
             directional_shadow_map_texture,
             directional_shadow_translucence_texture,
             point_shadow_map_textures,
+            point_shadow_translucence_textures,
             tile_light_count_texture: forward_textures.tile_light_count_texture,
             global_uniforms_buffer,
             kernel_uniforms_buffer,
@@ -1013,6 +1018,17 @@ impl GlobalContext {
         )
     }
 
+    fn create_point_shadow_translucence_textures(device: &Device, shadow_size: ScreenSize) -> CubeArrayTexture {
+        CubeArrayTexture::new(
+            device,
+            "point shadow translucence",
+            shadow_size,
+            TextureFormat::R8Unorm,
+            AttachmentTextureType::ColorAttachment,
+            NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS as u32,
+        )
+    }
+
     fn create_anti_aliasing_resources(
         device: &Device,
         screen_space_anti_aliasing: ScreenSpaceAntiAliasing,
@@ -1093,6 +1109,7 @@ impl GlobalContext {
             &self.directional_shadow_map_texture,
             &self.directional_shadow_translucence_texture,
             &self.point_shadow_map_textures,
+            &self.point_shadow_translucence_textures,
             &self.directional_light_partitions_buffer,
             &self.kernel_uniforms_buffer,
         );
@@ -1131,6 +1148,7 @@ impl GlobalContext {
         self.directional_shadow_translucence_texture =
             Self::create_directional_shadow_translucence_textures(device, self.directional_shadow_size);
         self.point_shadow_map_textures = Self::create_point_shadow_textures(device, self.point_shadow_size);
+        self.point_shadow_translucence_textures = Self::create_point_shadow_translucence_textures(device, self.point_shadow_size);
 
         // We need to update this bind group, because it's content changed, and it isn't
         // re-created each frame.
@@ -1143,6 +1161,7 @@ impl GlobalContext {
             &self.directional_shadow_map_texture,
             &self.directional_shadow_translucence_texture,
             &self.point_shadow_map_textures,
+            &self.point_shadow_translucence_textures,
             &self.directional_light_partitions_buffer,
             &self.kernel_uniforms_buffer,
         );
@@ -1423,6 +1442,16 @@ impl GlobalContext {
                         },
                         count: None,
                     },
+                    BindGroupLayoutEntry {
+                        binding: 9,
+                        visibility: ShaderStages::FRAGMENT,
+                        ty: BindingType::Texture {
+                            sample_type: TextureSampleType::Float { filterable: true },
+                            view_dimension: TextureViewDimension::CubeArray,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
                 ],
             })
         })
@@ -1659,6 +1688,7 @@ impl GlobalContext {
         directional_shadow_map_texture: &AttachmentTexture,
         directional_shadow_translucence_texture: &AttachmentTexture,
         point_shadow_maps_texture: &CubeArrayTexture,
+        point_shadow_translucence_texture: &CubeArrayTexture,
         directional_light_partition: &Buffer<DirectionalLightPartition>,
         kernel_uniforms_buffer: &Buffer<KernelUniforms>,
     ) -> BindGroup {
@@ -1701,6 +1731,10 @@ impl GlobalContext {
                 BindGroupEntry {
                     binding: 8,
                     resource: BindingResource::TextureView(directional_shadow_translucence_texture.get_texture_view()),
+                },
+                BindGroupEntry {
+                    binding: 9,
+                    resource: BindingResource::TextureView(point_shadow_translucence_texture.get_texture_view()),
                 },
             ],
         })

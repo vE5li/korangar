@@ -47,6 +47,7 @@ func fs_main(input: ModelVertexOutput) -> ModelFragmentOutput {
     }
 
     var output: ModelFragmentOutput;
+    output.translucence = 1.0;
     output.depth = depth.linearToNonLinear(light_distance);
     return output;
 }

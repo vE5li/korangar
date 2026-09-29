@@ -3445,7 +3445,7 @@ impl Client {
             directional_shadow_models: &self.directional_shadow_model_instructions,
             directional_shadow_entities: &mut self.directional_shadow_entity_instructions,
             point_shadow_models: &self.point_shadow_model_instructions,
-            point_shadow_entities: &self.point_shadow_entity_instructions,
+            point_shadow_entities: &mut self.point_shadow_entity_instructions,
             effects: self.effect_renderer.get_instructions(),
             water: water_instruction,
             map_picker_tile_vertex_buffer: Some(map.get_tile_picker_vertex_buffer()),

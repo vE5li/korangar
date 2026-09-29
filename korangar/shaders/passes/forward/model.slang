@@ -171,11 +171,11 @@ func fragment(input: ModelVertexOutput) -> float4 {
                 uint width, height, depth;
                 shadow_maps.GetDimensions(width, height, depth);
                 let shadow_map_dimensions = uint2(width, height);
-                visibility = get_pcf_shadow(partition_index, shadow_coords, shadow_map_dimensions, global_uniforms.shadow_detail, shadow_maps, shadow_map_sampler);
+                visibility = get_pcf_shadow(partition_index, shadow_coords, shadow_map_dimensions, global_uniforms.shadow_detail, false, shadow_maps, shadow_translucence, shadow_map_sampler, linear_sampler);
                 break;
             }
             case 2: {
-                visibility = get_pcf_pcss_shadow(partition_index, shadow_coords, global_uniforms, directional_light_partitions, shadow_maps, shadow_map_sampler, linear_sampler, kernel_uniforms);
+                visibility = get_pcf_pcss_shadow(partition_index, shadow_coords, false, global_uniforms, directional_light_partitions, shadow_maps, shadow_translucence, shadow_map_sampler, linear_sampler, kernel_uniforms);
                 break;
             }
         }
@@ -203,8 +203,10 @@ func fragment(input: ModelVertexOutput) -> float4 {
                     light.position.xyz,
                     light_direction,
                     light.texture_index - 1,
+                    false,
                     global_uniforms,
                     point_shadow_maps,
+                    point_shadow_translucence,
                     shadow_map_sampler,
                     linear_sampler,
                     kernel_uniforms

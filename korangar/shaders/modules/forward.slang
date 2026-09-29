@@ -86,6 +86,10 @@ public static const var SHADOW_OFFSET_NORMAL: float = -0.2;
 public static const var SHADOW_OFFSET_LIGHT: float = -0.2;
 public static const var SDSM_CONSTANT_DEPTH_BIAS: float = 0.0001;
 public static const var PPSM_CONSTANT_DEPTH_BIAS: float = 0.0005;
+// Entities don't receive shadows of entities, so their bias only needs to prevent acne from
+// other geometry. It depends on the partitioning, since both have different depth ranges.
+public static const var SDSM_ENTITY_DEPTH_BIAS: float = 0.001;
+public static const var PPSM_ENTITY_DEPTH_BIAS: float = 0.005;
 public static const var EPSILON: float = 1.0e-7;
 public static const var BANDLIMITED_PI_HALF: float = 0.5 * 3.14159265359;
 
@@ -141,14 +145,67 @@ public func calculate_mip_level(texture_coordinate: float2) -> float {
     return max(0.0, 0.5 * log2(delta_max_squared));
 }
 
+/// Takes a single (bilinear PCF) sample of the directional shadow.
+///
+/// The green channel of the translucence texture marks texels where the closest occluder
+/// is an entity. If `ignore_entity_occluders` is set, those texels are treated as unoccluded,
+/// which prevents entities from receiving the (mismatched) shadows of entities.
+[ForceInline]
+public func sample_directional_shadow(
+    location: float3,
+    depth: float,
+    ignore_entity_occluders: bool,
+    shadow_maps: DepthTexture2DArray,
+    shadow_translucence: Texture2DArray,
+    shadow_map_sampler: SamplerComparisonState,
+    linear_sampler: SamplerState
+) -> float {
+    let visibility = shadow_maps.SampleCmp(shadow_map_sampler, location, depth);
+
+    if (ignore_entity_occluders) {
+        let occluded_by_entity = shadow_translucence.SampleLevel(linear_sampler, location, 0.0).g;
+        return max(visibility, occluded_by_entity);
+    }
+
+    return visibility;
+}
+
+/// Gathers the comparison results of the 2x2 texels of the directional shadow around
+/// `location`. Texels whose closest occluder is an entity can be ignored, see
+/// `sample_directional_shadow`.
+[ForceInline]
+func gather_directional_shadow(
+    location: float3,
+    depth: float,
+    ignore_entity_occluders: bool,
+    shadow_maps: DepthTexture2DArray,
+    shadow_translucence: Texture2DArray,
+    shadow_map_sampler: SamplerComparisonState,
+    linear_sampler: SamplerState
+) -> float4 {
+    let visibility = shadow_maps.GatherCmp(shadow_map_sampler, location, depth);
+
+    if (ignore_entity_occluders) {
+        // The translucence texture has the same size as the shadow map, so both gathers
+        // return the same texels in the same order.
+        let occluded_by_entity = shadow_translucence.GatherGreen(linear_sampler, location);
+        return max(visibility, occluded_by_entity);
+    }
+
+    return visibility;
+}
+
 [ForceInline]
 public func get_pcf_shadow(
     partition_index: uint,
     shadow_coords: float3,
     shadow_map_dimensions: uint2,
     shadow_detail: uint,
+    ignore_entity_occluders: bool,
     shadow_maps: DepthTexture2DArray,
-    shadow_map_sampler: SamplerComparisonState
+    shadow_translucence: Texture2DArray,
+    shadow_map_sampler: SamplerComparisonState,
+    linear_sampler: SamplerState
 ) -> float {
     let texel_size = float2(1.0) / float2(shadow_map_dimensions);
     let depth = shadow_coords.z;
@@ -157,7 +214,15 @@ public func get_pcf_shadow(
 
     switch (shadow_detail) {
         case 1: {
-            let samples = shadow_maps.GatherCmp(shadow_map_sampler, float3(shadow_coords.xy, partition_index), depth);
+            let samples = gather_directional_shadow(
+                float3(shadow_coords.xy, partition_index),
+                depth,
+                ignore_entity_occluders,
+                shadow_maps,
+                shadow_translucence,
+                shadow_map_sampler,
+                linear_sampler
+            );
             return (samples.x + samples.y + samples.z + samples.w) / 4.0;
         }
         default: {
@@ -184,7 +249,15 @@ public func get_pcf_shadow(
                     let distance_squared = float(x * x + y * y);
                     let weight = exp(-distance_squared * weight_factor);
 
-                    let samples = shadow_maps.GatherCmp(shadow_map_sampler, float3(shadow_coords.xy + offset, partition_index), depth);
+                    let samples = gather_directional_shadow(
+                        float3(shadow_coords.xy + offset, partition_index),
+                        depth,
+                        ignore_entity_occluders,
+                        shadow_maps,
+                        shadow_translucence,
+                        shadow_map_sampler,
+                        linear_sampler
+                    );
                     shadow += (samples.x + samples.y + samples.z + samples.w) * weight;
                     total_weight += 4.0 * weight;
                 }
@@ -199,9 +272,11 @@ public func get_pcf_shadow(
 public func get_pcf_pcss_shadow(
     partition_index: uint,
     shadow_coords: float3,
+    ignore_entity_occluders: bool,
     global_uniforms: GlobalUniforms,
     directional_light_partitions: StructuredBuffer<DirectionalLightPartition>,
     shadow_maps: DepthTexture2DArray,
+    shadow_translucence: Texture2DArray,
     shadow_map_sampler: SamplerComparisonState,
     linear_sampler: SamplerState,
     kernel_uniforms: ConstantBuffer<KernelUniforms>
@@ -212,7 +287,18 @@ public func get_pcf_pcss_shadow(
     let world_space_texel_size = directional_light_partitions[partition_index].world_space_texel_size;
     let light_size_uv = LIGHT_WORLD_SIZE / (world_space_texel_size * shadow_map_size.x);
 
-    let blocker = find_blocker(partition_index, shadow_coords.xy, shadow_coords.z, light_size_uv, global_uniforms.shadow_detail, shadow_maps, linear_sampler, kernel_uniforms);
+    let blocker = find_blocker(
+        partition_index,
+        shadow_coords.xy,
+        shadow_coords.z,
+        light_size_uv,
+        global_uniforms.shadow_detail,
+        ignore_entity_occluders,
+        shadow_maps,
+        shadow_translucence,
+        linear_sampler,
+        kernel_uniforms
+    );
     let average_blocker_depth = blocker.x;
     let blocker_count = blocker.y;
 
@@ -225,7 +311,39 @@ public func get_pcf_pcss_shadow(
     let depth_difference = abs(receiver_distance - blocker_distance);
     let penumbra = depth_difference * light_size_uv * 2.0;
 
-    return pcf_filter(partition_index, shadow_coords, penumbra, global_uniforms.shadow_detail, shadow_maps, shadow_map_sampler, kernel_uniforms);
+    return pcf_filter(
+        partition_index,
+        shadow_coords,
+        penumbra,
+        global_uniforms.shadow_detail,
+        ignore_entity_occluders,
+        shadow_maps,
+        shadow_translucence,
+        shadow_map_sampler,
+        linear_sampler,
+        kernel_uniforms
+    );
+}
+
+[ForceInline]
+func accumulate_blocker(
+    location: float3,
+    receiver_depth: float,
+    ignore_entity_occluders: bool,
+    shadow_maps: DepthTexture2DArray,
+    shadow_translucence: Texture2DArray,
+    linear_sampler: SamplerState,
+    inout blocker_sum: float,
+    inout blocker_count: float
+) {
+    let shadow_depth = shadow_maps.Sample(linear_sampler, location);
+
+    let is_entity = ignore_entity_occluders && shadow_translucence.SampleLevel(linear_sampler, location, 0.0).g >= 0.5;
+
+    if (receiver_depth < shadow_depth && !is_entity) {
+        blocker_sum += shadow_depth;
+        blocker_count += 1.0;
+    }
 }
 
 [ForceInline]
@@ -235,7 +353,9 @@ public func find_blocker(
     receiver_depth: float,
     light_size_uv: float,
     shadow_detail: uint,
+    ignore_entity_occluders: bool,
     shadow_maps: DepthTexture2DArray,
+    shadow_translucence: Texture2DArray,
     linear_sampler: SamplerState,
     kernel_uniforms: ConstantBuffer<KernelUniforms>
 ) -> float2 {
@@ -249,12 +369,7 @@ public func find_blocker(
             for (var i = 0; i < 16; i++) {
                 let packed = kernel_uniforms.sample_points_16[i / 2];
                 let offset = (i % 2 == 0 ? packed.xy : packed.zw) * light_size_uv;
-                let shadow_depth = shadow_maps.Sample(linear_sampler, float3(uv + offset, partition_index));
-
-                if(receiver_depth < shadow_depth) {
-                    blocker_sum += shadow_depth;
-                    blocker_count += 1.0;
-                }
+                accumulate_blocker(float3(uv + offset, partition_index), receiver_depth, ignore_entity_occluders, shadow_maps, shadow_translucence, linear_sampler, blocker_sum, blocker_count);
             }
             break;
         }
@@ -263,12 +378,7 @@ public func find_blocker(
             for (var i = 0; i < 32; i++) {
                 let packed = kernel_uniforms.sample_points_32[i / 2];
                 let offset = (i % 2 == 0 ? packed.xy : packed.zw) * light_size_uv;
-                let shadow_depth = shadow_maps.Sample(linear_sampler, float3(uv + offset, partition_index));
-
-                if(receiver_depth < shadow_depth) {
-                    blocker_sum += shadow_depth;
-                    blocker_count += 1.0;
-                }
+                accumulate_blocker(float3(uv + offset, partition_index), receiver_depth, ignore_entity_occluders, shadow_maps, shadow_translucence, linear_sampler, blocker_sum, blocker_count);
             }
             break;
         }
@@ -277,18 +387,13 @@ public func find_blocker(
             for (var i = 0; i < 64; i++) {
                 let packed = kernel_uniforms.sample_points_64[i / 2];
                 let offset = (i % 2 == 0 ? packed.xy : packed.zw) * light_size_uv;
-                let shadow_depth = shadow_maps.Sample(linear_sampler, float3(uv + offset, partition_index));
-
-                if(receiver_depth < shadow_depth) {
-                    blocker_sum += shadow_depth;
-                    blocker_count += 1.0;
-                }
+                accumulate_blocker(float3(uv + offset, partition_index), receiver_depth, ignore_entity_occluders, shadow_maps, shadow_translucence, linear_sampler, blocker_sum, blocker_count);
             }
             break;
         }
     }
 
-    if(blocker_count == 0.0) {
+    if (blocker_count == 0.0) {
         return float2(-1.0, 0.0);
     }
 
@@ -301,8 +406,11 @@ public func pcf_filter(
     shadow_coords: float3,
     filter_radius_uv: float,
     shadow_detail: uint,
+    ignore_entity_occluders: bool,
     shadow_maps: DepthTexture2DArray,
+    shadow_translucence: Texture2DArray,
     shadow_map_sampler: SamplerComparisonState,
+    linear_sampler: SamplerState,
     kernel_uniforms: ConstantBuffer<KernelUniforms>
 ) -> float {
     var visibility = 0.0;
@@ -314,7 +422,7 @@ public func pcf_filter(
             for (var i = 0; i < 8; i++) {
                 let packed = kernel_uniforms.sample_points_8[i / 2];
                 let offset = (i % 2 == 0 ? packed.xy : packed.zw) * clamped_radius;
-                visibility += shadow_maps.SampleCmp(shadow_map_sampler, float3(shadow_coords.xy + offset, partition_index), shadow_coords.z);
+                visibility += sample_directional_shadow(float3(shadow_coords.xy + offset, partition_index), shadow_coords.z, ignore_entity_occluders, shadow_maps, shadow_translucence, shadow_map_sampler, linear_sampler);
             }
             return visibility / float(8);
         }
@@ -323,7 +431,7 @@ public func pcf_filter(
             for (var i = 0; i < 16; i++) {
                 let packed = kernel_uniforms.sample_points_16[i / 2];
                 let offset = (i % 2 == 0 ? packed.xy : packed.zw) * clamped_radius;
-                visibility += shadow_maps.SampleCmp(shadow_map_sampler, float3(shadow_coords.xy + offset, partition_index), shadow_coords.z);
+                visibility += sample_directional_shadow(float3(shadow_coords.xy + offset, partition_index), shadow_coords.z, ignore_entity_occluders, shadow_maps, shadow_translucence, shadow_map_sampler, linear_sampler);
             }
             return visibility / float(16);
         }
@@ -332,7 +440,7 @@ public func pcf_filter(
             for (var i = 0; i < 32; i++) {
                 let packed = kernel_uniforms.sample_points_32[i / 2];
                 let offset = (i % 2 == 0 ? packed.xy : packed.zw) * clamped_radius;
-                visibility += shadow_maps.SampleCmp(shadow_map_sampler, float3(shadow_coords.xy + offset, partition_index), shadow_coords.z);
+                visibility += sample_directional_shadow(float3(shadow_coords.xy + offset, partition_index), shadow_coords.z, ignore_entity_occluders, shadow_maps, shadow_translucence, shadow_map_sampler, linear_sampler);
             }
             return visibility / float(32);
         }
@@ -341,7 +449,7 @@ public func pcf_filter(
             for (var i = 0; i < 64; i++) {
                 let packed = kernel_uniforms.sample_points_64[i / 2];
                 let offset = (i % 2 == 0 ? packed.xy : packed.zw) * clamped_radius;
-                visibility += shadow_maps.SampleCmp(shadow_map_sampler, float3(shadow_coords.xy + offset, partition_index), shadow_coords.z);
+                visibility += sample_directional_shadow(float3(shadow_coords.xy + offset, partition_index), shadow_coords.z, ignore_entity_occluders, shadow_maps, shadow_translucence, shadow_map_sampler, linear_sampler);
             }
             return visibility / float(64);
         }
@@ -409,6 +517,32 @@ public struct PointShadowFilter {
     public var visibility: float;
 }
 
+/// Takes a single (bilinear PCF) sample of a point shadow.
+///
+/// The green channel of the translucence cube map marks texels where the closest occluder
+/// is an entity. If `ignore_entity_occluders` is set, those texels are treated as unoccluded,
+/// which prevents entities from receiving the (mismatched) point shadows of entities.
+[ForceInline]
+func sample_point_shadow(
+    direction: float3,
+    layer: float,
+    reference: float,
+    ignore_entity_occluders: bool,
+    point_shadow_maps: DepthTextureCubeArray,
+    point_shadow_translucence: TextureCubeArray,
+    shadow_map_sampler: SamplerComparisonState,
+    linear_sampler: SamplerState
+) -> float {
+    let visibility = point_shadow_maps.SampleCmpLevelZero(shadow_map_sampler, float4(direction, layer), reference);
+
+    if (ignore_entity_occluders) {
+        let occluded_by_entity = point_shadow_translucence.SampleLevel(linear_sampler, float4(direction, layer), 0.0).g;
+        return max(visibility, occluded_by_entity);
+    }
+
+    return visibility;
+}
+
 [ForceInline]
 func get_point_shadow_sample_direction(filter: PointShadowFilter, kernel_sample: float2, radius: float) -> float3 {
     return filter.direction + (filter.tangent * kernel_sample.x + filter.bitangent * kernel_sample.y) * radius;
@@ -417,7 +551,8 @@ func get_point_shadow_sample_direction(filter: PointShadowFilter, kernel_sample:
 /// Calculates the visibility of a receiver for a point light with shadows.
 ///
 /// `light_direction` is the normalized direction from the light to the receiver
-/// and `normal` is the normal of the receiver.
+/// and `normal` is the normal of the receiver. If `ignore_entity_occluders` is set,
+/// entities don't cast shadows onto the receiver.
 [ForceInline]
 public func create_point_shadow_filter(
     world_position: float3,
@@ -425,8 +560,10 @@ public func create_point_shadow_filter(
     light_position: float3,
     light_direction: float3,
     cube_index: int,
+    ignore_entity_occluders: bool,
     global_uniforms: GlobalUniforms,
     point_shadow_maps: DepthTextureCubeArray,
+    point_shadow_translucence: TextureCubeArray,
     shadow_map_sampler: SamplerComparisonState,
     linear_sampler: SamplerState,
     kernel_uniforms: ConstantBuffer<KernelUniforms>
@@ -446,7 +583,16 @@ public func create_point_shadow_filter(
         filter.direction = light_direction;
         filter.tangent = float3(0.0);
         filter.bitangent = float3(0.0);
-        filter.visibility = point_shadow_maps.SampleCmpLevelZero(shadow_map_sampler, float4(light_direction, filter.layer), reference);
+        filter.visibility = sample_point_shadow(
+            light_direction,
+            filter.layer,
+            reference,
+            ignore_entity_occluders,
+            point_shadow_maps,
+            point_shadow_translucence,
+            shadow_map_sampler,
+            linear_sampler
+        );
         return filter;
     }
 
@@ -493,7 +639,10 @@ public func create_point_shadow_filter(
             let direction = get_point_shadow_sample_direction(filter, kernel_sample, max_radius);
             let shadow_depth = point_shadow_maps.SampleLevel(linear_sampler, float4(direction, filter.layer), 0.0);
 
-            if (shadow_depth > reference) {
+            let is_entity = ignore_entity_occluders
+                && point_shadow_translucence.SampleLevel(linear_sampler, float4(direction, filter.layer), 0.0).g >= 0.5;
+
+            if (shadow_depth > reference && !is_entity) {
                 blocker_distance_sum += depth::nonLinearToLinear(shadow_depth);
                 blocker_count += 1.0;
             }
@@ -524,7 +673,16 @@ public func create_point_shadow_filter(
     for (var i: uint = 0; i < filter.sample_count; i++) {
         let kernel_sample = get_kernel_sample(kernel_uniforms, filter.sample_count, i);
         let direction = get_point_shadow_sample_direction(filter, kernel_sample, radius);
-        visibility += point_shadow_maps.SampleCmpLevelZero(shadow_map_sampler, float4(direction, filter.layer), reference);
+        visibility += sample_point_shadow(
+            direction,
+            filter.layer,
+            reference,
+            ignore_entity_occluders,
+            point_shadow_maps,
+            point_shadow_translucence,
+            shadow_map_sampler,
+            linear_sampler
+        );
     }
 
     filter.visibility = visibility / float(filter.sample_count);

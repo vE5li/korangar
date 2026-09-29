@@ -178,19 +178,12 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
                 compilation_options: PipelineCompilationOptions::default(),
                 targets: &[Some(ColorTargetState {
                     format: render_pass_context.color_attachment_formats()[0],
-                    blend: Some(BlendState {
-                        color: BlendComponent {
-                            src_factor: BlendFactor::Zero,
-                            dst_factor: BlendFactor::Src,
-                            operation: BlendOperation::Add,
-                        },
-                        alpha: BlendComponent {
-                            src_factor: BlendFactor::Zero,
-                            dst_factor: BlendFactor::SrcAlpha,
-                            operation: BlendOperation::Add,
-                        },
-                    }),
-                    write_mask: ColorWrites::RED,
+                    // Opaque entities are fully handled by the depth, so they don't touch the
+                    // translucence (red). They only mark that they are the closest occluder (green).
+                    // Since opaque entities are drawn after all other opaque geometry, the mark
+                    // survives exactly where an entity passed the depth test last.
+                    blend: None,
+                    write_mask: ColorWrites::GREEN,
                 })],
             }),
             primitive: PrimitiveState::default(),

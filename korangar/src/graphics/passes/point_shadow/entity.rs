@@ -295,6 +295,30 @@ impl PointShadowEntityDrawer {
             EntityPassMode::Transparent => (format!("{DRAWER_NAME} transparent"), "fs_main_transparent", false),
         };
 
+        let (blend, write_mask) = match pass_mode {
+            // Opaque entities are fully handled by the depth, so they don't touch the
+            // translucence (red). They only mark that they are the closest occluder (green).
+            // Since opaque entities are drawn after all other opaque geometry, the mark
+            // survives exactly where an entity passed the depth test last.
+            EntityPassMode::Opaque => (None, ColorWrites::GREEN),
+            // Multiplies the translucence of all transparent entities along the ray.
+            EntityPassMode::Transparent => (
+                Some(BlendState {
+                    color: BlendComponent {
+                        src_factor: BlendFactor::Zero,
+                        dst_factor: BlendFactor::Src,
+                        operation: BlendOperation::Add,
+                    },
+                    alpha: BlendComponent {
+                        src_factor: BlendFactor::Zero,
+                        dst_factor: BlendFactor::SrcAlpha,
+                        operation: BlendOperation::Add,
+                    },
+                }),
+                ColorWrites::RED,
+            ),
+        };
+
         device.create_render_pipeline(&RenderPipelineDescriptor {
             label: Some(&label),
             layout: Some(pipeline_layout),
@@ -310,20 +334,8 @@ impl PointShadowEntityDrawer {
                 compilation_options: PipelineCompilationOptions::default(),
                 targets: &[Some(ColorTargetState {
                     format: render_pass_context.color_attachment_formats()[0],
-                    // Multiplies the translucence of all entities along the ray.
-                    blend: Some(BlendState {
-                        color: BlendComponent {
-                            src_factor: BlendFactor::Zero,
-                            dst_factor: BlendFactor::Src,
-                            operation: BlendOperation::Add,
-                        },
-                        alpha: BlendComponent {
-                            src_factor: BlendFactor::Zero,
-                            dst_factor: BlendFactor::SrcAlpha,
-                            operation: BlendOperation::Add,
-                        },
-                    }),
-                    write_mask: ColorWrites::RED,
+                    blend,
+                    write_mask,
                 })],
             }),
             primitive: PrimitiveState::default(),

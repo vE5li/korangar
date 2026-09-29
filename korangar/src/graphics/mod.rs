@@ -990,7 +990,7 @@ impl GlobalContext {
 
         shadow_factory.new_attachment_array(
             "directional shadow translucence",
-            TextureFormat::R8Unorm,
+            TextureFormat::Rg8Unorm,
             AttachmentTextureType::ColorAttachment,
             PARTITION_COUNT as u32,
         )
@@ -1023,7 +1023,7 @@ impl GlobalContext {
             device,
             "point shadow translucence",
             shadow_size,
-            TextureFormat::R8Unorm,
+            TextureFormat::Rg8Unorm,
             AttachmentTextureType::ColorAttachment,
             NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS as u32,
         )

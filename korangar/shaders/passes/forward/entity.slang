@@ -31,6 +31,8 @@ struct ForwardEntityVertexOutput {
 [[vk::binding(5, 1)]] var point_shadow_maps: DepthTextureCubeArray;
 [[vk::binding(6, 1)]] var directional_light_partitions: StructuredBuffer<DirectionalLightPartition>;
 [[vk::binding(7, 1)]] var kernel_uniforms: ConstantBuffer<KernelUniforms>;
+[[vk::binding(8, 1)]] var shadow_translucence: Texture2DArray;
+[[vk::binding(9, 1)]] var point_shadow_translucence: TextureCubeArray;
 [[vk::binding(0, 2)]] var instance_data: StructuredBuffer<ForwardEntityInstanceData>;
 [[vk::binding(0, 3)]] var texture: Texture2D;
 
@@ -175,7 +177,7 @@ func fragment(input: ForwardEntityVertexOutput) -> ForwardEntityFragmentOutput {
 
         let shadow_position = mul(directional_light_partitions[partition_index].view_projection, adjusted_world_position);
         var shadow_coords = shadow_position.xyz / shadow_position.w;
-        let bias = 0.011;
+        let bias = global_uniforms.use_sdsm ? SDSM_ENTITY_DEPTH_BIAS : PPSM_ENTITY_DEPTH_BIAS;
         shadow_coords = float3(
             coordinate_space::clip_to_screen_space(shadow_coords.xy),
             // If the far plane of the shadow is in front of the drawn object, then it's value would be below 0.0.
@@ -184,14 +186,23 @@ func fragment(input: ForwardEntityVertexOutput) -> ForwardEntityFragmentOutput {
             max(shadow_coords.z, 0.0) + bias
         );
 
+        // Entities don't receive shadows of entities. The billboard of an entity is oriented
+        // differently in the shadow map, so it would shadow itself. This also matches fading
+        // entities, which never cast shadows onto entities.
+        let ignore_entity_occluders = true;
+
         var visibility: float = 1.0;
 
         switch (global_uniforms.shadow_method) {
             case 0: {
-                visibility = shadow_maps.SampleCmp(
-                    shadow_map_sampler,
+                visibility = sample_directional_shadow(
                     float3(shadow_coords.xy, partition_index),
-                    shadow_coords.z
+                    shadow_coords.z,
+                    ignore_entity_occluders,
+                    shadow_maps,
+                    shadow_translucence,
+                    shadow_map_sampler,
+                    linear_sampler
                 );
                 break;
             }
@@ -199,11 +210,11 @@ func fragment(input: ForwardEntityVertexOutput) -> ForwardEntityFragmentOutput {
                 uint shadow_width, shadow_height, shadow_depth;
                 shadow_maps.GetDimensions(shadow_width, shadow_height, shadow_depth);
                 let shadow_map_dimensions = uint2(shadow_width, shadow_height);
-                visibility = get_pcf_shadow(partition_index, shadow_coords, shadow_map_dimensions, global_uniforms.shadow_detail, shadow_maps, shadow_map_sampler);
+                visibility = get_pcf_shadow(partition_index, shadow_coords, shadow_map_dimensions, global_uniforms.shadow_detail, ignore_entity_occluders, shadow_maps, shadow_translucence, shadow_map_sampler, linear_sampler);
                 break;
             }
             case 2: {
-                visibility = get_pcf_pcss_shadow(partition_index, shadow_coords, global_uniforms, directional_light_partitions, shadow_maps, shadow_map_sampler, linear_sampler, kernel_uniforms);
+                visibility = get_pcf_pcss_shadow(partition_index, shadow_coords, ignore_entity_occluders, global_uniforms, directional_light_partitions, shadow_maps, shadow_translucence, shadow_map_sampler, linear_sampler, kernel_uniforms);
                 break;
             }
         }
@@ -229,8 +240,12 @@ func fragment(input: ForwardEntityVertexOutput) -> ForwardEntityFragmentOutput {
                     light.position.xyz,
                     light_direction_point,
                     light.texture_index - 1,
+                    // Entities don't receive point shadows of entities. The billboard of an entity
+                    // is oriented differently in the shadow map, so it would shadow itself.
+                    true,
                     global_uniforms,
                     point_shadow_maps,
+                    point_shadow_translucence,
                     shadow_map_sampler,
                     linear_sampler,
                     kernel_uniforms

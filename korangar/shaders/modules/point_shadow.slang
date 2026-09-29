@@ -32,12 +32,12 @@ public struct ModelInstanceData {
 };
 
 public struct ModelFragmentOutput {
-    [[vk::location(0)]] public var translucence: float;
+    [[vk::location(0)]] public var shadow_data: float2;
     public float depth: SV_Depth;
 };
 
 public struct EntityFragmentOutput {
-    [[vk::location(0)]] public var translucence: float;
+    [[vk::location(0)]] public var shadow_data: float2;
     public float depth: SV_Depth;
 };
 

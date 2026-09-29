@@ -192,22 +192,28 @@ func fragment(input: ModelVertexOutput) -> float4 {
             let light_direction = normalize(input.world_position.xyz - light.position.xyz);
             let light_percent = max(dot(light_direction, normal), 0.0);
             let light_distance = length(light.position.xyz - input.world_position.xyz);
+            let attenuation = calculate_attenuation(light_distance, light.range);
             var visibility = 1.0;
 
-            if (light.texture_index != 0) {
-                let bias = 1.2;
-                let distance_to_light = depth::linearToNonLinear(light_distance - bias);
-                let closest_distance = point_shadow_maps.Sample(
+            // Only calculate shadows if the light contributes to the fragment.
+            if (light.texture_index != 0 && light_percent * attenuation > 0.0) {
+                let filter = create_point_shadow_filter(
+                    input.world_position.xyz,
+                    normal,
+                    light.position.xyz,
+                    light_direction,
+                    light.texture_index - 1,
+                    global_uniforms,
+                    point_shadow_maps,
+                    shadow_map_sampler,
                     linear_sampler,
-                    float4(light_direction, light.texture_index - 1)
+                    kernel_uniforms
                 );
-
-                visibility = float(distance_to_light > closest_distance);
-\n                let translucence = point_shadow_translucence.SampleLevel(\n                    linear_sampler,\n                    float4(light_direction, light.texture_index - 1),\n                    0.0\n                ).r;\n                visibility *= translucence;
+                let translucence = sample_point_shadow_translucence(filter, point_shadow_translucence, linear_sampler, kernel_uniforms);
+                visibility = filter.visibility * translucence;
             }
 
             let intensity = 10.0;
-            let attenuation = calculate_attenuation(light_distance, light.range);
             point_light_contribution += (light.color.rgb * intensity) * light_percent * attenuation * visibility;
         }
 

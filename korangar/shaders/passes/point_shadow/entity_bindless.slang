@@ -61,7 +61,7 @@ func fs_main_opaque(input: EntityVertexOutput) -> EntityFragmentOutput {
         discard;
     }
 
-    return create_output(input, 1.0);
+    return create_output(input, float2(1.0, 1.0));
 }
 
 [[shader("pixel")]]
@@ -72,11 +72,11 @@ func fs_main_transparent(input: EntityVertexOutput) -> EntityFragmentOutput {
         discard;
     }
 
-    return create_output(input, input.alpha);
+    return create_output(input, float2(1.0 - input.alpha, 0.0));
 }
 
 [ForceInline]
-func create_output(input: EntityVertexOutput, alpha: float) -> EntityFragmentOutput {
+func create_output(input: EntityVertexOutput, shadow_data: float2) -> EntityFragmentOutput {
     let light_distance = calculate_adjusted_light_distance(
         input.world_position,
         input.depth_offset,
@@ -87,7 +87,7 @@ func create_output(input: EntityVertexOutput, alpha: float) -> EntityFragmentOut
     );
 
     var output: EntityFragmentOutput;
-    output.translucence = 1.0 - alpha;
+    output.shadow_data = shadow_data;
     output.depth = depth.linearToNonLinear(light_distance);
     return output;
 }

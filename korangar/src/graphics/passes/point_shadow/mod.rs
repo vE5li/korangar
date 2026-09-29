@@ -99,7 +99,13 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, {
                     .get_texture_face_view(pass_data.shadow_caster_index, pass_data.face_index),
                 resolve_target: None,
                 ops: Operations {
-                    load: LoadOp::Clear(Color::WHITE),
+                    // Fully translucent and not occluded by an entity.
+                    load: LoadOp::Clear(Color {
+                        r: 1.0,
+                        g: 0.0,
+                        b: 0.0,
+                        a: 1.0,
+                    }),
                     store: StoreOp::Store,
                 },
                 depth_slice: None,

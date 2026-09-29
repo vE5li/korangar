@@ -79,7 +79,13 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, {
                     .get_array_texture_view(pass_data),
                 resolve_target: None,
                 ops: Operations {
-                    load: LoadOp::Clear(Color::WHITE),
+                    // Fully translucent and not occluded by an entity.
+                    load: LoadOp::Clear(Color {
+                        r: 1.0,
+                        g: 0.0,
+                        b: 0.0,
+                        a: 1.0,
+                    }),
                     store: StoreOp::Store,
                 },
                 depth_slice: None,

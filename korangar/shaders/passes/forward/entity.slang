@@ -52,8 +52,10 @@ func vs_main(input: EntityVertexInput) -> ForwardEntityVertexOutput {
         output.texture_coordinates.x = 1.0 - output.texture_coordinates.x;
     }
 
-    let rotated = rotateY(float3(global_uniforms.view.getColumn(2).x, 0, global_uniforms.view.getColumn(2).z), vertex.position.x);
-    output.normal = float3(-rotated.x, rotated.y, rotated.z);
+    // Entities are lit like a cylinder. The normal at the center points in the view direction
+    // (away from the light when lit) and is rotated towards the edges of the sprite.
+    let view_direction = global_uniforms.view.getRow(2);
+    output.normal = rotateY(float3(view_direction.x, 0.0, view_direction.z), vertex.position.x);
 
     // Values are represented as proportions ranging from -1 to 1
     let proportion_x = instance.frame_size.x / SPRITE_MAX_SIZE_X;

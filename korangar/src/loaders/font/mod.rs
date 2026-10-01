@@ -1,7 +1,7 @@
 mod color_span_iterator;
 mod font_file;
-mod font_map_descriptor;
 mod layout_key;
+mod slug;
 
 use std::hash::Hash;
 use std::num::{NonZeroU32, NonZeroUsize};
@@ -11,7 +11,6 @@ use cgmath::{Point2, Vector2};
 use cosmic_text::fontdb::ID;
 use cosmic_text::{Attrs, Buffer, Family, FontSystem, Metrics, Shaping, Weight, fontdb};
 use hashbrown::HashMap;
-use image::{ImageBuffer, Rgba, RgbaImage, imageops};
 #[cfg(feature = "debug")]
 use korangar_container::CacheStatistics;
 use korangar_container::{Cacheable, SimpleCache};
@@ -24,14 +23,23 @@ use korangar_interface::components::drop_down::DropDownItem;
 use korangar_interface::element::{ElementDisplay, StateElement};
 use rust_state::RustState;
 use serde::{Deserialize, Serialize};
+use wgpu::{Device, Queue};
 
 use self::color_span_iterator::ColorSpanIterator;
-use super::{GameFileLoader, TextureLoader};
-use crate::graphics::{Color, MAX_TEXTURE_SIZE, ScreenSize, Texture};
-use crate::loaders::font::font_file::FontFile;
+use self::slug::SlugFontData;
+use super::GameFileLoader;
+use crate::graphics::{Color, ScreenSize, SlugFont};
+use crate::loaders::font::font_file::{FaceGlyphs, FontFile};
 use crate::loaders::font::layout_key::{LayoutKey, LayoutKeyRef};
 use crate::loaders::rectangle::Rectangle;
 use crate::state::ClientState;
+
+/// The padding in pixels that every glyph quad needs for the rasterizer to
+/// cover every pixel that the glyph outline touches.
+pub const GLYPH_PADDING: f32 = 0.5;
+/// The radius of the dark shadow around in-game text in em units. Must match
+/// `TEXT_SHADOW_RADIUS` in the postprocessing shader module.
+pub const TEXT_SHADOW_RADIUS: f32 = 0.08;
 
 const MAX_CACHE_COUNT: u32 = 2048;
 const MAX_CACHE_SIZE: usize = 32 << 20;
@@ -134,13 +142,38 @@ impl Scaling {
 #[derive(Copy, Clone)]
 pub struct GlyphInstruction {
     pub position: Rectangle<f32>,
-    pub texture_coordinate: Rectangle<f32>,
+    pub em_coordinate: Rectangle<f32>,
+    pub glyph_index: u32,
     pub color: Color,
+}
+
+impl GlyphInstruction {
+    /// Grows the glyph by `padding` pixels on every side. The em space
+    /// coordinates grow by the same amount, so the glyph keeps its size and
+    /// position on screen. The Slug shader needs at least [`GLYPH_PADDING`]
+    /// to cover every pixel that the outline touches.
+    pub fn dilated(&self, padding: f32, font_size: FontSize) -> Self {
+        let em_padding = padding / font_size.0;
+
+        Self {
+            position: Rectangle::new(
+                Point2::new(self.position.min.x - padding, self.position.min.y - padding),
+                Point2::new(self.position.max.x + padding, self.position.max.y + padding),
+            ),
+            em_coordinate: Rectangle::new(
+                Point2::new(self.em_coordinate.min.x - em_padding, self.em_coordinate.min.y + em_padding),
+                Point2::new(self.em_coordinate.max.x + em_padding, self.em_coordinate.max.y - em_padding),
+            ),
+            glyph_index: self.glyph_index,
+            color: self.color,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct GlyphCoordinate {
-    pub(crate) texture_coordinate: Rectangle<f32>,
+    pub(crate) em_coordinate: Rectangle<f32>,
+    pub(crate) glyph_index: u32,
     pub(crate) width: f32,
     pub(crate) height: f32,
     pub(crate) offset_top: f32,
@@ -150,27 +183,44 @@ pub(crate) struct GlyphCoordinate {
 pub struct FontLoader {
     font_system: Mutex<FontSystem>,
     primary_font_family: String,
-    font_map: Arc<Texture>,
-    glyph_cache: HashMap<ID, Arc<HashMap<u16, GlyphCoordinate>>>,
+    slug_font: SlugFont,
+    glyph_cache: HashMap<ID, FaceGlyphs>,
     layout_cache: Mutex<SimpleCache<LayoutKey, CachedLayout>>,
 }
 
 impl FontLoader {
-    pub fn new(fonts: &[String], game_file_loader: &GameFileLoader, texture_loader: &TextureLoader) -> Self {
+    pub fn new(fonts: &[String], game_file_loader: &GameFileLoader, device: &Device, queue: &Queue) -> Self {
         assert_ne!(fonts.len(), 0, "no font defined");
 
         let mut font_system = FontSystem::new_with_locale_and_db(Self::system_locale(), fontdb::Database::new());
         let mut glyph_cache = HashMap::new();
+        let mut slug_data = SlugFontData::default();
 
         let fonts: Vec<FontFile> = fonts
             .iter()
-            .filter_map(|font_name| FontFile::new(font_name, game_file_loader, &mut font_system))
+            .filter_map(|font_name| FontFile::new(font_name, game_file_loader, &mut font_system, &mut slug_data))
             .collect();
 
         let primary_font_family = Self::extract_primary_font_family(&font_system, &fonts);
-        let font_map_image_data = Self::merge_font_maps(&mut glyph_cache, &mut font_system, fonts);
 
-        let font_map = texture_loader.create_msdf("font map", font_map_image_data);
+        for (id, glyphs) in fonts.into_iter().flat_map(|font| font.faces) {
+            glyph_cache.insert(id, glyphs);
+            let _ = font_system.get_font(id, Weight::NORMAL);
+        }
+
+        slug_data.ensure_not_empty();
+
+        #[cfg(feature = "debug")]
+        print_debug!(
+            "slug font data: {} curve entries, {} band entries, {} glyphs ({} bytes)",
+            slug_data.curves.len().magenta(),
+            slug_data.bands.len().magenta(),
+            slug_data.glyphs.len().magenta(),
+            (size_of_val(slug_data.curves.as_slice()) + size_of_val(slug_data.bands.as_slice()) + size_of_val(slug_data.glyphs.as_slice()))
+                .magenta(),
+        );
+
+        let slug_font = SlugFont::new(device, queue, &slug_data.curves, &slug_data.bands, &slug_data.glyphs);
 
         let layout_cache = SimpleCache::new(
             NonZeroU32::new(MAX_CACHE_COUNT).unwrap(),
@@ -180,7 +230,7 @@ impl FontLoader {
         Self {
             font_system: Mutex::new(font_system),
             primary_font_family,
-            font_map,
+            slug_font,
             glyph_cache,
             layout_cache: Mutex::new(layout_cache),
         }
@@ -202,8 +252,8 @@ impl FontLoader {
     fn extract_primary_font_family(font_system: &FontSystem, fonts: &[FontFile]) -> String {
         let primary_font_id = fonts
             .first()
-            .and_then(|font| font.ids.first())
-            .copied()
+            .and_then(|font| font.faces.first())
+            .map(|(id, _)| *id)
             .expect("no primary font ID found");
 
         font_system
@@ -211,75 +261,6 @@ impl FontLoader {
             .face(primary_font_id)
             .and_then(|face| face.families.first().map(|(family, _)| family.clone()))
             .expect("primary font has no family name")
-    }
-
-    fn merge_font_maps(
-        glyph_cache: &mut HashMap<ID, Arc<HashMap<u16, GlyphCoordinate>>>,
-        font_system: &mut FontSystem,
-        mut fonts: Vec<FontFile>,
-    ) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
-        if fonts.len() == 1 {
-            let FontFile { ids, font_map, glyphs } = fonts.drain(..).take(1).next().unwrap();
-
-            for &id in &ids {
-                glyph_cache.insert(id, glyphs.clone());
-                let _ = font_system.get_font(id, Weight::NORMAL);
-            }
-
-            font_map
-        } else {
-            let overall_height: u32 = fonts.iter().map(|font| font.font_map.height()).sum();
-
-            assert!(
-                overall_height <= MAX_TEXTURE_SIZE,
-                "aggregated font map is higher than max texture size"
-            );
-            assert_ne!(overall_height, 0, "aggregated font map height is zero");
-
-            let mut font_map_image_data = RgbaImage::new(MAX_TEXTURE_SIZE, overall_height);
-            let mut start_height = 0;
-
-            for font in fonts {
-                let FontFile { ids, font_map, glyphs } = font;
-
-                let font_map_height = font_map.height() as f32;
-
-                let adjusted_glyphs: Arc<HashMap<u16, GlyphCoordinate>> = Arc::new(
-                    glyphs
-                        .iter()
-                        .map(|(&index, &coordinate)| {
-                            let mut new_coordinate = coordinate;
-
-                            let y_offset = start_height as f32 / overall_height as f32;
-                            let scale_factor = font_map_height / overall_height as f32;
-
-                            new_coordinate.texture_coordinate = Rectangle::new(
-                                Point2::new(
-                                    coordinate.texture_coordinate.min.x,
-                                    coordinate.texture_coordinate.min.y * scale_factor + y_offset,
-                                ),
-                                Point2::new(
-                                    coordinate.texture_coordinate.max.x,
-                                    coordinate.texture_coordinate.max.y * scale_factor + y_offset,
-                                ),
-                            );
-
-                            (index, new_coordinate)
-                        })
-                        .collect(),
-                );
-
-                for &id in &ids {
-                    glyph_cache.insert(id, adjusted_glyphs.clone());
-                    let _ = font_system.get_font(id, Weight::NORMAL);
-                }
-
-                imageops::replace(&mut font_map_image_data, &font_map, 0, start_height);
-                start_height += font_map_height as i64;
-            }
-
-            font_map_image_data
-        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -439,7 +420,7 @@ impl FontLoader {
                 let physical_glyph = layout_glyph.physical((0.0, 0.0), 1.0);
 
                 let Some(glyph_coordinate) = self.glyph_cache.get(&layout_glyph.font_id).and_then(|font| {
-                    font.get(&layout_glyph.glyph_id).copied().map(|mut glyph| {
+                    font.get(layout_glyph.glyph_id as usize).copied().flatten().map(|mut glyph| {
                         glyph.width *= font_size.0;
                         glyph.height *= font_size.0;
                         glyph.offset_left *= font_size.0;
@@ -460,7 +441,8 @@ impl FontLoader {
 
                 rendered_glyphs.push(GlyphInstruction {
                     position,
-                    texture_coordinate: glyph_coordinate.texture_coordinate,
+                    em_coordinate: glyph_coordinate.em_coordinate,
+                    glyph_index: glyph_coordinate.glyph_index,
                     color,
                 });
             }
@@ -469,9 +451,9 @@ impl FontLoader {
         (Vector2::new(text_width, text_height), rendered_glyphs)
     }
 
-    /// The texture of the static font map.
-    pub fn get_font_map(&self) -> &Texture {
-        &self.font_map
+    /// The GPU buffers with the glyph outlines of all fonts.
+    pub fn get_slug_font(&self) -> &SlugFont {
+        &self.slug_font
     }
 }
 

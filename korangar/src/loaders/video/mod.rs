@@ -94,7 +94,7 @@ impl VideoLoader {
 
                 let (image, _) = self
                     .texture_loader
-                    .load_texture_data(FALLBACK_PNG_FILE, false)
+                    .load_texture_data(FALLBACK_PNG_FILE)
                     .expect("can't load fallback PNG file");
                 let (width, height) = image.dimensions();
                 let texture = self.texture_loader.create_color(path, image, false);

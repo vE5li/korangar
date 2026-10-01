@@ -13,6 +13,7 @@ mod projection;
 mod sampler;
 mod settings;
 mod shader_compiler;
+mod slug;
 mod surface;
 mod texture;
 mod vertices;
@@ -45,6 +46,7 @@ pub use self::primitives::*;
 pub use self::projection::*;
 pub use self::settings::*;
 pub use self::shader_compiler::ShaderCompiler;
+pub use self::slug::{SlugFont, SlugGlyph};
 pub use self::surface::*;
 pub use self::texture::*;
 pub use self::vertices::*;
@@ -346,7 +348,6 @@ pub(crate) struct DebugUniforms {
     show_point_shadow_map: u32,
     show_light_culling_count_buffer: u32,
     show_sdsm_partitions: u32,
-    show_font_map: u32,
 }
 
 #[derive(Copy, Clone, Pod, Zeroable)]
@@ -530,7 +531,6 @@ impl Prepare for GlobalContext {
                     .unwrap_or(0),
                 show_light_culling_count_buffer: instructions.render_options.show_light_culling_count_buffer as u32,
                 show_sdsm_partitions: instructions.render_options.show_sdsm_partitions as u32,
-                show_font_map: instructions.render_options.show_font_map as u32,
             };
         }
     }

@@ -426,7 +426,8 @@ impl Client {
             let font_loader = Arc::new(FontLoader::new(
                 &["NotoSans".to_owned(), "NotoSansKR".to_owned()],
                 &game_file_loader,
-                &texture_loader,
+                &device,
+                &queue,
             ));
             let map_loader = Arc::new(MapLoader::new(
                 device.clone(),
@@ -3448,7 +3449,7 @@ impl Client {
             water: water_instruction,
             map_picker_tile_vertex_buffer: Some(map.get_tile_picker_vertex_buffer()),
             map_picker_tile_index_buffer: Some(map.get_tile_picker_index_buffer()),
-            font_map_texture: Some(self.font_loader.get_font_map()),
+            slug_font: Some(self.font_loader.get_slug_font()),
             #[cfg(feature = "debug")]
             render_options,
             #[cfg(feature = "debug")]

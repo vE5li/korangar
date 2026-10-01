@@ -6,8 +6,6 @@ import globals;
 import transform;
 
 static const var BREATHING_ROOM: float = 0.5;
-public static const var EDGE_VALUE: float = 0.5;
-public static const var PXRANGE: float = 6.0;
 
 public struct RectangleInstanceData {
     public var color: float4;
@@ -75,24 +73,6 @@ func rectangle_sdf_gradient(relative_position: float2, half_size: float2, corner
     let distance_to_shrunk_corner = max(float2(0.0), distance_to_shrunk_corner_unclipped);
     let distance_magnitude = length(distance_to_shrunk_corner) + 1e-7;
     return (distance_to_shrunk_corner / distance_magnitude) * sign(relative_position);
-}
-
-[ForceInline]
-public func median(r: float, g: float, b: float) -> float {
-    return max(min(r, g), min(max(r, g), b));
-}
-
-[ForceInline]
-public func calculate_msdf(
-    distance: float,
-    texture_size: float2,
-    texture_coordinates: float2,
-    color: float4,
-) -> float4 {
-    let unit_range = (float2(PXRANGE) / texture_size);
-    let screen_texture_size = float2(1.0) / fwidth(texture_coordinates);
-    let screen_px_range = max(EDGE_VALUE * dot(unit_range, screen_texture_size), 1.0);
-    return color * saturate(distance * screen_px_range + EDGE_VALUE);
 }
 
 [ForceInline]

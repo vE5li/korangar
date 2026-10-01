@@ -21,7 +21,7 @@ pub use self::action::*;
 pub use self::animation::*;
 pub use self::r#async::*;
 pub use self::effect::EffectLoader;
-pub use self::font::{FontLoader, FontSize, GlyphInstruction, OverflowBehavior, Scaling};
+pub use self::font::{FontLoader, FontSize, GLYPH_PADDING, GlyphInstruction, OverflowBehavior, Scaling, TEXT_SHADOW_RADIUS};
 pub use self::gamefile::*;
 pub use self::map::{GAT_TILE_SIZE, MapLoader};
 pub use self::model::*;

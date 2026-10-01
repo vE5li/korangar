@@ -1934,6 +1934,7 @@ dependencies = [
  "smallvec",
  "spin_sleep",
  "sys-locale",
+ "ttf-parser",
  "walkdir",
  "wgpu",
  "winit",

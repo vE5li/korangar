@@ -207,7 +207,7 @@ fn analyze_files(
                     match media_type {
                         MediaType::Texture => {
                             if let (Some(texture_loader), Some(texture_name)) = (texture_loader, source_file.strip_prefix(TEXTURE_PREFIX)) {
-                                match texture_loader.load_texture_data(texture_name, false) {
+                                match texture_loader.load_texture_data(texture_name) {
                                     Ok((image, _)) => {
                                         let hash = blake3::hash(image.as_bytes());
                                         hash != cached_hash
@@ -297,7 +297,7 @@ fn process_media_files(
         match media_type {
             MediaType::Texture => {
                 if let (Some(texture_loader), Some(texture_name)) = (texture_loader, source_file.strip_prefix(TEXTURE_PREFIX)) {
-                    match texture_loader.load_texture_data(texture_name, false) {
+                    match texture_loader.load_texture_data(texture_name) {
                         Ok((image, transparent))
                             if (image.height() % 4 == 0 && image.width() % 4 == 0) || (image.height() >= 48 && image.width() >= 48) =>
                         {

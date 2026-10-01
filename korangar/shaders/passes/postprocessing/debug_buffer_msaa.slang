@@ -11,7 +11,6 @@ public struct DebugUniforms {
     public var show_point_shadow_map: uint;
     public var show_light_culling_count_buffer: uint;
     public var show_sdsm_partitions: uint;
-    public var show_font_map: uint;
 }
 
 public struct Partition {
@@ -32,7 +31,6 @@ static const var TILE_SIZE: uint = 16;
 [[vk::binding(4, 1)]] var point_shadow_maps: DepthTextureCubeArray;
 [[vk::binding(5, 1)]] var depth_texture: DepthTexture2DMS;
 [[vk::binding(6, 1)]] var partition_data: StructuredBuffer<Partition>;
-[[vk::binding(0, 2)]] var font_map: Texture2D;
 
 [[shader("vertex")]]
 func vs_main(uint vertex_index : SV_VulkanVertexID) -> FullscreenVertex {
@@ -142,11 +140,6 @@ func fs_main(input: FullscreenVertex) -> float4 {
         }
 
         output_color += partition_color * 0.25;
-    }
-
-    if (debug_uniforms.show_font_map != 0) {
-        let color = font_map.Sample(nearest_sampler, coordinate_space::clip_to_screen_space(input.uv)).rgb;
-        output_color += float4(color, 1.0);
     }
 
     return output_color;

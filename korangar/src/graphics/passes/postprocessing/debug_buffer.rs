@@ -1,9 +1,8 @@
 use wgpu::util::StagingBelt;
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource,
-    BindingType, BlendState, ColorTargetState, ColorWrites, CommandEncoder, Device, FragmentState, MultisampleState,
+    BindGroup, BlendState, ColorTargetState, ColorWrites, CommandEncoder, Device, FragmentState, MultisampleState,
     PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor,
-    ShaderStages, TextureSampleType, TextureViewDimension, VertexState,
+    VertexState,
 };
 
 use crate::graphics::passes::{
@@ -11,7 +10,7 @@ use crate::graphics::passes::{
 };
 use crate::graphics::settings::RenderOptions;
 use crate::graphics::shader_compiler::ShaderCompiler;
-use crate::graphics::{Capabilities, GlobalContext, Prepare, RenderInstruction, Texture};
+use crate::graphics::{Capabilities, GlobalContext, Prepare, RenderInstruction};
 
 const DRAWER_NAME: &str = "debug buffer";
 
@@ -21,8 +20,6 @@ pub(crate) struct DebugBufferDrawData<'a> {
 }
 
 pub(crate) struct DebugBufferDrawer {
-    bind_group_layout: BindGroupLayout,
-    bind_group: BindGroup,
     pipeline: RenderPipeline,
 }
 
@@ -43,30 +40,13 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
             true => shader_compiler.create_shader_module("postprocessing", "debug_buffer_msaa"),
         };
 
-        let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: Some(DRAWER_NAME),
-            entries: &[BindGroupLayoutEntry {
-                binding: 0,
-                visibility: ShaderStages::FRAGMENT,
-                ty: BindingType::Texture {
-                    sample_type: TextureSampleType::Float { filterable: true },
-                    view_dimension: TextureViewDimension::D2,
-                    multisampled: false,
-                },
-                count: None,
-            }],
-        });
-
         let bind_group_layouts = Self::Context::bind_group_layout(device);
-
-        let bind_group = Self::create_bind_group(device, &bind_group_layout, &global_context.solid_pixel_texture);
 
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some(DRAWER_NAME),
             bind_group_layouts: &[
                 Some(bind_group_layouts[0]),
                 Some(GlobalContext::debug_bind_group_layout(device, global_context.msaa)),
-                Some(&bind_group_layout),
             ],
             immediate_size: 0,
         });
@@ -97,11 +77,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
             multiview_mask: None,
         });
 
-        Self {
-            bind_group_layout,
-            bind_group,
-            pipeline,
-        }
+        Self { pipeline }
     }
 
     fn draw(&mut self, pass: &mut RenderPass<'_>, draw_data: Self::DrawData<'_>) {
@@ -111,32 +87,16 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
 
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(1, draw_data.debug_bind_group, &[]);
-        pass.set_bind_group(2, &self.bind_group, &[]);
         pass.draw(0..3, 0..1);
     }
 }
 
 impl Prepare for DebugBufferDrawer {
-    fn prepare(&mut self, device: &Device, instructions: &RenderInstruction) {
-        if let Some(font_map_texture) = instructions.font_map_texture {
-            self.bind_group = Self::create_bind_group(device, &self.bind_group_layout, font_map_texture);
-        }
+    fn prepare(&mut self, _device: &Device, _instructions: &RenderInstruction) {
+        /* Nothing to do */
     }
 
     fn upload(&mut self, _device: &Device, _staging_belt: &mut StagingBelt, _command_encoder: &mut CommandEncoder) {
         /* Nothing to do */
-    }
-}
-
-impl DebugBufferDrawer {
-    fn create_bind_group(device: &Device, bind_group_layout: &BindGroupLayout, font_map_texture: &Texture) -> BindGroup {
-        device.create_bind_group(&BindGroupDescriptor {
-            label: Some(DRAWER_NAME),
-            layout: bind_group_layout,
-            entries: &[BindGroupEntry {
-                binding: 0,
-                resource: BindingResource::TextureView(font_map_texture.get_texture_view()),
-            }],
-        })
     }
 }

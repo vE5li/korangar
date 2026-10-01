@@ -336,7 +336,6 @@ pub struct RenderOptions {
     pub show_directional_shadow_map: Option<NonZeroU32>,
     pub show_point_shadow_map: Option<NonZeroU32>,
     pub show_light_culling_count_buffer: bool,
-    pub show_font_map: bool,
     pub show_sdsm_partitions: bool,
     pub show_rectangle_instructions: bool,
     pub show_glyph_instructions: bool,
@@ -379,7 +378,6 @@ impl RenderOptions {
             show_point_shadow_map: None,
             show_light_culling_count_buffer: false,
             show_sdsm_partitions: false,
-            show_font_map: false,
             show_rectangle_instructions: false,
             show_glyph_instructions: false,
             show_sprite_instructions: false,
@@ -396,6 +394,5 @@ impl RenderOptions {
             || self.show_point_shadow_map.is_some()
             || self.show_light_culling_count_buffer
             || self.show_sdsm_partitions
-            || self.show_font_map
     }
 }

@@ -11,7 +11,7 @@ use korangar_interface::layout::{ClipId, Icon, WindowLayout};
 use crate::graphics::{
     Color, CornerDiameter, InterfaceRectangleInstruction, ScreenClip, ScreenPosition, ScreenSize, ShadowPadding, Texture,
 };
-use crate::loaders::{FontLoader, FontSize, GlyphInstruction, ImageType, OverflowBehavior, Sprite, TextureLoader};
+use crate::loaders::{FontLoader, FontSize, GLYPH_PADDING, GlyphInstruction, ImageType, OverflowBehavior, Sprite, TextureLoader};
 use crate::renderer::SpriteRenderer;
 use crate::state::ClientState;
 use crate::world::{Actions, SpriteAnimationState};
@@ -293,49 +293,44 @@ impl InterfaceRenderer {
 
         let mut instructions = self.instructions.borrow_mut();
 
-        glyphs.drain(..).for_each(
-            |GlyphInstruction {
-                 position,
-                 texture_coordinate,
-                 color,
-             }| {
-                // If the character is not even within the bounds of the clip, discard it early
-                // saving GPU resources.
-                //
-                // TODO: For some reason the min.y is actually max.y and vice versa. Not sure
-                // how this rendering code works but that's why the check is
-                // using max.y and min.y inverted.
-                if text_position.left + position.min.x > screen_clip.right
-                    || text_position.top + position.max.y > screen_clip.bottom
-                    || text_position.left + position.max.x < screen_clip.left
-                    || text_position.top + position.min.y < screen_clip.top
-                {
-                    #[cfg(feature = "debug")]
-                    if self.show_glyph_instructions {
-                        let screen_position = ScreenPosition {
-                            left: text_position.left + position.min.x,
-                            top: text_position.top + position.min.y,
-                        } / self.interface_size;
+        glyphs.drain(..).for_each(|glyph| {
+            let position = glyph.position;
 
-                        let screen_size = ScreenSize {
-                            width: position.width(),
-                            height: position.height(),
-                        } / self.interface_size;
+            // If the character is not even within the bounds of the clip, discard it early
+            // saving GPU resources.
+            if text_position.left + position.min.x > screen_clip.right
+                || text_position.top + position.min.y > screen_clip.bottom
+                || text_position.left + position.max.x < screen_clip.left
+                || text_position.top + position.max.y < screen_clip.top
+            {
+                #[cfg(feature = "debug")]
+                if self.show_glyph_instructions {
+                    let screen_position = ScreenPosition {
+                        left: text_position.left + position.min.x,
+                        top: text_position.top + position.min.y,
+                    } / self.interface_size;
 
-                        instructions.push(InterfaceRectangleInstruction::Solid {
-                            screen_position,
-                            screen_size,
-                            screen_clip: ScreenClip::unbound(),
-                            color: Color::rgba_u8(255, 0, 0, 150),
-                            corner_diameter: CornerDiameter::default(),
-                            shadow_color: Color::rgba_u8(255, 150, 0, 150),
-                            shadow_padding: ShadowPadding::uniform(0.0),
-                        });
-                    }
+                    let screen_size = ScreenSize {
+                        width: position.width(),
+                        height: position.height(),
+                    } / self.interface_size;
 
-                    return;
+                    instructions.push(InterfaceRectangleInstruction::Solid {
+                        screen_position,
+                        screen_size,
+                        screen_clip: ScreenClip::unbound(),
+                        color: Color::rgba_u8(255, 0, 0, 150),
+                        corner_diameter: CornerDiameter::default(),
+                        shadow_color: Color::rgba_u8(255, 150, 0, 150),
+                        shadow_padding: ShadowPadding::uniform(0.0),
+                    });
                 }
 
+                return;
+            }
+
+            #[cfg(feature = "debug")]
+            if self.show_glyph_instructions {
                 let screen_position = ScreenPosition {
                     left: text_position.left + position.min.x,
                     top: text_position.top + position.min.y,
@@ -346,34 +341,46 @@ impl InterfaceRenderer {
                     height: position.height(),
                 } / self.interface_size;
 
-                #[cfg(feature = "debug")]
-                if self.show_glyph_instructions {
-                    instructions.push(InterfaceRectangleInstruction::Solid {
-                        screen_position,
-                        screen_size,
-                        screen_clip: ScreenClip::unbound(),
-                        color: Color::rgba_u8(180, 255, 0, 150),
-                        corner_diameter: CornerDiameter::default(),
-                        shadow_color: Color::rgba_u8(0, 255, 0, 150),
-                        shadow_padding: ShadowPadding::uniform(0.0),
-                    });
-
-                    return;
-                }
-
-                let texture_position = texture_coordinate.min.to_vec();
-                let texture_size = texture_coordinate.max - texture_coordinate.min;
-
-                instructions.push(InterfaceRectangleInstruction::Text {
+                instructions.push(InterfaceRectangleInstruction::Solid {
                     screen_position,
                     screen_size,
-                    screen_clip,
-                    texture_position,
-                    texture_size,
-                    color,
+                    screen_clip: ScreenClip::unbound(),
+                    color: Color::rgba_u8(180, 255, 0, 150),
+                    corner_diameter: CornerDiameter::default(),
+                    shadow_color: Color::rgba_u8(0, 255, 0, 150),
+                    shadow_padding: ShadowPadding::uniform(0.0),
                 });
-            },
-        );
+
+                return;
+            }
+
+            let GlyphInstruction {
+                position,
+                em_coordinate,
+                glyph_index,
+                color,
+            } = glyph.dilated(GLYPH_PADDING, font_size);
+
+            let screen_position = ScreenPosition {
+                left: text_position.left + position.min.x,
+                top: text_position.top + position.min.y,
+            } / self.interface_size;
+
+            let screen_size = ScreenSize {
+                width: position.width(),
+                height: position.height(),
+            } / self.interface_size;
+
+            instructions.push(InterfaceRectangleInstruction::Text {
+                screen_position,
+                screen_size,
+                screen_clip,
+                color,
+                em_position: em_coordinate.min.to_vec(),
+                em_size: em_coordinate.max - em_coordinate.min,
+                glyph_index,
+            });
+        });
 
         if self.high_quality_interface {
             size.y /= 2.0;

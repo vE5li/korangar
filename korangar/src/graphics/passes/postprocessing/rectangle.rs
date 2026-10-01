@@ -16,7 +16,9 @@ use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, PostProcessingRenderPassContext, RenderPassContext,
 };
 use crate::graphics::shader_compiler::ShaderCompiler;
-use crate::graphics::{BindlessSupport, Buffer, Capabilities, GlobalContext, Prepare, RectangleInstruction, RenderInstruction, Texture};
+use crate::graphics::{
+    BindlessSupport, Buffer, Capabilities, GlobalContext, Prepare, RectangleInstruction, RenderInstruction, SlugFont, Texture,
+};
 
 const DRAWER_NAME: &str = "post processing rectangle";
 const INITIAL_INSTRUCTION_SIZE: usize = 256;
@@ -72,7 +74,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
     fn new(
         capabilities: &Capabilities,
         device: &Device,
-        _queue: &Queue,
+        queue: &Queue,
         shader_compiler: &ShaderCompiler,
         global_context: &GlobalContext,
         render_pass_context: &Self::Context,
@@ -90,6 +92,9 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
             (size_of::<InstanceData>() * INITIAL_INSTRUCTION_SIZE) as _,
         );
 
+        let slug_entries = SlugFont::bind_group_layout_entries(1);
+        let placeholder_font = SlugFont::placeholder(device, queue);
+
         let bind_group_layout = if capabilities.bindless_support() == BindlessSupport::Full {
             device.create_bind_group_layout(&BindGroupLayoutDescriptor {
                 label: Some(DRAWER_NAME),
@@ -104,18 +109,11 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
                         },
                         count: None,
                     },
+                    slug_entries[0],
+                    slug_entries[1],
+                    slug_entries[2],
                     BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: ShaderStages::FRAGMENT,
-                        ty: BindingType::Texture {
-                            sample_type: TextureSampleType::Float { filterable: true },
-                            view_dimension: TextureViewDimension::D2,
-                            multisampled: false,
-                        },
-                        count: None,
-                    },
-                    BindGroupLayoutEntry {
-                        binding: 2,
+                        binding: 4,
                         visibility: ShaderStages::FRAGMENT,
                         ty: BindingType::Texture {
                             sample_type: TextureSampleType::Float { filterable: true },
@@ -140,35 +138,19 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
                         },
                         count: None,
                     },
-                    BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: ShaderStages::FRAGMENT,
-                        ty: BindingType::Texture {
-                            sample_type: TextureSampleType::Float { filterable: true },
-                            view_dimension: TextureViewDimension::D2,
-                            multisampled: false,
-                        },
-                        count: None,
-                    },
+                    slug_entries[0],
+                    slug_entries[1],
+                    slug_entries[2],
                 ],
             })
         };
 
         let bind_group = if capabilities.bindless_support() == BindlessSupport::Full {
-            Self::create_bind_group_bindless(
-                device,
-                &bind_group_layout,
-                &instance_data_buffer,
+            Self::create_bind_group_bindless(device, &bind_group_layout, &instance_data_buffer, &placeholder_font, &[
                 global_context.solid_pixel_texture.get_texture_view(),
-                &[global_context.solid_pixel_texture.get_texture_view()],
-            )
+            ])
         } else {
-            Self::create_bind_group(
-                device,
-                &bind_group_layout,
-                &instance_data_buffer,
-                global_context.solid_pixel_texture.get_texture_view(),
-            )
+            Self::create_bind_group(device, &bind_group_layout, &instance_data_buffer, &placeholder_font)
         };
 
         let pass_bind_group_layouts = Self::Context::bind_group_layout(device);
@@ -277,7 +259,7 @@ impl Prepare for PostProcessingRectangleDrawer {
             return;
         }
 
-        let Some(font_map_texture) = instructions.font_map_texture else {
+        let Some(slug_font) = instructions.slug_font else {
             return;
         };
 
@@ -388,17 +370,18 @@ impl Prepare for PostProcessingRectangleDrawer {
                             screen_position,
                             screen_size,
                             color,
-                            texture_position,
-                            texture_size,
+                            em_position,
+                            em_size,
+                            glyph_index,
                         } => {
                             self.instance_data.push(InstanceData {
                                 color: color.components_linear(),
                                 screen_position: (*screen_position).into(),
                                 screen_size: (*screen_size).into(),
-                                texture_position: (*texture_position).into(),
-                                texture_size: (*texture_size).into(),
+                                texture_position: (*em_position).into(),
+                                texture_size: (*em_size).into(),
                                 rectangle_type: 4,
-                                texture_index: -1,
+                                texture_index: *glyph_index as i32,
                                 padding: Default::default(),
                             });
                         }
@@ -415,7 +398,7 @@ impl Prepare for PostProcessingRectangleDrawer {
                 device,
                 &self.bind_group_layout,
                 &self.instance_data_buffer,
-                font_map_texture.get_texture_view(),
+                slug_font,
                 &texture_views,
             );
         } else {
@@ -496,17 +479,18 @@ impl Prepare for PostProcessingRectangleDrawer {
                             screen_position,
                             screen_size,
                             color,
-                            texture_position,
-                            texture_size,
+                            em_position,
+                            em_size,
+                            glyph_index,
                         } => {
                             self.instance_data.push(InstanceData {
                                 color: color.components_linear(),
                                 screen_position: (*screen_position).into(),
                                 screen_size: (*screen_size).into(),
-                                texture_position: (*texture_position).into(),
-                                texture_size: (*texture_size).into(),
+                                texture_position: (*em_position).into(),
+                                texture_size: (*em_size).into(),
                                 rectangle_type: 4,
-                                texture_index: -1,
+                                texture_index: *glyph_index as i32,
                                 padding: Default::default(),
                             });
                         }
@@ -514,12 +498,7 @@ impl Prepare for PostProcessingRectangleDrawer {
                 }
             }
 
-            self.bind_group = Self::create_bind_group(
-                device,
-                &self.bind_group_layout,
-                &self.instance_data_buffer,
-                font_map_texture.get_texture_view(),
-            );
+            self.bind_group = Self::create_bind_group(device, &self.bind_group_layout, &self.instance_data_buffer, slug_font);
         }
     }
 
@@ -534,9 +513,11 @@ impl PostProcessingRectangleDrawer {
         device: &Device,
         bind_group_layout: &BindGroupLayout,
         instance_data_buffer: &Buffer<InstanceData>,
-        msdf_font_map_view: &TextureView,
+        slug_font: &SlugFont,
         texture_views: &[&TextureView],
     ) -> BindGroup {
+        let [curves, bands, glyphs] = slug_font.binding_resources();
+
         device.create_bind_group(&BindGroupDescriptor {
             label: Some(DRAWER_NAME),
             layout: bind_group_layout,
@@ -547,10 +528,18 @@ impl PostProcessingRectangleDrawer {
                 },
                 BindGroupEntry {
                     binding: 1,
-                    resource: BindingResource::TextureView(msdf_font_map_view),
+                    resource: curves,
                 },
                 BindGroupEntry {
                     binding: 2,
+                    resource: bands,
+                },
+                BindGroupEntry {
+                    binding: 3,
+                    resource: glyphs,
+                },
+                BindGroupEntry {
+                    binding: 4,
                     resource: BindingResource::TextureViewArray(texture_views),
                 },
             ],
@@ -561,8 +550,10 @@ impl PostProcessingRectangleDrawer {
         device: &Device,
         bind_group_layout: &BindGroupLayout,
         instance_data_buffer: &Buffer<InstanceData>,
-        msdf_font_map_view: &TextureView,
+        slug_font: &SlugFont,
     ) -> BindGroup {
+        let [curves, bands, glyphs] = slug_font.binding_resources();
+
         device.create_bind_group(&BindGroupDescriptor {
             label: Some(DRAWER_NAME),
             layout: bind_group_layout,
@@ -573,7 +564,15 @@ impl PostProcessingRectangleDrawer {
                 },
                 BindGroupEntry {
                     binding: 1,
-                    resource: BindingResource::TextureView(msdf_font_map_view),
+                    resource: curves,
+                },
+                BindGroupEntry {
+                    binding: 2,
+                    resource: bands,
+                },
+                BindGroupEntry {
+                    binding: 3,
+                    resource: glyphs,
                 },
             ],
         })

@@ -8,7 +8,7 @@ use super::color::Color;
 #[cfg(feature = "debug")]
 use super::settings::RenderOptions;
 use super::vertices::ModelVertex;
-use super::{Buffer, ShadowDetail, ShadowMethod, Texture, TextureSet, TileVertex, WaterVertex};
+use super::{Buffer, ShadowDetail, ShadowMethod, SlugFont, Texture, TextureSet, TileVertex, WaterVertex};
 use crate::graphics::{CornerDiameter, ScreenClip, ScreenPosition, ScreenSize, ShadowPadding};
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
@@ -42,7 +42,7 @@ pub struct RenderInstruction<'a> {
     pub water: Option<WaterInstruction<'a>>,
     pub map_picker_tile_vertex_buffer: Option<&'a Buffer<TileVertex>>,
     pub map_picker_tile_index_buffer: Option<&'a Buffer<u32>>,
-    pub font_map_texture: Option<&'a Texture>,
+    pub slug_font: Option<&'a SlugFont>,
     #[cfg(feature = "debug")]
     pub render_options: RenderOptions,
     #[cfg(feature = "debug")]
@@ -197,8 +197,9 @@ pub enum RectangleInstruction {
         screen_position: ScreenPosition,
         screen_size: ScreenSize,
         color: Color,
-        texture_position: Vector2<f32>,
-        texture_size: Vector2<f32>,
+        em_position: Vector2<f32>,
+        em_size: Vector2<f32>,
+        glyph_index: u32,
     },
 }
 
@@ -235,8 +236,9 @@ pub enum InterfaceRectangleInstruction {
         screen_size: ScreenSize,
         screen_clip: ScreenClip,
         color: Color,
-        texture_position: Vector2<f32>,
-        texture_size: Vector2<f32>,
+        em_position: Vector2<f32>,
+        em_size: Vector2<f32>,
+        glyph_index: u32,
     },
 }
 

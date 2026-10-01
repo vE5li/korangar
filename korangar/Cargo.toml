@@ -47,6 +47,7 @@ sevenz-rust2 = { workspace = true, features = ["compress"] }
 smallvec = { workspace = true, features = ["const_generics", "const_new", "union"] }
 spin_sleep = { workspace = true }
 sys-locale = { workspace = true }
+ttf-parser = { workspace = true, features = ["std"] }
 walkdir = { workspace = true }
 wgpu = { workspace = true, features = ["static-dxc", "spirv"] }
 winit = { workspace = true }

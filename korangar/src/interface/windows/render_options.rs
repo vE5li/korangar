@@ -311,12 +311,6 @@ where
                         state: self.render_options_path.show_sdsm_partitions(),
                         event: Toggle(self.render_options_path.show_sdsm_partitions()),
                     },
-                    state_button! {
-                        text: "Font map",
-                        tooltip: "Overlay the ^000001font map^000000",
-                        state: self.render_options_path.show_font_map(),
-                        event: Toggle(self.render_options_path.show_font_map()),
-                    },
                 ),
             },
         );

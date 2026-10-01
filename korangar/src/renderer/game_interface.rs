@@ -6,7 +6,7 @@ use cgmath::Point3;
 use cgmath::{EuclideanSpace, Vector2};
 
 use crate::graphics::{Color, RectangleInstruction, ScreenClip, ScreenPosition, ScreenSize, Texture};
-use crate::loaders::{FontLoader, FontSize, GlyphInstruction, Scaling};
+use crate::loaders::{FontLoader, FontSize, GLYPH_PADDING, GlyphInstruction, Scaling, TEXT_SHADOW_RADIUS};
 #[cfg(feature = "debug")]
 use crate::loaders::{ImageType, TextureLoader};
 #[cfg(feature = "debug")]
@@ -199,34 +199,33 @@ impl GameInterfaceRenderer {
 
         let mut instructions = self.instructions.borrow_mut();
 
-        glyphs.drain(..).for_each(
-            |GlyphInstruction {
-                 position,
-                 texture_coordinate,
-                 color,
-             }| {
-                let screen_position = ScreenPosition {
-                    left: text_position.left + position.min.x + horizontal_offset,
-                    top: text_position.top + position.min.y,
-                } / self.window_size;
+        glyphs.drain(..).for_each(|glyph| {
+            let GlyphInstruction {
+                position,
+                em_coordinate,
+                glyph_index,
+                color,
+            } = glyph.dilated(GLYPH_PADDING + TEXT_SHADOW_RADIUS * font_size.0, font_size);
 
-                let screen_size = ScreenSize {
-                    width: position.width(),
-                    height: position.height(),
-                } / self.window_size;
+            let screen_position = ScreenPosition {
+                left: text_position.left + position.min.x + horizontal_offset,
+                top: text_position.top + position.min.y,
+            } / self.window_size;
 
-                let texture_position = texture_coordinate.min.to_vec();
-                let texture_size = texture_coordinate.max - texture_coordinate.min;
+            let screen_size = ScreenSize {
+                width: position.width(),
+                height: position.height(),
+            } / self.window_size;
 
-                instructions.push(RectangleInstruction::Text {
-                    screen_position,
-                    screen_size,
-                    color,
-                    texture_position,
-                    texture_size,
-                });
-            },
-        );
+            instructions.push(RectangleInstruction::Text {
+                screen_position,
+                screen_size,
+                color,
+                em_position: em_coordinate.min.to_vec(),
+                em_size: em_coordinate.max - em_coordinate.min,
+                glyph_index,
+            });
+        });
     }
 
     pub fn render_hover_text(&self, text: &str, scaling: Scaling, mouse_position: ScreenPosition) {

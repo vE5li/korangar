@@ -2,12 +2,15 @@
 
 import globals;
 import interface;
+import slug;
 
 [[vk::binding(0, 0)]] var global_uniforms: ConstantBuffer<GlobalUniforms>;
 [[vk::binding(1, 0)]] var nearest_sampler: SamplerState;
 [[vk::binding(2, 0)]] var linear_sampler: SamplerState;
 [[vk::binding(0, 1)]] var instance_data: StructuredBuffer<RectangleInstanceData>;
-[[vk::binding(1, 1)]] var msdf_font_map: Texture2D;
+[[vk::binding(1, 1)]] var slug_curves: StructuredBuffer<float4>;
+[[vk::binding(2, 1)]] var slug_bands: StructuredBuffer<uint>;
+[[vk::binding(3, 1)]] var slug_glyphs: StructuredBuffer<SlugGlyph>;
 [[vk::binding(0, 2)]] var texture: Texture2D;
 
 [[shader("vertex")]]
@@ -48,12 +51,10 @@ func fs_main(input: RectangleVertexOutput) -> float4 {
             break;
         }
         case 4: {
-            // Text
-            let distances = msdf_font_map.Sample(linear_sampler, input.texture_coordinates);
-            let distance = median(distances.r, distances.g, distances.b) - EDGE_VALUE;
-            var texture_size: float2;
-            msdf_font_map.GetDimensions(texture_size.x, texture_size.y);
-            color = calculate_msdf(distance, texture_size, input.texture_coordinates, color);
+            // Text (slug)
+            let glyph = slug_glyphs[instance.texture_index];
+            let pixels_per_em = slug_pixels_per_em(input.texture_coordinates);
+            color *= slug_coverage(slug_curves, slug_bands, glyph, input.texture_coordinates, pixels_per_em);
             break;
         }
         default: {

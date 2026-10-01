@@ -2,6 +2,8 @@
 
 module postprocessing;
 
+import slug;
+
 public struct PostprocessingVertexInput {
     public uint vertex_index : SV_VulkanVertexID;
     public uint instance_index : SV_VulkanInstanceID;
@@ -54,12 +56,14 @@ public struct DebugUniforms {
     public var show_point_shadow_map: uint;
     public var show_light_culling_count_buffer: uint;
     public var show_sdsm_partitions: uint;
-    public var show_font_map: uint;
 }
 
 public static const var EDGE_VALUE: float = 0.5;
 public static const var PXRANGE: float = 6.0;
 public static const var SHADOW_SPREAD: float = 0.45;
+// The radius of the dark shadow around text in em units. Must match
+// `TEXT_SHADOW_RADIUS` of the font loader.
+public static const var TEXT_SHADOW_RADIUS: float = 0.08;
 public static const var TILE_SIZE: uint = 16;
 
 // Optimized version of the following truth table:
@@ -101,11 +105,6 @@ public func effect_position_data(instance: EffectInstanceData, vertex_index: uin
 }
 
 [ForceInline]
-public func median(r: float, g: float, b: float) -> float {
-    return max(min(r, g), min(max(r, g), b));
-}
-
-[ForceInline]
 public func calculate_shadowed_sdf(
     distance: float,
     texture_size: float2,
@@ -121,6 +120,47 @@ public func calculate_shadowed_sdf(
     let shadow_color = float4(0.0, 0.0, 0.0, shadow_alpha);
 
     let text_alpha = saturate(distance * screen_px_range + EDGE_VALUE);
+    let text_color = color * text_alpha;
+
+    return lerp(shadow_color, text_color, text_alpha);
+}
+
+// Renders a glyph with a dark shadow around it. The shadow covers every pixel
+// that lies within the shadow radius of the glyph along one of eight directions.
+public func calculate_shadowed_text(
+    curves: StructuredBuffer<float4>,
+    bands: StructuredBuffer<uint>,
+    glyph: SlugGlyph,
+    render_coordinate: float2,
+    color: float4
+) -> float4 {
+    static const var DIAGONAL: float = 0.70710678;
+    static const float2 DIRECTIONS[8] = {
+        float2(1.0, 0.0),
+        float2(DIAGONAL, DIAGONAL),
+        float2(0.0, 1.0),
+        float2(-DIAGONAL, DIAGONAL),
+        float2(-1.0, 0.0),
+        float2(-DIAGONAL, -DIAGONAL),
+        float2(0.0, -1.0),
+        float2(DIAGONAL, -DIAGONAL),
+    };
+
+    let pixels_per_em = slug_pixels_per_em(render_coordinate);
+    let text_alpha = slug_coverage(curves, bands, glyph, render_coordinate, pixels_per_em);
+
+    var shadow_alpha = text_alpha;
+
+    for (var index = 0; index < 8; index++) {
+        if (shadow_alpha >= 1.0) {
+            break;
+        }
+
+        let offset = DIRECTIONS[index] * TEXT_SHADOW_RADIUS;
+        shadow_alpha = max(shadow_alpha, slug_coverage(curves, bands, glyph, render_coordinate + offset, pixels_per_em));
+    }
+
+    let shadow_color = float4(0.0, 0.0, 0.0, shadow_alpha);
     let text_color = color * text_alpha;
 
     return lerp(shadow_color, text_color, text_alpha);

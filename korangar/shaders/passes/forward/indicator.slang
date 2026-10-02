@@ -27,6 +27,7 @@ struct IndicatorVertexOutput {
 [[vk::binding(6, 1)]] var directional_light_partitions: StructuredBuffer<DirectionalLightPartition>;
 [[vk::binding(7, 1)]] var kernel_uniforms: ConstantBuffer<KernelUniforms>;
 [[vk::binding(8, 1)]] var shadow_translucence: Texture2DArray;
+[[vk::binding(9, 1)]] var point_shadow_translucence: TextureCubeArray;
 [[vk::binding(0, 2)]] var texture: Texture2D;
 
 static const var INDICATOR_CONSTANT_DEPTH_BIAS: float = 0.0005;
@@ -106,11 +107,11 @@ func fs_main(input: IndicatorVertexOutput) -> float4 {
             uint shadow_width, shadow_height, shadow_depth;
             shadow_maps.GetDimensions(shadow_width, shadow_height, shadow_depth);
             let shadow_map_dimensions = uint2(shadow_width, shadow_height);
-            visibility = get_pcf_shadow(partition_index, shadow_coords, shadow_map_dimensions, global_uniforms.shadow_detail, shadow_maps, shadow_map_sampler);
+            visibility = get_pcf_shadow(partition_index, shadow_coords, shadow_map_dimensions, global_uniforms.shadow_detail, false, shadow_maps, shadow_translucence, shadow_map_sampler, linear_sampler);
             break;
         }
         case 2: {
-            visibility = get_pcf_pcss_shadow(partition_index, shadow_coords, global_uniforms, directional_light_partitions, shadow_maps, shadow_map_sampler, linear_sampler, kernel_uniforms);
+            visibility = get_pcf_pcss_shadow(partition_index, shadow_coords, false, global_uniforms, directional_light_partitions, shadow_maps, shadow_translucence, shadow_map_sampler, linear_sampler, kernel_uniforms);
             break;
         }
     }
@@ -128,22 +129,30 @@ func fs_main(input: IndicatorVertexOutput) -> float4 {
         let light_direction_point = normalize(input.world_position.xyz - light.position.xyz);
         let light_percent_point = max(dot(light_direction_point, input.normal), 0.0);
         let light_distance = length(light.position.xyz - input.world_position.xyz);
+        let attenuation = calculate_attenuation(light_distance, light.range);
         var visibility_point = 1.0;
 
-        if (light.texture_index != 0) {
-            let bias = 1.2;
-            let distance_to_light = depth::linearToNonLinear(light_distance - bias);
-
-            let closest_distance = point_shadow_maps.Sample(
+        // Only calculate shadows if the light contributes to the fragment.
+        if (light.texture_index != 0 && light_percent_point * attenuation > 0.0) {
+            let filter = create_point_shadow_filter(
+                input.world_position.xyz,
+                normal,
+                light.position.xyz,
+                light_direction_point,
+                light.texture_index - 1,
+                false,
+                global_uniforms,
+                point_shadow_maps,
+                point_shadow_translucence,
+                shadow_map_sampler,
                 linear_sampler,
-                float4(light_direction_point, light.texture_index - 1)
+                kernel_uniforms
             );
-
-            visibility_point = float(distance_to_light > closest_distance);
+            let translucence = sample_point_shadow_translucence(filter, point_shadow_translucence, linear_sampler, kernel_uniforms);
+            visibility_point = filter.visibility * translucence;
         }
 
         let intensity = 10.0;
-        let attenuation = calculate_attenuation(light_distance, light.range);
         point_light_contribution += (light.color.rgb * intensity) * light_percent_point * attenuation * visibility_point;
     }
 

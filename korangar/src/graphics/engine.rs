@@ -19,9 +19,9 @@ use winit::window::Window;
 #[cfg(feature = "debug")]
 use super::BindlessSupport;
 use super::{
-    AntiAliasingResources, Capabilities, DirectionalShadowPartition, FramePacer, FrameStage, GlobalContext, LimitFramerate, Msaa,
-    PARTITION_COUNT, Partition, Prepare, PresentModeInfo, RENDER_TO_TEXTURE_FORMAT, ScreenSpaceAntiAliasing, ShadowResolution, Ssaa,
-    Surface, TextureSamplerType,
+    AntiAliasingResources, Capabilities, DirectionalShadowPartition, EntityInstruction, FramePacer, FrameStage, GlobalContext,
+    LimitFramerate, Msaa, PARTITION_COUNT, Partition, Prepare, PresentModeInfo, RENDER_TO_TEXTURE_FORMAT, ScreenSpaceAntiAliasing,
+    ShadowResolution, Ssaa, Surface, TextureSamplerType,
 };
 use crate::graphics::ScreenSize;
 use crate::graphics::instruction::RenderInstruction;
@@ -872,17 +872,25 @@ impl GraphicsEngine {
 
         // Shadow rendering of entities is done in two ways for opaque and transparent
         // entities. This is way we render opaque first then transparent.
-        for batch in instructions.directional_shadow_entities.iter_mut() {
-            batch.sort_unstable_by(|a, b| {
-                let a_opaque = a.color.alpha == 1.0;
-                let b_opaque = b.color.alpha == 1.0;
+        fn opaque_first(a: &EntityInstruction, b: &EntityInstruction) -> std::cmp::Ordering {
+            let a_opaque = a.color.alpha == 1.0;
+            let b_opaque = b.color.alpha == 1.0;
 
-                match (a_opaque, b_opaque) {
-                    (true, true) | (false, false) => std::cmp::Ordering::Equal,
-                    (true, false) => std::cmp::Ordering::Less,
-                    (false, true) => std::cmp::Ordering::Greater,
-                }
-            })
+            match (a_opaque, b_opaque) {
+                (true, true) | (false, false) => std::cmp::Ordering::Equal,
+                (true, false) => std::cmp::Ordering::Less,
+                (false, true) => std::cmp::Ordering::Greater,
+            }
+        }
+
+        for batch in instructions.directional_shadow_entities.iter_mut() {
+            batch.sort_unstable_by(opaque_first);
+        }
+
+        for caster in instructions.point_light_with_shadows {
+            for (offset, count) in caster.entity_offset.into_iter().zip(caster.entity_count) {
+                instructions.point_shadow_entities[offset..offset + count].sort_unstable_by(opaque_first);
+            }
         }
 
         for batch in instructions.model_batches {
@@ -1199,11 +1207,13 @@ impl GraphicsEngine {
                             pass_data,
                         );
 
+                        // Entities need to be drawn last, so that transparent entities are
+                        // occluded by all opaque geometry.
                         engine_context.point_shadow_model_drawer.draw(&mut render_pass, &model_data);
-                        engine_context.point_shadow_entity_drawer.draw(&mut render_pass, &entity_data);
                         engine_context
                             .point_shadow_indicator_drawer
                             .draw(&mut render_pass, instruction.indicator.as_ref());
+                        engine_context.point_shadow_entity_drawer.draw(&mut render_pass, &entity_data);
                     });
                 });
             });

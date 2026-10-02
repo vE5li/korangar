@@ -50,6 +50,7 @@ func fs_main(input: ModelVertexOutput) -> ModelFragmentOutput {
     }
 
     var output: ModelFragmentOutput;
+    output.shadow_data = float2(1.0, 0.0);
     output.depth = depth.linearToNonLinear(light_distance);
     return output;
 }

@@ -3338,6 +3338,7 @@ impl Client {
                 directional_shadow_entity_instructions: &mut self.directional_shadow_entity_instructions,
                 point_shadow_camera: &mut self.point_shadow_camera,
                 point_shadow_model_instructions: &mut self.point_shadow_model_instructions,
+                point_shadow_entity_instructions: &mut self.point_shadow_entity_instructions,
                 point_light_with_shadow_instructions: &mut self.point_light_with_shadow_instructions,
                 point_light_instructions: &mut self.point_light_instructions,
                 directional_shadow_object_set_buffer: &mut self.directional_shadow_object_set_buffer,
@@ -3444,7 +3445,7 @@ impl Client {
             directional_shadow_models: &self.directional_shadow_model_instructions,
             directional_shadow_entities: &mut self.directional_shadow_entity_instructions,
             point_shadow_models: &self.point_shadow_model_instructions,
-            point_shadow_entities: &self.point_shadow_entity_instructions,
+            point_shadow_entities: &mut self.point_shadow_entity_instructions,
             effects: self.effect_renderer.get_instructions(),
             water: water_instruction,
             map_picker_tile_vertex_buffer: Some(map.get_tile_picker_vertex_buffer()),
@@ -3657,6 +3658,7 @@ struct MapRenderContext<'a, 'm: 'a> {
     directional_shadow_entity_instructions: &'a mut [Vec<EntityInstruction>; PARTITION_COUNT],
     point_shadow_camera: &'a mut PointShadowCamera,
     point_shadow_model_instructions: &'a mut Vec<ModelInstruction>,
+    point_shadow_entity_instructions: &'a mut Vec<EntityInstruction>,
     point_light_with_shadow_instructions: &'a mut Vec<PointLightWithShadowInstruction>,
     point_light_instructions: &'a mut Vec<PointLightInstruction>,
     directional_shadow_object_set_buffer: &'a mut ResourceSetBuffer<ObjectKey>,
@@ -3780,6 +3782,13 @@ impl<'a, 'm: 'a> MapRenderContext<'a, 'm> {
     #[inline(always)]
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     fn render_point_lights(&mut self) {
+        let point_shadow_entities = PointShadowEntities {
+            entities: self.client_state.follow(client_state().entities()),
+            dead_entities: self.client_state.follow(client_state().dead_entities()),
+            ground_items: self.client_state.follow(client_state().ground_items()),
+            client_tick: self.client_tick,
+        };
+
         #[cfg_attr(feature = "debug", korangar_debug::debug_condition(self.render_options.enable_point_lights))]
         self.point_light_set.render_point_lights(self.point_light_instructions);
 
@@ -3789,7 +3798,9 @@ impl<'a, 'm: 'a> MapRenderContext<'a, 'm> {
             self.point_shadow_camera,
             self.point_shadow_object_set_buffer,
             self.point_shadow_model_instructions,
+            self.point_shadow_entity_instructions,
             self.point_light_with_shadow_instructions,
+            &point_shadow_entities,
             self.animation_timer_ms,
             #[cfg(feature = "debug")]
             self.render_options,

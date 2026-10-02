@@ -5,9 +5,10 @@ use bytemuck::{Pod, Zeroable};
 use hashbrown::HashMap;
 use wgpu::{
     BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType,
-    CompareFunction, DepthBiasState, DepthStencilState, Device, FragmentState, MultisampleState, PipelineCompilationOptions,
-    PipelineLayoutDescriptor, PrimitiveState, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderStages, StencilState,
-    TextureSampleType, TextureView, TextureViewDimension, VertexState,
+    BlendComponent, BlendFactor, BlendOperation, BlendState, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState,
+    DepthStencilState, Device, FragmentState, MultisampleState, PipelineCompilationOptions, PipelineLayout, PipelineLayoutDescriptor,
+    PrimitiveState, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModule, ShaderStages, StencilState, TextureSampleType,
+    TextureView, TextureViewDimension, VertexState,
 };
 
 use crate::graphics::passes::{
@@ -36,19 +37,26 @@ struct InstanceData {
     alpha: f32,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum EntityPassMode {
+    Opaque,
+    Transparent,
+}
+
 pub(crate) struct PointShadowEntityDrawer {
     bindless_support: bool,
     solid_pixel_texture: Arc<Texture>,
     instance_data_buffer: Buffer<InstanceData>,
     bind_group_layout: BindGroupLayout,
     bind_group: BindGroup,
-    pipeline: RenderPipeline,
+    opaque_pipeline: RenderPipeline,
+    transparent_pipeline: RenderPipeline,
     instance_data: Vec<InstanceData>,
     bump: Bump,
     lookup: HashMap<u64, i32>,
 }
 
-impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAttachmentCount::One }> for PointShadowEntityDrawer {
+impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttachmentCount::One }> for PointShadowEntityDrawer {
     type Context = PointShadowRenderPassContext;
     type DrawData<'data> = &'data PointShadowEntityBatchData<'data>;
 
@@ -145,33 +153,20 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
             immediate_size: 0,
         });
 
-        let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
-            label: Some(DRAWER_NAME),
-            layout: Some(&pipeline_layout),
-            vertex: VertexState {
-                module: &shader_module,
-                entry_point: Some("vs_main"),
-                compilation_options: PipelineCompilationOptions::default(),
-                buffers: &[],
-            },
-            fragment: Some(FragmentState {
-                module: &shader_module,
-                entry_point: Some("fs_main"),
-                compilation_options: PipelineCompilationOptions::default(),
-                targets: &[],
-            }),
-            primitive: PrimitiveState::default(),
-            multisample: MultisampleState::default(),
-            depth_stencil: Some(DepthStencilState {
-                format: render_pass_context.depth_attachment_output_format()[0],
-                depth_write_enabled: Some(true),
-                depth_compare: Some(CompareFunction::Greater),
-                stencil: StencilState::default(),
-                bias: DepthBiasState::default(),
-            }),
-            cache: None,
-            multiview_mask: None,
-        });
+        let opaque_pipeline = Self::create_pipeline(
+            device,
+            render_pass_context,
+            &shader_module,
+            &pipeline_layout,
+            EntityPassMode::Opaque,
+        );
+        let transparent_pipeline = Self::create_pipeline(
+            device,
+            render_pass_context,
+            &shader_module,
+            &pipeline_layout,
+            EntityPassMode::Transparent,
+        );
 
         Self {
             bindless_support: capabilities.bindless_support() == BindlessSupport::Full,
@@ -179,7 +174,8 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
             instance_data_buffer,
             bind_group_layout,
             bind_group,
-            pipeline,
+            opaque_pipeline,
+            transparent_pipeline,
             instance_data: Vec::default(),
             bump: Bump::default(),
             lookup: HashMap::default(),
@@ -195,30 +191,17 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
             return;
         }
 
-        let offset = batch.entity_offset[face_index] as u32;
-        let count = batch.entity_count[face_index] as u32;
-        let end = offset + count;
+        let start = batch.entity_offset[face_index];
+        let end = start + batch.entity_count[face_index];
 
-        pass.set_pipeline(&self.pipeline);
+        // Instructions of each face are sorted so that opaque entities come first,
+        // which ensures that transparent entities are occluded by them.
+        let opaque_end = start + draw_data.instructions[start..end].partition_point(|instruction| instruction.color.alpha == 1.0);
+
         pass.set_bind_group(2, &self.bind_group, &[]);
-        pass.draw(0..6, offset..end);
 
-        if self.bindless_support {
-            pass.draw(0..6, offset..end);
-        } else {
-            let mut current_texture_id = self.solid_pixel_texture.get_id();
-            pass.set_bind_group(3, self.solid_pixel_texture.get_bind_group(), &[]);
-
-            for (index, instruction) in draw_data.instructions[offset as usize..end as usize].iter().enumerate() {
-                if instruction.texture.get_id() != current_texture_id {
-                    current_texture_id = instruction.texture.get_id();
-                    pass.set_bind_group(3, instruction.texture.get_bind_group(), &[]);
-                }
-                let index = offset + index as u32;
-
-                pass.draw(0..6, index..index + 1);
-            }
-        }
+        self.draw_range(pass, draw_data.instructions, start..opaque_end, EntityPassMode::Opaque);
+        self.draw_range(pass, draw_data.instructions, opaque_end..end, EntityPassMode::Transparent);
     }
 }
 
@@ -300,6 +283,111 @@ impl Prepare for PointShadowEntityDrawer {
 }
 
 impl PointShadowEntityDrawer {
+    fn create_pipeline(
+        device: &Device,
+        render_pass_context: &PointShadowRenderPassContext,
+        shader_module: &ShaderModule,
+        pipeline_layout: &PipelineLayout,
+        pass_mode: EntityPassMode,
+    ) -> RenderPipeline {
+        let (label, entry_point, depth_write_enabled) = match pass_mode {
+            EntityPassMode::Opaque => (format!("{DRAWER_NAME} opaque"), "fs_main_opaque", true),
+            EntityPassMode::Transparent => (format!("{DRAWER_NAME} transparent"), "fs_main_transparent", false),
+        };
+
+        let (blend, write_mask) = match pass_mode {
+            // Opaque entities are fully handled by the depth, so they don't touch the
+            // translucence (red). They only mark that they are the closest occluder (green).
+            // Since opaque entities are drawn after all other opaque geometry, the mark
+            // survives exactly where an entity passed the depth test last.
+            EntityPassMode::Opaque => (None, ColorWrites::GREEN),
+            // Multiplies the translucence of all transparent entities along the ray.
+            EntityPassMode::Transparent => (
+                Some(BlendState {
+                    color: BlendComponent {
+                        src_factor: BlendFactor::Zero,
+                        dst_factor: BlendFactor::Src,
+                        operation: BlendOperation::Add,
+                    },
+                    alpha: BlendComponent {
+                        src_factor: BlendFactor::Zero,
+                        dst_factor: BlendFactor::SrcAlpha,
+                        operation: BlendOperation::Add,
+                    },
+                }),
+                ColorWrites::RED,
+            ),
+        };
+
+        device.create_render_pipeline(&RenderPipelineDescriptor {
+            label: Some(&label),
+            layout: Some(pipeline_layout),
+            vertex: VertexState {
+                module: shader_module,
+                entry_point: Some("vs_main"),
+                compilation_options: PipelineCompilationOptions::default(),
+                buffers: &[],
+            },
+            fragment: Some(FragmentState {
+                module: shader_module,
+                entry_point: Some(entry_point),
+                compilation_options: PipelineCompilationOptions::default(),
+                targets: &[Some(ColorTargetState {
+                    format: render_pass_context.color_attachment_formats()[0],
+                    blend,
+                    write_mask,
+                })],
+            }),
+            primitive: PrimitiveState::default(),
+            multisample: MultisampleState::default(),
+            depth_stencil: Some(DepthStencilState {
+                format: render_pass_context.depth_attachment_output_format()[0],
+                depth_write_enabled: Some(depth_write_enabled),
+                depth_compare: Some(CompareFunction::Greater),
+                stencil: StencilState::default(),
+                bias: DepthBiasState::default(),
+            }),
+            cache: None,
+            multiview_mask: None,
+        })
+    }
+
+    fn draw_range(
+        &self,
+        pass: &mut RenderPass<'_>,
+        instructions: &[EntityInstruction],
+        range: std::ops::Range<usize>,
+        pass_mode: EntityPassMode,
+    ) {
+        if range.is_empty() {
+            return;
+        }
+
+        let pipeline = match pass_mode {
+            EntityPassMode::Opaque => &self.opaque_pipeline,
+            EntityPassMode::Transparent => &self.transparent_pipeline,
+        };
+
+        pass.set_pipeline(pipeline);
+
+        if self.bindless_support {
+            pass.draw(0..6, range.start as u32..range.end as u32);
+        } else {
+            let mut current_texture_id = self.solid_pixel_texture.get_id();
+            pass.set_bind_group(3, self.solid_pixel_texture.get_bind_group(), &[]);
+
+            for (index, instruction) in instructions[range.clone()].iter().enumerate() {
+                if instruction.texture.get_id() != current_texture_id {
+                    current_texture_id = instruction.texture.get_id();
+                    pass.set_bind_group(3, instruction.texture.get_bind_group(), &[]);
+                }
+                let index = (range.start + index) as u32;
+
+                pass.draw(0..6, index..index + 1);
+            }
+        }
+    }
+
     fn create_bind_group_bindless(
         device: &Device,
         bind_group_layout: &BindGroupLayout,

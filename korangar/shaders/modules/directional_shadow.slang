@@ -36,7 +36,7 @@ public struct EntityVertexInput {
 };
 
 public struct EntityFragmentOutput {
-    [[vk::location(0)]] public var translucence: float;
+    [[vk::location(0)]] public var shadow_data: float2;
     public float depth : SV_Depth;
 };
 
@@ -95,9 +95,9 @@ public func calculate_adjusted_clip_position(
 }
 
 [ForceInline]
-public func create_shadow_output(combined_alpha: float, clip_position: float4) -> EntityFragmentOutput {
+public func create_shadow_output(shadow_data: float2, clip_position: float4) -> EntityFragmentOutput {
     var output: EntityFragmentOutput;
-    output.translucence = 1.0 - combined_alpha;
+    output.shadow_data = shadow_data;
     output.depth = saturate(clip_position.z / clip_position.w);
     return output;
 }

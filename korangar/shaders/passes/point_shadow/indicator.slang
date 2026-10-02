@@ -16,6 +16,7 @@ struct IndicatorVertexOutput {
 };
 
 struct IndicatorFragmentOutput {
+    [[vk::location(0)]] var shadow_data: float2;
     float depth: SV_Depth;
 };
 
@@ -44,6 +45,7 @@ func fs_main(input: IndicatorVertexOutput) -> IndicatorFragmentOutput {
     }
 
     var output: IndicatorFragmentOutput;
+    output.shadow_data = float2(1.0, 0.0);
     output.depth = depth.linearToNonLinear(light_distance);
     return output;
 }

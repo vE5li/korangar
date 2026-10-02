@@ -72,8 +72,7 @@ func fs_main_opaque(input: EntityVertexOutput) -> EntityFragmentOutput {
         pass_uniforms
     );
 
-    // Fully opaque, so combined_alpha is 1.0
-    return create_shadow_output(1.0, clip_position);
+    return create_shadow_output(float2(1.0, 1.0), clip_position);
 }
 
 [[shader("pixel")]]
@@ -94,5 +93,5 @@ func fs_main_transparent(input: EntityVertexOutput) -> EntityFragmentOutput {
         pass_uniforms
     );
 
-    return create_shadow_output(diffuse_color.a * input.alpha, clip_position);
+    return create_shadow_output(float2(1.0 - diffuse_color.a * input.alpha, 0.0), clip_position);
 }

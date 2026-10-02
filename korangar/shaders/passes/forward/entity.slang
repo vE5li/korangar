@@ -31,6 +31,8 @@ struct ForwardEntityVertexOutput {
 [[vk::binding(5, 1)]] var point_shadow_maps: DepthTextureCubeArray;
 [[vk::binding(6, 1)]] var directional_light_partitions: StructuredBuffer<DirectionalLightPartition>;
 [[vk::binding(7, 1)]] var kernel_uniforms: ConstantBuffer<KernelUniforms>;
+[[vk::binding(8, 1)]] var shadow_translucence: Texture2DArray;
+[[vk::binding(9, 1)]] var point_shadow_translucence: TextureCubeArray;
 [[vk::binding(0, 2)]] var instance_data: StructuredBuffer<ForwardEntityInstanceData>;
 [[vk::binding(0, 3)]] var texture: Texture2D;
 
@@ -52,8 +54,10 @@ func vs_main(input: EntityVertexInput) -> ForwardEntityVertexOutput {
         output.texture_coordinates.x = 1.0 - output.texture_coordinates.x;
     }
 
-    let rotated = rotateY(float3(global_uniforms.view.getColumn(2).x, 0, global_uniforms.view.getColumn(2).z), vertex.position.x);
-    output.normal = float3(-rotated.x, rotated.y, rotated.z);
+    // Entities are lit like a cylinder. The normal at the center points in the view direction
+    // (away from the light when lit) and is rotated towards the edges of the sprite.
+    let view_direction = global_uniforms.view.getRow(2);
+    output.normal = rotateY(float3(view_direction.x, 0.0, view_direction.z), vertex.position.x);
 
     // Values are represented as proportions ranging from -1 to 1
     let proportion_x = instance.frame_size.x / SPRITE_MAX_SIZE_X;
@@ -173,7 +177,7 @@ func fragment(input: ForwardEntityVertexOutput) -> ForwardEntityFragmentOutput {
 
         let shadow_position = mul(directional_light_partitions[partition_index].view_projection, adjusted_world_position);
         var shadow_coords = shadow_position.xyz / shadow_position.w;
-        let bias = 0.011;
+        let bias = global_uniforms.use_sdsm ? SDSM_ENTITY_DEPTH_BIAS : PPSM_ENTITY_DEPTH_BIAS;
         shadow_coords = float3(
             coordinate_space::clip_to_screen_space(shadow_coords.xy),
             // If the far plane of the shadow is in front of the drawn object, then it's value would be below 0.0.
@@ -182,14 +186,23 @@ func fragment(input: ForwardEntityVertexOutput) -> ForwardEntityFragmentOutput {
             max(shadow_coords.z, 0.0) + bias
         );
 
+        // Entities don't receive shadows of entities. The billboard of an entity is oriented
+        // differently in the shadow map, so it would shadow itself. This also matches fading
+        // entities, which never cast shadows onto entities.
+        let ignore_entity_occluders = true;
+
         var visibility: float = 1.0;
 
         switch (global_uniforms.shadow_method) {
             case 0: {
-                visibility = shadow_maps.SampleCmp(
-                    shadow_map_sampler,
+                visibility = sample_directional_shadow(
                     float3(shadow_coords.xy, partition_index),
-                    shadow_coords.z
+                    shadow_coords.z,
+                    ignore_entity_occluders,
+                    shadow_maps,
+                    shadow_translucence,
+                    shadow_map_sampler,
+                    linear_sampler
                 );
                 break;
             }
@@ -197,11 +210,11 @@ func fragment(input: ForwardEntityVertexOutput) -> ForwardEntityFragmentOutput {
                 uint shadow_width, shadow_height, shadow_depth;
                 shadow_maps.GetDimensions(shadow_width, shadow_height, shadow_depth);
                 let shadow_map_dimensions = uint2(shadow_width, shadow_height);
-                visibility = get_pcf_shadow(partition_index, shadow_coords, shadow_map_dimensions, global_uniforms.shadow_detail, shadow_maps, shadow_map_sampler);
+                visibility = get_pcf_shadow(partition_index, shadow_coords, shadow_map_dimensions, global_uniforms.shadow_detail, ignore_entity_occluders, shadow_maps, shadow_translucence, shadow_map_sampler, linear_sampler);
                 break;
             }
             case 2: {
-                visibility = get_pcf_pcss_shadow(partition_index, shadow_coords, global_uniforms, directional_light_partitions, shadow_maps, shadow_map_sampler, linear_sampler, kernel_uniforms);
+                visibility = get_pcf_pcss_shadow(partition_index, shadow_coords, ignore_entity_occluders, global_uniforms, directional_light_partitions, shadow_maps, shadow_translucence, shadow_map_sampler, linear_sampler, kernel_uniforms);
                 break;
             }
         }
@@ -216,22 +229,31 @@ func fragment(input: ForwardEntityVertexOutput) -> ForwardEntityFragmentOutput {
             let light_direction_point = normalize(adjusted_world_position.xyz - light.position.xyz);
             let light_percent_point = max(dot(light_direction_point, input.normal), 0.0);
             let light_distance = length(light.position.xyz - adjusted_world_position.xyz);
+            let attenuation = calculate_attenuation(light_distance, light.range);
             var visibility_point = 1.0;
 
-            if (light.texture_index != 0) {
-                let point_bias = 1.2;
-                let distance_to_light = depth::linearToNonLinear(light_distance - point_bias);
-
-                let closest_distance = point_shadow_maps.Sample(
+            // Only calculate shadows if the light contributes to the fragment.
+            if (light.texture_index != 0 && light_percent_point * attenuation > 0.0) {
+                let filter = create_point_shadow_filter(
+                    adjusted_world_position.xyz,
+                    normal,
+                    light.position.xyz,
+                    light_direction_point,
+                    light.texture_index - 1,
+                    // Entities don't receive point shadows of entities. The billboard of an entity
+                    // is oriented differently in the shadow map, so it would shadow itself.
+                    true,
+                    global_uniforms,
+                    point_shadow_maps,
+                    point_shadow_translucence,
+                    shadow_map_sampler,
                     linear_sampler,
-                    float4(light_direction_point, light.texture_index - 1)
+                    kernel_uniforms
                 );
-
-                visibility_point = float(distance_to_light > closest_distance);
+                visibility_point = filter.visibility;
             }
 
             let intensity = 10.0;
-            let attenuation = calculate_attenuation(light_distance, light.range);
             point_light_contribution += (light.color.rgb * intensity) * light_percent_point * attenuation * visibility_point;
         }
 

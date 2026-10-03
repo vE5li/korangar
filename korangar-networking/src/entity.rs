@@ -10,6 +10,7 @@ pub struct EntityData {
     pub destination: Option<WorldPosition>,
     pub health_points: i32,
     pub maximum_health_points: i32,
+    pub effect_state: u32,
     pub head_direction: usize,
     pub sex: Sex,
 }
@@ -25,6 +26,7 @@ impl EntityData {
             destination: None,
             health_points: character_information.health_points as i32,
             maximum_health_points: character_information.maximum_health_points as i32,
+            effect_state: character_information.effect_state as u32,
             head_direction: 0, // TODO: get correct rotation
             sex: character_information.sex,
         }
@@ -42,6 +44,7 @@ impl From<EntityAppearPacket> for EntityData {
             destination: None,
             health_points: packet.health_points,
             maximum_health_points: packet.maximum_health_points,
+            effect_state: packet.effect_state,
             head_direction: packet.head_direction as usize,
             sex: packet.sex,
         }
@@ -59,6 +62,7 @@ impl From<EntityAppear2Packet> for EntityData {
             destination: None,
             health_points: packet.health_points,
             maximum_health_points: packet.maximum_health_points,
+            effect_state: packet.effect_state,
             head_direction: packet.head_direction as usize,
             sex: packet.sex,
         }
@@ -78,6 +82,7 @@ impl From<MovingEntityAppearPacket> for EntityData {
             destination: Some(destination),
             health_points: packet.health_points,
             maximum_health_points: packet.maximum_health_points,
+            effect_state: packet.effect_state,
             head_direction: packet.head_direction as usize,
             sex: packet.sex,
         }

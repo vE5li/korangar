@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use cgmath::{Matrix4, Point3, SquareMatrix, Vector3};
 use korangar_collision::Sphere;
@@ -39,10 +40,16 @@ impl LightSourceExt for LightSource {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PointLightId(u32);
 
+static NEXT_DYNAMIC_POINT_LIGHT_ID: AtomicU32 = AtomicU32::new(0x8000_0000);
+
 impl PointLightId {
     pub fn new(id: u32) -> Self {
         Self(id)
     }
+}
+
+pub fn next_dynamic_point_light_id() -> PointLightId {
+    PointLightId::new(NEXT_DYNAMIC_POINT_LIGHT_ID.fetch_add(1, Ordering::Relaxed))
 }
 
 #[derive(Clone, Debug)]

@@ -20,7 +20,7 @@ use ragnarok_formats::map::MapData;
 use ragnarok_formats::map::{LightSource, SoundSource, Tile, TileFlags};
 #[cfg(feature = "debug")]
 use ragnarok_formats::transform::Transform;
-use ragnarok_packets::{ClientTick, TilePosition};
+use ragnarok_packets::{ClientTick, EntityId, TilePosition};
 use rust_state::RustState;
 use wgpu::Queue;
 
@@ -388,11 +388,20 @@ impl Map {
         entities: &[Entity],
         camera: &dyn Camera,
         client_tick: ClientTick,
+        highlight: Option<(EntityId, Color)>,
     ) {
-        entities
-            .iter()
-            .enumerate()
-            .for_each(|(index, entity)| entity.render(instructions, camera, index != 0, client_tick));
+        entities.iter().enumerate().for_each(|(index, entity)| {
+            let first_instruction = instructions.len();
+            entity.render(instructions, camera, index != 0, client_tick);
+
+            if let Some((entity_id, color)) = highlight
+                && entity.get_entity_id() == entity_id
+            {
+                instructions[first_instruction..]
+                    .iter_mut()
+                    .for_each(|instruction| instruction.color = instruction.color * color);
+            }
+        });
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]

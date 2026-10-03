@@ -8,6 +8,7 @@ use rust_state::RustState;
 use crate::FadeDirection;
 use crate::graphics::EntityInstruction;
 use crate::loaders::GAT_TILE_SIZE;
+use crate::state::ClientState;
 use crate::world::{AnimationData, AnimationState, Camera, EntityType, FadeState, ItemResource, ItemResourceKey, Library, Map};
 
 pub const ITEM_SPRITE_PREFIX: &str = "아이템\\";
@@ -16,6 +17,7 @@ const FADE_IN_DURATION_MS: u32 = 100;
 const FADE_OUT_DURATION_MS: u32 = 250;
 
 #[derive(Clone, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct GroundItem {
     pub entity_id: EntityId,
     pub item_id: ItemId,

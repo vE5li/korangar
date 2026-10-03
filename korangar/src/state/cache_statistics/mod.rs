@@ -5,8 +5,10 @@ use rust_state::RustState;
 
 use crate::interface::windows::WindowClass;
 use crate::loaders::{ActionLoader, AnimationLoader, EffectLoader, FontLoader, GameFileLoader, MapLoader, SpriteLoader, TextureLoader};
+use crate::state::ClientState;
 
 #[derive(Clone, Copy, PartialEq, Default, RustState, StateElement, StateWindow)]
+#[impl_for(ClientState)]
 #[window_class(WindowClass::CacheStatistics)]
 #[window_title("Cache Statistics")]
 pub struct CacheStatistics {

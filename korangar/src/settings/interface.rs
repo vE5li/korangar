@@ -6,6 +6,7 @@ use rust_state::RustState;
 use serde::{Deserialize, Serialize};
 
 use crate::loaders::Scaling;
+use crate::state::ClientState;
 use crate::state::localization::Language;
 
 /// This theme name includes a zero byte so that it can not point to an actual
@@ -18,6 +19,7 @@ pub const IN_GAME_THEMES_PATH: &str = "client/in_game_themes";
 pub const WORLD_THEMES_PATH: &str = "client/world_themes";
 
 #[derive(Clone, Serialize, Deserialize, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct InterfaceSettings {
     pub language: Language,
     pub scaling: Scaling,
@@ -83,6 +85,7 @@ impl Drop for InterfaceSettings {
 }
 
 #[derive(RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct InterfaceSettingsCapabilities {
     languages: Vec<Language>,
     scalings: Vec<Scaling>,

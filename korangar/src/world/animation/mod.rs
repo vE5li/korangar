@@ -10,6 +10,7 @@ use rust_state::RustState;
 use crate::graphics::DebugRectangleInstruction;
 use crate::graphics::{Color, EntityInstruction};
 use crate::loaders::Sprite;
+use crate::state::ClientState;
 use crate::world::{ActionEvent, Actions, Camera, EntityType};
 
 const TILE_SIZE: f32 = 10.0;
@@ -166,6 +167,7 @@ impl AnimationState {
 }
 
 #[derive(RustState, Clone, StateElement)]
+#[impl_for(ClientState)]
 pub struct AnimationData {
     pub animation_pair: Vec<AnimationPair>,
     pub animations: Vec<Animation>,
@@ -182,12 +184,14 @@ impl Cacheable for AnimationData {
 }
 
 #[derive(RustState, Clone, StateElement)]
+#[impl_for(ClientState)]
 pub struct AnimationPair {
     pub sprites: Arc<Sprite>,
     pub actions: Arc<Actions>,
 }
 
 #[derive(RustState, Clone, StateElement)]
+#[impl_for(ClientState)]
 pub struct Animation {
     #[hidden_element]
     pub frames: Vec<AnimationFrame>,

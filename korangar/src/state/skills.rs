@@ -85,6 +85,7 @@ pub enum SkillAcquisition {
 }
 
 #[derive(Clone, Debug, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct LearnableSkill {
     pub skill_id: SkillId,
     pub maximum_level: SkillLevel,
@@ -107,6 +108,7 @@ pub struct LearnableSkill {
 }
 
 #[derive(Clone, Debug, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct LearnedSkill {
     pub skill_id: SkillId,
     pub skill_level: SkillLevel,
@@ -142,6 +144,7 @@ impl LearnedSkill {
 }
 
 #[derive(Debug, Clone, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct SkillTabLayout {
     pub name: String,
     #[hidden_element]
@@ -149,11 +152,13 @@ pub struct SkillTabLayout {
 }
 
 #[derive(Debug, Clone, Default, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct SkillTreeLayout {
     pub tabs: Vec<SkillTabLayout>,
 }
 
 #[derive(Default, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct SkillTree {
     layout: SkillTreeLayout,
     skills: Vec<LearnedSkill>,

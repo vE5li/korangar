@@ -156,6 +156,7 @@ where
 
 /// Internal state of the chat window.
 #[derive(Default, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct ChatWindowState {
     current_text: String,
 }

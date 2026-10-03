@@ -4,9 +4,11 @@ use ragnarok_packets::handler::PacketCallback;
 use ragnarok_packets::{HotbarSlot, HotbarTab, HotkeyData, HotkeyType};
 use rust_state::RustState;
 
+use crate::state::ClientState;
 use crate::state::skills::LearnableSkill;
 
 #[derive(Default, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct Hotbar {
     skills: [Option<LearnableSkill>; 10],
 }

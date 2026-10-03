@@ -9,8 +9,10 @@ use serde::{Deserialize, Serialize};
 use crate::graphics::{
     LimitFramerate, Msaa, PresentModeInfo, ScreenSpaceAntiAliasing, ShadowDetail, ShadowMethod, ShadowResolution, Ssaa, TextureSamplerType,
 };
+use crate::state::ClientState;
 
 #[derive(Clone, Serialize, Deserialize, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct GraphicsSettings {
     pub lighting_mode: LightingMode,
     pub vsync: bool,
@@ -114,6 +116,7 @@ impl DropDownItem<LightingMode> for LightingMode {
 }
 
 #[derive(RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct GraphicsSettingsCapabilities {
     lighting_modes: Vec<LightingMode>,
     texture_filtering_options: Vec<TextureSamplerType>,

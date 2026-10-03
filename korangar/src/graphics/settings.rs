@@ -7,6 +7,7 @@ use korangar_interface::element::StateElement;
 use serde::{Deserialize, Serialize};
 
 use crate::graphics::ScreenSize;
+use crate::state::ClientState;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, StateElement)]
 pub enum LimitFramerate {
@@ -305,6 +306,7 @@ impl Display for ScreenSpaceAntiAliasing {
 
 #[cfg(feature = "debug")]
 #[derive(Copy, Clone, Default, rust_state::RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct RenderOptions {
     pub show_frames_per_second: bool,
     pub frustum_culling: bool,

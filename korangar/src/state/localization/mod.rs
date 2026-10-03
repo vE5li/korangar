@@ -125,6 +125,7 @@ impl StateElement<ClientState> for LocalizationControls {
 
 /// Localization for the client in form of a string lookup.
 #[derive(Serialize, Deserialize, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct Localization {
     /// Controls for reloading and saving the localization from the state
     /// inspector.

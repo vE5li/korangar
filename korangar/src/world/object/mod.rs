@@ -17,8 +17,10 @@ use crate::graphics::DebugAabbInstruction;
 use crate::graphics::ModelInstruction;
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
+use crate::state::ClientState;
 
 #[derive(Clone, RustState, StateElement, StateWindow)]
+#[impl_for(ClientState)]
 pub struct Object {
     pub name: Option<String>,
     pub model_name: String,

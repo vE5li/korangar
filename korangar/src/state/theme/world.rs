@@ -6,8 +6,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::graphics::{Color, ScreenPosition, ScreenSize};
 use crate::loaders::FontSize;
+use crate::state::ClientState;
 
 #[derive(Serialize, Deserialize, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct OverlayTheme {
     pub foreground_color: Color,
     pub text_offset: ScreenPosition,
@@ -25,6 +27,7 @@ impl Default for OverlayTheme {
 }
 
 #[derive(Serialize, Deserialize, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct StatusBarTheme {
     pub background_color: Color,
     pub player_health_color: Color,
@@ -62,6 +65,7 @@ impl Default for StatusBarTheme {
 }
 
 #[derive(Serialize, Deserialize, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct IndicatorTheme {
     pub walking: Color,
 }
@@ -75,6 +79,7 @@ impl Default for IndicatorTheme {
 }
 
 #[derive(Serialize, Deserialize, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct CursorTheme {
     pub color: Color,
 }
@@ -88,6 +93,7 @@ impl Default for CursorTheme {
 }
 
 #[derive(Default, Serialize, Deserialize, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct WorldTheme {
     pub overlay: OverlayTheme,
     pub status_bar: StatusBarTheme,

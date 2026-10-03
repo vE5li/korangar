@@ -24,6 +24,61 @@ fn random_velocity() -> f32 {
     rand_f32() * 40.0 - 20.0
 }
 
+/// Particle feedback derived from a signed `ZC_NOTIFY_SKILL` damage value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SkillDamageDisplay {
+    /// Negative values are protocol sentinels and produce no number.
+    Suppressed,
+    Miss,
+    Damage {
+        amount: u32,
+        is_critical: bool,
+    },
+}
+
+impl SkillDamageDisplay {
+    pub fn from_packet(damage: i32, action: i8) -> Self {
+        match damage {
+            ..=-1 => Self::Suppressed,
+            0 => Self::Miss,
+            amount => Self::Damage {
+                amount: amount as u32,
+                // e_damage_type::DMG_CRITICAL and
+                // e_damage_type::DMG_MULTI_HIT_CRITICAL.
+                is_critical: matches!(action, 10 | 13),
+            },
+        }
+    }
+}
+
+#[cfg(test)]
+mod skill_damage_display_tests {
+    use super::SkillDamageDisplay;
+
+    #[test]
+    fn suppresses_signed_sentinels_and_distinguishes_misses() {
+        assert_eq!(SkillDamageDisplay::from_packet(-30000, 0), SkillDamageDisplay::Suppressed);
+        assert_eq!(SkillDamageDisplay::from_packet(-1, 0), SkillDamageDisplay::Suppressed);
+        assert_eq!(SkillDamageDisplay::from_packet(0, 0), SkillDamageDisplay::Miss);
+    }
+
+    #[test]
+    fn only_critical_actions_receive_critical_styling() {
+        assert_eq!(SkillDamageDisplay::from_packet(123, 10), SkillDamageDisplay::Damage {
+            amount: 123,
+            is_critical: true,
+        });
+        assert_eq!(SkillDamageDisplay::from_packet(123, 13), SkillDamageDisplay::Damage {
+            amount: 123,
+            is_critical: true,
+        });
+        assert_eq!(SkillDamageDisplay::from_packet(123, 127), SkillDamageDisplay::Damage {
+            amount: 123,
+            is_critical: false,
+        });
+    }
+}
+
 pub struct DamageNumber {
     position: Point3<f32>,
     damage_amount: String,

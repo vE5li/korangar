@@ -533,7 +533,17 @@ where
     })?;
     packet_handler.register_noop::<DisplaySpecialEffectPacket>()?;
     packet_handler.register_noop::<DisplaySkillCooldownPacket>()?;
-    packet_handler.register_noop::<DisplaySkillEffectAndDamagePacket>()?;
+    packet_handler.register(|packet: DisplaySkillEffectAndDamagePacket| {
+        // Reuse the regular damage event so skill damage shows damage numbers
+        // and plays the hit animation just like auto attacks.
+        NetworkEvent::DamageEffect {
+            source_entity_id: packet.source_entity_id,
+            destination_entity_id: packet.destination_entity_id,
+            damage_amount: (packet.damage > 0).then_some(packet.damage as usize),
+            attack_duration: packet.destination_delay,
+            is_critical: false,
+        }
+    })?;
     packet_handler.register(|packet: DisplaySkillEffectNoDamagePacket| NetworkEvent::HealEffect {
         entity_id: packet.destination_entity_id,
         heal_amount: packet.heal_amount as usize,

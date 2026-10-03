@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use korangar_interface::MouseMode;
 use korangar_networking::InventoryItem;
-use ragnarok_packets::TilePosition;
+use ragnarok_packets::{HotbarSlot, SkillLevel, SkillType, TilePosition};
 
 use crate::graphics::Texture;
 use crate::interface::resource::{ItemSource, SkillSource};
@@ -25,6 +25,17 @@ pub enum MouseInputMode {
         source: SkillSource,
         skill: LearnableSkill,
     },
+    /// The player clicked a skill in the hotbar and is now selecting a target
+    /// for it, like in the original client. The next left click in the world
+    /// casts the skill in the given slot.
+    TargetSkill {
+        slot: HotbarSlot,
+        skill_type: SkillType,
+        /// The level to cast the skill at. Starts at the level the skill was
+        /// placed in the hotbar with and can be adjusted with the mouse wheel
+        /// while selecting a target.
+        level: SkillLevel,
+    },
 }
 
 impl From<MouseInputMode> for MouseMode<ClientState> {
@@ -46,6 +57,8 @@ pub trait MouseModeExt {
     fn is_grabbing(&self) -> bool;
 
     fn grabbed(&self) -> Option<Grabbed>;
+
+    fn skill_target(&self) -> Option<(HotbarSlot, SkillType, SkillLevel)>;
 }
 
 impl MouseModeExt for MouseMode<ClientState> {
@@ -87,6 +100,15 @@ impl MouseModeExt for MouseMode<ClientState> {
                 skill.actions.clone()?,
                 skill.animation_state.clone(),
             )),
+            _ => None,
+        }
+    }
+
+    fn skill_target(&self) -> Option<(HotbarSlot, SkillType, SkillLevel)> {
+        match self {
+            MouseMode::Custom {
+                mode: MouseInputMode::TargetSkill { slot, skill_type, level },
+            } => Some((*slot, *skill_type, *level)),
             _ => None,
         }
     }

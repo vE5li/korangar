@@ -274,28 +274,34 @@ impl InputSystem {
             }
         }
 
-        if self.get_key(KeyCode::KeyJ).pressed() {
-            events.push(InputEvent::CastSkill { slot: HotbarSlot(0) });
-        }
+        // The hotbar slots are mapped to the function keys, like in the
+        // original client. Pressing a function key uses the skill in that
+        // slot, which either casts it directly or starts a target selection.
+        const HOTBAR_KEYS: [KeyCode; 10] = [
+            KeyCode::F1,
+            KeyCode::F2,
+            KeyCode::F3,
+            KeyCode::F4,
+            KeyCode::F5,
+            KeyCode::F6,
+            KeyCode::F7,
+            KeyCode::F8,
+            KeyCode::F9,
+            KeyCode::F10,
+        ];
 
-        if self.get_key(KeyCode::KeyJ).released() {
-            events.push(InputEvent::StopSkill { slot: HotbarSlot(0) });
-        }
+        for (slot, key_code) in HOTBAR_KEYS.into_iter().enumerate() {
+            if self.get_key(key_code).pressed() {
+                events.push(InputEvent::UseSkillInSlot {
+                    slot: HotbarSlot(slot as u16),
+                });
+            }
 
-        if self.get_key(KeyCode::KeyL).pressed() {
-            events.push(InputEvent::CastSkill { slot: HotbarSlot(1) });
-        }
-
-        if self.get_key(KeyCode::KeyL).released() {
-            events.push(InputEvent::StopSkill { slot: HotbarSlot(1) });
-        }
-
-        if self.get_key(KeyCode::KeyU).pressed() {
-            events.push(InputEvent::CastSkill { slot: HotbarSlot(2) });
-        }
-
-        if self.get_key(KeyCode::KeyU).released() {
-            events.push(InputEvent::StopSkill { slot: HotbarSlot(2) });
+            if self.get_key(key_code).released() {
+                events.push(InputEvent::StopSkill {
+                    slot: HotbarSlot(slot as u16),
+                });
+            }
         }
 
         #[cfg(feature = "debug")]

@@ -99,6 +99,7 @@ struct EngineContext {
     point_shadow_indicator_drawer: PointShadowIndicatorDrawer,
     light_culling_dispatcher: LightCullingDispatcher,
     forward_entity_drawer: ForwardEntityDrawer,
+    forward_ground_marker_drawer: ForwardGroundMarkerDrawer,
     forward_indicator_drawer: ForwardIndicatorDrawer,
     forward_model_drawer: ForwardModelDrawer,
     water_wave_drawer: WaterWaveDrawer,
@@ -328,6 +329,7 @@ impl GraphicsEngine {
                         );
                         let ForwardResources {
                             forward_entity_drawer,
+                            forward_ground_marker_drawer,
                             forward_indicator_drawer,
                             forward_model_drawer,
                         } = ForwardResources::create(
@@ -457,6 +459,7 @@ impl GraphicsEngine {
                         point_shadow_entity_drawer,
                         light_culling_dispatcher,
                         forward_entity_drawer,
+                        forward_ground_marker_drawer,
                         forward_indicator_drawer,
                         forward_model_drawer,
                         water_wave_drawer,
@@ -597,6 +600,7 @@ impl GraphicsEngine {
 
             let ForwardResources {
                 forward_entity_drawer,
+                forward_ground_marker_drawer,
                 forward_indicator_drawer,
                 forward_model_drawer,
             } = ForwardResources::create(
@@ -632,6 +636,7 @@ impl GraphicsEngine {
             );
 
             engine_context.forward_entity_drawer = forward_entity_drawer;
+            engine_context.forward_ground_marker_drawer = forward_ground_marker_drawer;
             engine_context.forward_indicator_drawer = forward_indicator_drawer;
             engine_context.forward_model_drawer = forward_model_drawer;
             engine_context.post_processing_effect_drawer = post_processing_effect_drawer;
@@ -964,6 +969,7 @@ impl GraphicsEngine {
             });
             scope.spawn(|_| {
                 context.forward_entity_drawer.prepare(&self.device, instruction);
+                context.forward_ground_marker_drawer.prepare(&self.device, instruction);
                 context.forward_model_drawer.prepare(&self.device, instruction);
             });
             scope.spawn(|_| {
@@ -1016,6 +1022,7 @@ impl GraphicsEngine {
         visitor.upload(&mut context.point_shadow_pass_context);
         visitor.upload(&mut context.post_processing_effect_drawer);
         visitor.upload(&mut context.forward_entity_drawer);
+        visitor.upload(&mut context.forward_ground_marker_drawer);
         visitor.upload(&mut context.forward_model_drawer);
         visitor.upload(&mut context.water_wave_drawer);
         visitor.upload(&mut context.post_processing_rectangle_drawer);
@@ -1265,6 +1272,10 @@ impl GraphicsEngine {
                     pass_mode: ModelPassMode::Transparent,
                 });
 
+                engine_context
+                    .forward_ground_marker_drawer
+                    .draw(&mut render_pass, instruction.ground_markers);
+
                 if let Some(water_instruction) = instruction.water.as_ref() {
                     engine_context.water_wave_drawer.draw(&mut render_pass, water_instruction);
                 }
@@ -1486,6 +1497,7 @@ impl UploadVisitor<'_> {
 
 struct ForwardResources {
     forward_entity_drawer: ForwardEntityDrawer,
+    forward_ground_marker_drawer: ForwardGroundMarkerDrawer,
     forward_indicator_drawer: ForwardIndicatorDrawer,
     forward_model_drawer: ForwardModelDrawer,
 }
@@ -1500,6 +1512,14 @@ impl ForwardResources {
         forward_pass_context: &ForwardRenderPassContext,
     ) -> Self {
         let forward_entity_drawer = ForwardEntityDrawer::new(
+            capabilities,
+            device,
+            queue,
+            shader_compiler,
+            global_context,
+            forward_pass_context,
+        );
+        let forward_ground_marker_drawer = ForwardGroundMarkerDrawer::new(
             capabilities,
             device,
             queue,
@@ -1526,6 +1546,7 @@ impl ForwardResources {
 
         Self {
             forward_entity_drawer,
+            forward_ground_marker_drawer,
             forward_indicator_drawer,
             forward_model_drawer,
         }

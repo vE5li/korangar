@@ -1,3 +1,4 @@
+use std::num::NonZeroU32;
 use std::sync::Arc;
 
 use cgmath::{Array, Matrix4, Point3, Transform, Vector2, Vector3, Zero};
@@ -61,6 +62,10 @@ impl AnimationActionType {
                 AnimationActionType::Attack1 => 2,
                 AnimationActionType::Hurt => 3,
                 AnimationActionType::Die => 4,
+                // Monster acts have no dedicated casting action; the classic
+                // client plays their attack motion for the wind-up instead
+                // of leaving them standing idle.
+                AnimationActionType::Skill => 2,
                 _ => 0,
             },
             EntityType::Warp => 0,
@@ -77,6 +82,14 @@ pub struct AnimationState {
     duration: Option<u32>,
     factor: Option<f32>,
     looping: bool,
+    casting: Option<CastingState>,
+}
+
+#[derive(Clone, Debug)]
+struct CastingState {
+    start_time: ClientTick,
+    elapsed: u32,
+    duration: NonZeroU32,
 }
 
 impl AnimationState {
@@ -90,6 +103,7 @@ impl AnimationState {
             duration: None,
             factor: None,
             looping: true,
+            casting: None,
         }
     }
 
@@ -123,6 +137,25 @@ impl AnimationState {
         self.looping = false;
     }
 
+    /// Plays the casting motion for the duration reported by the server.
+    ///
+    /// Cast timing is tracked separately from the visible sprite action so
+    /// that reactions such as hurt animations do not hide the cast bar.
+    pub fn cast(&mut self, entity_type: EntityType, cast_time: NonZeroU32, client_tick: ClientTick) {
+        self.action_type = AnimationActionType::Skill;
+        self.action_base_offset = self.action_type.action_base_offset(entity_type);
+        self.start_time = client_tick;
+        self.time = 0;
+        self.duration = Some(cast_time.get());
+        self.factor = None;
+        self.looping = false;
+        self.casting = Some(CastingState {
+            start_time: client_tick,
+            elapsed: 0,
+            duration: cast_time,
+        });
+    }
+
     pub fn walk(&mut self, entity_type: EntityType, movement_speed: usize, client_tick: ClientTick) {
         self.action_type = AnimationActionType::Walk;
         self.action_base_offset = self.action_type.action_base_offset(entity_type);
@@ -139,6 +172,7 @@ impl AnimationState {
         self.duration = None;
         self.factor = None;
         self.looping = false;
+        self.casting = None;
     }
 
     pub fn is_attack(&self) -> bool {
@@ -152,6 +186,40 @@ impl AnimationState {
         self.action_type == AnimationActionType::Pickup
     }
 
+    pub fn is_casting(&self) -> bool {
+        self.casting.is_some()
+    }
+
+    pub fn casting_progress(&self) -> Option<f32> {
+        self.casting
+            .as_ref()
+            .map(|casting| (casting.elapsed as f32 / casting.duration.get() as f32).clamp(0.0, 1.0))
+    }
+
+    pub fn is_casting_complete(&self) -> bool {
+        self.is_casting()
+            && self
+                .casting
+                .as_ref()
+                .is_some_and(|casting| casting.elapsed >= casting.duration.get())
+    }
+
+    /// Clears cast timing without changing the current sprite action.
+    pub fn clear_cast(&mut self) {
+        self.casting = None;
+    }
+
+    /// Clears server-side cast timing and returns the sprite to idle only when
+    /// the casting action is still visible.
+    pub fn finish_cast(&mut self, entity_type: EntityType, client_tick: ClientTick) {
+        let was_casting = self.casting.take().is_some();
+
+        if was_casting && self.action_type == AnimationActionType::Skill {
+            self.idle(entity_type, client_tick);
+            self.time = 0;
+        }
+    }
+
     pub fn is_walking(&self) -> bool {
         self.action_type == AnimationActionType::Walk
     }
@@ -162,6 +230,68 @@ impl AnimationState {
 
     pub fn update(&mut self, client_tick: ClientTick) {
         self.time = client_tick.0.wrapping_sub(self.start_time.0);
+
+        if let Some(casting) = self.casting.as_mut() {
+            casting.elapsed = client_tick.0.wrapping_sub(casting.start_time.0);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::num::NonZeroU32;
+
+    use ragnarok_packets::ClientTick;
+
+    use super::AnimationState;
+    use crate::world::EntityType;
+
+    #[test]
+    fn cast_progress_tracks_server_duration_and_clamps() {
+        let mut state = AnimationState::new(EntityType::Player, ClientTick(100));
+        state.cast(EntityType::Player, NonZeroU32::new(400).unwrap(), ClientTick(100));
+
+        assert_eq!(state.casting_progress(), Some(0.0));
+        assert!(!state.is_casting_complete());
+
+        state.update(ClientTick(300));
+        assert_eq!(state.casting_progress(), Some(0.5));
+        assert!(!state.is_casting_complete());
+
+        state.update(ClientTick(600));
+        assert_eq!(state.casting_progress(), Some(1.0));
+        assert!(state.is_casting_complete());
+    }
+
+    #[test]
+    fn finishing_a_cast_clears_cast_progress() {
+        let mut state = AnimationState::new(EntityType::Player, ClientTick(100));
+        state.cast(EntityType::Player, NonZeroU32::new(400).unwrap(), ClientTick(100));
+        state.finish_cast(EntityType::Player, ClientTick(200));
+
+        assert!(!state.is_casting());
+        assert_eq!(state.casting_progress(), None);
+    }
+
+    #[test]
+    fn finishing_a_cast_preserves_a_newer_action() {
+        let mut state = AnimationState::new(EntityType::Player, ClientTick(100));
+        state.cast(EntityType::Player, NonZeroU32::new(400).unwrap(), ClientTick(100));
+        state.attack(EntityType::Player, 200, false, ClientTick(200));
+        state.finish_cast(EntityType::Player, ClientTick(250));
+
+        assert!(!state.is_casting());
+        assert!(state.is_attack());
+    }
+
+    #[test]
+    fn death_clears_an_active_cast() {
+        let mut state = AnimationState::new(EntityType::Player, ClientTick(100));
+        state.cast(EntityType::Player, NonZeroU32::new(400).unwrap(), ClientTick(100));
+        state.dead(EntityType::Player, ClientTick(200));
+
+        assert!(!state.is_casting());
+        assert!(state.is_dead());
     }
 }
 

@@ -124,6 +124,39 @@ pub struct EntityId(pub u32);
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct SkillId(pub u16);
 
+/// rAthena's `useskill_fail_cause`.
+///
+/// This remains a newtype instead of an enum so packets containing newer,
+/// unknown failure codes can still be decoded and inspected.
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+pub struct SkillUseFailureCode(pub u8);
+
+impl SkillUseFailureCode {
+    pub const COOLDOWN: Self = Self(4);
+    pub const FAILED: Self = Self(10);
+    pub const GENERIC: Self = Self(0);
+    pub const INVALID_DIRECTION: Self = Self(18);
+    pub const INVALID_POSITION: Self = Self(26);
+    pub const INVALID_TARGET: Self = Self(11);
+    pub const MISSING_ITEMS: Self = Self(3);
+    pub const NEED_AMMUNITION: Self = Self(84);
+    pub const NEED_BLUE_GEMSTONE: Self = Self(8);
+    pub const NEED_COINS: Self = Self(85);
+    pub const NEED_COMBO_SKILL: Self = Self(73);
+    pub const NEED_EQUIPMENT: Self = Self(72);
+    pub const NEED_HOLY_WATER: Self = Self(13);
+    pub const NEED_ITEM: Self = Self(71);
+    pub const NEED_OTHER_SKILL: Self = Self(16);
+    pub const NEED_RED_GEMSTONE: Self = Self(7);
+    pub const NEED_SPIRITS: Self = Self(74);
+    pub const NOT_ENOUGH_HP: Self = Self(2);
+    pub const NOT_ENOUGH_MONEY: Self = Self(5);
+    pub const NOT_ENOUGH_SP: Self = Self(1);
+    pub const OVERWEIGHT: Self = Self(9);
+    pub const WRONG_WEAPON: Self = Self(6);
+}
+
 #[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct SkillLevel(pub u16);
@@ -3208,6 +3241,7 @@ pub struct DisplaySkillCooldownPacket {
     pub until: ClientTick,
 }
 
+/// `ZC_NOTIFY_SKILL`, sent when a skill hit resolves.
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x01DE)]
@@ -3216,12 +3250,65 @@ pub struct DisplaySkillEffectAndDamagePacket {
     pub source_entity_id: EntityId,
     pub destination_entity_id: EntityId,
     pub start_time: ClientTick,
-    pub soruce_delay: u32,
-    pub destination_delay: u32,
-    pub damage: u32,
-    pub level: SkillLevel,
-    pub div: u16,
-    pub skill_type: u8,
+    pub source_motion: i32,
+    pub target_motion: i32,
+    /// Negative values are server-side display sentinels and must not be
+    /// interpreted as damage amounts.
+    pub damage: i32,
+    pub skill_level: i16,
+    pub hit_count: i16,
+    pub action: i8,
+}
+
+#[cfg(test)]
+mod skill_damage_packet_tests {
+    use super::*;
+
+    #[test]
+    fn skill_damage_packet_preserves_signed_wire_fields() {
+        let expected = [
+            0xDE, 0x01, // header
+            0x34, 0x12, // skill id
+            0x04, 0x03, 0x02, 0x01, // source entity
+            0x08, 0x07, 0x06, 0x05, // destination entity
+            0x0D, 0x0C, 0x0B, 0x0A, // start tick
+            0xFE, 0xFF, 0xFF, 0xFF, // source motion: -2
+            0xFD, 0xFF, 0xFF, 0xFF, // target motion: -3
+            0xD0, 0x8A, 0xFF, 0xFF, // damage sentinel: -30000
+            0xFE, 0xFF, // skill level: -2
+            0xFC, 0xFF, // hit count: -4
+            0x0E, // action: 14
+        ];
+        let packet = DisplaySkillEffectAndDamagePacket {
+            skill_id: SkillId(0x1234),
+            source_entity_id: EntityId(0x0102_0304),
+            destination_entity_id: EntityId(0x0506_0708),
+            start_time: ClientTick(0x0A0B_0C0D),
+            source_motion: -2,
+            target_motion: -3,
+            damage: -30000,
+            skill_level: -2,
+            hit_count: -4,
+            action: 14,
+        };
+
+        let mut writer = ByteWriter::new();
+        assert_eq!(packet.packet_to_bytes(&mut writer).unwrap(), expected.len());
+        assert_eq!(writer.as_slice(), expected);
+
+        let mut reader = ByteReader::without_metadata(&expected);
+        let decoded = DisplaySkillEffectAndDamagePacket::packet_from_bytes(&mut reader).unwrap();
+        assert_eq!(decoded.skill_id, packet.skill_id);
+        assert_eq!(decoded.source_entity_id, packet.source_entity_id);
+        assert_eq!(decoded.destination_entity_id, packet.destination_entity_id);
+        assert_eq!(decoded.start_time.0, packet.start_time.0);
+        assert_eq!(decoded.source_motion, packet.source_motion);
+        assert_eq!(decoded.target_motion, packet.target_motion);
+        assert_eq!(decoded.damage, packet.damage);
+        assert_eq!(decoded.skill_level, packet.skill_level);
+        assert_eq!(decoded.hit_count, packet.hit_count);
+        assert_eq!(decoded.action, packet.action);
+    }
 }
 
 #[derive(Debug, Clone, ByteConvertable)]
@@ -3878,9 +3965,21 @@ pub struct EndUseSkillPacket {
     pub skill_id: SkillId,
 }
 
+/// `ZC_DISPEL`, sent when an entity's skill cast is cancelled.
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
-#[header(0x07FB)]
+#[header(0x01B9)]
+pub struct CancelSkillCastPacket {
+    pub entity_id: EntityId,
+}
+
+/// Modern `ZC_USESKILL_ACK` sent when an entity starts casting a skill.
+///
+/// This is the `PACKETVER >= 20181212` layout used by packet version
+/// 20220406. `delay_time` is the cast time in milliseconds.
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
+#[header(0x0B1A)]
 pub struct UseSkillSuccessPacket {
     pub source_entity: EntityId,
     pub destination_entity: EntityId,
@@ -3889,212 +3988,317 @@ pub struct UseSkillSuccessPacket {
     pub element: u32,
     pub delay_time: u32,
     pub disposable: u8,
+    pub attack_motion: u32,
 }
 
+/// Modern `ZC_ACK_TOUSESKILL` result for a requested skill use.
+///
+/// This is the 14-byte layout used since the 2018 packet versions.
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 #[header(0x0110)]
 pub struct ToUseSkillSuccessPacket {
     pub skill_id: SkillId,
-    pub btype: i32,
+    /// Failure-specific detail. For example, a required item quantity or
+    /// prerequisite skill id.
+    pub detail: i32,
     pub item_id: ItemId,
+    /// Zero when the skill was rejected; nonzero for a successful
+    /// acknowledgement.
     pub flag: u8,
-    pub cause: u8,
+    pub cause: SkillUseFailureCode,
 }
 
-#[derive(Debug, Clone, ByteConvertable)]
+#[cfg(test)]
+mod skill_use_result_packet_tests {
+    use super::*;
+
+    #[test]
+    fn modern_skill_rejection_has_exact_wire_layout() {
+        let expected = [
+            0x10, 0x01, // header
+            0x34, 0x12, // skill id
+            0xFE, 0xFF, 0xFF, 0xFF, // signed detail: -2
+            0xEF, 0xCD, 0xAB, 0x89, // item id
+            0x00, // rejected
+            0x47, // required item
+        ];
+        let packet = ToUseSkillSuccessPacket {
+            skill_id: SkillId(0x1234),
+            detail: -2,
+            item_id: ItemId(0x89AB_CDEF),
+            flag: 0,
+            cause: SkillUseFailureCode::NEED_ITEM,
+        };
+
+        let mut writer = ByteWriter::new();
+        assert_eq!(packet.packet_to_bytes(&mut writer).unwrap(), expected.len());
+        assert_eq!(writer.as_slice(), expected);
+
+        let mut reader = ByteReader::without_metadata(&expected);
+        let decoded = ToUseSkillSuccessPacket::packet_from_bytes(&mut reader).unwrap();
+        assert_eq!(decoded.skill_id, packet.skill_id);
+        assert_eq!(decoded.detail, packet.detail);
+        assert_eq!(decoded.item_id, packet.item_id);
+        assert_eq!(decoded.flag, packet.flag);
+        assert_eq!(decoded.cause, packet.cause);
+    }
+}
+
+#[cfg(test)]
+mod skill_cast_packet_tests {
+    use super::*;
+
+    #[test]
+    fn modern_skill_cast_acknowledgement_has_exact_wire_layout() {
+        let packet = UseSkillSuccessPacket {
+            source_entity: EntityId(0x0102_0304),
+            destination_entity: EntityId(0x0506_0708),
+            position: TilePosition { x: 0x1112, y: 0x1314 },
+            skill_id: SkillId(0x1516),
+            element: 0x1718_191A,
+            delay_time: 0x1B1C_1D1E,
+            disposable: 0x1F,
+            attack_motion: 0x2021_2223,
+        };
+
+        let expected = [
+            0x1A, 0x0B, // header
+            0x04, 0x03, 0x02, 0x01, // source entity
+            0x08, 0x07, 0x06, 0x05, // destination entity
+            0x12, 0x11, // x
+            0x14, 0x13, // y
+            0x16, 0x15, // skill id
+            0x1A, 0x19, 0x18, 0x17, // element
+            0x1E, 0x1D, 0x1C, 0x1B, // cast delay
+            0x1F, // disposable
+            0x23, 0x22, 0x21, 0x20, // attack motion
+        ];
+
+        let mut writer = ByteWriter::new();
+        assert_eq!(packet.packet_to_bytes(&mut writer).unwrap(), expected.len());
+        assert_eq!(writer.as_slice(), expected);
+
+        let mut reader = ByteReader::without_metadata(&expected);
+        let decoded = UseSkillSuccessPacket::packet_from_bytes(&mut reader).unwrap();
+        assert_eq!(decoded.source_entity, packet.source_entity);
+        assert_eq!(decoded.destination_entity, packet.destination_entity);
+        assert_eq!(decoded.position, packet.position);
+        assert_eq!(decoded.skill_id, packet.skill_id);
+        assert_eq!(decoded.element, packet.element);
+        assert_eq!(decoded.delay_time, packet.delay_time);
+        assert_eq!(decoded.disposable, packet.disposable);
+        assert_eq!(decoded.attack_motion, packet.attack_motion);
+    }
+
+    #[test]
+    fn cancelled_skill_cast_has_exact_wire_layout() {
+        let packet = CancelSkillCastPacket {
+            entity_id: EntityId(0x0102_0304),
+        };
+        let expected = [0xB9, 0x01, 0x04, 0x03, 0x02, 0x01];
+
+        let mut writer = ByteWriter::new();
+        assert_eq!(packet.packet_to_bytes(&mut writer).unwrap(), expected.len());
+        assert_eq!(writer.as_slice(), expected);
+
+        let mut reader = ByteReader::without_metadata(&expected);
+        let decoded = CancelSkillCastPacket::packet_from_bytes(&mut reader).unwrap();
+        assert_eq!(decoded.entity_id, packet.entity_id);
+    }
+}
+
+/// The server-side type of a persistent skill unit.
+///
+/// This is intentionally an open newtype instead of an enum. Servers can add
+/// unit ids independently of the client packet version, and an unknown id must
+/// not make packet decoding (including Packet Inspector decoding) fail.
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
-#[numeric_type(u32)]
-pub enum UnitId {
-    #[numeric_value(0x7E)]
-    Safetywall,
-    Firewall,
-    WarpWaiting,
-    WarpActive,
-    Benedictio,
-    Sanctuary,
-    Magnus,
-    Pneuma,
-    Dummyskill,
-    FirepillarWaiting,
-    FirepillarActive,
-    HiddenTrap,
-    Trap,
-    HiddenWarpNpc,
-    UsedTraps,
-    Icewall,
-    Quagmire,
-    Blastmine,
-    Skidtrap,
-    Anklesnare,
-    Venomdust,
-    Landmine,
-    Shockwave,
-    Sandman,
-    Flasher,
-    Freezingtrap,
-    Claymoretrap,
-    Talkiebox,
-    Volcano,
-    Deluge,
-    Violentgale,
-    Landprotector,
-    Lullaby,
-    Richmankim,
-    Eternalchaos,
-    Drumbattlefield,
-    Ringnibelungen,
-    Rokisweil,
-    Intoabyss,
-    Siegfried,
-    Dissonance,
-    Whistle,
-    Assassincross,
-    Poembragi,
-    Appleidun,
-    Uglydance,
-    Humming,
-    Dontforgetme,
-    Fortunekiss,
-    Serviceforyou,
-    Graffiti,
-    Demonstration,
-    Callfamily,
-    Gospel,
-    Basilica,
-    Moonlit,
-    Fogwall,
-    Spiderweb,
-    Gravitation,
-    Hermode,
-    Kaensin,
-    Suiton,
-    Tatamigaeshi,
-    Kaen,
-    GrounddriftWind,
-    GrounddriftDark,
-    GrounddriftPoison,
-    GrounddriftWater,
-    GrounddriftFire,
-    Deathwave,
-    Waterattack,
-    Windattack,
-    Earthquake,
-    Evilland,
-    DarkRunner,
-    DarkTransfer,
-    Epiclesis,
-    Earthstrain,
-    Manhole,
-    Dimensiondoor,
-    Chaospanic,
-    Maelstrom,
-    Bloodylust,
-    Feintbomb,
-    Magentatrap,
-    Cobalttrap,
-    Maizetrap,
-    Verduretrap,
-    Firingtrap,
-    Iceboundtrap,
-    Electricshocker,
-    Clusterbomb,
-    Reverberation,
-    SevereRainstorm,
-    Firewalk,
-    Electricwalk,
-    Netherworld,
-    PsychicWave,
-    CloudKill,
-    Poisonsmoke,
-    Neutralbarrier,
-    Stealthfield,
-    Warmer,
-    ThornsTrap,
-    Wallofthorn,
-    DemonicFire,
-    FireExpansionSmokePowder,
-    FireExpansionTearGas,
-    HellsPlant,
-    VacuumExtreme,
-    Banding,
-    FireMantle,
-    WaterBarrier,
-    Zephyr,
-    PowerOfGaia,
-    FireInsignia,
-    WaterInsignia,
-    WindInsignia,
-    EarthInsignia,
-    PoisonMist,
-    LavaSlide,
-    VolcanicAsh,
-    ZenkaiWater,
-    ZenkaiLand,
-    ZenkaiFire,
-    ZenkaiWind,
-    Makibishi,
-    Venomfog,
-    Icemine,
-    Flamecross,
-    Hellburning,
-    MagmaEruption,
-    KingsGrace,
-    GlitteringGreed,
-    BTrap,
-    FireRain,
-    Catnippowder,
-    Nyanggrass,
-    Creatingstar,
-    Dummy0,
-    RainOfCrystal,
-    MysteryIllusion,
-    #[numeric_value(269)]
-    StrantumTremor,
-    ViolentQuake,
-    AllBloom,
-    TornadoStorm,
-    FloralFlareRoad,
-    AstralStrike,
-    CrossRain,
-    PneumaticusProcella,
-    AbyssSquare,
-    AcidifiedZoneWater,
-    AcidifiedZoneGround,
-    AcidifiedZoneWind,
-    AcidifiedZoneFire,
-    LightningLand,
-    VenomSwamp,
-    Conflagration,
-    CaneOfEvilEye,
-    TwinklingGalaxy,
-    StarCannon,
-    GrenadesDropping,
-    #[numeric_value(290)]
-    Fuumashouaku,
-    MissionBombard,
-    TotemOfTutelary,
-    HyunRoksBreeze,
-    Shinkirou, // mirage
-    JackFrostNova,
-    GroundGravitation,
-    #[numeric_value(298)]
-    Kunaiwaikyoku,
-    #[numeric_value(20852)]
-    Deepblindtrap,
-    Solidtrap,
-    Swifttrap,
-    Flametrap,
-    #[numeric_value(0xC1)]
-    GdLeadership,
-    #[numeric_value(0xC2)]
-    GdGlorywounds,
-    #[numeric_value(0xC3)]
-    GdSoulcold,
-    #[numeric_value(0xC4)]
-    GdHawkeyes,
-    #[numeric_value(0x190)]
-    Max,
+pub struct UnitId(pub u32);
+
+#[allow(non_upper_case_globals)]
+impl UnitId {
+    pub const AbyssSquare: Self = Self(277);
+    pub const AcidifiedZoneFire: Self = Self(281);
+    pub const AcidifiedZoneGround: Self = Self(279);
+    pub const AcidifiedZoneWater: Self = Self(278);
+    pub const AcidifiedZoneWind: Self = Self(280);
+    pub const AllBloom: Self = Self(271);
+    pub const Anklesnare: Self = Self(145);
+    pub const Appleidun: Self = Self(170);
+    pub const Assassincross: Self = Self(168);
+    pub const AstralStrike: Self = Self(274);
+    pub const BTrap: Self = Self(260);
+    pub const Banding: Self = Self(236);
+    pub const Basilica: Self = Self(180);
+    pub const Benedictio: Self = Self(130);
+    pub const Blastmine: Self = Self(143);
+    pub const Bloodylust: Self = Self(208);
+    pub const Callfamily: Self = Self(178);
+    pub const CaneOfEvilEye: Self = Self(285);
+    pub const Catnippowder: Self = Self(262);
+    pub const Chaospanic: Self = Self(206);
+    pub const Claymoretrap: Self = Self(152);
+    pub const CloudKill: Self = Self(224);
+    pub const Clusterbomb: Self = Self(217);
+    pub const Cobalttrap: Self = Self(211);
+    pub const Conflagration: Self = Self(284);
+    pub const Creatingstar: Self = Self(265);
+    pub const CrossRain: Self = Self(275);
+    pub const DarkRunner: Self = Self(200);
+    pub const DarkTransfer: Self = Self(201);
+    pub const Deathwave: Self = Self(195);
+    pub const Deepblindtrap: Self = Self(20852);
+    pub const Deluge: Self = Self(155);
+    pub const DemonicFire: Self = Self(231);
+    pub const Demonstration: Self = Self(177);
+    pub const Dimensiondoor: Self = Self(205);
+    pub const Dissonance: Self = Self(166);
+    pub const Dontforgetme: Self = Self(173);
+    pub const Drumbattlefield: Self = Self(161);
+    pub const Dummyskill: Self = Self(134);
+    pub const EarthInsignia: Self = Self(244);
+    pub const Earthquake: Self = Self(198);
+    pub const Earthstrain: Self = Self(203);
+    pub const Electricshocker: Self = Self(216);
+    pub const Electricwalk: Self = Self(221);
+    pub const Epiclesis: Self = Self(202);
+    pub const Eternalchaos: Self = Self(160);
+    pub const Evilland: Self = Self(199);
+    pub const Feintbomb: Self = Self(209);
+    pub const FireExpansionSmokePowder: Self = Self(232);
+    pub const FireExpansionTearGas: Self = Self(233);
+    pub const FireInsignia: Self = Self(241);
+    pub const FireMantle: Self = Self(237);
+    pub const FireRain: Self = Self(261);
+    pub const FirepillarActive: Self = Self(136);
+    pub const FirepillarWaiting: Self = Self(135);
+    pub const Firewalk: Self = Self(220);
+    pub const Firewall: Self = Self(127);
+    pub const Firingtrap: Self = Self(214);
+    pub const Flamecross: Self = Self(255);
+    pub const Flametrap: Self = Self(20855);
+    pub const Flasher: Self = Self(150);
+    pub const FloralFlareRoad: Self = Self(273);
+    pub const Fogwall: Self = Self(182);
+    pub const Fortunekiss: Self = Self(174);
+    pub const Freezingtrap: Self = Self(151);
+    pub const Fuumashouaku: Self = Self(290);
+    pub const GdGlorywounds: Self = Self(194);
+    pub const GdHawkeyes: Self = Self(196);
+    pub const GdLeadership: Self = Self(193);
+    pub const GdSoulcold: Self = Self(195);
+    pub const GlitteringGreed: Self = Self(259);
+    pub const Gospel: Self = Self(179);
+    pub const Graffiti: Self = Self(176);
+    pub const Gravitation: Self = Self(184);
+    pub const GrenadesDropping: Self = Self(288);
+    pub const GroundGravitation: Self = Self(296);
+    pub const GrounddriftDark: Self = Self(191);
+    pub const GrounddriftFire: Self = Self(194);
+    pub const GrounddriftNeutral: Self = Self(264);
+    pub const GrounddriftPoison: Self = Self(192);
+    pub const GrounddriftWater: Self = Self(193);
+    pub const GrounddriftWind: Self = Self(190);
+    pub const Hellburning: Self = Self(256);
+    pub const HellsPlant: Self = Self(234);
+    pub const Hermode: Self = Self(185);
+    pub const HiddenTrap: Self = Self(137);
+    pub const HiddenWarpNpc: Self = Self(139);
+    pub const Humming: Self = Self(172);
+    pub const HyunRoksBreeze: Self = Self(293);
+    pub const Iceboundtrap: Self = Self(215);
+    pub const Icemine: Self = Self(254);
+    pub const Icewall: Self = Self(141);
+    pub const Intoabyss: Self = Self(164);
+    pub const JackFrostNova: Self = Self(295);
+    pub const Kaen: Self = Self(189);
+    pub const Kaensin: Self = Self(186);
+    pub const KingsGrace: Self = Self(258);
+    pub const Kunaiwaikyoku: Self = Self(298);
+    pub const Landmine: Self = Self(147);
+    pub const Landprotector: Self = Self(157);
+    pub const LavaSlide: Self = Self(246);
+    pub const LightningLand: Self = Self(282);
+    pub const Lullaby: Self = Self(158);
+    pub const Maelstrom: Self = Self(207);
+    pub const Magentatrap: Self = Self(210);
+    pub const MagmaEruption: Self = Self(257);
+    pub const Magnus: Self = Self(132);
+    pub const Maizetrap: Self = Self(212);
+    pub const Makibishi: Self = Self(252);
+    pub const Manhole: Self = Self(204);
+    pub const Max: Self = Self(400);
+    pub const MissionBombard: Self = Self(291);
+    pub const Moonlit: Self = Self(181);
+    pub const MysteryIllusion: Self = Self(267);
+    pub const Netherworld: Self = Self(222);
+    pub const Neutralbarrier: Self = Self(226);
+    pub const Nyanggrass: Self = Self(263);
+    pub const Pneuma: Self = Self(133);
+    pub const PneumaticusProcella: Self = Self(276);
+    pub const Poembragi: Self = Self(169);
+    pub const PoisonMist: Self = Self(245);
+    pub const Poisonsmoke: Self = Self(225);
+    pub const PowerOfGaia: Self = Self(240);
+    pub const PsychicWave: Self = Self(223);
+    pub const Quagmire: Self = Self(142);
+    pub const RainOfCrystal: Self = Self(266);
+    pub const Reverberation: Self = Self(218);
+    pub const Richmankim: Self = Self(159);
+    pub const Ringnibelungen: Self = Self(162);
+    pub const Rokisweil: Self = Self(163);
+    pub const Safetywall: Self = Self(126);
+    pub const Sanctuary: Self = Self(131);
+    pub const Sandman: Self = Self(149);
+    pub const SeedTrap: Self = Self(268);
+    pub const Serviceforyou: Self = Self(175);
+    pub const SevereRainstorm: Self = Self(219);
+    pub const Shinkirou: Self = Self(294);
+    pub const Shockwave: Self = Self(148);
+    pub const Siegfried: Self = Self(165);
+    pub const Skidtrap: Self = Self(144);
+    pub const Solidtrap: Self = Self(20853);
+    pub const Spiderweb: Self = Self(183);
+    pub const StarCannon: Self = Self(287);
+    pub const Stealthfield: Self = Self(227);
+    pub const StrantumTremor: Self = Self(269);
+    pub const Suiton: Self = Self(187);
+    pub const Swifttrap: Self = Self(20854);
+    pub const Talkiebox: Self = Self(153);
+    pub const Tatamigaeshi: Self = Self(188);
+    pub const ThornsTrap: Self = Self(229);
+    pub const TornadoStorm: Self = Self(272);
+    pub const TotemOfTutelary: Self = Self(292);
+    pub const Trap: Self = Self(138);
+    pub const TwinklingGalaxy: Self = Self(286);
+    pub const Uglydance: Self = Self(171);
+    pub const UsedTraps: Self = Self(140);
+    pub const VacuumExtreme: Self = Self(235);
+    pub const VenomSwamp: Self = Self(283);
+    pub const Venomdust: Self = Self(146);
+    pub const Venomfog: Self = Self(253);
+    pub const Verduretrap: Self = Self(213);
+    pub const ViolentQuake: Self = Self(270);
+    pub const Violentgale: Self = Self(156);
+    pub const VolcanicAsh: Self = Self(247);
+    pub const Volcano: Self = Self(154);
+    pub const Wallofthorn: Self = Self(230);
+    pub const Warmer: Self = Self(228);
+    pub const WarpActive: Self = Self(129);
+    pub const WarpWaiting: Self = Self(128);
+    pub const WaterBarrier: Self = Self(238);
+    pub const WaterInsignia: Self = Self(242);
+    pub const Waterattack: Self = Self(196);
+    pub const Whistle: Self = Self(167);
+    pub const WindInsignia: Self = Self(243);
+    pub const Windattack: Self = Self(197);
+    pub const ZenkaiFire: Self = Self(250);
+    pub const ZenkaiLand: Self = Self(249);
+    pub const ZenkaiWater: Self = Self(248);
+    pub const ZenkaiWind: Self = Self(251);
+    pub const Zephyr: Self = Self(239);
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
@@ -4120,6 +4324,43 @@ pub struct NotifyGroundSkillPacket {
     pub level: SkillLevel,
     pub position: TilePosition,
     pub start_time: ClientTick,
+}
+
+#[cfg(test)]
+mod skill_unit_packet_tests {
+    use super::*;
+
+    #[test]
+    fn unknown_skill_unit_id_round_trips_without_decode_failure() {
+        let expected = [
+            0xCA, 0x09, // header
+            0x17, 0x00, // packet length
+            0x08, 0x07, 0x06, 0x05, // unit entity
+            0x04, 0x03, 0x02, 0x01, // creator
+            0x12, 0x11, // x
+            0x14, 0x13, // y
+            0xEF, 0xBE, 0xAD, 0xDE, // unknown/new unit id
+            0x09, // range
+            0x01, // visible
+            0x07, // skill level
+        ];
+
+        let mut reader = ByteReader::without_metadata(&expected);
+        let decoded = NotifySkillUnitPacket::packet_from_bytes(&mut reader).unwrap();
+        assert_eq!(decoded.lenght, expected.len() as u16);
+        assert_eq!(decoded.entity_id, EntityId(0x0506_0708));
+        assert_eq!(decoded.creator_id, EntityId(0x0102_0304));
+        assert_eq!(decoded.position, TilePosition { x: 0x1112, y: 0x1314 });
+        assert_eq!(decoded.unit_id, UnitId(0xDEAD_BEEF));
+        assert_eq!(decoded.range, 9);
+        assert_eq!(decoded.visible, 1);
+        assert_eq!(decoded.skill_level, 7);
+        assert_eq!(reader.remaining_bytes(), []);
+
+        let mut writer = ByteWriter::new();
+        assert_eq!(decoded.packet_to_bytes(&mut writer).unwrap(), expected.len());
+        assert_eq!(writer.as_slice(), expected);
+    }
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]

@@ -10,7 +10,7 @@ use rust_state::{Path, State};
 
 use super::{SkillTreeWindowState, SkillTreeWindowStatePathExt};
 use crate::graphics::{Color, ShadowPadding};
-use crate::input::{InputEvent, MouseInputMode};
+use crate::input::{InputEvent, MouseInputMode, SkillActivation};
 use crate::interface::resource::SkillSource;
 use crate::loaders::OverflowBehavior;
 use crate::renderer::LayoutExt;
@@ -92,10 +92,8 @@ where
         } else {
             let learned_skill = state.try_get(&self.learned_skill_path);
 
-            if learned_skill.is_some_and(|skill| !skill.upgradable) {
-                return;
-            }
-
+            // Maxed skills can no longer be upgraded, but they must remain draggable
+            // and castable.
             if let Some(cast_level) = state
                 .get(&self.window_state_path.chosen_skill_level())
                 .get(&learnable_skill.skill_id)
@@ -196,11 +194,48 @@ where
     }
 }
 
+/// Double-clicking a learned skill casts it at the level selected in the tree.
+struct SkillSlotCastHandler<A, B, C> {
+    learnable_skill_path: A,
+    learned_skill_path: B,
+    window_state_path: C,
+}
+
+impl<A, B, C> ClickHandler<ClientState> for SkillSlotCastHandler<A, B, C>
+where
+    A: Path<ClientState, LearnableSkill, false>,
+    B: Path<ClientState, LearnedSkill, false>,
+    C: Path<ClientState, SkillTreeWindowState>,
+{
+    fn handle_click(&self, state: &State<ClientState>, queue: &mut EventQueue<ClientState>) {
+        let (Some(learnable_skill), Some(learned_skill)) = (
+            state.try_get(&self.learnable_skill_path),
+            state.try_get(&self.learned_skill_path),
+        ) else {
+            return;
+        };
+
+        let skill_level = state
+            .get(&self.window_state_path.chosen_skill_level())
+            .get(&learnable_skill.skill_id)
+            .copied()
+            .unwrap_or(learned_skill.skill_level);
+
+        queue.queue(InputEvent::CastLearnedSkill {
+            skill_id: learnable_skill.skill_id,
+            skill_level,
+            skill_type: learned_skill.skill_type,
+            activation: SkillActivation::Toggle,
+        });
+    }
+}
+
 pub struct SkillSlot<A, B, C> {
     learnable_skill_path: A,
     learned_skill_path: B,
     window_state_path: C,
     click_handler: SkillSlotClickHandler<A, B, C>,
+    cast_handler: SkillSlotCastHandler<A, B, C>,
     choose_lower_handler: ChooseLowerClickHandler<B, C>,
     choose_higher_handler: ChooseHigherClickHandler<B, C>,
     level_display: LevelDisplay,
@@ -218,6 +253,11 @@ where
             learned_skill_path,
             window_state_path,
             click_handler: SkillSlotClickHandler::new(learnable_skill_path, learned_skill_path, window_state_path, source),
+            cast_handler: SkillSlotCastHandler {
+                learnable_skill_path,
+                learned_skill_path,
+                window_state_path,
+            },
             choose_lower_handler: ChooseLowerClickHandler::new(learned_skill_path, window_state_path),
             choose_higher_handler: ChooseHigherClickHandler::new(learned_skill_path, window_state_path),
             level_display: LevelDisplay::default(),
@@ -450,6 +490,10 @@ where
 
             if is_hovered {
                 layout.register_click_handler(MouseButton::Left, &self.click_handler);
+
+                if learned_skill.is_some() && !*state.get(&self.window_state_path.currently_skilling()) {
+                    layout.register_click_handler(MouseButton::DoubleLeft, &self.cast_handler);
+                }
 
                 struct SkillSlotTooltip;
                 layout.add_tooltip(&skill.skill_name, SkillSlotTooltip.tooltip_id());

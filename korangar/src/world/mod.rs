@@ -12,6 +12,7 @@ mod model;
 mod object;
 mod particles;
 mod pathing;
+mod skill_visual;
 mod sound;
 mod video;
 
@@ -31,6 +32,7 @@ pub use self::model::*;
 pub use self::object::*;
 pub use self::particles::*;
 pub use self::pathing::*;
+pub use self::skill_visual::*;
 pub use self::sound::*;
 pub use self::video::*;
 use crate::graphics::Texture;

@@ -65,7 +65,7 @@ struct BackgroundMusicTrack {
 
 enum QueuedSoundEffectType {
     Sound,
-    SpatialSound { position: Point3<f32>, range: f32 },
+    SpatialSound { position: Point3<f32>, range: f32, volume: f32 },
     AmbientSound { ambient_key: AmbientKey },
 }
 
@@ -234,8 +234,20 @@ impl<F: FileLoader> AudioEngine<F> {
     pub fn load(&self, path: &str) -> SoundEffectKey {
         let mut context = self.engine_context.lock().unwrap();
 
-        if let Some(sound_effect_key) = context.lookup.get(path) {
-            return *sound_effect_key;
+        if let Some(sound_effect_key) = context.lookup.get(path).copied() {
+            let should_load = context.cache.get(&sound_effect_key).is_none() && !context.loading_sound_effect.contains(&sound_effect_key);
+
+            if should_load {
+                context.loading_sound_effect.insert(sound_effect_key);
+                spawn_async_load(
+                    context.game_file_loader.clone(),
+                    context.async_response_sender.clone(),
+                    path.to_string(),
+                    sound_effect_key,
+                );
+            }
+
+            return sound_effect_key;
         }
 
         let sound_effect_key = context.sound_effect_paths.insert(path.to_string()).expect("mapping slab is full");
@@ -298,10 +310,30 @@ impl<F: FileLoader> AudioEngine<F> {
     /// Plays a spatial sound effect, which will get removed automatically once
     /// it finishes playing.
     pub fn play_spatial_sound_effect(&self, sound_effect_key: SoundEffectKey, position: Point3<f32>, range: f32) {
+        self.play_spatial_sound_effect_with_volume(sound_effect_key, position, range, 1.0);
+    }
+
+    /// Like [`play_spatial_sound_effect`](Self::play_spatial_sound_effect)
+    /// with a linear volume factor applied on top of the distance
+    /// attenuation, for sounds that should sit under the mix even up close.
+    pub fn play_spatial_sound_effect_with_volume(&self, sound_effect_key: SoundEffectKey, position: Point3<f32>, range: f32, volume: f32) {
         self.engine_context
             .lock()
             .unwrap()
-            .play_spatial_sound_effect(sound_effect_key, position, range);
+            .play_spatial_sound_effect(sound_effect_key, position, range, volume);
+    }
+
+    /// Attempts to play a spatial sound without queueing it on a cache miss.
+    ///
+    /// Returns `true` once cached audio playback was attempted and `false` when
+    /// the sound is still loading. This lets callers preserve their own timing
+    /// instead of collapsing several queued requests into one frame.
+    #[must_use]
+    pub fn try_play_spatial_sound_effect(&self, sound_effect_key: SoundEffectKey, position: Point3<f32>, range: f32) -> bool {
+        self.engine_context
+            .lock()
+            .unwrap()
+            .try_play_spatial_sound_effect(sound_effect_key, position, range)
     }
 
     /// Sets the listener of the spatial sound. This is normally the camera's
@@ -338,6 +370,14 @@ impl<F: FileLoader> AudioEngine<F> {
     /// Removes all ambient-sound tracks.
     pub fn clear_ambient_sound(&self) {
         self.engine_context.lock().unwrap().clear_ambient_sound()
+    }
+
+    /// Removes sound effects that are waiting for asynchronous data loading.
+    ///
+    /// This is used when leaving a world so a delayed sound cannot start in
+    /// the next map with stale spatial coordinates.
+    pub fn clear_queued_sound_effects(&self) {
+        self.engine_context.lock().unwrap().clear_queued_sound_effects()
     }
 
     /// Re-creates the spatial world with the ambient sounds.
@@ -423,46 +463,64 @@ impl<F: FileLoader> EngineContext<F> {
         }
     }
 
-    fn play_spatial_sound_effect(&mut self, sound_effect_key: SoundEffectKey, position: Point3<f32>, range: f32) {
-        match self
+    fn play_spatial_sound_effect(&mut self, sound_effect_key: SoundEffectKey, position: Point3<f32>, range: f32, volume: f32) {
+        if self.try_play_spatial_sound_effect_with_volume(sound_effect_key, position, range, volume) {
+            return;
+        }
+
+        queue_sound_effect_playback(
+            self.game_file_loader.clone(),
+            self.async_response_sender.clone(),
+            &self.sound_effect_paths,
+            &mut self.queued_sound_effect,
+            &mut self.loading_sound_effect,
+            sound_effect_key,
+            QueuedSoundEffectType::SpatialSound { position, range, volume },
+        );
+    }
+
+    fn try_play_spatial_sound_effect(&mut self, sound_effect_key: SoundEffectKey, position: Point3<f32>, range: f32) -> bool {
+        self.try_play_spatial_sound_effect_with_volume(sound_effect_key, position, range, 1.0)
+    }
+
+    fn try_play_spatial_sound_effect_with_volume(
+        &mut self,
+        sound_effect_key: SoundEffectKey,
+        position: Point3<f32>,
+        range: f32,
+        volume: f32,
+    ) -> bool {
+        let Some(data) = self
             .cache
             .get(&sound_effect_key)
             .map(|cached_sound_effect| cached_sound_effect.0.clone())
-        {
-            Some(data) => {
-                let spatial_track = SpatialTrackBuilder::new()
-                    .persist_until_sounds_finish(true)
-                    .distances(SpatialTrackDistances {
-                        min_distance: 5.0,
-                        max_distance: range,
-                    })
-                    .use_linear_attenuation_function(true);
+        else {
+            return false;
+        };
 
-                match self.spatial_sound_effect_track.add_spatial_sub_track(position, spatial_track) {
-                    Ok(mut spatial_track_handle) => {
-                        if let Err(_error) = spatial_track_handle.play(data) {
-                            #[cfg(feature = "debug")]
-                            print_debug!("[{}] can't play sound effect: {:?}", "error".red(), _error);
-                        }
-                    }
-                    Err(_error) => {
-                        #[cfg(feature = "debug")]
-                        print_debug!("[{}] can't add spatial sound track: {:?}", "error".red(), _error);
-                    }
-                };
+        let spatial_track = SpatialTrackBuilder::new()
+            .persist_until_sounds_finish(true)
+            .distances(SpatialTrackDistances {
+                min_distance: 5.0,
+                max_distance: range,
+            })
+            .use_linear_attenuation_function(true)
+            .volume(Decibels::from_amplitude(volume));
+
+        match self.spatial_sound_effect_track.add_spatial_sub_track(position, spatial_track) {
+            Ok(mut spatial_track_handle) => {
+                if let Err(_error) = spatial_track_handle.play(data) {
+                    #[cfg(feature = "debug")]
+                    print_debug!("[{}] can't play sound effect: {:?}", "error".red(), _error);
+                }
             }
-            None => {
-                queue_sound_effect_playback(
-                    self.game_file_loader.clone(),
-                    self.async_response_sender.clone(),
-                    &self.sound_effect_paths,
-                    &mut self.queued_sound_effect,
-                    &mut self.loading_sound_effect,
-                    sound_effect_key,
-                    QueuedSoundEffectType::SpatialSound { position, range },
-                );
+            Err(_error) => {
+                #[cfg(feature = "debug")]
+                print_debug!("[{}] can't add spatial sound track: {:?}", "error".red(), _error);
             }
-        }
+        };
+
+        true
     }
 
     fn set_spatial_listener(&mut self, position: Point3<f32>, view_direction: Vector3<f32>, look_up: Vector3<f32>) {
@@ -606,6 +664,10 @@ impl<F: FileLoader> EngineContext<F> {
         self.object_kdtree = KDTree::empty();
     }
 
+    fn clear_queued_sound_effects(&mut self) {
+        self.queued_sound_effect.clear();
+    }
+
     fn prepare_ambient_sound_world(&mut self) {
         let objects: Vec<(AmbientKey, Sphere)> = self.ambient_sound.iter().map(|(key, object)| (key, object.bounds)).collect();
 
@@ -673,7 +735,7 @@ impl<F: FileLoader> EngineContext<F> {
         let now = Instant::now();
 
         self.queued_sound_effect.retain(|queued| {
-            if queued.queued_time.duration_since(now).as_secs_f32() > MAX_QUEUE_TIME_SECONDS {
+            if queued_sound_expired(queued.queued_time, now) {
                 // We waited too long.
                 return false;
             }
@@ -694,14 +756,15 @@ impl<F: FileLoader> EngineContext<F> {
                         print_debug!("[{}] can't play sound effect: {:?}", "error".red(), _error);
                     }
                 }
-                QueuedSoundEffectType::SpatialSound { position, range } => {
+                QueuedSoundEffectType::SpatialSound { position, range, volume } => {
                     let spatial_track = SpatialTrackBuilder::new()
                         .persist_until_sounds_finish(true)
                         .distances(SpatialTrackDistances {
                             min_distance: 5.0,
                             max_distance: range,
                         })
-                        .use_linear_attenuation_function(true);
+                        .use_linear_attenuation_function(true)
+                        .volume(Decibels::from_amplitude(volume));
 
                     match self.spatial_sound_effect_track.add_spatial_sub_track(position, spatial_track) {
                         Ok(mut spatial_track_handle) => {
@@ -799,6 +862,10 @@ impl<F: FileLoader> EngineContext<F> {
             handle,
         });
     }
+}
+
+fn queued_sound_expired(queued_time: Instant, now: Instant) -> bool {
+    now.duration_since(queued_time).as_secs_f32() > MAX_QUEUE_TIME_SECONDS
 }
 
 fn queue_sound_effect_playback(
@@ -952,7 +1019,9 @@ fn linear_to_decibel(linear: f32) -> Decibels {
 
 #[cfg(test)]
 mod tests {
-    use crate::difference;
+    use std::time::{Duration, Instant};
+
+    use crate::{difference, queued_sound_expired};
 
     #[test]
     fn test_difference() {
@@ -996,5 +1065,13 @@ mod tests {
         difference(&mut vector_1, &mut vector_2, &mut result);
 
         assert!(result.is_empty());
+    }
+
+    #[test]
+    fn queued_sounds_expire_after_the_maximum_wait() {
+        let now = Instant::now();
+
+        assert!(!queued_sound_expired(now, now));
+        assert!(queued_sound_expired(now - Duration::from_secs(2), now));
     }
 }

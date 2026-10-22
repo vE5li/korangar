@@ -92,7 +92,10 @@ where
         } else {
             let learned_skill = state.try_get(&self.learned_skill_path);
 
-            if learned_skill.is_some_and(|skill| !skill.upgradable) {
+            // Only skills the player has actually learned can be picked up.
+            // Whether the skill can still be upgraded is irrelevant here: a
+            // skill at its maximum level must still be usable from the hotbar.
+            if learned_skill.is_none_or(|skill| skill.skill_level.0 == 0) {
                 return;
             }
 

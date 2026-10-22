@@ -1,0 +1,12 @@
+[package]
+name = "korangar-testing"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+korangar = { path = "../korangar" }
+korangar-networking = { workspace = true }
+ragnarok-packets = { workspace = true }
+rust-state = { workspace = true }
+winit = { workspace = true }

@@ -300,6 +300,7 @@ impl ServerType {
 #[derive(Debug, Clone, Copy, Deserialize, StateElement)]
 pub enum PacketVersion {
     _20220406,
+    // TODO: Adjust this in the other PR.
     Unsupported(u64),
 }
 

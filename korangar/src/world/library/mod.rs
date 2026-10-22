@@ -87,9 +87,9 @@ impl LuaExt for Lua {
         let state = Lua::new();
 
         for file in files {
-            let data = game_file_loader
-                .get(file)
-                .unwrap_or_else(|_| panic!("failed to open lua file {}", file));
+            let Ok(data) = game_file_loader.get(file) else {
+                continue;
+            };
 
             state.load(&data).exec()?;
         }

@@ -21,6 +21,7 @@ use crate::loaders::GameFileLoader;
 pub enum Language {
     English,
     German,
+    Thai,
 }
 
 impl Language {
@@ -29,6 +30,7 @@ impl Language {
         match self {
             Self::English => "en-US",
             Self::German => "de-DE",
+            Self::Thai => "th-TH",
         }
     }
 }
@@ -38,6 +40,7 @@ impl DropDownItem<Language> for Language {
         match self {
             Self::English => "English",
             Self::German => "Deutsch",
+            Self::Thai => "ภาษาไทย",
         }
     }
 
@@ -256,13 +259,13 @@ mod languages {
     #[test]
     fn language_files_are_valid() {
         // Please extend this when adding a language.
-        let languages = [Language::English, Language::German];
+        let languages = [Language::English, Language::German, Language::Thai];
 
         for language in languages {
             // Used match here so the test fails if somebody forgets to adjust the test
             // after adding a language.
             match language {
-                Language::English | Language::German => {
+                Language::English | Language::German | Language::Thai => {
                     let locale_code = language.to_locale_code();
                     let file_name = format!("archive/data/languages/{locale_code}.ron");
                     let file_content = std::fs::read_to_string(file_name).expect("language file should exist");

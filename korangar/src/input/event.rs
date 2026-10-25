@@ -5,8 +5,8 @@ use korangar_debug::profiling::FrameMeasurement;
 use korangar_interface::event::{ClickHandler, Event, EventQueue};
 use korangar_networking::{InventoryItem, ShopItem};
 use ragnarok_packets::{
-    AccountId, BuyOrSellOption, CharacterId, CharacterServerInformation, EntityId, HotbarSlot, ShopId, SkillId, SoldItemInformation,
-    StatUpType, TilePosition,
+    AccountId, BuyOrSellOption, CharacterId, CharacterServerInformation, EntityId, HotbarSlot, PartyId, ShopId, SkillId,
+    SoldItemInformation, StatUpType, TilePosition,
 };
 use rust_state::State;
 
@@ -75,6 +75,8 @@ pub enum InputEvent {
     ToggleAudioSettingsWindow,
     /// Open or close the friend list window. Only works while playing.
     ToggleFriendListWindow,
+    /// Open or close the party window. Only works while playing.
+    TogglePartyWindow,
     /// Close the most recently opened or clicked closable window.
     CloseTopWindow,
     /// Toggle if the user interface should be rendered or not.
@@ -204,6 +206,35 @@ pub enum InputEvent {
         account_id: AccountId,
         /// Character id of the requestor.
         character_id: CharacterId,
+    },
+    /// Create a new party.
+    CreateParty {
+        /// Name of the party to create.
+        party_name: String,
+    },
+    /// Invite a player to the current party.
+    InvitePlayerToParty {
+        /// Name of the character to invite.
+        player_name: String,
+    },
+    /// Reject a pending party invitation.
+    RejectPartyInvite {
+        /// Id of the inviting party.
+        party_id: PartyId,
+    },
+    /// Accept a pending party invitation.
+    AcceptPartyInvite {
+        /// Id of the inviting party.
+        party_id: PartyId,
+    },
+    /// Leave the current party.
+    LeaveParty,
+    /// Expel a member from the current party. Only works as party leader.
+    ExpelPartyMember {
+        /// Account id of the member to expel.
+        account_id: AccountId,
+        /// Name of the member to expel.
+        player_name: String,
     },
     /// Buy items from a shop.
     BuyItems {

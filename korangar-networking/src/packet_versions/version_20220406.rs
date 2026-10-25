@@ -784,7 +784,38 @@ where
         },
     })?;
     packet_handler.register_noop::<UseSkillSuccessPacket>()?;
-    packet_handler.register_noop::<ToUseSkillSuccessPacket>()?;
+    packet_handler.register(|packet: ToUseSkillSuccessPacket| {
+        // The server reports skill use failures through this packet. A flag of
+        // zero means the skill failed. The causes match rAthena's
+        // `useskill_fail_cause` enum.
+        const NOVICE_BASIC_SKILL: SkillId = SkillId(1);
+
+        if packet.flag != 0 {
+            return None;
+        }
+
+        let text = match packet.cause {
+            0 if packet.skill_id == NOVICE_BASIC_SKILL => format!("You need Basic Skill level {} to do that.", packet.btype),
+            0 => "Your skill level is too low.".to_owned(),
+            1 => "Not enough SP.".to_owned(),
+            2 => "Not enough HP.".to_owned(),
+            3 => "You are missing a required item.".to_owned(),
+            4 => "The skill is still on cooldown.".to_owned(),
+            5 => "Not enough Zeny.".to_owned(),
+            6 => "This skill cannot be used with your current weapon.".to_owned(),
+            7 => "You need a Red Gemstone.".to_owned(),
+            8 => "You need a Blue Gemstone.".to_owned(),
+            9 => "You are carrying too much weight.".to_owned(),
+            11 => "This skill cannot reach the target.".to_owned(),
+            23 => "The skill conditions are not met.".to_owned(),
+            _ => "The skill failed.".to_owned(),
+        };
+
+        Some(NetworkEvent::ChatMessage {
+            text,
+            color: MessageColor::Error,
+        })
+    })?;
     packet_handler.register(|packet: NotifySkillUnitPacket| {
         let NotifySkillUnitPacket {
             entity_id,
@@ -834,7 +865,125 @@ where
         account_id: packet.account_id,
         character_id: packet.character_id,
     })?;
-    packet_handler.register_noop::<PartyInvitePacket>()?;
+    packet_handler.register(|packet: PartyInvitePacket| NetworkEvent::PartyInvite {
+        party_id: packet.party_id,
+        party_name: packet.party_name,
+    })?;
+    packet_handler.register(|packet: CreatePartyResultPacket| {
+        let text = match packet.result {
+            CreatePartyResult::Success => "Party created.".to_owned(),
+            CreatePartyResult::NameAlreadyExists => "A party with that name already exists.".to_owned(),
+            CreatePartyResult::AlreadyInParty => "You are already in a party.".to_owned(),
+            CreatePartyResult::NotAllowedOnMap => "You cannot create a party on this map.".to_owned(),
+        };
+
+        NetworkEvent::ChatMessage {
+            text,
+            color: MessageColor::Information,
+        }
+    })?;
+    packet_handler.register(|packet: PartyInviteResultPacket| {
+        let text = match packet.result {
+            PartyInviteResult::AlreadyInParty => format!("{} is already in a party.", packet.player_name),
+            PartyInviteResult::Rejected => format!("{} rejected your party invitation.", packet.player_name),
+            PartyInviteResult::Accepted => format!("{} accepted your party invitation.", packet.player_name),
+            PartyInviteResult::PartyFull => "Your party is full.".to_owned(),
+            PartyInviteResult::DuplicateMember => format!("{} is already in your party.", packet.player_name),
+            PartyInviteResult::JoinMessageRefused => format!("{} is blocking party invitations.", packet.player_name),
+            PartyInviteResult::UnknownError => "Party invitation failed.".to_owned(),
+            PartyInviteResult::UnknownCharacter => "That character is not online.".to_owned(),
+            PartyInviteResult::InvalidMapProperty | PartyInviteResult::InvalidMapPropertySelf => {
+                "Party invitations are not allowed on this map.".to_owned()
+            }
+            PartyInviteResult::MemorialDungeon => "Party invitations are not allowed in a Memorial Dungeon.".to_owned(),
+            PartyInviteResult::LevelMismatch => "Party invitation failed due to a level difference.".to_owned(),
+        };
+
+        NetworkEvent::ChatMessage {
+            text,
+            color: MessageColor::Information,
+        }
+    })?;
+    packet_handler.register(|packet: PartyMemberListPacket| NetworkEvent::SetPartyInfo {
+        party_name: packet.party_name,
+        members: packet.members,
+    })?;
+    packet_handler.register(|packet: PartyMemberAddedPacket| {
+        let PartyMemberAddedPacket {
+            account_id,
+            character_id,
+            leader,
+            job_id,
+            level,
+            offline,
+            party_name,
+            player_name,
+            map_name,
+            ..
+        } = packet;
+
+        NetworkEvent::PartyMemberAdded {
+            party_name,
+            member: PartyMember {
+                account_id,
+                character_id,
+                name: player_name,
+                map_name,
+                leader: leader.min(1) as u8,
+                offline,
+                job_id,
+                level,
+            },
+        }
+    })?;
+    packet_handler.register(|packet: PartyMemberLeftPacket| NetworkEvent::PartyMemberLeft {
+        account_id: packet.account_id,
+        player_name: packet.player_name,
+        reason: packet.reason,
+    })?;
+    packet_handler.register_noop::<UpdatePartyOptionsPacket>()?;
+    packet_handler.register(|packet: PartyMemberPositionPacket| {
+        // A coordinate of 65535 means the position is unavailable.
+        match packet.x == u16::MAX || packet.y == u16::MAX {
+            true => None,
+            false => Some(NetworkEvent::PartyMemberPosition {
+                account_id: packet.account_id,
+                x: packet.x,
+                y: packet.y,
+            }),
+        }
+    })?;
+    packet_handler.register(|packet: PartyMemberHealthPacket| NetworkEvent::PartyMemberHealth {
+        account_id: packet.account_id,
+        health_points: packet.health_points,
+        maximum_health_points: packet.maximum_health_points,
+    })?;
+    packet_handler.register(|packet: PartyMemberDeadPacket| match packet.is_dead != 0 {
+        true => Some(NetworkEvent::PartyMemberDead {
+            account_id: packet.account_id,
+        }),
+        false => None,
+    })?;
+    packet_handler.register(|packet: PartyMemberJobLevelPacket| NetworkEvent::PartyMemberJobLevel {
+        account_id: packet.account_id,
+        job_id: packet.job_id,
+        level: packet.level,
+    })?;
+    packet_handler.register_noop::<UseSkillAckPacket>()?;
+    packet_handler.register_noop::<NpcSpriteChangePacket>()?;
+    packet_handler.register(|packet: PartyLeaderChangedPacket| NetworkEvent::PartyLeaderChanged {
+        previous_leader: packet.previous_leader,
+        new_leader: packet.new_leader,
+    })?;
+    packet_handler.register(|packet: PartyChatMessagePacket| NetworkEvent::ChatMessage {
+        text: packet.message,
+        color: MessageColor::Rgb {
+            red: 220,
+            green: 200,
+            blue: 30,
+        },
+    })?;
+    packet_handler.register_noop::<PartyItemPickupPacket>()?;
     packet_handler.register_noop::<StatusChangeSequencePacket>()?;
     packet_handler.register_noop::<ReputationPacket>()?;
     packet_handler.register_noop::<ClanInfoPacket>()?;

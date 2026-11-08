@@ -93,7 +93,7 @@ use winit::application::ApplicationHandler;
 use winit::dpi::{LogicalSize, PhysicalSize};
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
-use winit::keyboard::PhysicalKey;
+use winit::keyboard::{ModifiersState, PhysicalKey};
 use winit::window::{Icon, Window, WindowId};
 
 use crate::graphics::*;
@@ -175,6 +175,7 @@ fn initialize_shutdown_signal() {
 pub struct Client {
     event_loop: Option<EventLoop<()>>,
     startup_error: Option<String>,
+    keyboard_modifiers: ModifiersState,
     game_file_loader: Arc<GameFileLoader>,
     action_loader: Arc<ActionLoader>,
     #[cfg(feature = "debug")]
@@ -697,6 +698,7 @@ impl Client {
         Some(Self {
             event_loop: Some(event_loop),
             startup_error: None,
+            keyboard_modifiers: ModifiersState::empty(),
             game_file_loader,
             action_loader,
             #[cfg(feature = "debug")]
@@ -3635,6 +3637,7 @@ impl ApplicationHandler for Client {
             WindowEvent::Focused(focused) => {
                 if !focused {
                     self.input_system.reset();
+                    self.keyboard_modifiers = ModifiersState::empty();
                 }
 
                 if *self.client_state.follow(client_state().audio_settings().mute_on_focus_loss()) {
@@ -3646,9 +3649,16 @@ impl ApplicationHandler for Client {
             WindowEvent::CursorMoved { position, .. } => self.input_system.update_mouse_position(position),
             WindowEvent::MouseInput { button, state, .. } => self.input_system.update_mouse_buttons(button, state),
             WindowEvent::MouseWheel { delta, .. } => self.input_system.update_mouse_wheel(delta),
+            WindowEvent::ModifiersChanged(modifiers) => self.keyboard_modifiers = modifiers.state(),
             WindowEvent::KeyboardInput { event, .. } => {
                 if let PhysicalKey::Code(keycode) = event.physical_key {
                     self.input_system.update_keyboard(keycode, event.state);
+                }
+
+                if event.state.is_pressed() && input::is_paste_shortcut(&event.logical_key, self.keyboard_modifiers) {
+                    self.input_system
+                        .paste_if_focused(self.interface.has_focus(), input::read_clipboard_text);
+                    return;
                 }
 
                 // TODO: NHA We should also support IME in the long term (winit::event::Ime)

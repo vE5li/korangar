@@ -414,10 +414,48 @@ where
             });
         } else if !character.is_control() {
             state.update_value_with(self.path, move |current_text| {
-                if current_text.len() < INPUT_LENGTH {
-                    current_text.push(character);
-                }
+                append_character(current_text, character, INPUT_LENGTH);
             });
         }
+    }
+}
+
+/// Both typed and pasted characters use the field's UTF-8 byte limit. Never
+/// split a character or allow the final multibyte character to exceed it.
+fn append_character(text: &mut String, character: char, byte_limit: usize) {
+    if text.len().saturating_add(character.len_utf8()) <= byte_limit {
+        text.push(character);
+    }
+}
+
+#[cfg(test)]
+mod input_limit_tests {
+    use super::append_character;
+
+    #[test]
+    fn insertion_appends_without_replacing_existing_text() {
+        let mut text = String::from("old");
+        for c in "🙂한".chars() {
+            append_character(&mut text, c, 10);
+        }
+        assert_eq!(text, "old🙂한");
+    }
+
+    #[test]
+    fn unicode_insertions_respect_exact_utf8_byte_boundary() {
+        let mut text = String::from("ab");
+        append_character(&mut text, '한', 4);
+        assert_eq!(text, "ab");
+        append_character(&mut text, 'é', 4);
+        assert_eq!(text, "abé");
+        append_character(&mut text, 'x', 4);
+        assert_eq!(text.len(), 4);
+    }
+
+    #[test]
+    fn already_full_or_oversized_fields_remain_unchanged() {
+        let mut text = String::from("synthetic");
+        append_character(&mut text, 'x', 0);
+        assert_eq!(text, "synthetic");
     }
 }

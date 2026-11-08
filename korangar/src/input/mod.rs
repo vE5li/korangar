@@ -1,3 +1,4 @@
+mod clipboard;
 mod event;
 mod key;
 mod mode;
@@ -11,6 +12,7 @@ use winit::dpi::PhysicalPosition;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta};
 use winit::keyboard::KeyCode;
 
+pub(crate) use self::clipboard::{is_paste_shortcut, read_clipboard_text};
 pub use self::event::InputEvent;
 pub use self::key::Key;
 pub use self::mode::{Grabbed, MouseInputMode, MouseModeExt};
@@ -124,6 +126,15 @@ impl InputSystem {
 
     pub fn buffer_character(&mut self, character: char) {
         self.input_buffer.push(character);
+    }
+
+    pub(crate) fn paste_if_focused(&mut self, focused: bool, read: impl FnOnce() -> Option<String>) {
+        if focused && let Some(text) = read() {
+            // Pasting must never synthesize Enter/Tab/Escape/Backspace actions.
+            // Bound queued characters even for unexpectedly large clipboards.
+            self.input_buffer
+                .extend(text.chars().filter(|character| !character.is_control()).take(4096));
+        }
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile("update input system"))]
@@ -371,5 +382,42 @@ impl InputSystem {
         }
 
         self.input_buffer.clear();
+    }
+}
+
+#[cfg(test)]
+mod clipboard_input_tests {
+    use super::*;
+
+    #[test]
+    fn paste_is_focus_gated_and_never_reads_clipboard_in_tests() {
+        let mut input = InputSystem::new(Arc::new(AtomicU64::new(0)));
+        input.paste_if_focused(false, || panic!("must not read without a text field"));
+        assert!(input.input_buffer.is_empty());
+        input.paste_if_focused(true, || Some("synthetic-한🙂".into()));
+        assert_eq!(input.input_buffer.iter().collect::<String>(), "synthetic-한🙂");
+    }
+
+    #[test]
+    fn pasted_controls_cannot_submit_focus_or_delete() {
+        let mut input = InputSystem::new(Arc::new(AtomicU64::new(0)));
+        input.paste_if_focused(true, || Some("a\r\n\t\x1b\x08\0b".into()));
+        assert_eq!(input.input_buffer, vec!['a', 'b']);
+    }
+
+    #[test]
+    fn empty_or_unavailable_clipboard_preserves_pending_typing() {
+        let mut input = InputSystem::new(Arc::new(AtomicU64::new(0)));
+        input.buffer_character('a');
+        input.paste_if_focused(true, || None);
+        input.paste_if_focused(true, || Some(String::new()));
+        assert_eq!(input.input_buffer, vec!['a']);
+    }
+
+    #[test]
+    fn pasted_input_is_bounded_in_unicode_characters() {
+        let mut input = InputSystem::new(Arc::new(AtomicU64::new(0)));
+        input.paste_if_focused(true, || Some("🙂".repeat(5000)));
+        assert_eq!(input.input_buffer.len(), 4096);
     }
 }

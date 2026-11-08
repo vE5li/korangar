@@ -47,6 +47,10 @@ pub trait PacketCallback: Clone + 'static {
         let _ = bytes;
     }
 
+    /// A recognized wire frame has no semantic handler. Only its opcode is
+    /// exposed.
+    fn unsupported_packet(&self, _opcode: u16) {}
+
     /// Called by the [`PacketHandler`] when a packet handler returned an error.
     fn failed_packet(&self, bytes: Vec<u8>, error: Box<ConversionError>) {
         let _ = (bytes, error);
@@ -67,6 +71,7 @@ pub type HandlerFunction<Output> = Box<dyn Fn(&mut ByteReader) -> ConversionResu
 pub struct PacketHandler<Output, Callback> {
     handlers: HashMap<PacketHeader, HandlerFunction<Output>>,
     packet_callback: Callback,
+    callbacks_enabled: bool,
 }
 
 impl<Output, Callback> Default for PacketHandler<Output, Callback>
@@ -77,6 +82,7 @@ where
         Self {
             handlers: Default::default(),
             packet_callback: Default::default(),
+            callbacks_enabled: true,
         }
     }
 }
@@ -91,7 +97,23 @@ where
         Self {
             handlers: Default::default(),
             packet_callback,
+            callbacks_enabled: true,
         }
+    }
+
+    /// Exclude authentication packets (including failures) from inspectors.
+    /// Call before registering handlers, because handlers capture this setting.
+    pub fn without_callbacks(mut self) -> Self {
+        self.callbacks_enabled = false;
+        self
+    }
+
+    pub fn has_handler(&self, header: PacketHeader) -> bool {
+        self.handlers.contains_key(&header)
+    }
+
+    pub fn report_unsupported(&self, header: PacketHeader) {
+        self.packet_callback.unsupported_packet(header.0);
     }
 
     /// Register a new packet handler.
@@ -101,12 +123,15 @@ where
         Return: Into<Output>,
     {
         let packet_callback = self.packet_callback.clone();
+        let callbacks_enabled = self.callbacks_enabled;
         let old_handler = self.handlers.insert(
             Packet::HEADER,
             Box::new(move |byte_reader| {
                 let packet = Packet::payload_from_bytes(byte_reader)?;
 
-                packet_callback.incoming_packet(&packet);
+                if callbacks_enabled {
+                    packet_callback.incoming_packet(&packet);
+                }
 
                 Ok(handler(packet).into())
             }),
@@ -126,12 +151,15 @@ where
         Packet: ragnarok_packets::Packet,
     {
         let packet_callback = self.packet_callback.clone();
+        let callbacks_enabled = self.callbacks_enabled;
         let old_handler = self.handlers.insert(
             Packet::HEADER,
             Box::new(move |byte_reader| {
                 let packet = Packet::payload_from_bytes(byte_reader)?;
 
-                packet_callback.incoming_packet(&packet);
+                if callbacks_enabled {
+                    packet_callback.incoming_packet(&packet);
+                }
 
                 Ok(Output::default())
             }),
@@ -158,7 +186,9 @@ where
         let Some(handler) = self.handlers.get(&header) else {
             byte_reader.restore_save_point(save_point);
 
-            self.packet_callback.unknown_packet(byte_reader.remaining_bytes());
+            if self.callbacks_enabled {
+                self.packet_callback.unknown_packet(byte_reader.remaining_bytes());
+            }
 
             return HandlerResult::UnhandledPacket;
         };
@@ -173,10 +203,53 @@ where
             Err(error) => {
                 byte_reader.restore_save_point(save_point);
 
-                self.packet_callback.failed_packet(byte_reader.remaining_bytes(), error.clone());
+                if self.callbacks_enabled {
+                    self.packet_callback.failed_packet(byte_reader.remaining_bytes(), error.clone());
+                }
 
                 HandlerResult::InternalError(error)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod security_tests {
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use ragnarok_bytes::ByteWriter;
+
+    use super::*;
+    use crate::{LoginServerLoginPacket, PacketExt};
+    #[derive(Clone, Default)]
+    struct Inspector(Arc<AtomicUsize>);
+    impl PacketCallback for Inspector {
+        fn incoming_packet<P: crate::Packet>(&self, _: &P) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+
+        fn unknown_packet(&self, _: Vec<u8>) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+
+        fn failed_packet(&self, _: Vec<u8>, _: Box<ConversionError>) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+    #[test]
+    fn authentication_payloads_never_reach_inspectors() {
+        let inspector = Inspector::default();
+        let mut handler = PacketHandler::<(), _>::with_callback(inspector.clone()).without_callbacks();
+        handler.register(|_: LoginServerLoginPacket| ()).unwrap();
+        let mut writer = ByteWriter::new();
+        LoginServerLoginPacket::new("synthetic".into(), "synthetic-only-password".into())
+            .packet_to_bytes(&mut writer)
+            .unwrap();
+        let mut reader = ByteReader::without_metadata(writer.as_slice());
+        assert!(matches!(handler.process_one(&mut reader), HandlerResult::Ok(())));
+        let mut reader = ByteReader::without_metadata(&[0xFF, 0xFF, 1, 2]);
+        assert!(matches!(handler.process_one(&mut reader), HandlerResult::UnhandledPacket));
+        assert_eq!(inspector.0.load(Ordering::SeqCst), 0);
     }
 }

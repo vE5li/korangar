@@ -11,6 +11,7 @@ rust-state = { workspace = true, optional = true }
 tokio = { workspace = true, features = ["rt", "io-util", "net", "macros", "sync", "time"] }
 
 [dev-dependencies]
+serde_json = "1"
 korangar-debug = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
 serde = { workspace = true, features = ["derive"] }

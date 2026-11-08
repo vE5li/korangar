@@ -455,6 +455,7 @@ where
                             w_item_sprite_number,
                             option_count,
                             option_data,
+                            forge_data: None,
                             refinement_level,
                             enchantment_level,
                             flags,
@@ -621,6 +622,7 @@ where
                 w_item_sprite_number: 0,
                 option_count: option_data.len() as u8,
                 option_data,
+                forge_data: None,
                 refinement_level,
                 enchantment_level,
                 flags: {

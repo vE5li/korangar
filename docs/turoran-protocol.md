@@ -1,4 +1,83 @@
-# Turoran Hercules protocol contract (20190530 RE)
+# Turoran live protocol contract: 20250716 MAIN / Renewal
+
+## Verified deployment facts — November 8, 2026 (CST)
+
+The client must target the deployed build, not the fallback macro in `mmo.h` or
+an older source-tree browser configuration.
+
+* LIVE `/opt/hercules/config.status`: `--enable-packetver=20250716`; generated
+  CPPFLAGS contain `-DPACKETVER=20250716` and **not** ENABLE_PACKETVER_RE.
+* The LIVE `map-server` binary's embedded compiler command also contains
+  `-DPACKETVER=20250716`, without ENABLE_PACKETVER_RE. The running service uses
+  `/opt/hercules/map-server`. This is the MAIN packet family with Renewal gameplay.
+* The publicly served `https://ro.turoran.com/Config.local.js` specifies
+  `packetver: 20250716`. The older source-tree
+  `applications/pwa/Config.local.js` says 20190530 but is NOT the served config.
+  roBrowser LoginEngine applies the served packetver to its packet builders.
+* Isolated `/opt/hercules-test` is likewise configured as 20250716 MAIN. Direct
+  dedicated-account traffic confirms modern character-page opcode **0x0b72**.
+  No live/test build or service was reconfigured or restarted during this work.
+
+## Selectable client profile
+
+Use `<packet_version>20250716</packet_version>` in clientinfo, or
+`SupportedPacketVersion::_20250716`. The 20220406 default remains unchanged.
+20190530 RE remains an explicitly selectable historical integration candidate,
+not the deployment target. Renewal rules and packet family are separate axes.
+
+| Message | Live wire contract |
+| --- | --- |
+| Login request/success | 0x0064 / 55 bytes; 0x0ac4 / variable |
+| Character authentication | 0x0065 / 17; raw 4-byte account prefix |
+| Character pages / creation | 0x0b72 / variable; 0x0b6f / 177 |
+| Character record | 175 bytes, including 64-bit HP/SP |
+| Map authentication | 0x0436 / 23, including trailing four bytes after sex |
+| Load end / walk / attack | 0x007d / 2; 0x035f / 5; 0x0437 / 7 |
+| Target / ground skill | 0x0438 / 10; 0x0af4 / 11 |
+| Public chat | 0x00f3 / variable |
+| Equipment list | 0x0b39 / variable; 83-byte entries |
+| Pickup | 0x0b41 / 85 |
+| Expanded emotion | request 0x0be9 / 6; response 0x0bea / 10 |
+
+Live inventory includes five random options PLUS three Turoran forge options.
+Modern refinement and grade follow the option arrays; do not use the old 2019
+refinement-before-cards layout. Forge metadata is retained in network events.
+Ordinary legacy group-zero emotes map to the existing UI; other groups still
+need expanded UI support. Packet framing and typed decoding are version-aware,
+with a bounded receive buffer, exact frame consumption, and no auth payload logs.
+Known but semantically unsupported plugin/UI frames are skipped only at verified
+boundaries and surfaced by opcode; this does NOT implement their custom UI.
+
+## Milestone-1 test evidence and limits
+
+All game interaction uses only the isolated test endpoint and an unprivileged,
+dedicated test account. A character was created using the protocol; its test-only
+fixture learned First Aid (142); level 10, STR 15, DEX 30 and offline test-DB
+position/HP/SP were set
+for controlled scenarios. No production account or database was used.
+
+The headless integration runner validates login, character creation/list/select,
+map acceptance/load acknowledgement, walking, inventory (three starter items),
+actor entry/updates, positive attack damage, First Aid healing, NPC dialogue,
+a natural novice-ship room warp, and a fresh connection at the persisted warp
+destination. It does not load Gravity artwork or claim graphical/rendering QA.
+
+Run `cargo run -p korangar-networking --example hercules_test -- /private/account.json
+--scenario=warp` (or `npc`, `combat`, `smoke`). The runner hard-guards the isolated
+addresses and dedicated-account prefix. Fixtures must be staged only while that
+character is offline; credentials are never command-line values or log output. Wait for server offline
+propagation between fresh login runs: an immediate retry can legitimately receive
+AlreadyOnline; the later fresh session at the persisted warp destination passed.
+
+Persistent asset cache and allowlisted snapshot-manifest changes are merged
+separately; the manifest has NOT been deployed/enabled on live. Full custom UI,
+PIN UI, non-milestone social/economy systems and complete graphical asset coverage
+remain explicit parity gates. See the historical audit below for that inventory;
+its 2019 request/header tables are NOT live deployment facts.
+
+---
+
+# Historical source audit: 20190530 RE (not the live profile)
 
 Status: **implementation reference, not a claim of client parity**. Keep the
 existing 20220406 backend working. No production endpoints, accounts, captures,
@@ -12,7 +91,7 @@ This audit pins these source revisions rather than a moving branch:
 - roBrowser: [`3239980f4a69a3146d1c96d44dcce7104ebdc274`](https://github.com/Turor/roBrowserLegacy/tree/3239980f4a69a3146d1c96d44dcce7104ebdc274).
 - Korangar starting point: `639eaabfeb6901b68697739ea84f7375e4c26783`.
 
-Hercules is configured with `--enable-packetver=20190530 --enable-packetver-re`
+This earlier source-only audit assumed `--enable-packetver=20190530 --enable-packetver-re`
 and Renewal gameplay. Packet version, packet family, gameplay rules, and custom
 extensions are independent settings: a generic 2019 client is not sufficient.
 
@@ -172,7 +251,7 @@ warns that failing to register `0x0ef5` as variable length desynchronizes map en
   `0x0b24` is behind a newer version gate. Confirm an explicit server extension
   before emitting either. Do not turn on grade-above-A gameplay as client work.
 
-## Persistent remote-asset contract (next independent milestone)
+## Persistent remote-asset contract
 
 The client must use local archives/cache first, then the configured remoteclient
 endpoint. Development uses the rodata-dev test service on port 3339; public
@@ -215,3 +294,25 @@ or gameplay transport. Production must never silently become a test fallback.
 
 Do not claim parity until the unchecked gates have recorded evidence. Preserve
 upstream MIT attribution and keep credentials and game artwork out of all PRs.
+
+
+## Reproducible local checkpoint
+
+`cargo test -p ragnarok-packets -p korangar-networking --lib`: 30 tests passed.
+`cargo check -p korangar-networking --all-features` and full
+`cargo check -p korangar --bin korangar` passed. Existing remote cache tests (9)
+and manifest/server tests (17) passed before their independent squash merges.
+
+Sanitized, asset-free scenario logs are retained outside the repository on the
+development container in `/root/Work/korangar-evidence/`:
+
+* combat: inventory=3, actors=9, actor updates=34, positive attack=true,
+  First Aid heal=true;
+* warp: room position 20,27 to 51,30, one acknowledged position change;
+* fresh reconnect/NPC: map login at persisted 51,30, walk and NPC dialogue=true.
+
+The documented positive combat run uses a seeded dedicated test fixture, not a
+claim about novice combat balance. The currently observed skipped opcodes are
+097b, 0a3b, 0ae2, 0aff, 0b1a, 0ef5 (plus NPC sound 01b0). Their framing is known;
+semantic support remains a separate feature/parity gate. No arbitrary payloads
+or session captures are committed.

@@ -2015,6 +2015,8 @@ impl Client {
                     let packet_version = match service.packet_version {
                         Some(packet_version) => match packet_version {
                             PacketVersion::_20220406 => SupportedPacketVersion::_20220406,
+                            PacketVersion::_20250716 => SupportedPacketVersion::_20250716,
+                            PacketVersion::_20190530 => SupportedPacketVersion::_20190530,
                             PacketVersion::Unsupported(packet_version) => {
                                 self.interface.open_window(ErrorWindow::new(format!(
                                     "Selected server has an unsupported package version: {packet_version}"

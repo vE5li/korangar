@@ -470,7 +470,6 @@ impl Client {
                 eprintln!("Asset setup failed: {error}");
                 return None;
             }
-            game_file_loader.load_patched_lua_files();
         });
 
         time_phase!("calculate game file hash", {
@@ -516,23 +515,15 @@ impl Client {
             let effect_loader = Arc::new(EffectLoader::new(game_file_loader.clone()));
             let animation_loader = Arc::new(AnimationLoader::new());
 
-            let library = Arc::new(Library::new(&game_file_loader).unwrap_or_else(|_| {
-                // The library not being created correctly means that the lua files were
-                // not valid. It's possible that the archive was copied from a
-                // different machine with a different architecture, so the one thing
-                // we can try is generating it again.
-
-                #[cfg(feature = "debug")]
-                print_debug!(
-                    "[{}] failed to execute lua files; attempting to fix it by re-patching",
-                    "error".red()
-                );
-
-                game_file_loader.remove_patched_lua_files();
-                game_file_loader.load_patched_lua_files();
-
-                Library::new(&game_file_loader).unwrap()
-            }));
+            // Load from the selected sources, never from a stale rewritten Lua overlay.
+            // Bytecode ABI adaptation happens in memory; translations stay untouched.
+            let library = match Library::new(&game_file_loader) {
+                Ok(library) => Arc::new(library),
+                Err(error) => {
+                    eprintln!("Lua library initialization failed: {error}");
+                    return None;
+                }
+            };
 
             if sync_cache {
                 sync_cache_archive(&game_file_loader, texture_loader, game_file_hash);

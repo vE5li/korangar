@@ -18,12 +18,11 @@ use korangar_loaders::{FileLoader, FileNotFoundError};
 pub use self::cache::{sync_cache_archive, texture_file_dds_name, video_file_ivf_name};
 use self::list::GameArchiveList;
 use super::archive::folder::FolderArchive;
-use super::archive::native::{NativeArchive, NativeArchiveBuilder};
-use super::archive::{Archive, ArchiveType, Compression, Writable};
-use crate::loaders::archive::seven_zip::{SevenZipArchive, SevenZipArchiveBuilder};
+use super::archive::native::NativeArchive;
+use super::archive::{Archive, ArchiveType};
+use crate::loaders::archive::seven_zip::SevenZipArchive;
 
 pub(crate) const CACHE_FILE_NAME: &str = "cache.7z";
-pub(crate) const LUA_ARCHIVE_FILE_NAME: &str = "lua_files.7z";
 
 pub(crate) const TEMPORARY_CACHE_FILE_NAME: &str = "cache.7z.tmp";
 pub(crate) const HASH_FILE_PATH: &str = "game_file_hash.txt";
@@ -180,21 +179,6 @@ impl GameFileLoader {
         hasher.finalize()
     }
 
-    pub fn remove_patched_lua_files(&self) {
-        if Path::new(LUA_ARCHIVE_FILE_NAME).exists() {
-            std::fs::remove_file(LUA_ARCHIVE_FILE_NAME).unwrap();
-        }
-    }
-
-    pub fn load_patched_lua_files(&self) {
-        if !Path::new(LUA_ARCHIVE_FILE_NAME).exists() {
-            self.patch_lua_files();
-        }
-
-        let lua_archive = Self::load_archive_from_path(LUA_ARCHIVE_FILE_NAME);
-        self.add_archive(lua_archive, false);
-    }
-
     pub fn get_files_with_extension(&self, extensions: &[&str]) -> Vec<String> {
         let mut files = Vec::new();
         self.archives
@@ -215,73 +199,6 @@ impl GameFileLoader {
         files.dedup();
 
         files
-    }
-
-    fn patch_lua_files(&self) {
-        use lunify::{Format, Settings, unify};
-
-        const LUA_BYTECODE_EXTENSION: &str = ".lub";
-        let lua_files = self.get_files_with_extension(&[LUA_BYTECODE_EXTENSION]);
-
-        let path = Path::new(LUA_ARCHIVE_FILE_NAME);
-        let mut lua_archive: Box<dyn Writable> = match GameFileLoader::get_archive_type_by_path(path) {
-            ArchiveType::Folder => Box::new(FolderArchive::from_path(path)),
-            ArchiveType::Native => Box::new(NativeArchiveBuilder::from_path(path)),
-            ArchiveType::SevenZip => Box::new(SevenZipArchiveBuilder::from_path(path)),
-        };
-
-        let bytecode_format = Format::default();
-        let settings = Settings::default();
-
-        #[cfg(feature = "debug")]
-        let mut total_count = lua_files.len();
-        #[cfg(feature = "debug")]
-        let mut failed_count = 0;
-
-        for file_name in lua_files {
-            let bytes = match self.get(&file_name) {
-                Ok(bytes) => bytes,
-                Err(_error) => {
-                    #[cfg(feature = "debug")]
-                    {
-                        print_debug!(
-                            "[{}] failed to extract file {} from the grf: {:?}",
-                            "warning".yellow(),
-                            file_name.magenta(),
-                            _error
-                        );
-                        failed_count += 1;
-                    }
-
-                    continue;
-                }
-            };
-
-            // Try to unify all bytecode to Lua 5.1 and possibly 64 bit.
-            match unify(&bytes, &bytecode_format, &settings) {
-                Ok(bytes) => lua_archive.add_file(&file_name, bytes, Compression::Default),
-                // If the operation fails the file with this error, the Lua file is not actually a
-                // pre-compiled binary but rather a source file, so we can safely ignore it.
-                #[cfg(feature = "debug")]
-                Err(lunify::LunifyError::IncorrectSignature) => total_count -= 1,
-                Err(_error) => {
-                    #[cfg(feature = "debug")]
-                    {
-                        print_debug!("[{}] error upcasting {}: {:?}", "warning".yellow(), file_name.magenta(), _error,);
-                        failed_count += 1;
-                    }
-                }
-            }
-        }
-
-        #[cfg(feature = "debug")]
-        print_debug!(
-            "converted a total of {} files of which {} failed.",
-            total_count.yellow(),
-            failed_count.red(),
-        );
-
-        lua_archive.finish().expect("can't save lua archive");
     }
 
     #[allow(unused_variables)]

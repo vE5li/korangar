@@ -1,5 +1,4 @@
 //! A GRF file containing game assets.
-mod builder;
 mod mixcrypt;
 
 use std::collections::HashMap;
@@ -16,7 +15,6 @@ use korangar_debug::logging::{Colorize, Timer, print_debug};
 use ragnarok_bytes::{ByteReader, FixedByteSize, FromBytes};
 use ragnarok_formats::archive::{AssetTable, FileTableRow, Header};
 
-pub use self::builder::NativeArchiveBuilder;
 use crate::loaders::archive::Archive;
 use crate::loaders::archive::native::mixcrypt::decrypt_file;
 

@@ -3,6 +3,7 @@ mod item_info;
 mod item_name;
 mod item_resource;
 mod job_identity;
+mod lua;
 mod map_sky_data;
 mod skill_information;
 mod skill_requirements;
@@ -10,16 +11,16 @@ mod skill_tree;
 
 use std::hash::Hash;
 
-use encoding_rs::EUC_KR;
 use hashbrown::HashMap;
 use korangar_loaders::FileLoader;
-use mlua::Lua;
+use mlua::{ErrorContext, Lua};
 
 pub use self::baby_job::IsBabyJob;
 pub use self::item_info::ItemInfo;
 pub use self::item_name::{ItemName, ItemNameKey};
 pub use self::item_resource::{ItemResource, ItemResourceKey};
 pub use self::job_identity::JobIdentity;
+use self::lua::{execute_chunk, game_string};
 pub use self::map_sky_data::MapSkyData;
 pub use self::skill_tree::SkillTreeLayout;
 use crate::loaders::GameFileLoader;
@@ -38,13 +39,13 @@ pub struct Library {
 
 impl Library {
     pub fn new(game_file_loader: &GameFileLoader) -> mlua::Result<Self> {
-        let job_identity_table = JobIdentity::load(game_file_loader)?;
-        let item_info_table = ItemInfo::load(game_file_loader)?;
-        let map_sky_data_table = MapSkyData::load(game_file_loader)?;
-        let skill_information_table = SkillListInformation::load(game_file_loader)?;
-        let skill_requirements_table = SkillListRequirements::load(game_file_loader)?;
-        let skill_tree_table = SkillTreeLayout::load(game_file_loader)?;
-        let baby_job_table = IsBabyJob::load(game_file_loader)?;
+        let job_identity_table = JobIdentity::load(game_file_loader).context("loading JobIdentity")?;
+        let item_info_table = ItemInfo::load(game_file_loader).context("loading ItemInfo")?;
+        let map_sky_data_table = MapSkyData::load(game_file_loader).context("loading MapSkyData")?;
+        let skill_information_table = SkillListInformation::load(game_file_loader).context("loading SkillListInformation")?;
+        let skill_requirements_table = SkillListRequirements::load(game_file_loader).context("loading SkillListRequirements")?;
+        let skill_tree_table = SkillTreeLayout::load(game_file_loader).context("loading SkillTreeLayout")?;
+        let baby_job_table = IsBabyJob::load(game_file_loader).context("loading IsBabyJob")?;
 
         Ok(Self {
             job_identity_table,
@@ -79,19 +80,18 @@ where
 }
 
 trait LuaExt: Sized {
-    fn load_from_game_files(game_file_loader: &GameFileLoader, files: &[&str]) -> mlua::Result<Self>;
+    fn load_from_game_files(game_file_loader: &impl FileLoader, files: &[&str]) -> mlua::Result<Self>;
 }
 
 impl LuaExt for Lua {
-    fn load_from_game_files(game_file_loader: &GameFileLoader, files: &[&str]) -> mlua::Result<Self> {
+    fn load_from_game_files(game_file_loader: &impl FileLoader, files: &[&str]) -> mlua::Result<Self> {
         let state = Lua::new();
 
         for file in files {
             let data = game_file_loader
                 .get(file)
-                .unwrap_or_else(|_| panic!("failed to open lua file {}", file));
-
-            state.load(&data).exec()?;
+                .map_err(|error| mlua::Error::RuntimeError(format!("Cannot read Lua asset {file}: {error:?}")))?;
+            execute_chunk(&state, file, &data)?;
         }
 
         Ok(state)
@@ -112,12 +112,4 @@ pub trait Table {
     fn get<'a, 'b>(library: &'a Library, key: Self::Key<'b>) -> &'a Self
     where
         Self: Sized;
-}
-
-fn fix_encoding(broken: String) -> String {
-    let bytes: Vec<u8> = broken.chars().map(|char| char as u8).collect();
-    match EUC_KR.decode_without_bom_handling_and_without_replacement(&bytes) {
-        None => broken.to_string(),
-        Some(char) => char.to_string(),
-    }
 }

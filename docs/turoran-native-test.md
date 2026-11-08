@@ -44,3 +44,45 @@ Inventory/cart/storage transfers are isolated at the network layer. Until
 separate container UI/state exists, completed non-player container snapshots
 are ignored instead of being published as the ordinary inventory. This fixes
 inventory corruption; it does not implement storage/cart gameplay.
+
+## Lua bootstrap compatibility
+
+The embedded VM is Lua 5.1. Server `.lub` files can be either bytecode (the dev
+assets include 32-bit-size_t Lua 5.1 chunks) or plain source with legacy encoded
+string literals. The normal loader now adapts recognized Lua 5.0/5.1 bytecode
+in memory, using lunify2's byte-preserving converter. Lunify1's converter could
+transcode raw strings during ABI conversion; do not reinstate the old low-byte
+Unicode hack to compensate. Plain source is passed through unchanged except
+for an optional UTF-8 BOM; UTF-16 is rejected with a named error.
+
+Names/resource strings are decoded from the original Lua bytes: valid UTF-8 is
+preserved exactly, otherwise strict Windows-949/EUC-KR decoding is attempted.
+Invalid text is an error, not lossy normalization. Syntax, bytecode or table
+conversion failures do not trigger rewriting, deletion or remounting of caches.
+Legacy generated `lua_files.7z` overlays are no longer loaded; they are left
+untouched on disk, and user-selected archive/translation precedence is retained.
+
+With the isolated17-file bootstrap fixture, the actual normal executable now
+passes all seven Lua library initializers and reaches the hard-coded initial
+menu map `geffen`. That fixture does not include `data/geffen.rsw` or its full
+dependency graph, so startup still stops there. Stage an approved complete menu
+map dependency manifest before expecting a window; do not equate this progress
+with rendering, audio playback, or a complete offline installation.
+
+The exact staged-file probe found that `skillinfoz/skillinfolist.lub` is valid
+Lua source, not corrupt bytecode. Its `SKILL_INFO_LIST[779].SkillName` is
+non-UTF-8 but valid Windows-949/EUC-KR; the old Rust String conversion failed
+before its encoding helper could run. All skill resource-name strings in that
+fixture were valid UTF-8. The old unconditional archive-repair retry hid this
+primary failure behind a later error. Synthetic tests cover this display-only
+case as well as resource names and Unicode-preservation regressions.
+
+A separate20-entry pinned fixture adds only Geffen RSW/GND/GAT via the existing
+dev asset route. With it, normal startup passes Lua and the initial map-loader
+call, then fails at window creation because neither DISPLAY nor WAYLAND_DISPLAY
+nor WAYLAND_SOCKET is available. Missing dependent models/textures can fall
+back, so passing the map-loader call is NOT complete-map/graphics validation.
+Next graphical prerequisite: an existing interactive Vulkan-capable display
+session for the TEST runtime (or separately authorized desktop provisioning),
+plus complete approved map dependencies. No display-server/network setup or
+production asset-service change was performed.

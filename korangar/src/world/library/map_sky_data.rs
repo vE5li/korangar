@@ -2,6 +2,7 @@ use hashbrown::HashMap;
 use korangar_loaders::FileLoader;
 use mlua::{Lua, Value};
 
+use super::lua::execute_chunk;
 use super::{Library, Table};
 use crate::graphics::Color;
 use crate::loaders::GameFileLoader;
@@ -43,7 +44,7 @@ impl Table for MapSkyData {
         let map_sky_data_table = match game_file_loader.get("data\\luafiles514\\lua files\\mapskydata\\mapskydata.lub") {
             Ok(data) => {
                 let state = Lua::new();
-                state.load(&data).exec()?;
+                execute_chunk(&state, "data\\luafiles514\\lua files\\mapskydata\\mapskydata.lub", &data)?;
 
                 let globals = state.globals();
                 let mut result = HashMap::new();

@@ -2,7 +2,7 @@ use hashbrown::HashMap;
 use mlua::Lua;
 use ragnarok_packets::ItemId;
 
-use super::{HashMapExt, ItemName, ItemResource, Library, LuaExt, Table, fix_encoding};
+use super::{HashMapExt, ItemName, ItemResource, Library, LuaExt, Table, game_string};
 use crate::loaders::GameFileLoader;
 
 #[derive(Debug, Clone)]
@@ -26,10 +26,30 @@ impl Table for ItemInfo {
         if let Ok(table) = globals.get::<mlua::Table>("tbl") {
             for (item_id, item_table) in table.pairs::<u32, mlua::Table>().flatten() {
                 let info = ItemInfo {
-                    identified_name: ItemName::from_option(item_table.get("identifiedDisplayName").ok().map(fix_encoding)),
-                    unidentified_name: ItemName::from_option(item_table.get("unidentifiedDisplayName").ok().map(fix_encoding)),
-                    identified_resource: ItemResource::from_option(item_table.get("identifiedResourceName").ok().map(fix_encoding)),
-                    unidentified_resource: ItemResource::from_option(item_table.get("unidentifiedResourceName").ok().map(fix_encoding)),
+                    identified_name: ItemName::from_option(
+                        item_table
+                            .get::<Option<mlua::String>>("identifiedDisplayName")?
+                            .map(game_string)
+                            .transpose()?,
+                    ),
+                    unidentified_name: ItemName::from_option(
+                        item_table
+                            .get::<Option<mlua::String>>("unidentifiedDisplayName")?
+                            .map(game_string)
+                            .transpose()?,
+                    ),
+                    identified_resource: ItemResource::from_option(
+                        item_table
+                            .get::<Option<mlua::String>>("identifiedResourceName")?
+                            .map(game_string)
+                            .transpose()?,
+                    ),
+                    unidentified_resource: ItemResource::from_option(
+                        item_table
+                            .get::<Option<mlua::String>>("unidentifiedResourceName")?
+                            .map(game_string)
+                            .transpose()?,
+                    ),
                 };
 
                 result.insert(ItemId(item_id), info);

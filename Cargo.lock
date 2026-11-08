@@ -2249,9 +2249,9 @@ dependencies = [
 
 [[package]]
 name = "lunify"
-version = "1.1.0"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af319e973195cc1edc87c21c8c206af77611176b0c62e94add116d40a765aaed"
+checksum = "269e867dc2034fedb0f6c5fc10d3e6252e087d6ab3bb202783f955d05a8b4d97"
 
 [[package]]
 name = "lzma-rust2"

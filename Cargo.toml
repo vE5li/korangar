@@ -32,7 +32,7 @@ korangar-loaders = { path = "korangar-loaders" }
 korangar-networking = { path = "korangar-networking" }
 korangar-video = { path = "korangar-video" }
 libc = "0.2"
-lunify = "1"
+lunify = "2.0.0"
 mlua = "0.11"
 num = "0.4"
 option-ext = "0.2"

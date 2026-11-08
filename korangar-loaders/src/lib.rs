@@ -1,6 +1,9 @@
 //! Generic file loading functionality.
 #![warn(missing_docs)]
 
+/// Persistent verified remote assets and immutable snapshot manifests.
+pub mod remote;
+
 /// Error that is thrown when a file loader can't find the requested file.
 #[repr(transparent)]
 pub struct FileNotFoundError(String);

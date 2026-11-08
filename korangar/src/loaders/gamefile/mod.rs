@@ -7,11 +7,12 @@ mod list;
 
 use core::panic;
 use std::path::Path;
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 
 use blake3::Hash;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, Timer, print_debug};
+use korangar_loaders::remote::{PersistentAssets, RemoteConfig};
 use korangar_loaders::{FileLoader, FileNotFoundError};
 
 pub use self::cache::{sync_cache_archive, texture_file_dds_name, video_file_ivf_name};
@@ -47,16 +48,28 @@ struct LoaderArchive {
 #[derive(Default)]
 pub struct GameFileLoader {
     archives: RwLock<Vec<LoaderArchive>>,
+    remote: RwLock<Option<Arc<PersistentAssets>>>,
 }
 
 impl FileLoader for GameFileLoader {
     fn get(&self, path: &str) -> Result<Vec<u8>, FileNotFoundError> {
         let lowercase_path = path.to_lowercase();
-        self.archives
+        if let Some(bytes) = self
+            .archives
             .read()
             .unwrap()
             .iter()
             .find_map(|archive| archive.archive.get_file_by_path(&lowercase_path))
+        {
+            return Ok(bytes);
+        }
+        // Existing local archives retain priority. The permanent verified cache
+        // is consulted next; the network is only used for missing/corrupt objects.
+        self.remote
+            .read()
+            .unwrap()
+            .as_ref()
+            .and_then(|remote| remote.get(&lowercase_path).ok())
             .ok_or_else(|| FileNotFoundError::new(path.to_owned()))
     }
 }
@@ -68,6 +81,7 @@ impl GameFileLoader {
             .unwrap()
             .iter()
             .any(|archive| archive.archive.file_exists(path))
+            || self.remote.read().unwrap().as_ref().is_some_and(|r| r.contains(path))
     }
 
     fn add_archive(&self, archive: Box<dyn Archive>, is_game_archive: bool) {
@@ -104,6 +118,20 @@ impl GameFileLoader {
         #[cfg(feature = "debug")]
         let timer = Timer::new("load game archives");
 
+        if let Ok(base_url) = std::env::var("KORANGAR_REMOTE_BASE_URL") {
+            let cache_dir = std::env::var_os("KORANGAR_REMOTE_CACHE")
+                .map(std::path::PathBuf::from)
+                .unwrap_or_else(|| ".korangar-assets".into());
+            let enabled = |name| std::env::var(name).is_ok_and(|v| v == "1");
+            let config = RemoteConfig {
+                base_url,
+                cache_dir,
+                allow_http: enabled("KORANGAR_REMOTE_ALLOW_HTTP"),
+                offline: enabled("KORANGAR_REMOTE_OFFLINE"),
+            };
+            let remote = PersistentAssets::open(config).expect("cannot initialize pinned remote assets");
+            *self.remote.write().unwrap() = Some(Arc::new(remote));
+        }
         let game_archive_list = GameArchiveList::load();
 
         game_archive_list.archives.iter().for_each(|path| {
@@ -123,6 +151,9 @@ impl GameFileLoader {
             .iter()
             .filter(|archive| archive.is_game_archive)
             .for_each(|archive| archive.archive.hash(&mut hasher));
+        if let Some(remote) = self.remote.read().unwrap().as_ref() {
+            hasher.update(remote.revision().as_bytes());
+        }
         hasher.finalize()
     }
 
@@ -149,6 +180,14 @@ impl GameFileLoader {
             .iter()
             .for_each(|archive| archive.archive.get_files_with_extension(&mut files, extensions));
 
+        if let Some(remote) = self.remote.read().unwrap().as_ref() {
+            files.extend(
+                remote
+                    .paths()
+                    .filter(|path| extensions.iter().any(|ext| path.ends_with(ext)))
+                    .map(str::to_owned),
+            );
+        }
         files.sort();
         files.dedup();
 

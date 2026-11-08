@@ -2,7 +2,10 @@ use cgmath::Vector2;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, print_debug};
 use rust_state::RustState;
-use wgpu::{Adapter, CurrentSurfaceTexture, Device, PresentMode, SurfaceConfiguration, SurfaceTexture, TextureFormat};
+use wgpu::{
+    Adapter, CurrentSurfaceTexture, Device, PresentMode, SurfaceCapabilities, SurfaceConfiguration, SurfaceTexture, TextureFormat,
+    TextureUsages,
+};
 
 use crate::graphics::ScreenSize;
 
@@ -15,24 +18,67 @@ pub struct PresentModeInfo {
 }
 
 impl PresentModeInfo {
-    pub fn from_adapter(adapter: &Adapter, surface: &wgpu::Surface) -> PresentModeInfo {
+    fn from_capabilities(capabilities: &SurfaceCapabilities) -> PresentModeInfo {
         let mut present_mode_info = PresentModeInfo {
             supports_immediate: false,
             supports_mailbox: false,
         };
 
-        surface
-            .get_capabilities(adapter)
-            .present_modes
-            .iter()
-            .for_each(|present_mode| match present_mode {
-                PresentMode::Mailbox => present_mode_info.supports_mailbox = true,
-                PresentMode::Immediate => present_mode_info.supports_immediate = true,
-                _ => {}
-            });
+        capabilities.present_modes.iter().for_each(|present_mode| match present_mode {
+            PresentMode::Mailbox => present_mode_info.supports_mailbox = true,
+            PresentMode::Immediate => present_mode_info.supports_immediate = true,
+            _ => {}
+        });
 
         present_mode_info
     }
+}
+
+/// Select only configurations advertised by the adapter for this surface.
+/// In particular, an adapter found on a surfaceless EGL display is not evidence
+/// that it can present to a native window.
+fn surface_configuration(
+    capabilities: &SurfaceCapabilities,
+    width: u32,
+    height: u32,
+    triple_buffering: bool,
+    vsync: bool,
+) -> Result<SurfaceConfiguration, String> {
+    let format = capabilities.formats.first().copied().ok_or(
+        "No presentable surface formats. On GLES, the instance must use the window's native display connection; a surfaceless adapter \
+         cannot present",
+    )?;
+    if capabilities.present_modes.is_empty() {
+        return Err("No presentation modes are supported by this adapter and window surface".into());
+    }
+    // Fifo is wgpu's guaranteed vsync mode and is required by our runtime toggle.
+    if !capabilities.present_modes.contains(&PresentMode::Fifo) {
+        return Err("The surface does not advertise the required Fifo (vsync) presentation mode".into());
+    }
+    if !capabilities.usages.contains(TextureUsages::RENDER_ATTACHMENT) {
+        return Err("The surface does not support RENDER_ATTACHMENT usage".into());
+    }
+    let alpha_mode = capabilities
+        .alpha_modes
+        .first()
+        .copied()
+        .ok_or("No surface alpha modes are supported")?;
+    let present_mode_info = PresentModeInfo::from_capabilities(capabilities);
+    let present_mode = match vsync {
+        false if present_mode_info.supports_mailbox => PresentMode::Mailbox,
+        false if present_mode_info.supports_immediate => PresentMode::Immediate,
+        _ => PresentMode::Fifo,
+    };
+    Ok(SurfaceConfiguration {
+        usage: TextureUsages::RENDER_ATTACHMENT,
+        format,
+        width: width.max(1),
+        height: height.max(1),
+        desired_maximum_frame_latency: if triple_buffering { 2 } else { 1 },
+        present_mode,
+        alpha_mode,
+        view_formats: vec![],
+    })
 }
 
 pub struct Surface {
@@ -52,34 +98,16 @@ impl Surface {
         window_height: u32,
         triple_buffering: bool,
         vsync: bool,
-    ) -> Self {
-        let window_width = window_width.max(1);
-        let window_height = window_height.max(1);
-
-        let mut config = surface.get_default_config(adapter, window_width, window_height).unwrap();
-
-        let surfaces_formats: Vec<TextureFormat> = surface.get_capabilities(adapter).formats;
-
-        #[cfg(feature = "debug")]
-        {
-            print_debug!("Supported surface formats:");
-            for format in &surfaces_formats {
-                print_debug!("{:?}", format);
-            }
-        }
-
-        let present_mode_info = PresentModeInfo::from_adapter(adapter, &surface);
-
-        config.format = surfaces_formats.first().copied().expect("not surface formats found");
-        config.desired_maximum_frame_latency = match triple_buffering {
-            true => 2,
-            false => 1,
-        };
-        config.present_mode = match vsync {
-            false if present_mode_info.supports_mailbox => PresentMode::Mailbox,
-            false if present_mode_info.supports_immediate => PresentMode::Immediate,
-            _ => PresentMode::Fifo,
-        };
+    ) -> Result<Self, String> {
+        let capabilities = surface.get_capabilities(adapter);
+        let config = surface_configuration(&capabilities, window_width, window_height, triple_buffering, vsync).map_err(|error| {
+            let info = adapter.get_info();
+            format!(
+                "{error}; adapter={:?}, backend={:?}, formats={:?}, present_modes={:?}",
+                info.name, info.backend, capabilities.formats, capabilities.present_modes
+            )
+        })?;
+        let present_mode_info = PresentModeInfo::from_capabilities(&capabilities);
 
         #[cfg(feature = "debug")]
         {
@@ -89,13 +117,13 @@ impl Surface {
 
         surface.configure(&device, &config);
 
-        Self {
+        Ok(Self {
             device,
             surface,
             config,
             present_mode_info,
             invalid: false,
-        }
+        })
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
@@ -154,8 +182,8 @@ impl Surface {
     }
 
     pub fn update_window_size(&mut self, window_size: ScreenSize) {
-        self.config.width = window_size.width as u32;
-        self.config.height = window_size.height as u32;
+        self.config.width = (window_size.width as u32).max(1);
+        self.config.height = (window_size.height as u32).max(1);
         self.invalidate();
     }
 
@@ -179,5 +207,95 @@ impl Surface {
             width: self.config.width as f32,
             height: self.config.height as f32,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use wgpu::CompositeAlphaMode;
+
+    use super::*;
+
+    fn supported() -> SurfaceCapabilities {
+        SurfaceCapabilities {
+            formats: vec![TextureFormat::Bgra8UnormSrgb],
+            present_modes: vec![PresentMode::Fifo],
+            alpha_modes: vec![CompositeAlphaMode::Opaque],
+            usages: TextureUsages::RENDER_ATTACHMENT,
+        }
+    }
+
+    #[test]
+    fn rejects_surfaceless_adapter_without_formats() {
+        let mut caps = supported();
+        caps.formats.clear();
+        let error = surface_configuration(&caps, 800, 600, false, true).unwrap_err();
+        assert!(error.contains("No presentable surface formats"));
+        assert!(error.contains("native display"));
+    }
+
+    #[test]
+    fn rejects_empty_or_incompatible_present_modes() {
+        let mut caps = supported();
+        caps.present_modes.clear();
+        assert!(
+            surface_configuration(&caps, 800, 600, false, true)
+                .unwrap_err()
+                .contains("No presentation modes")
+        );
+        caps.present_modes.push(PresentMode::Mailbox);
+        assert!(surface_configuration(&caps, 800, 600, false, false).unwrap_err().contains("Fifo"));
+    }
+
+    #[test]
+    fn rejects_missing_render_usage_or_alpha_mode() {
+        let mut caps = supported();
+        caps.usages = TextureUsages::COPY_DST;
+        assert!(
+            surface_configuration(&caps, 800, 600, false, true)
+                .unwrap_err()
+                .contains("RENDER_ATTACHMENT")
+        );
+        caps.usages = TextureUsages::RENDER_ATTACHMENT;
+        caps.alpha_modes.clear();
+        assert!(
+            surface_configuration(&caps, 800, 600, false, true)
+                .unwrap_err()
+                .contains("alpha modes")
+        );
+    }
+
+    #[test]
+    fn selects_advertised_format_alpha_and_safe_dimensions() {
+        let caps = supported();
+        let config = surface_configuration(&caps, 0, 0, true, true).unwrap();
+        assert_eq!(config.format, caps.formats[0]);
+        assert_eq!(config.alpha_mode, caps.alpha_modes[0]);
+        assert_eq!(config.present_mode, PresentMode::Fifo);
+        assert_eq!((config.width, config.height), (1, 1));
+        assert_eq!(config.desired_maximum_frame_latency, 2);
+    }
+
+    #[test]
+    fn uses_only_supported_vsync_off_modes_in_preference_order() {
+        let mut caps = supported();
+        assert_eq!(
+            surface_configuration(&caps, 800, 600, false, false).unwrap().present_mode,
+            PresentMode::Fifo
+        );
+        caps.present_modes.push(PresentMode::Immediate);
+        assert_eq!(
+            surface_configuration(&caps, 800, 600, false, false).unwrap().present_mode,
+            PresentMode::Immediate
+        );
+        caps.present_modes.push(PresentMode::Mailbox);
+        assert_eq!(
+            surface_configuration(&caps, 800, 600, false, false).unwrap().present_mode,
+            PresentMode::Mailbox
+        );
+        assert_eq!(
+            surface_configuration(&caps, 800, 600, false, true).unwrap().present_mode,
+            PresentMode::Fifo
+        );
     }
 }

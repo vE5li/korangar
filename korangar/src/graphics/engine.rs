@@ -185,13 +185,16 @@ impl GraphicsEngine {
         ssaa: Ssaa,
         screen_space_anti_aliasing: ScreenSpaceAntiAliasing,
         high_quality_interface: bool,
-    ) {
+    ) -> Result<(), String> {
         self.set_limit_framerate(limit_framerate);
 
         if self.surface.is_none() {
             time_phase!("create surface", {
                 let screen_size: ScreenSize = window.inner_size().max(PhysicalSize::new(1, 1)).into();
-                let raw_surface = self.instance.create_surface(window).unwrap();
+                let raw_surface = self
+                    .instance
+                    .create_surface(window)
+                    .map_err(|error| format!("Cannot create window surface: {error}"))?;
                 let surface = Surface::new(
                     &self.adapter,
                     self.device.clone(),
@@ -200,7 +203,7 @@ impl GraphicsEngine {
                     screen_size.height as u32,
                     triple_buffering,
                     vsync,
-                );
+                )?;
 
                 let surface_texture_format = surface.format();
 
@@ -493,6 +496,7 @@ impl GraphicsEngine {
         }
         // Android devices need to drop the surface on suspend, so we might need
         // to re-create it.
+        Ok(())
     }
 
     #[cfg(feature = "debug")]

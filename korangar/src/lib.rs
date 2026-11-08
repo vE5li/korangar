@@ -88,12 +88,7 @@ use state::{ChatMessage, ClientState, ClientStatePathExt, client_state, this_ent
 #[cfg(feature = "debug")]
 use wgpu::Device;
 use wgpu::util::initialize_adapter_from_env_or_default;
-use wgpu::wgt::{Dx12SwapchainKind, Dx12UseFrameLatencyWaitableObject};
-use wgpu::{
-    BackendOptions, Backends, DeviceDescriptor, Dx12BackendOptions, Dx12Compiler, ExperimentalFeatures, ForceShaderModelToken,
-    GlBackendOptions, GlDebugFns, GlFenceBehavior, Gles3MinorVersion, Instance, InstanceDescriptor, InstanceFlags, MemoryBudgetThresholds,
-    MemoryHints, NoopBackendOptions, Queue, Trace,
-};
+use wgpu::{DeviceDescriptor, ExperimentalFeatures, Instance, MemoryHints, Queue, Trace};
 use winit::application::ApplicationHandler;
 use winit::dpi::{LogicalSize, PhysicalSize};
 use winit::event::WindowEvent;
@@ -178,6 +173,8 @@ fn initialize_shutdown_signal() {
 }
 
 pub struct Client {
+    event_loop: Option<EventLoop<()>>,
+    startup_error: Option<String>,
     game_file_loader: Arc<GameFileLoader>,
     action_loader: Arc<ActionLoader>,
     #[cfg(feature = "debug")]
@@ -400,29 +397,19 @@ impl Client {
             let graphics_settings = GraphicsSettings::new();
         });
 
+        // GLES must connect to the same platform display used by the eventual
+        // window, not an implicit surfaceless EGL display. Keep the event loop
+        // for run() and let the instance own a clone of its display connection.
+        let event_loop = match EventLoop::new() {
+            Ok(event_loop) => event_loop,
+            Err(error) => {
+                eprintln!("Cannot create native display event loop: {error}");
+                return None;
+            }
+        };
+
         time_phase!("create adapter", {
-            let instance = Instance::new(InstanceDescriptor {
-                backends: Backends::all().with_env(),
-                flags: InstanceFlags::from_build_config().with_env(),
-                memory_budget_thresholds: MemoryBudgetThresholds::default(),
-                backend_options: BackendOptions {
-                    gl: GlBackendOptions {
-                        gles_minor_version: Gles3MinorVersion::Automatic,
-                        fence_behavior: GlFenceBehavior::Normal,
-                        debug_fns: GlDebugFns::Auto,
-                    },
-                    dx12: Dx12BackendOptions {
-                        shader_compiler: Dx12Compiler::StaticDxc.with_env(),
-                        presentation_system: Dx12SwapchainKind::DxgiFromHwnd,
-                        latency_waitable_object: Dx12UseFrameLatencyWaitableObject::Wait,
-                        force_shader_model: ForceShaderModelToken::default(),
-                        agility_sdk: None,
-                    },
-                    noop: NoopBackendOptions { enable: false },
-                },
-                // On Vulkan, Metal and Dx12, this is currently unused.
-                display: None,
-            });
+            let instance = Instance::new(graphics::window_instance_descriptor(event_loop.owned_display_handle()));
 
             let adapter = pollster::block_on(async { initialize_adapter_from_env_or_default(&instance, None).await.unwrap() });
 
@@ -708,6 +695,8 @@ impl Client {
         ));
 
         Some(Self {
+            event_loop: Some(event_loop),
+            startup_error: None,
             game_file_loader,
             action_loader,
             #[cfg(feature = "debug")]
@@ -794,10 +783,13 @@ impl Client {
         })
     }
 
-    pub fn run(&mut self) {
-        let event_loop = EventLoop::new().unwrap();
+    pub fn run(&mut self) -> Result<(), String> {
+        let event_loop = self.event_loop.take().ok_or("Client event loop has already been consumed")?;
         event_loop.set_control_flow(ControlFlow::Poll);
-        let _ = event_loop.run_app(self);
+        event_loop
+            .run_app(self)
+            .map_err(|error| format!("Native event loop failed: {error}"))?;
+        self.startup_error.take().map_or(Ok(()), Err)
     }
 
     #[inline(always)]
@@ -3558,7 +3550,14 @@ impl ApplicationHandler for Client {
                     .with_title(CLIENT_NAME)
                     .with_window_icon(Some(icon))
                     .with_visible(false);
-                let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
+                let window = match event_loop.create_window(window_attributes) {
+                    Ok(window) => Arc::new(window),
+                    Err(error) => {
+                        self.startup_error = Some(format!("Cannot create native window: {error}"));
+                        event_loop.exit();
+                        return;
+                    }
+                };
 
                 let backend_name = self.graphics_engine.get_backend_name();
                 window.set_title(&format!("{CLIENT_NAME} ({})", str::to_uppercase(&backend_name)));
@@ -3577,7 +3576,7 @@ impl ApplicationHandler for Client {
             let path = client_state().graphics_settings();
             let graphics_settings = self.client_state.follow(path);
 
-            self.graphics_engine.on_resume(
+            if let Err(error) = self.graphics_engine.on_resume(
                 window.clone(),
                 graphics_settings.triple_buffering,
                 graphics_settings.vsync,
@@ -3588,7 +3587,11 @@ impl ApplicationHandler for Client {
                 graphics_settings.ssaa,
                 graphics_settings.screen_space_anti_aliasing,
                 graphics_settings.high_quality_interface,
-            );
+            ) {
+                self.startup_error = Some(format!("Cannot initialize window presentation: {error}"));
+                event_loop.exit();
+                return;
+            }
 
             // Update graphics settings capabilities based on the new surface.
             // We don't expect the capabilities to change on consecutive calls but we

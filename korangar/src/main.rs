@@ -28,6 +28,11 @@ fn main() {
         return;
     }
     if let Some(mut client) = Client::init(arguments.sync_cache) {
-        client.run();
+        if let Err(error) = client.run() {
+            eprintln!("Native client failed: {error}");
+            std::process::exit(2);
+        }
+    } else if !arguments.sync_cache {
+        std::process::exit(2);
     }
 }

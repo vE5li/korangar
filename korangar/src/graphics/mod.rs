@@ -5,6 +5,7 @@ mod engine;
 #[cfg(feature = "debug")]
 mod error;
 mod frame_pacer;
+mod instance;
 mod instruction;
 mod passes;
 mod picker_target;
@@ -39,6 +40,7 @@ pub use self::engine::{GraphicsEngine, GraphicsEngineDescriptor};
 #[cfg(feature = "debug")]
 pub use self::error::error_handler;
 pub use self::frame_pacer::*;
+pub(crate) use self::instance::window_instance_descriptor;
 pub use self::instruction::*;
 pub use self::passes::{Lanczos3Drawer, MipMapRenderPassContext};
 pub use self::picker_target::PickerTarget;

@@ -2,6 +2,7 @@
 #![cfg_attr(feature = "interface", feature(impl_trait_in_assoc_type))]
 
 pub mod handler;
+pub mod version_20190530;
 mod position;
 
 use std::net::Ipv4Addr;

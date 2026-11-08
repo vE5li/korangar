@@ -283,6 +283,78 @@ pub struct Client {
 }
 
 impl Client {
+    /// Check native configuration and verified asset-source initialization
+    /// without creating a window/GPU or authenticating. This is not
+    /// completeness/render validation.
+    pub fn check_bootstrap() -> Result<(), String> {
+        let loader = loaders::GameFileLoader::default();
+        loader.load_archives_from_settings()?;
+        let _ = loaders::try_load_client_info(&loader)?;
+        let mut checked = 0;
+        macro_rules! sample {
+            ($path:literal, $kind:ty, $metadata:ty) => {
+                if loader.file_exists($path) {
+                    let bytes = korangar_loaders::FileLoader::get(&loader, $path)
+                        .map_err(|error| format!("Representative asset unavailable: {error:?}"))?;
+                    let mut reader = ragnarok_bytes::ByteReader::with_default_metadata::<$metadata>(&bytes);
+                    <$kind as ragnarok_bytes::FromBytes>::from_bytes(&mut reader)
+                        .map_err(|_| format!("Representative asset format is invalid or unsupported: {}", $path))?;
+                    if !reader.is_empty() {
+                        return Err(format!("Unparsed representative asset bytes: {}", $path));
+                    }
+                    checked += 1;
+                }
+            };
+        }
+        sample!(
+            "data/izlude.rsw",
+            ragnarok_formats::map::MapData,
+            ragnarok_formats::version::MapFormatMetadata
+        );
+        sample!(
+            "data/izlude.gnd",
+            ragnarok_formats::map::GroundData,
+            ragnarok_formats::version::MapFormatMetadata
+        );
+        sample!(
+            "data/izlude.gat",
+            ragnarok_formats::map::GatData,
+            ragnarok_formats::version::MapFormatMetadata
+        );
+        sample!(
+            "data/prontera.rsw",
+            ragnarok_formats::map::MapData,
+            ragnarok_formats::version::MapFormatMetadata
+        );
+        sample!(
+            "data/prontera.gnd",
+            ragnarok_formats::map::GroundData,
+            ragnarok_formats::version::MapFormatMetadata
+        );
+        sample!(
+            "data/prontera.gat",
+            ragnarok_formats::map::GatData,
+            ragnarok_formats::version::MapFormatMetadata
+        );
+        sample!(
+            "data/sprite/npc/4_f_kafra1.spr",
+            ragnarok_formats::sprite::SpriteData,
+            ragnarok_formats::version::GenericFormatMetadata
+        );
+        sample!(
+            "data/sprite/npc/4_f_kafra1.act",
+            ragnarok_formats::action::ActionsData,
+            ragnarok_formats::version::GenericFormatMetadata
+        );
+        sample!(
+            "data/texture/effect/angel.str",
+            ragnarok_formats::effect::EffectData,
+            ragnarok_formats::version::GenericFormatMetadata
+        );
+        println!("Representative assets parsed: {checked} (not a complete dependency inventory)");
+        Ok(())
+    }
+
     pub fn init(sync_cache: bool) -> Option<Self> {
         // We start a frame so that functions trying to start a measurement don't panic.
         #[cfg(feature = "debug")]
@@ -394,7 +466,10 @@ impl Client {
         time_phase!("create game file loader", {
             let game_file_loader = Arc::new(GameFileLoader::default());
 
-            game_file_loader.load_archives_from_settings();
+            if let Err(error) = game_file_loader.load_archives_from_settings() {
+                eprintln!("Asset setup failed: {error}");
+                return None;
+            }
             game_file_loader.load_patched_lua_files();
         });
 

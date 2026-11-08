@@ -97,10 +97,10 @@ impl Manifest {
         }
         let mut sizes = BTreeMap::new();
         for e in &m.files {
-            if let Some(old) = sizes.insert(&e.sha256, e.size) {
-                if old != e.size {
-                    return Err(error("inconsistent asset size"));
-                }
+            if let Some(old) = sizes.insert(&e.sha256, e.size)
+                && old != e.size
+            {
+                return Err(error("inconsistent asset size"));
             }
         }
         Ok(m)

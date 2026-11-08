@@ -38,3 +38,5 @@ pub const FALLBACK_TGA_FILE: &str = "missing.tga";
 pub const FALLBACK_MODEL_FILE: &str = "missing.rsm";
 pub const FALLBACK_SPRITE_FILE: &str = "npc\\missing.spr";
 pub const FALLBACK_ACTIONS_FILE: &str = "npc\\missing.act";
+
+pub(crate) use self::server::try_load_client_info;

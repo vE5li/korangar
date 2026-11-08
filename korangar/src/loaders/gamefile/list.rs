@@ -1,5 +1,3 @@
-#[cfg(feature = "debug")]
-use korangar_debug::logging::{Colorize, print_debug};
 use korangar_interface::element::StateElement;
 use rust_state::RustState;
 use serde::{Deserialize, Serialize};
@@ -21,22 +19,44 @@ impl GameArchiveList {
     const DEFAULT_FILES: &'static [&'static str] = &["data.grf", "rdata.grf", "archive/"];
     const FILE_NAME: &'static str = "client/game_archives.ron";
 
-    pub(super) fn load() -> Self {
-        #[cfg(feature = "debug")]
-        print_debug!("loading game archive list from {}", Self::FILE_NAME.magenta());
+    pub(super) fn load(remote_enabled: bool) -> Result<Self, String> {
+        match std::fs::read_to_string(Self::FILE_NAME) {
+            Ok(data) => ron::from_str(&data).map_err(|_| format!("Invalid {}: expected (archives: [\"path\", ...])", Self::FILE_NAME)),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Self::without_settings(remote_enabled)),
+            Err(_) => Err(format!("Cannot read {}", Self::FILE_NAME)),
+        }
+    }
 
-        std::fs::read_to_string(Self::FILE_NAME)
-            .ok()
-            .and_then(|data| ron::from_str(&data).ok())
-            .unwrap_or_else(|| {
-                #[cfg(feature = "debug")]
-                print_debug!(
-                    "[{}] failed to load game archive list from {}; trying with default",
-                    "warning".yellow(),
-                    Self::FILE_NAME.magenta(),
-                );
+    fn without_settings(remote_enabled: bool) -> Self {
+        // A remote install does not imply that proprietary local GRFs exist.
+        // Explicit local overlays remain opt-in and retain precedence.
+        Self {
+            archives: if remote_enabled {
+                Vec::new()
+            } else {
+                Self::DEFAULT_FILES
+                    .iter()
+                    .filter(|path| std::path::Path::new(path).exists())
+                    .map(ToString::to_string)
+                    .collect()
+            },
+        }
+    }
+}
 
-                GameArchiveList::default()
-            })
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn remote_defaults_do_not_require_grfs() {
+        assert!(GameArchiveList::without_settings(true).archives.is_empty());
+    }
+    #[test]
+    fn explicit_empty_archive_list_and_local_overlays_are_valid() {
+        assert!(ron::from_str::<GameArchiveList>("(archives: [])").unwrap().archives.is_empty());
+        assert_eq!(
+            ron::from_str::<GameArchiveList>("(archives: [\"archive/\"])").unwrap().archives,
+            vec!["archive/"]
+        );
     }
 }

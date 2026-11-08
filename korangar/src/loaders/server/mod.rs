@@ -18,13 +18,17 @@ use super::GameFileLoader;
 pub struct ServiceId(pub usize);
 
 pub fn load_client_info(game_file_loader: &GameFileLoader) -> ClientInfo {
+    try_load_client_info(game_file_loader).expect("clientinfo setup failed; run --check-bootstrap for diagnostics")
+}
+
+pub fn try_load_client_info(game_file_loader: &GameFileLoader) -> Result<ClientInfo, String> {
     #[cfg(feature = "debug")]
     let timer = Timer::new("read clientinfo");
 
     let client_info = game_file_loader
         .get("data\\sclientinfo.xml")
         .or_else(|_| game_file_loader.get("data\\clientinfo.xml"))
-        .expect("failed to find clientinfo");
+        .map_err(|_| "Missing clientinfo: provide a local archive/data/sclientinfo.xml overlay (see profiles/turoran-test)".to_owned())?;
 
     let content = match get_xml_encoding(&client_info) {
         Some(encoding) => {
@@ -34,12 +38,13 @@ pub fn load_client_info(game_file_loader: &GameFileLoader) -> ClientInfo {
         None => String::from_utf8_lossy(client_info.as_slice()),
     };
 
-    let client_info: ClientInfo = from_str(&content).unwrap();
+    let client_info: ClientInfo =
+        from_str(&content).map_err(|_| "Malformed clientinfo XML; check the selected native profile".to_owned())?;
 
     #[cfg(feature = "debug")]
     timer.stop();
 
-    client_info
+    Ok(client_info)
 }
 
 fn get_xml_encoding(data: &[u8]) -> Option<&'static Encoding> {
@@ -61,4 +66,22 @@ fn get_xml_encoding(data: &[u8]) -> Option<&'static Encoding> {
     }
 
     None
+}
+
+#[cfg(test)]
+mod native_profile_tests {
+    use super::*;
+    #[test]
+    fn checked_in_test_profile_selects_only_isolated_modern_server() {
+        let info: ClientInfo = from_str(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../profiles/turoran-test/clientinfo.xml"
+        )))
+        .unwrap();
+        assert_eq!(info.services.len(), 1);
+        let service = &info.services[0];
+        assert_eq!(service.address, "192.168.11.110");
+        assert_eq!(service.port, 6910);
+        assert!(matches!(service.packet_version, Some(PacketVersion::_20250716)));
+    }
 }

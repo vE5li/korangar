@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<clientinfo>
+  <servicetype>korea</servicetype><servertype>sakray</servertype>
+  <connection>
+    <display>Turoran TEST ONLY</display><desc>Isolated hercules-test; not production</desc>
+    <address>192.168.11.110</address><port>6910</port><version>55</version>
+    <packet_version>20250716</packet_version><langtype>1</langtype>
+  </connection>
+</clientinfo>

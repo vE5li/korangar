@@ -198,7 +198,8 @@ where
     //
     // This variable provides some transient storage shared by all the inventory
     // handlers.
-    let inventory_items: Rc<RefCell<Option<Vec<InventoryItem<NoMetadata>>>>> = Rc::new(RefCell::new(None));
+    let inventory_items: Rc<RefCell<crate::inventory_lists::InventoryLists<InventoryItem<NoMetadata>>>> =
+        Rc::new(RefCell::new(Default::default()));
 
     packet_handler.register(|_: MapServerPingPacket| NoNetworkEvents)?;
     packet_handler.register(|packet: BroadcastMessagePacket| NetworkEvent::ChatMessage {
@@ -373,8 +374,8 @@ where
     packet_handler.register({
         let inventory_items = inventory_items.clone();
 
-        move |_: InventoyStartPacket| {
-            *inventory_items.borrow_mut() = Some(Vec::new());
+        move |packet: InventoyStartPacket| {
+            inventory_items.borrow_mut().start(packet.inventory_type);
             NoNetworkEvents
         }
     })?;
@@ -382,11 +383,9 @@ where
         let inventory_items = inventory_items.clone();
 
         move |packet: RegularItemListPacket| {
-            inventory_items
-                .borrow_mut()
-                .as_mut()
-                .expect("Unexpected inventory packet")
-                .extend(packet.item_information.into_iter().map(|item_information| {
+            inventory_items.borrow_mut().extend(
+                packet.inventory_type,
+                packet.item_information.into_iter().map(|item_information| {
                     let RegularItemInformation {
                         index,
                         item_id,
@@ -411,7 +410,8 @@ where
                             flags,
                         },
                     }
-                }));
+                }),
+            );
             NoNetworkEvents
         }
     })?;
@@ -419,11 +419,9 @@ where
         let inventory_items = inventory_items.clone();
 
         move |packet: EquippableItemListPacket| {
-            inventory_items
-                .borrow_mut()
-                .as_mut()
-                .expect("Unexpected inventory packet")
-                .extend(packet.item_information.into_iter().map(|item| {
+            inventory_items.borrow_mut().extend(
+                packet.inventory_type,
+                packet.item_information.into_iter().map(|item| {
                     let EquippableItemInformation {
                         index,
                         item_id,
@@ -461,16 +459,19 @@ where
                             flags,
                         },
                     }
-                }));
+                }),
+            );
             NoNetworkEvents
         }
     })?;
     packet_handler.register({
         let inventory_items = inventory_items.clone();
 
-        move |_: InventoyEndPacket| {
-            let items = inventory_items.borrow_mut().take().expect("Unexpected inventory end packet");
-            NetworkEvent::SetInventory { items }
+        move |packet: InventoyEndPacket| {
+            inventory_items
+                .borrow_mut()
+                .finish(packet.inventory_type, packet.flag)
+                .map(|items| NetworkEvent::SetInventory { items })
         }
     })?;
     packet_handler.register_noop::<EquippableSwitchItemListPacket>()?;

@@ -95,7 +95,9 @@ impl SpriteLoader {
         #[cfg(feature = "debug")]
         let cloned_sprite_data = sprite_data.clone();
 
-        let palette = sprite_data.palette.unwrap(); // unwrap_or_default() as soon as i know what
+        // No palette is required for an RGBA-only sprite. Indexed data has already
+        // required and validated its palette in SpriteData::from_bytes.
+        let palette = sprite_data.palette;
 
         let rgba_images: Vec<RgbaImageData> = sprite_data
             .rgba_image_data
@@ -140,7 +142,12 @@ impl SpriteLoader {
                 .data
                 .0
                 .iter()
-                .flat_map(|palette_index| color_bytes(&palette.colors[*palette_index as usize], *palette_index))
+                .flat_map(|palette_index| {
+                    color_bytes(
+                        &palette.as_ref().expect("indexed sprite palette validated by parser").colors[*palette_index as usize],
+                        *palette_index,
+                    )
+                })
                 .collect();
 
             RgbaImageData {

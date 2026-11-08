@@ -384,8 +384,8 @@ impl Common {
         let direction = entity_data.position.direction;
 
         let movement_speed = entity_data.movement_speed as usize;
-        let health_points = entity_data.health_points as usize;
-        let maximum_health_points = entity_data.maximum_health_points as usize;
+        let health_points = usize::try_from(entity_data.health_points).unwrap_or_default();
+        let maximum_health_points = usize::try_from(entity_data.maximum_health_points).unwrap_or_default();
         let sex = entity_data.sex;
 
         let active_movement = None;

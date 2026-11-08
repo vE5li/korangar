@@ -69,8 +69,12 @@ impl FileLoader for GameFileLoader {
             .read()
             .unwrap()
             .as_ref()
-            .and_then(|remote| remote.get(&lowercase_path).ok())
-            .ok_or_else(|| FileNotFoundError::new(path.to_owned()))
+            .map(|remote| {
+                remote
+                    .get(&lowercase_path)
+                    .map_err(|error| FileNotFoundError::new(format!("{path}: verified remote retrieval failed: {error}")))
+            })
+            .unwrap_or_else(|| Err(FileNotFoundError::new(path.to_owned())))
     }
 }
 
@@ -114,7 +118,7 @@ impl GameFileLoader {
         }
     }
 
-    pub fn load_archives_from_settings(&self) {
+    pub fn load_archives_from_settings(&self) -> Result<(), String> {
         #[cfg(feature = "debug")]
         let timer = Timer::new("load game archives");
 
@@ -129,18 +133,37 @@ impl GameFileLoader {
                 allow_http: enabled("KORANGAR_REMOTE_ALLOW_HTTP"),
                 offline: enabled("KORANGAR_REMOTE_OFFLINE"),
             };
-            let remote = PersistentAssets::open(config).expect("cannot initialize pinned remote assets");
+            let remote = PersistentAssets::open(config).map_err(|error| {
+                format!(
+                    "Cannot initialize verified remote assets: {error}. Stage an approved manifest/cache first; see \
+                     docs/turoran-native-test.md. No local GRFs are required in remote mode."
+                )
+            })?;
             *self.remote.write().unwrap() = Some(Arc::new(remote));
         }
-        let game_archive_list = GameArchiveList::load();
-
-        game_archive_list.archives.iter().for_each(|path| {
+        let remote_enabled = self.remote.read().unwrap().is_some();
+        let game_archive_list = GameArchiveList::load(remote_enabled)?;
+        if !remote_enabled && game_archive_list.archives.is_empty() {
+            return Err(
+                "No game assets configured: add licensed local GRFs/overlays to client/game_archives.ron, or configure \
+                 KORANGAR_REMOTE_BASE_URL and a staged manifest/cache. See docs/turoran-native-test.md."
+                    .into(),
+            );
+        }
+        for path in &game_archive_list.archives {
+            if !Path::new(path).exists() {
+                return Err(format!(
+                    "Configured archive is missing: {path}. Update client/game_archives.ron; remote-only installs should omit missing \
+                     GRFs."
+                ));
+            }
             let game_archive = Self::load_archive_from_path(path);
             self.add_archive(game_archive, true);
-        });
+        }
 
         #[cfg(feature = "debug")]
         timer.stop();
+        Ok(())
     }
 
     pub fn calculate_hash(&self) -> Hash {

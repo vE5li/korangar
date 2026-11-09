@@ -29,6 +29,7 @@ macro_rules! time_phase {
     }
 }
 
+pub mod deployment;
 mod graphics;
 mod input;
 mod state;

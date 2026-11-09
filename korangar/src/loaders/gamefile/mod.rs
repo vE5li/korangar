@@ -12,7 +12,7 @@ use std::sync::{Arc, RwLock};
 use blake3::Hash;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, Timer, print_debug};
-use korangar_loaders::remote::{PersistentAssets, RemoteConfig};
+use korangar_loaders::remote::PersistentAssets;
 use korangar_loaders::{FileLoader, FileNotFoundError};
 
 pub use self::cache::{sync_cache_archive, texture_file_dds_name, video_file_ivf_name};
@@ -121,17 +121,7 @@ impl GameFileLoader {
         #[cfg(feature = "debug")]
         let timer = Timer::new("load game archives");
 
-        if let Ok(base_url) = std::env::var("KORANGAR_REMOTE_BASE_URL") {
-            let cache_dir = std::env::var_os("KORANGAR_REMOTE_CACHE")
-                .map(std::path::PathBuf::from)
-                .unwrap_or_else(|| ".korangar-assets".into());
-            let enabled = |name| std::env::var(name).is_ok_and(|v| v == "1");
-            let config = RemoteConfig {
-                base_url,
-                cache_dir,
-                allow_http: enabled("KORANGAR_REMOTE_ALLOW_HTTP"),
-                offline: enabled("KORANGAR_REMOTE_OFFLINE"),
-            };
+        if let Some(config) = crate::deployment::remote_config() {
             let remote = PersistentAssets::open(config).map_err(|error| {
                 format!(
                     "Cannot initialize verified remote assets: {error}. Stage an approved manifest/cache first; see \

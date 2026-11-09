@@ -14,6 +14,11 @@ struct Arguments {
 
 fn main() {
     let arguments = Arguments::parse();
+    let interactive = !arguments.check_bootstrap && !arguments.sync_cache;
+    if let Err(error) = korangar::deployment::prepare(interactive) {
+        korangar::deployment::report_failure(&error, interactive);
+        std::process::exit(2);
+    }
 
     if arguments.check_bootstrap {
         match Client::check_bootstrap() {
@@ -22,6 +27,10 @@ fn main() {
             }
             Err(error) => {
                 eprintln!("Native bootstrap failed: {error}");
+                korangar::deployment::report_failure(
+                    "Native bootstrap failed; restore approved assets or inspect console diagnostics",
+                    false,
+                );
                 std::process::exit(2);
             }
         }
@@ -30,9 +39,17 @@ fn main() {
     if let Some(mut client) = Client::init(arguments.sync_cache) {
         if let Err(error) = client.run() {
             eprintln!("Native client failed: {error}");
+            korangar::deployment::report_failure(
+                "Native client runtime failed; no credentials or packet contents recorded",
+                interactive,
+            );
             std::process::exit(2);
         }
     } else if !arguments.sync_cache {
+        korangar::deployment::report_failure(
+            "Client initialization failed; run korangar.exe --check-bootstrap for diagnostics",
+            interactive,
+        );
         std::process::exit(2);
     }
 }

@@ -86,3 +86,42 @@ Next graphical prerequisite: an existing interactive Vulkan-capable display
 session for the TEST runtime (or separately authorized desktop provisioning),
 plus complete approved map dependencies. No display-server/network setup or
 production asset-service change was performed.
+
+
+## Windows deployments: double-click the actual executable
+
+Build with `cargo build --locked -p korangar --bin korangar --features windows-test-deployment`.
+Deploy the actual `korangar.exe` at the installation root (for example
+`~/Work/korangar-client/korangar.exe`), with the licensed `bundled/`, existing
+`runtime/` tree and the required Microsoft runtime DLLs **beside** it. This is
+one directly launchable executable, not a literal one-file game or embedded
+Gravity asset distribution. Never commit or publish proprietary assets.
+
+Explorer and arbitrary launch directories work without a `.cmd`, environment
+setup, or user settings rewrites. The compiled TEST profile resolves runtime
+and cache relative to the executable, defaults to Vulkan and the pinned offline
+`runtime/asset-cache`, and requires an explicit TEST clientinfo overlay for
+192.168.11.110:6910 / PACKETVER 20250716. Runtime configuration/settings remain
+inside the installation; no global settings, auto-login or credential files
+are loaded. Existing archive/UI/graphics/account settings are not rewritten.
+
+An optional `korangar-portable.ron` beside the executable may specify
+`(profile: TuroranTest20250716, runtime: "runtime")`. The runtime must remain a
+child directory inside this installation, including after junction/symlink
+resolution. Unmarked Windows developer builds opt in with this sidecar; Linux
+startup remains unchanged.
+
+Explicit `KORANGAR_REMOTE_*` settings and `WGPU_BACKEND` overrides still win.
+Relative explicit cache overrides are anchored to the portable runtime, never
+an arbitrary Explorer launch directory; absolute explicit cache paths remain
+explicit user choices. Set `KORANGAR_REMOTE_OFFLINE=0` to intentionally enable
+fetching from the configured approved asset route. This does not enable a
+production manifest or change any server. Defaults alone do not supply missing
+assets or prove offline completeness/gameplay parity.
+
+On initialization failure, a sanitized `startup-error.log` beside the executable
+records only technical summaries or panic source locations, not passwords,
+clipboard contents, panic payloads or packets. Interactive failures show a
+native Windows error dialog; `--check-bootstrap` / `--sync-cache` never show
+dialogs or start rendering. Verify from an unrelated working directory with
+`C:\path\to\korangar.exe --check-bootstrap`, with wrapper variables unset.

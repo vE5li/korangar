@@ -57,6 +57,8 @@ arboard = { version = "=3.6.1", default-features = false, features = ["wayland-d
 sevenz-rust2 = { workspace = true, features = ["compress"] }
 
 [features]
+# Explicit deployment build: Windows-only native TEST defaults; no effect on Linux.
+windows-test-deployment = []
 debug = ["korangar-audio/debug", "korangar-debug", "korangar-interface/debug", "korangar-networking/debug", "ragnarok-packets/debug"]
 plain = ["korangar-debug/plain"]
 unicode = ["korangar-debug/unicode"]

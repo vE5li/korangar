@@ -1,6 +1,6 @@
 use wgpu::wgt::{Dx12SwapchainKind, Dx12UseFrameLatencyWaitableObject, WgpuHasDisplayHandle};
 use wgpu::{
-    BackendOptions, Backends, Dx12BackendOptions, Dx12Compiler, ForceShaderModelToken, GlBackendOptions, GlDebugFns, GlFenceBehavior,
+    BackendOptions, Dx12BackendOptions, Dx12Compiler, ForceShaderModelToken, GlBackendOptions, GlDebugFns, GlFenceBehavior,
     Gles3MinorVersion, InstanceDescriptor, InstanceFlags, MemoryBudgetThresholds, NoopBackendOptions,
 };
 
@@ -9,7 +9,7 @@ use wgpu::{
 /// the instance.
 pub(crate) fn window_instance_descriptor(display: impl WgpuHasDisplayHandle) -> InstanceDescriptor {
     InstanceDescriptor {
-        backends: Backends::all().with_env(),
+        backends: crate::deployment::default_backends().with_env(),
         flags: InstanceFlags::from_build_config().with_env(),
         memory_budget_thresholds: MemoryBudgetThresholds::default(),
         backend_options: BackendOptions {

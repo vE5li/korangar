@@ -4,8 +4,10 @@ use ragnarok_formats::map::LightSettings;
 use rust_state::RustState;
 
 use crate::graphics::Color;
+use crate::state::ClientState;
 
 #[derive(RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct Lighting {
     ambient_color: Color,
     diffuse_color: Color,

@@ -284,6 +284,7 @@ pub enum Direction {
 }
 
 #[derive(RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct PacketEntry {
     /// Stores the data of the packet.
     #[hidden_element]
@@ -354,6 +355,7 @@ pub struct PacketHistoryCallback {
 }
 
 #[derive(RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct PacketHistory {
     #[hidden_element]
     receiver: std::sync::mpsc::Receiver<PacketApplicator>,

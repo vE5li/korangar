@@ -255,6 +255,7 @@ impl DropDownItem<crate::threads::Enum> for crate::threads::Enum {
 
 /// Internal state of the chat window.
 #[derive(RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct ProfilerWindowState {
     visible_thread: crate::threads::Enum,
 }

@@ -19,6 +19,7 @@ use crate::state::{ClientState, ClientStatePathExt, client_state};
 /// - Storing information about which elements are next buttons since we need to
 ///   be able to remove those individually.
 #[derive(RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct DialogElement {
     /// Stores the UI element.
     // TODO: Unfortunately this has to be an unsafe cell as of now. Ideally this can be changed
@@ -44,6 +45,7 @@ impl DialogElement {
 
 /// Internal state of the dialog window.
 #[derive(RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct DialogWindowState {
     /// All current dialog elements.
     elements: Vec<DialogElement>,

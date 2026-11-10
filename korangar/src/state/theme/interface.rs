@@ -27,18 +27,21 @@ pub enum InterfaceThemeType {
 }
 
 #[derive(Serialize, Deserialize, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct DebugButtonTheme {
     foreground_color: Color,
     hovered_background_color: Color,
 }
 
 #[derive(Serialize, Deserialize, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct ChatTheme {
     window_color: Color,
     text_box_background_color: Color,
 }
 
 #[derive(Serialize, Deserialize, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct SkillTreeTheme {
     /// Background color for an occupied slot.
     slot_background_color: Color,
@@ -67,6 +70,7 @@ pub struct SkillTreeTheme {
 }
 
 #[derive(Serialize, Deserialize, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct GlobalTheme {
     /// Color indicating that a grabbed resource can be dropped in the
     /// highlighted area.
@@ -82,6 +86,7 @@ pub struct GlobalTheme {
 }
 
 #[derive(Serialize, Deserialize, RustState, StateElement, StateWindow)]
+#[impl_for(ClientState)]
 #[window_title("Theme Inspector")]
 pub struct InterfaceTheme {
     #[hidden_element]

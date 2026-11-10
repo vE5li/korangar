@@ -10,6 +10,7 @@ use crate::state::theme::{InterfaceTheme, InterfaceThemeType, WorldTheme};
 const MAXIMUM_NAME_LENGTH: usize = 40;
 
 #[derive(Default, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct ThemeInspectorWindowState {
     menu_theme_name: String,
     in_game_theme_name: String,

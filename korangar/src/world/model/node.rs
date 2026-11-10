@@ -5,9 +5,11 @@ use ragnarok_formats::version::InternalVersion;
 use rust_state::RustState;
 
 use crate::graphics::ModelInstruction;
+use crate::state::ClientState;
 use crate::world::Camera;
 
 #[derive(RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct Node {
     pub version: InternalVersion,
     #[hidden_element]
@@ -64,6 +66,7 @@ impl Node {
 }
 
 #[derive(Clone, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct SubMesh {
     pub index_offset: u32,
     pub index_count: u32,

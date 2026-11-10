@@ -5,7 +5,10 @@ use ron::ser::PrettyConfig;
 use rust_state::RustState;
 use serde::{Deserialize, Serialize};
 
+use crate::state::ClientState;
+
 #[derive(Clone, Serialize, Deserialize, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct AudioSettings {
     pub mute_on_focus_loss: bool,
 }

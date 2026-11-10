@@ -19,6 +19,7 @@ use crate::state::{ClientState, ClientStatePathExt, client_state};
 
 /// Internal state of the skill tree window.
 #[derive(Default, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct SkillTreeWindowState {
     currently_skilling: bool,
     /// List of pending skill points. Each new point gets appended to this list,

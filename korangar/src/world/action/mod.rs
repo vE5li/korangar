@@ -13,8 +13,10 @@ use rust_state::RustState;
 use crate::graphics::{Color, ScreenClip, ScreenPosition, ScreenSize};
 use crate::loaders::Sprite;
 use crate::renderer::SpriteRenderer;
+use crate::state::ClientState;
 
 #[derive(Clone, Debug, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct SpriteAnimationState {
     pub action_base_offset: usize,
     pub start_time: ClientTick,
@@ -44,7 +46,10 @@ impl SpriteAnimationState {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, RustState, StateElement)]
 pub enum ActionEvent {
     /// Start playing a WAV sound file.
-    Sound { key: SoundEffectKey },
+    Sound {
+        #[hidden_element]
+        key: SoundEffectKey,
+    },
     /// An attack event when the "flinch" animation is played.
     Attack,
     /// Start playing a WAV sound file.
@@ -52,6 +57,7 @@ pub enum ActionEvent {
 }
 
 #[derive(Debug, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct Actions {
     pub actions: Vec<Action>,
     pub delays: Vec<f32>,

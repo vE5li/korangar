@@ -19,11 +19,13 @@ use crate::graphics::Texture;
 use crate::loaders::GameFileLoader;
 use crate::loaders::color::premultiply_alpha;
 use crate::loaders::error::LoadError;
+use crate::state::ClientState;
 
 const MAX_CACHE_COUNT: u32 = 4096;
 const MAX_CACHE_SIZE: usize = 256 << 20;
 
 #[derive(Clone, Debug, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct Sprite {
     pub palette_size: usize,
     #[hidden_element]

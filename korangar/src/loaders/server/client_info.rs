@@ -7,6 +7,7 @@ use serde::de::Error;
 use serde::{Deserialize, Deserializer};
 
 use super::ServiceId;
+use crate::state::ClientState;
 
 /// The ClientInfo structure.
 ///
@@ -17,6 +18,7 @@ use super::ServiceId;
 /// See more: <https://github.com/rathena/rathena/wiki/Clientinfo.xml>
 #[allow(dead_code)]
 #[derive(Default, Debug, Deserialize, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct ClientInfo {
     /// ClientInfo's description.
     #[serde(alias = "desc")]
@@ -75,6 +77,7 @@ pub struct ClientInfo {
 /// The ClientInfo's Service structure
 #[allow(dead_code)]
 #[derive(Debug, Clone, Default, Deserialize, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct Service {
     /// Displays the name of the server at the Service Select screen.
     #[serde(alias = "display")]
@@ -155,6 +158,7 @@ impl DropDownItem<ServiceId> for Service {
 /// The ClientInfo Service's Account ID structure.
 #[allow(dead_code)]
 #[derive(Debug, Clone, Default, Deserialize, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct GameMasterAccount {
     /// GM's Account ID.
     #[serde(alias = "admin")]
@@ -164,6 +168,7 @@ pub struct GameMasterAccount {
 /// The ClientInfo Service's Loading Image structure.
 #[allow(dead_code)]
 #[derive(Debug, Clone, Default, Deserialize, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct LoadingImage {
     /// File name.
     #[serde(alias = "image")]

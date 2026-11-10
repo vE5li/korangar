@@ -9,8 +9,10 @@ use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize, Serializer};
 
 use crate::loaders::ServiceId;
+use crate::state::ClientState;
 
 #[derive(Clone, Default, RustState, Serialize, Deserialize, StateElement)]
+#[impl_for(ClientState)]
 pub struct LoginSettings {
     // TODO: Unhide this element.
     #[hidden_element]

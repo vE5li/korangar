@@ -66,6 +66,7 @@ use crate::{AudioSettings, GraphicsSettings};
 /// The message stores the color separately rather than baking it into the
 /// message so the chat window can use the correct colors when switching themes.
 #[derive(Debug, Clone, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct ChatMessage {
     /// Raw message.
     pub text: String,
@@ -99,6 +100,7 @@ impl BufferedAction {
 /// the user interface should be in here. State that takes care of managing OS
 /// or rendering resources should be in [`Client`](super::Client).
 #[derive(RustState, StateElement, StateWindow)]
+#[impl_for(ClientState)]
 #[cfg_attr(feature = "debug", window_class(WindowClass::ClientStateInspector))]
 #[window_title("Client State Inspector")]
 #[state_root]

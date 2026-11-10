@@ -7,9 +7,11 @@ use rust_state::RustState;
 
 use crate::graphics::Texture;
 use crate::loaders::AsyncLoader;
+use crate::state::ClientState;
 use crate::world::ResourceMetadata;
 
 #[derive(Default, RustState, StateElement)]
+#[impl_for(ClientState)]
 pub struct Inventory {
     // TODO: Unhide this.
     #[hidden_element]
